@@ -9,7 +9,14 @@ import { validateRect } from '@/utils/stashScan/decodeImage';
 import { checkDimensions, imageDimensions } from '@/utils/stashScan/imageHeader';
 import { decodeScanShard, encodeScanShard } from '@/utils/stashScan/indexCodec';
 import { overlapsRegion, splitRegion } from '@/utils/stashScan/regions';
-import { needsReview, reviewCell, reviewedTotals, selectItem } from '@/utils/stashScan/review';
+import {
+  blocksImport,
+  needsReview,
+  reviewCell,
+  reviewedTotals,
+  reviewState,
+  selectItem,
+} from '@/utils/stashScan/review';
 import {
   SCAN_LIMITS,
   type ReviewedCell,
@@ -27,6 +34,13 @@ const item = (id = 'single', maxStack = 1): ScanItem => ({
   height: 1,
   maxStack,
 });
+/** A suggestion whose art and label are only moderately similar, so no single signal decides. */
+const candidate = (itemId: string, score: number, artScore = 0.6, textScore = 0.6) => ({
+  itemId,
+  score,
+  artScore,
+  textScore,
+});
 const cell = (patch: Partial<ScanCell> = {}): ScanCell => ({
   key: 1,
   x: 8,
@@ -36,9 +50,10 @@ const cell = (patch: Partial<ScanCell> = {}): ScanCell => ({
   slotsWide: 1,
   slotsHigh: 1,
   empty: false,
-  candidates: [{ itemId: 'single', score: 0.9 }],
+  candidates: [candidate('single', 0.9)],
   margin: 0.2,
   fir: false,
+  stack: null,
   ...patch,
 });
 const row = (patch: Partial<ReviewedCell> = {}): ReviewedCell => ({
@@ -89,14 +104,12 @@ describe('observation review and quantity accounting', () => {
   });
   it('routes weak, ambiguous, absent, and unidentified suggestions to review', () => {
     const items = new Map([['single', item()]]);
-    expect(
-      reviewCell(cell({ candidates: [{ itemId: 'single', score: 0.49 }] }), items).itemId
-    ).toBe('');
+    expect(reviewCell(cell({ candidates: [candidate('single', 0.49)] }), items).itemId).toBe('');
     expect(needsReview(reviewCell(cell({ candidates: [] }), items))).toBe(true);
     expect(needsReview(reviewCell(cell({ margin: 0.079 }), items))).toBe(true);
-    expect(
-      needsReview(reviewCell(cell({ candidates: [{ itemId: 'single', score: 0.719 }] }), items))
-    ).toBe(true);
+    expect(needsReview(reviewCell(cell({ candidates: [candidate('single', 0.719)] }), items))).toBe(
+      true
+    );
     expect(needsReview(row({ itemId: '' }))).toBe(true);
     expect(needsReview(row({ reviewed: false }))).toBe(true);
   });
@@ -112,6 +125,65 @@ describe('observation review and quantity accounting', () => {
     });
     selectItem(reviewed, item('single'));
     expect(reviewed.quantity).toBe(1);
+  });
+  it('fills a stack amount read from the icon, and only when the item can hold it', () => {
+    const items = new Map([['single', item('single', 50)]]);
+    expect(reviewCell(cell({ stack: 4 }), items)).toMatchObject({ quantity: 4, reviewed: true });
+    expect(needsReview(reviewCell(cell({ stack: 4 }), items))).toBe(false);
+    // A clear corner means one item; an unread or impossible count is left for the player.
+    expect(reviewCell(cell({ stack: 1 }), items).quantity).toBe(1);
+    expect(reviewCell(cell({ stack: null }), items).quantity).toBeNull();
+    expect(reviewCell(cell({ stack: 51 }), items).quantity).toBeNull();
+    // Picking another item keeps the count that was read from the icon.
+    const reviewed = reviewCell(cell({ stack: 4 }), new Map());
+    selectItem(reviewed, item('ammo', 60));
+    expect(reviewed.quantity).toBe(4);
+  });
+  it('accepts one decisive signal unless another candidate ties on it', () => {
+    const items = new Map([
+      ['tube', item('tube')],
+      ['tape', item('tape')],
+    ]);
+    const confident = (candidates: ReturnType<typeof candidate>[]) =>
+      !needsReview(reviewCell(cell({ candidates, margin: 0.04 }), items));
+    // Near-identical art with a differently rendered label.
+    expect(
+      confident([candidate('tube', 0.8, 0.99, 0.7), candidate('tape', 0.76, 0.51, 0.89)])
+    ).toBe(true);
+    // An exact label on a tinted or modded weapon whose art does not match.
+    expect(
+      confident([candidate('tube', 0.53, -0.26, 0.95), candidate('tape', 0.46, 0.05, 0.8)])
+    ).toBe(true);
+    // Two items sharing an icon, or a short name, cannot be told apart by it.
+    expect(
+      confident([candidate('tube', 0.66, 0.99, 0.5), candidate('tape', 0.62, 0.99, 0.4)])
+    ).toBe(false);
+    expect(confident([candidate('tube', 0.6, 0.3, 0.95), candidate('tape', 0.58, 0.2, 0.9)])).toBe(
+      false
+    );
+  });
+  it('lets uncertain rows that no requirement uses through, and leaves them out of totals', () => {
+    const weapon = row({
+      itemId: 'rifle',
+      reviewed: false,
+      cell: cell({ candidates: [candidate('rifle', 0.5), candidate('shotgun', 0.49)] }),
+    });
+    const tracked = new Set(['single']);
+    expect(needsReview(weapon)).toBe(true);
+    expect(blocksImport(weapon, tracked)).toBe(false);
+    expect(reviewState(weapon, tracked)).toBe('skip');
+    expect(reviewedTotals([weapon, row()], tracked)).toEqual([
+      { itemId: 'single', fir: 0, nonFir: 0, unknown: 1 },
+    ]);
+    // A tracked suggestion, a tracked choice, or no tracked set at all still blocks.
+    const lookalike = { ...weapon, cell: cell({ candidates: [candidate('single', 0.5)] }) };
+    expect(blocksImport(lookalike, tracked)).toBe(true);
+    expect(blocksImport({ ...weapon, itemId: 'single' }, tracked)).toBe(true);
+    expect(blocksImport(weapon)).toBe(true);
+    expect(() => reviewedTotals([weapon])).toThrow(error('review_required'));
+    expect(reviewState(row(), tracked)).toBe('ok');
+    expect(reviewState(row({ excluded: true }), tracked)).toBe('removed');
+    expect(reviewState(lookalike, tracked)).toBe('check');
   });
   it('ignores excluded incomplete rows and automatically excludes detected empty slots', () => {
     expect(reviewCell(cell({ empty: true }), new Map()).excluded).toBe(true);

@@ -69,6 +69,7 @@ const target = (key: string, itemId: string, current: number) => ({
 vi.mock('@/features/stash-import/useStashImport', () => ({
   useStashImport: () => ({
     signedIn: ref(true),
+    trackedItemIds: computed(() => new Set(['item', 'other'])),
     sameLocal: () => mocks.current,
     prepare: mocks.prepare,
     commit: mocks.commit,

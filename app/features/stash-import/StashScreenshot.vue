@@ -100,7 +100,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { needsReview } from '@/utils/stashScan/review';
+  import { reviewState } from '@/utils/stashScan/review';
   import type { ReviewedCell, ScanRect } from '@/utils/stashScan/types';
   const props = defineProps<{
     bitmap?: ImageBitmap;
@@ -108,6 +108,7 @@
     width: number;
     height: number;
     rows: ReviewedCell[];
+    tracked?: ReadonlySet<string>;
     active?: ReviewedCell;
   }>();
   const emit = defineEmits<{ select: [key: number]; region: [rect: ScanRect]; rescan: [] }>();
@@ -115,6 +116,7 @@
   const legend = [
     { key: 'check', swatch: 'border-warning-400 bg-warning-400/25' },
     { key: 'ok', swatch: 'border-success-400' },
+    { key: 'skip', swatch: 'border-surface-400 bg-surface-400/15' },
     { key: 'selected', swatch: 'border-primary-300 bg-primary-400/20' },
     { key: 'removed', swatch: 'border-surface-500 border-dashed' },
   ];
@@ -168,18 +170,17 @@
     });
   }
   function regionStatus(row: ReviewedCell) {
-    if (isActive(row)) return 'selected';
-    if (row.excluded) return 'removed';
-    return needsReview(row) ? 'check' : 'ok';
+    return isActive(row) ? 'selected' : reviewState(row, props.tracked);
   }
   const isActive = (row: ReviewedCell) => row.cell.key === props.active?.cell.key;
-  function regionClass(row: ReviewedCell) {
-    if (isActive(row)) return 'fill-primary-400/20 stroke-primary-300';
-    if (row.excluded) return 'fill-transparent stroke-surface-500/40 [stroke-dasharray:4_3]';
-    return needsReview(row)
-      ? 'fill-warning-400/25 stroke-warning-400'
-      : 'fill-transparent stroke-success-400/70';
-  }
+  const regionClasses = {
+    selected: 'fill-primary-400/20 stroke-primary-300',
+    removed: 'fill-transparent stroke-surface-500/40 [stroke-dasharray:4_3]',
+    check: 'fill-warning-400/25 stroke-warning-400',
+    skip: 'fill-surface-400/10 stroke-surface-400/70',
+    ok: 'fill-transparent stroke-success-400/70',
+  };
+  const regionClass = (row: ReviewedCell) => regionClasses[regionStatus(row)];
   function point(event: PointerEvent) {
     const matrix = canvas.value?.getScreenCTM();
     if (!matrix) return { x: 0, y: 0 };

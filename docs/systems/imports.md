@@ -14,7 +14,8 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
 ### Review and allocation
 
 - Recognition scores route review attention; they are not probabilities. Uncertain identities
-  and stack counts need correction. Quantities are units, never durability or remaining uses.
+  and unread stack counts need correction. Quantities are units, never durability or remaining
+  uses.
   FIR comes from the found-in-raid checkmark: each region's bottom-right corner, including the
   spot above a stack or uses count, is correlated with the measured mark (`firMark.ts`). Only a
   clear mark sets FIR. Every other region starts as FIR unknown, including items without the
@@ -25,6 +26,19 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
   clients at 1440p) and a ridge up to `pitch / 40` pixels off its lattice line (JPEG blur).
   Short-name text is compared both as captured and two template rows lower, where in-game
   labels sit relative to Tarkov.dev icons.
+- A suggestion is confident on its combined score, or on one decisive signal when the other is
+  spoiled: art of at least 0.97 that leads every other candidate's art by 0.3 (a label the game
+  renders differently), or a label of at least 0.93 that leads by 0.12 (a tinted or modded
+  weapon). Items that share an icon or a short name tie on that signal and stay uncertain.
+- Stack counts are read from the bottom-right corner (`stackCount.ts`): right-aligned digits
+  matched against digit shapes averaged from catalog labels. A clear corner, or a FIR mark in
+  the corner itself, means one item. Look-alike digits (0, 5, 6, 8 often), slashes as in
+  `10/10`, spaced thousands, other ink near the count, and slots under 48 px leave the amount
+  for the player. A count above the item's stack size is ignored.
+- An uncertain row blocks Continue only when its chosen item or one of its suggestions is used
+  by an eligible requirement (`blocksImport`). Others, such as modded weapons or crates, show as
+  "Not needed" under To check, are left out of the totals, and count again once the player
+  picks an item.
 - Users can search the indexed catalog, exclude regions, split merged detections, and draw a
   manually sized item region when detection fails. Keyboard users can enter region coordinates
   and slot dimensions. Regions and split parts must be at least 8 pixels wide and high.

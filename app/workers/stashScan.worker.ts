@@ -1,8 +1,9 @@
 import { loadSizes, readScanCatalog } from '@/utils/stashScan/catalogClient';
 import { cellFeatures } from '@/utils/stashScan/core/features';
-import { detectFirMark } from '@/utils/stashScan/core/firMark';
+import { detectFirMark, matchFirMark } from '@/utils/stashScan/core/firMark';
 import { detectGrid, type RgbImage } from '@/utils/stashScan/core/grid';
 import { matchCell, type IconIndex } from '@/utils/stashScan/core/matcher';
+import { readStackCount, type StackCount } from '@/utils/stashScan/core/stackCount';
 import { decodeScreenshot, validateRect } from '@/utils/stashScan/decodeImage';
 import {
   SCAN_LIMITS,
@@ -32,15 +33,28 @@ function matchRegion(image: RgbImage, rect: ScanRect, index: IconIndex, key: num
     rect.slotsHigh
   );
   const matched = matchCell(features, index);
+  const occupied = !matched.empty;
+  const mark = occupied ? matchFirMark(image, rect) : undefined;
+  const fir = mark !== undefined && detectFirMark(image, rect, mark);
   return {
     ...rect,
     key,
     empty: matched.empty,
     margin: matched.margin,
-    candidates: matched.matches.map(({ itemId, score }) => ({ itemId, score })),
-    fir: !matched.empty && detectFirMark(image, rect),
+    candidates: matched.matches.map(({ itemId, score, artScore, textScore }) => ({
+      itemId,
+      score,
+      artScore,
+      textScore,
+    })),
+    fir,
+    stack: occupied ? stackValue(readStackCount(image, rect, fir && (mark?.lift ?? 0) <= 2)) : null,
   };
 }
+const stackValue = (count: StackCount): number | null => {
+  if (count.kind === 'none') return 1;
+  return count.kind === 'number' ? count.value : null;
+};
 async function run(command: ScanCommand): Promise<void> {
   endpoint.postMessage({ type: 'progress', stage: 'decode', done: 0, total: 1 });
   const { image, sourceHash, preview } = await readSource(command);

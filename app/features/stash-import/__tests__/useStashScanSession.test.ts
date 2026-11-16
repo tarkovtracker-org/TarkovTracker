@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { effectScope } from 'vue';
+import { effectScope, ref } from 'vue';
 import { useStashScanSession } from '@/features/stash-import/useStashScanSession';
 import type { ScanResult } from '@/utils/stashScan/types';
 const mocks = vi.hoisted(() => ({ request: vi.fn(), cancel: vi.fn() }));
@@ -27,9 +27,10 @@ function fixture(): ScanResult {
       slotsWide: 1,
       slotsHigh: 1,
       empty: false,
-      candidates: [{ itemId: 'item', score: 0.6 }],
+      candidates: [{ itemId: 'item', score: 0.6, artScore: 0.6, textScore: 0.6 }],
       margin: 0.05,
       fir: false,
+      stack: 1,
     })),
   };
 }
@@ -143,6 +144,20 @@ describe('stash scan session', () => {
     expect([session.width.value, session.height.value]).toEqual([70, 140]);
     expect(session.error.value).toBe('stash_import.errors.no_grid');
     expect(session.image.value).toBeDefined();
+    scope.stop();
+  });
+  it('counts and visits only rows that can change a requirement', async () => {
+    const scope = effectScope();
+    const tracked = ref<ReadonlySet<string>>(new Set(['other']));
+    const session = scope.run(() => useStashScanSession(() => tracked.value))!;
+    await session.select([screenshot()]);
+    // Both uncertain rows suggest only 'item', which no requirement uses.
+    expect(session.remaining.value).toBe(0);
+    expect(session.activeKey.value).toBeUndefined();
+    tracked.value = new Set(['item']);
+    expect(session.remaining.value).toBe(2);
+    session.next();
+    expect(session.activeKey.value).toBe(0);
     scope.stop();
   });
   it('ignores a second correction while one is still being matched', async () => {

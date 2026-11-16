@@ -365,8 +365,15 @@ describe('reviewed stash import persistence', () => {
       };
       configure[kind]();
       expect(useStashImport([candidate]).targets(total)).toEqual([]);
+      // An item only finished or excluded requirements use cannot change any count.
+      expect(useStashImport([candidate]).trackedItemIds.value.size).toBe(0);
     }
   );
+  it('tracks the items that eligible requirements use', () => {
+    const other = need(unrelated, { item: { id: 'other' } as TarkovItem });
+    const importer = useStashImport([need(), other]);
+    expect([...importer.trackedItemIds.value].sort()).toEqual(['item', 'other']);
+  });
   it.each(['conflict', 'duplicate'] as const)(
     'reconciles before later saves after a %s response',
     async (status) => {

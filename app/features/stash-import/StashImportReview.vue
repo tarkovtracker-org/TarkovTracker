@@ -60,6 +60,7 @@
           :items="result.catalog.items"
           :open="row.cell.key === activeKey"
           :bitmap="bitmap"
+          :tracked="tracked"
           :item-name="itemName"
           @toggle="toggle(row.cell.key)"
           @next="$emit('next')"
@@ -70,6 +71,29 @@
       <li v-if="!visibleRows.length" class="text-surface-400 px-2 py-6 text-center text-sm">
         {{ $t(emptyKey) }}
       </li>
+      <template v-if="skippedRows.length">
+        <li class="text-surface-400 px-1 pt-2 text-xs font-semibold tracking-wide uppercase">
+          {{ $t('stash_import.skip_heading', { count: skippedRows.length }) }}
+        </li>
+        <li
+          v-for="row in skippedRows"
+          :key="row.cell.key"
+          :ref="(element) => track(row.cell.key, element)"
+        >
+          <StashReviewRow
+            :row="row"
+            :items="result.catalog.items"
+            :open="row.cell.key === activeKey"
+            :bitmap="bitmap"
+            :tracked="tracked"
+            :item-name="itemName"
+            @toggle="toggle(row.cell.key)"
+            @next="$emit('next')"
+            @split="(columns, rows) => $emit('split', columns, rows)"
+            @change="$emit('change', $event)"
+          />
+        </li>
+      </template>
     </ul>
     <details class="text-surface-400 text-xs">
       <summary class="cursor-pointer">{{ $t('stash_import.coverage') }}</summary>
@@ -91,11 +115,12 @@
 </template>
 <script setup lang="ts">
   import StashReviewRow from '@/features/stash-import/StashReviewRow.vue';
-  import { needsReview } from '@/utils/stashScan/review';
+  import { blocksImport, reviewState } from '@/utils/stashScan/review';
   import type { ReviewedCell, ScanResult } from '@/utils/stashScan/types';
   const props = defineProps<{
     result: ScanResult;
     rows: ReviewedCell[];
+    tracked?: ReadonlySet<string>;
     remaining: number;
     bitmap?: ImageBitmap;
     itemName: (id: string) => string;
@@ -139,13 +164,21 @@
   const emptyKey = computed(() =>
     filter.value === 'check' ? 'stash_import.nothing_to_check' : 'stash_import.nothing_found'
   );
+  const skipped = (row: ReviewedCell) => reviewState(row, props.tracked) === 'skip';
   /** Empty slots stay hidden; the open row stays visible while it is being corrected. */
   function visible(row: ReviewedCell) {
-    if (row.cell.key === activeKey.value) return true;
-    if (filter.value === 'check') return needsReview(row);
-    return listed(row);
+    if (filter.value === 'check') {
+      if (row.cell.key === activeKey.value) return !skipped(row);
+      return blocksImport(row, props.tracked);
+    }
+    return row.cell.key === activeKey.value || listed(row);
   }
   const visibleRows = computed(() => props.rows.filter(visible));
+  /**
+   * Uncertain rows that no requirement can use stay in view under To check, below the rows
+   * that block, so a wrong guess for a needed item can still be caught. They open in place.
+   */
+  const skippedRows = computed(() => (filter.value === 'check' ? props.rows.filter(skipped) : []));
   function toggle(key: number) {
     activeKey.value = key === activeKey.value ? undefined : key;
   }

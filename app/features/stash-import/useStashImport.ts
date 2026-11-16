@@ -138,6 +138,15 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
   const hideoutLabel = (need: NeededItemHideoutModule) =>
     `${stationLabel(need.hideoutModule.stationId)} · ${need.hideoutModule.level}`;
   const labelFor = (need: Need) => (taskNeed(need) ? taskLabel(need) : hideoutLabel(need));
+  /** Items any eligible requirement uses; only these can change a count. */
+  const trackedItemIds = computed(
+    () =>
+      new Set(
+        toValue(needs)
+          .filter(eligible)
+          .flatMap((need) => getNeededItemId(need) ?? [])
+      )
+  );
   function targets(totals: ObservedTotals[]): ImportTarget[] {
     const byItem = new Map(totals.map((total) => [total.itemId, total]));
     const candidates = toValue(needs)
@@ -339,5 +348,14 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
     assertDestination(preview);
     return status === 'found';
   }
-  return { targets, estimate, prepare, commit, recover, sameLocal, signedIn };
+  return {
+    targets,
+    trackedItemIds,
+    estimate,
+    prepare,
+    commit,
+    recover,
+    sameLocal,
+    signedIn,
+  };
 }

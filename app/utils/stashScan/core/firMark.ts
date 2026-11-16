@@ -105,18 +105,32 @@ function scoreAt(patch: Float64Array, left: number, top: number): number {
   if (Math.sqrt(energy / DISC.length) < MIN_CONTRAST) return 0;
   return dot / Math.sqrt(energy);
 }
-/** Best normalised correlation with the mark anywhere it can sit in this cell's corner. */
-export function firMarkScore(image: RgbImage, cell: GridCell): number {
+export interface FirMarkMatch {
+  /** Best normalised correlation with the mark. */
+  score: number;
+  /** Template pixels the best match sits above the unlifted corner position. */
+  lift: number;
+}
+/** Best match with the mark anywhere it can sit in this cell's corner. */
+export function matchFirMark(image: RgbImage, cell: GridCell): FirMarkMatch {
   const patch = cornerPatch(image, cell);
-  let best = 0;
+  const unlifted = SEARCH_HEIGHT - MARK_TOP;
+  let best = { score: 0, lift: 0 };
   for (let top = 0; top <= SEARCH_HEIGHT - MARK_HEIGHT; top++) {
-    for (let left = 0; left <= SEARCH_WIDTH - MARK_WIDTH; left++)
-      best = Math.max(best, scoreAt(patch, left, top));
+    for (let left = 0; left <= SEARCH_WIDTH - MARK_WIDTH; left++) {
+      const score = scoreAt(patch, left, top);
+      if (score > best.score) best = { score, lift: unlifted - top };
+    }
   }
   return best;
 }
-/** True only for a clear checkmark on a screenshot large enough to resolve it. */
-export function detectFirMark(image: RgbImage, cell: GridCell): boolean {
-  if ((cell.height - 1) / cell.slotsHigh < MIN_SLOT_PX) return false;
-  return firMarkScore(image, cell) >= FIR_SCORE;
+export const firMarkScore = (image: RgbImage, cell: GridCell): number =>
+  matchFirMark(image, cell).score;
+/** True for a clear mark on slots large enough to resolve it; `match` reuses a search. */
+export function detectFirMark(
+  image: RgbImage,
+  cell: GridCell,
+  match: FirMarkMatch = matchFirMark(image, cell)
+): boolean {
+  return (cell.height - 1) / cell.slotsHigh >= MIN_SLOT_PX && match.score >= FIR_SCORE;
 }

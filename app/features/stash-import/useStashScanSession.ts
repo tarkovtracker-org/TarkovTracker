@@ -1,6 +1,6 @@
 import { imageDimensions } from '@/utils/stashScan/imageHeader';
 import { overlapsRegion, splitRegion } from '@/utils/stashScan/regions';
-import { needsReview, reviewCell } from '@/utils/stashScan/review';
+import { blocksImport, reviewCell } from '@/utils/stashScan/review';
 import { createStashScanner } from '@/utils/stashScan/scanClient';
 import {
   SCAN_LIMITS,
@@ -10,7 +10,10 @@ import {
   type ScanResult,
   type ScanCommand,
 } from '@/utils/stashScan/types';
-export function useStashScanSession() {
+/** `tracked` lists the item IDs eligible requirements use; only rows touching them block. */
+export function useStashScanSession(
+  tracked: () => ReadonlySet<string> | undefined = () => undefined
+) {
   const source = shallowRef<File>();
   const result = shallowRef<ScanResult>();
   const rows = ref<ReviewedCell[]>([]);
@@ -26,7 +29,8 @@ export function useStashScanSession() {
   let scanner: ReturnType<typeof createStashScanner> | undefined;
   let generation = 0;
   const active = computed(() => rows.value.find((row) => row.cell.key === activeKey.value));
-  const remaining = computed(() => rows.value.filter(needsReview).length);
+  const blocking = (row: ReviewedCell) => blocksImport(row, tracked());
+  const remaining = computed(() => rows.value.filter(blocking).length);
   const currentItems = computed(
     () => new Map(result.value?.catalog.items.map((item) => [item.id, item]) ?? [])
   );
@@ -36,7 +40,7 @@ export function useStashScanSession() {
     image.value = blob;
   }
   function next() {
-    const unchecked = rows.value.filter(needsReview);
+    const unchecked = rows.value.filter(blocking);
     activeKey.value =
       unchecked.find((row) => row.cell.key > (activeKey.value ?? -1))?.cell.key ??
       unchecked[0]?.cell.key;

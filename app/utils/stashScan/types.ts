@@ -40,6 +40,9 @@ export interface ScanCatalog {
 export interface ScanCandidate {
   itemId: string;
   score: number;
+  /** Icon art and short-name similarity behind `score`. */
+  artScore: number;
+  textScore: number;
 }
 export interface ScanCell extends ScanRect {
   key: number;
@@ -48,6 +51,11 @@ export interface ScanCell extends ScanRect {
   margin: number;
   /** A clear found-in-raid checkmark was seen on the item. */
   fir: boolean;
+  /**
+   * The stack count printed on the item: 1 when the corner shows no count, as the game does
+   * for a single item, or null when the corner could not be read.
+   */
+  stack: number | null;
 }
 export interface ScanResult {
   width: number;

@@ -22,6 +22,7 @@ describe('stack quantity review', () => {
         margin: 1,
         empty: false,
         fir: false,
+        stack: null,
       },
       itemId: 'item',
       quantity: 1,

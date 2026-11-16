@@ -89,6 +89,7 @@
                 :width="width"
                 :height="height"
                 :rows="rows"
+                :tracked="trackedItemIds"
                 :active="active"
                 @select="activeKey = $event"
                 @region="pendingRegion = $event"
@@ -108,6 +109,7 @@
               v-model:active-key="activeKey"
               :result="result"
               :rows="rows"
+              :tracked="trackedItemIds"
               :remaining="remaining"
               :bitmap="bitmap"
               :item-name="itemName"
@@ -183,6 +185,9 @@
   const emit = defineEmits<{ close: [] }>();
   const { t } = useI18n({ useScope: 'global' });
   const store = useTarkovStore();
+  const importer = useStashImport(() => props.needs);
+  const trackedItemIds = importer.trackedItemIds;
+  const tracked = () => trackedItemIds.value;
   const {
     clear,
     source,
@@ -205,8 +210,7 @@
     region,
     split,
     next,
-  } = useStashScanSession();
-  const importer = useStashImport(() => props.needs);
+  } = useStashScanSession(tracked);
   // Decode for display only once the worker has finished, so the two decodes never overlap.
   const { bitmap, failed: bitmapFailed } = useScreenshotBitmap(() =>
     result.value ? image.value : undefined
@@ -240,7 +244,7 @@
   const pendingRegion = ref<ScanRect>();
   const totals = computed(() => {
     try {
-      return reviewedTotals(rows.value);
+      return reviewedTotals(rows.value, tracked());
     } catch {
       return undefined;
     }
@@ -568,7 +572,7 @@
   async function prepareShown(shown: string): Promise<PreviewData | undefined> {
     const prepared = await importer.prepare(
       result.value!.sourceHash,
-      reviewedTotals(rows.value),
+      reviewedTotals(rows.value, tracked()),
       selected.value,
       importMode.value
     );
@@ -587,7 +591,7 @@
       if (!preview.value) return;
       const receipt = await importer.commit(
         preview.value,
-        reviewedTotals(rows.value),
+        reviewedTotals(rows.value, tracked()),
         selected.value
       );
       await showReceipt(receipt);
