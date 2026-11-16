@@ -57,7 +57,7 @@ const i18n = createI18n({
   messages: createTestLocaleMessages({
     common: { tasks: 'Tasks', hideout: 'Hideout', fir: 'FIR' },
     needed_items: {
-      view_details_for: 'Open {name}',
+      view_requirements_for: '{requirements} for {name}',
       remaining_count: '{count} remaining',
       view_requirements: 'View {count} requirement | View {count} requirements',
       aria: { increase_count: 'Add one' },
@@ -87,10 +87,13 @@ describe('NeededItemGroupEntry', () => {
     'opens the details from its named button in the %s layout',
     async (layout) => {
       const wrapper = mountEntry({ layout });
-      const open = wrapper.get('button[aria-label="Open Bolts"]');
-      expect(open.text()).toBe('View 2 requirements');
+      const open = wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'View 2 requirements');
+      expect(open).toBeDefined();
+      expect(open!.attributes('aria-label')).toBe('View 2 requirements for Bolts');
       expect(wrapper.text()).toContain('6 remaining');
-      await open.trigger('click');
+      await open!.trigger('click');
       expect(wrapper.emitted('open')).toEqual([['item']]);
     }
   );
@@ -121,7 +124,9 @@ describe('NeededItemGroupEntry', () => {
   it('tracks an item with a single need in place instead of a total', async () => {
     progress.count = 1;
     const wrapper = mountEntry({ needs: [need] });
-    expect(wrapper.get('button[aria-label="Open Bolts"]').text()).toBe('View 1 requirement');
+    expect(wrapper.get('button[aria-label="View 1 requirement for Bolts"]').text()).toBe(
+      'View 1 requirement'
+    );
     expect(wrapper.find('[role="progressbar"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('1/4');
     await wrapper.get('button[aria-label="Add one"]').trigger('click');

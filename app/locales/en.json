@@ -2695,7 +2695,7 @@
     "unknown_task": "Unknown Task",
     "unknown_station": "Unknown Station",
     "needed": "needed",
-    "view_details_for": "View details for {name}",
+    "view_requirements_for": "{requirements} for {name}",
     "remaining_count": "{count} remaining",
     "view_requirements": "View {count} requirement | View {count} requirements",
     "locked_before": "{count} before",

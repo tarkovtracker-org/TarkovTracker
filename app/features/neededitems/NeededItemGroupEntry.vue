@@ -129,9 +129,6 @@
   const { t } = useI18n({ useScope: 'global' });
   const progress = useNeededItemProgress();
   const { isSelfCompleted } = useNeedSelfCompletion();
-  const openLabel = computed(() =>
-    t('needed_items.view_details_for', { name: props.group.item.name })
-  );
   const formatNumber = useLocaleNumberFormatter();
   const remainingLabel = computed(() =>
     t('needed_items.remaining_count', {
@@ -140,6 +137,12 @@
   );
   const requirementsLabel = computed(() =>
     t('needed_items.view_requirements', { count: props.needs.length }, props.needs.length)
+  );
+  const openLabel = computed(() =>
+    t('needed_items.view_requirements_for', {
+      requirements: requirementsLabel.value,
+      name: props.group.item.name,
+    })
   );
   const { isCraftable, craftableIconClass, craftableTitle, goToCraftStation } = useCraftableItem(
     () => props.group.item.id
