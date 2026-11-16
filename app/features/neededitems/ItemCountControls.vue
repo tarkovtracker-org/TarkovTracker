@@ -3,7 +3,7 @@
     <div class="bg-surface-700 flex items-center rounded-md border border-white/15 shadow-sm">
       <button
         type="button"
-        :disabled="disabled"
+        :disabled="disabled || !canDecrease"
         class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-l-md transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
         :class="sizeClasses.button"
         :title="decreaseText"
@@ -21,9 +21,9 @@
             ref="inputRef"
             v-model.number="editValue"
             type="number"
-            :min="0"
+            :min="minimumCount"
             :max="neededCount"
-            :aria-label="$t('needed_items.aria.enter_count')"
+            :aria-label="countLabel ?? $t('needed_items.aria.enter_count')"
             class="bg-surface-900 focus:ring-primary-500 light:text-surface-50 h-full w-full text-center font-semibold text-white tabular-nums focus:ring-2 focus:outline-none focus:ring-inset"
             :class="sizeClasses.text"
             @blur="commitEdit"
@@ -38,7 +38,7 @@
           class="hover:bg-surface-600 light:text-surface-50 h-full w-full font-semibold text-white tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           :class="sizeClasses.text"
           :title="$t('needed_items.aria.click_to_enter_value')"
-          :aria-label="$t('needed_items.aria.click_to_enter_value')"
+          :aria-label="countLabel ?? $t('needed_items.aria.click_to_enter_value')"
           @click="startEdit"
         >
           {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
@@ -46,7 +46,7 @@
       </div>
       <button
         type="button"
-        :disabled="disabled"
+        :disabled="disabled || !canIncrease"
         class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-r-md transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
         :class="sizeClasses.button"
         :title="increaseText"
@@ -57,6 +57,7 @@
       </button>
     </div>
     <button
+      v-if="showToggle"
       type="button"
       :disabled="disabled"
       class="flex items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
@@ -125,8 +126,19 @@
       disabled?: boolean;
       decreaseLabel?: string;
       increaseLabel?: string;
+      minimumCount?: number;
+      showToggle?: boolean;
+      countLabel?: string;
     }>(),
-    { size: 'responsive', disabled: false, decreaseLabel: undefined, increaseLabel: undefined }
+    {
+      size: 'responsive',
+      disabled: false,
+      decreaseLabel: undefined,
+      increaseLabel: undefined,
+      minimumCount: 0,
+      showToggle: true,
+      countLabel: undefined,
+    }
   );
   const emit = defineEmits<{
     decrease: [];
@@ -143,13 +155,22 @@
       ? t('needed_items.aria.mark_as_incomplete')
       : t('needed_items.aria.mark_as_complete')
   );
-  const { isEditing, editValue, inputRef, startEdit, commitEdit, cancelEdit } =
-    useCountEditController({
-      current: () => props.currentCount,
-      max: () => props.neededCount,
-      onUpdate: (count) => emit('setCount', count),
-      externalChangeBehavior: 'cancel',
-    });
+  const {
+    isEditing,
+    editValue,
+    inputRef,
+    startEdit,
+    commitEdit,
+    cancelEdit,
+    canIncrease,
+    canDecrease,
+  } = useCountEditController({
+    current: () => props.currentCount,
+    max: () => props.neededCount,
+    min: () => props.minimumCount,
+    onUpdate: (count) => emit('setCount', count),
+    externalChangeBehavior: 'cancel',
+  });
   watch(
     () => props.disabled,
     (disabled) => {

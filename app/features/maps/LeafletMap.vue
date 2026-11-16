@@ -434,6 +434,20 @@
                               </kbd>
                             </template>
                           </i18n-t>
+                          <i18n-t
+                            keypath="maps.help.copy_coordinates"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #key>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'C' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
                           <p class="text-surface-300 text-[11px]">
                             {{ t('maps.help.click_marker') }}
                           </p>
@@ -449,6 +463,9 @@
                           </p>
                           <p class="text-surface-300 text-[11px]">
                             {{ t('maps.help.resize') }}
+                          </p>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.coordinates') }}
                           </p>
                         </div>
                       </div>
@@ -486,14 +503,26 @@
           :class="props.fill ? 'h-full' : 'h-100 sm:h-125 lg:h-150'"
           :style="mapHeightStyle"
         />
-        <p
-          v-if="extractSource"
-          data-testid="map-extract-source"
-          class="text-surface-300 absolute bottom-2 left-2 z-650 max-w-[calc(100%-4rem)] rounded bg-black/70 px-1.5 py-0.5 text-[10px] leading-snug"
-          :title="extractSource.detail"
+        <div
+          class="pointer-events-none absolute bottom-2 left-2 z-650 flex max-w-[calc(100%-4rem)] flex-col items-start gap-1"
         >
-          {{ extractSource.label }} · {{ t('maps.extract_requirements.raid_notice') }}
-        </p>
+          <MapCursorCoordinates
+            :map="mapInstance"
+            :crosshair-shown="showKeyboardCursor"
+            :keyboard-activity="keyboardCursorActivity"
+            :has-keyboard-focus="isMapKeyboardActive"
+            :map-name="props.map.name"
+            :floor="coordinatesFloor"
+          />
+          <p
+            v-if="extractSource"
+            data-testid="map-extract-source"
+            class="text-surface-300 pointer-events-auto rounded bg-black/70 px-1.5 py-0.5 text-[10px] leading-snug"
+            :title="extractSource.detail"
+          >
+            {{ extractSource.label }} · {{ t('maps.extract_requirements.raid_notice') }}
+          </p>
+        </div>
         <div
           v-if="showKeyboardCursor"
           aria-hidden="true"
@@ -619,6 +648,7 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
+  import MapCursorCoordinates from '@/features/maps/MapCursorCoordinates.vue';
   import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
   import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
   import {
@@ -674,6 +704,7 @@
   import { zoneOutlineStyle, zoneScreenSize } from '@/features/maps/utils/objectiveZoneOutline';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import { isEditableTarget } from '@/utils/editableTarget';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
@@ -774,6 +805,12 @@
   const currentGameMode = computed(() => metadataStore.currentGameMode ?? 'pvp');
   const mapSurfaceRef = ref<HTMLElement | null>(null);
   const showKeyboardCursor = ref(false);
+  /** Counts keyboard map actions; the coordinate readout follows the crosshair after each one. */
+  const keyboardCursorActivity = ref(0);
+  const showKeyboardCrosshair = () => {
+    showKeyboardCursor.value = true;
+    keyboardCursorActivity.value += 1;
+  };
   const fullscreenToggleLabel = computed(() =>
     props.isFullscreen ? t('maps.tooltips.exit_fullscreen') : t('maps.tooltips.open_fullscreen')
   );
@@ -819,6 +856,8 @@
     initialView: props.initialView ?? null,
     initialFloor: props.initialFloor,
   });
+  /** The floor named in copied coordinates, written as the floor panel shows it. */
+  const coordinatesFloor = computed(() => selectedFloor.value.replace(/_/g, ' ') || null);
   /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */
   const OBJECTIVE_DOT_RADIUS = OBJECTIVE_CHIP_SIZE / 2;
   /** Hit-test dots are invisible: the chip above them is the visible marker. */
@@ -1135,15 +1174,6 @@
         return null;
     }
   };
-  const isEditableTarget = (target: EventTarget | null): boolean => {
-    if (!(target instanceof HTMLElement)) return false;
-    if (target.isContentEditable) return true;
-    return Boolean(
-      target.closest(
-        'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]'
-      )
-    );
-  };
   const isMapKeyboardActive = (): boolean => {
     if (!mapInstance.value) return false;
     const mapSurface = mapSurfaceRef.value;
@@ -1329,7 +1359,7 @@
       if (isEditableTarget(event.target)) return;
       if (!isMapKeyboardActive()) return;
       event.preventDefault();
-      showKeyboardCursor.value = true;
+      showKeyboardCrosshair();
       syncKeyboardCursorHover();
       if (event.repeat) return;
       triggerCenterMapClick();
@@ -1340,7 +1370,7 @@
       if (isEditableTarget(event.target)) return;
       if (!isMapKeyboardActive()) return;
       event.preventDefault();
-      showKeyboardCursor.value = true;
+      showKeyboardCrosshair();
       if (event.repeat) return;
       refreshView();
       window.requestAnimationFrame(syncKeyboardCursorHover);
@@ -1352,7 +1382,7 @@
     if (isEditableTarget(event.target)) return;
     if (!isMapKeyboardActive()) return;
     event.preventDefault();
-    showKeyboardCursor.value = true;
+    showKeyboardCrosshair();
     syncKeyboardCursorHover();
     pressedMapKeys.add(controlKey);
     startMapKeyboardLoop();
