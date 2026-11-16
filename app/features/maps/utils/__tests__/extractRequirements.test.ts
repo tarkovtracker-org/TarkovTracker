@@ -213,12 +213,15 @@ describe('extract requirements', () => {
     const reserve = getExtractDataSource('5704e5fad2720bc05b8b4567', 'pvp', data);
     expect(reserve?.curatedCues).toBe(false);
     expect(describeExtractSource(regular!, t)).toEqual({
-      label: 'Requirements: game data, EFT 1.3.0.0, plus curated cues',
+      label: 'Requirements: EFT 1.3.0.0 data, public references and scene cues',
       detail:
-        "From the EFT 1.3.0.0.48484 client's location and global definitions. Base values only; check the in-raid extraction list. Flare, smoke and key cues the game data does not describe are curated from tarkov.help.",
+        'EFT 1.3.0.0.48484 location and global definitions, supplemented by public references where definitions are incomplete. Check the in-raid extraction list. Flare, smoke and key cues are curated from public references.',
     });
-    expect(describeExtractSource(reserve!, t).label).toBe('Requirements: game data, EFT 1.3.0.0');
-    expect(describeExtractSource(reserve!, t).detail).not.toContain('tarkov.help');
+    expect(describeExtractSource(reserve!, t)).toEqual({
+      label: 'Requirements: EFT 1.3.0.0 data and public references',
+      detail:
+        'EFT 1.3.0.0.48484 location and global definitions, supplemented by public references where definitions are incomplete. Check the in-raid extraction list.',
+    });
     expect(getExtractDataSource('unknown-map', 'pvp', data)).toBeUndefined();
     expect(getExtractDataSource(groundZero, 'arena', data)).toBeUndefined();
     const regularOnly = {
