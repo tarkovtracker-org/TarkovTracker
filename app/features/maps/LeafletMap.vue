@@ -509,6 +509,7 @@
           <MapCursorCoordinates
             :map="mapInstance"
             :crosshair-shown="showKeyboardCursor"
+            :keyboard-activity="keyboardCursorActivity"
             :has-keyboard-focus="isMapKeyboardActive"
             :map-name="props.map.name"
             :floor="coordinatesFloor"
@@ -804,6 +805,12 @@
   const currentGameMode = computed(() => metadataStore.currentGameMode ?? 'pvp');
   const mapSurfaceRef = ref<HTMLElement | null>(null);
   const showKeyboardCursor = ref(false);
+  /** Counts keyboard map actions; the coordinate readout follows the crosshair after each one. */
+  const keyboardCursorActivity = ref(0);
+  const showKeyboardCrosshair = () => {
+    showKeyboardCursor.value = true;
+    keyboardCursorActivity.value += 1;
+  };
   const fullscreenToggleLabel = computed(() =>
     props.isFullscreen ? t('maps.tooltips.exit_fullscreen') : t('maps.tooltips.open_fullscreen')
   );
@@ -1351,7 +1358,7 @@
       if (isEditableTarget(event.target)) return;
       if (!isMapKeyboardActive()) return;
       event.preventDefault();
-      showKeyboardCursor.value = true;
+      showKeyboardCrosshair();
       syncKeyboardCursorHover();
       if (event.repeat) return;
       triggerCenterMapClick();
@@ -1362,7 +1369,7 @@
       if (isEditableTarget(event.target)) return;
       if (!isMapKeyboardActive()) return;
       event.preventDefault();
-      showKeyboardCursor.value = true;
+      showKeyboardCrosshair();
       if (event.repeat) return;
       refreshView();
       window.requestAnimationFrame(syncKeyboardCursorHover);
@@ -1374,7 +1381,7 @@
     if (isEditableTarget(event.target)) return;
     if (!isMapKeyboardActive()) return;
     event.preventDefault();
-    showKeyboardCursor.value = true;
+    showKeyboardCrosshair();
     syncKeyboardCursorHover();
     pressedMapKeys.add(controlKey);
     startMapKeyboardLoop();

@@ -34,6 +34,7 @@
   const props = defineProps<{
     map: L.Map | null;
     crosshairShown: boolean;
+    keyboardActivity: number;
     hasKeyboardFocus: () => boolean;
     /** Map and floor names lead the copied text, so a pasted report names the place. */
     mapName: string;
@@ -53,6 +54,7 @@
   const position = useMapCursorCoordinates({
     map: toRef(props, 'map'),
     crosshairShown: toRef(props, 'crosshairShown'),
+    keyboardActivity: toRef(props, 'keyboardActivity'),
     hasKeyboardFocus: () => props.hasKeyboardFocus(),
     onCopy: copyPosition,
   });

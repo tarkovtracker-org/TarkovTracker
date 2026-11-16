@@ -9,6 +9,8 @@ interface MapCursorCoordinatesOptions {
   map: Readonly<Ref<L.Map | null>>;
   /** True while the keyboard crosshair is drawn at the map center. */
   crosshairShown: Readonly<Ref<boolean>>;
+  /** Changes on every keyboard map action, so the crosshair takes over again while shown. */
+  keyboardActivity: Readonly<Ref<number>>;
   /** Whether keyboard focus is inside this map, so a press of C belongs to its crosshair. */
   hasKeyboardFocus: () => boolean;
   /** Receives the reading when the user presses C. */
@@ -47,8 +49,8 @@ const isCopyShortcut = (event: KeyboardEvent): boolean =>
  *
  * Markers and pins do not interrupt the reading: it always names the ground under the pointer.
  * Popups and the map's own controls are not the map, so the reading clears over them. The
- * keyboard crosshair takes over when it appears, so keyboard panning reads the map center even
- * with the mouse parked over the map; moving the mouse hands the reading back. Only real mouse
+ * keyboard crosshair takes over whenever a key moves or uses it, so keyboard panning reads the map
+ * center even with the mouse parked over the map; moving the mouse hands the reading back. Only real mouse
  * input counts: the crosshair's own synthetic hover events never pose as the mouse. Panning and
  * zooming update the value under a still pointer. Pressing C copies the reading of the map under
  * the pointer, or of the focused map's crosshair.
@@ -56,6 +58,7 @@ const isCopyShortcut = (event: KeyboardEvent): boolean =>
 export function useMapCursorCoordinates({
   map,
   crosshairShown,
+  keyboardActivity,
   hasKeyboardFocus,
   onCopy,
 }: MapCursorCoordinatesOptions): Readonly<Ref<GamePoint | null>> {
@@ -122,7 +125,7 @@ export function useMapCursorCoordinates({
     },
     { immediate: true }
   );
-  watch(crosshairShown, (shown) => {
+  watch([crosshairShown, keyboardActivity], ([shown]) => {
     crosshairFirst = shown;
     update();
   });

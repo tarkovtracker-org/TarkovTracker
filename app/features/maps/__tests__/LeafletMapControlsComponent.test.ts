@@ -1198,4 +1198,24 @@ describe('LeafletMap controls', () => {
       if (!unmounted) wrapper.unmount();
     }
   });
+  it('tells the coordinate readout about every keyboard action, even with the crosshair shown', async () => {
+    const wrapper = await mountMap();
+    const MapCursorCoordinates = (await import('@/features/maps/MapCursorCoordinates.vue')).default;
+    const readout = () => wrapper.findComponent(MapCursorCoordinates);
+    (wrapper.element as HTMLElement).focus();
+    const press = async (key: string, code: string) => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key, code, bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true }));
+      await nextTick();
+    };
+    expect(readout().props('keyboardActivity')).toBe(0);
+    await press('w', 'KeyW');
+    expect(readout().props('crosshairShown')).toBe(true);
+    expect(readout().props('keyboardActivity')).toBe(1);
+    // The crosshair is already shown, so only the activity count can hand it the reading back.
+    await press('w', 'KeyW');
+    await press('r', 'KeyR');
+    expect(readout().props('keyboardActivity')).toBe(3);
+    wrapper.unmount();
+  });
 });

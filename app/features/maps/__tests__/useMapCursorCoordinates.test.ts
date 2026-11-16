@@ -37,6 +37,7 @@ const createMap = async (config: MapRenderConfig): Promise<L.Map> => {
 const track = (map: L.Map | null) => {
   const mapRef = shallowRef(map);
   const crosshairShown = ref(false);
+  const keyboardActivity = ref(0);
   const focus = { inside: false };
   const onCopy = vi.fn();
   scope = effectScope();
@@ -44,11 +45,18 @@ const track = (map: L.Map | null) => {
     useMapCursorCoordinates({
       map: mapRef,
       crosshairShown,
+      keyboardActivity,
       hasKeyboardFocus: () => focus.inside,
       onCopy,
     })
   )!;
-  return { mapRef, crosshairShown, focus, onCopy, position };
+  /** What LeafletMap does on every keyboard map action: show the crosshair and count the action. */
+  const keyboardAction = async () => {
+    crosshairShown.value = true;
+    keyboardActivity.value += 1;
+    await nextTick();
+  };
+  return { mapRef, crosshairShown, focus, keyboardAction, onCopy, position };
 };
 const pressKey = (init: KeyboardEventInit, target: EventTarget = window) => {
   const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
@@ -226,6 +234,22 @@ describe('useMapCursorCoordinates', () => {
     focus.inside = true;
     pressKey({ key: 'c' });
     expect(onCopy).toHaveBeenCalledTimes(1);
+  });
+  it('gives the crosshair the reading back on every keyboard action while it stays shown', async () => {
+    const map = await createMap(customs);
+    const { focus, keyboardAction, onCopy, position } = track(map);
+    focus.inside = true;
+    const size = map.getSize();
+    const center = map.containerPointToLatLng([size.x / 2, size.y / 2]);
+    // Press W, release it, move the mouse away from the center, then press W again.
+    await keyboardAction();
+    expectPosition(position.value, center.lng, center.lat);
+    hoverGamePoint(map, -30, 40);
+    expectPosition(position.value, -30, 40);
+    await keyboardAction();
+    expectPosition(position.value, center.lng, center.lat);
+    pressKey({ key: 'c' });
+    expectPosition(onCopy.mock.calls[0]![0], center.lng, center.lat);
   });
   it('moves its listeners to a rebuilt map and drops them with a destroyed one', async () => {
     const first = await createMap(customs);

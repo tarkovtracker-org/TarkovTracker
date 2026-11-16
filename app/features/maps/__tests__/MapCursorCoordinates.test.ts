@@ -30,7 +30,14 @@ const createMap = (latLng: { lat: number; lng: number }) => {
 };
 const mountReadout = (map: L.Map, floor: string | null) =>
   mount(MapCursorCoordinates, {
-    props: { map, crosshairShown: false, hasKeyboardFocus: () => false, mapName: 'Customs', floor },
+    props: {
+      map,
+      crosshairShown: false,
+      keyboardActivity: 0,
+      hasKeyboardFocus: () => false,
+      mapName: 'Customs',
+      floor,
+    },
     global: { stubs: { 'i18n-t': { template: '<span><slot name="key" /></span>' } } },
   });
 const valueOf = (wrapper: ReturnType<typeof mountReadout>) =>
