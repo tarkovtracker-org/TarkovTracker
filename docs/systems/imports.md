@@ -123,6 +123,10 @@ runtime. The manifest lists items with unusable templates; they remain available
 Each shard is written to a temporary file and atomically replaced; the manifest is replaced last,
 so an interrupted build preserves the last complete index. Successful publication prunes only
 obsolete content-addressed shard files; icon downloads are streamed with a 4 MB limit.
+Cached images and ETags are replaced atomically, with the complete image published first.
+An exclusive `public/stash-scan/.build-lock` directory covers the whole build, including cache
+writes and shard pruning. A second builder fails with `EEXIST`. After a process interruption,
+remove that empty lock directory only after confirming no catalog builder is still running.
 Feature version 2 recenters cropped rotated-label templates.
 Catalog files are content-addressed and loaded by detected slot size. This first catalog is
 English and regular-mode based; mode-exclusive items absent from it cannot be identified.

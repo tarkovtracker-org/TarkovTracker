@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
-import { cacheImage, publishScanCatalog, writeScanAsset } from '@@/scripts/stash-scan/build-assets';
+import {
+  cacheImage,
+  publishScanCatalog,
+  withScanBuildLock,
+  writeScanAsset,
+} from '@@/scripts/stash-scan/build-assets';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ScanCatalog } from '@/utils/stashScan/types';
 vi.mock('node:fs/promises', async (original) => {
@@ -68,6 +73,79 @@ describe('bounded builder image responses', () => {
     expect(Buffer.from(result).equals(bytes)).toBe(true);
     expect((await readFile(file)).equals(bytes)).toBe(true);
     expect(await readFile(`${file}.etag`, 'utf8')).toBe('test-tag');
+  });
+  it('preserves the complete cached image and ETag after an interrupted image write', async () => {
+    const file = join(directory, 'icon.webp');
+    await writeFile(file, 'complete image');
+    await writeFile(`${file}.etag`, 'old-tag');
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    vi.mocked(writeFile).mockImplementationOnce(async (target, _data, options) => {
+      await actual.writeFile(target, 'partial', options);
+      throw new Error('disk full');
+    });
+    await expect(
+      cacheImage(new Response('new image', { headers: { etag: 'new-tag' } }), file)
+    ).rejects.toThrow('disk full');
+    expect(await readFile(file, 'utf8')).toBe('complete image');
+    expect(await readFile(`${file}.etag`, 'utf8')).toBe('old-tag');
+    expect((await readdir(directory)).sort()).toEqual(['icon.webp', 'icon.webp.etag']);
+  });
+  it('keeps complete image bytes and the prior ETag when metadata replacement fails', async () => {
+    const file = join(directory, 'icon.webp');
+    await writeFile(file, 'complete image');
+    await writeFile(`${file}.etag`, 'old-tag');
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    vi.mocked(rename)
+      .mockImplementationOnce(actual.rename)
+      .mockRejectedValueOnce(new Error('metadata rename failed'));
+    await expect(
+      cacheImage(new Response('new image', { headers: { etag: 'new-tag' } }), file)
+    ).rejects.toThrow('metadata rename failed');
+    expect(await readFile(file, 'utf8')).toBe('new image');
+    expect(await readFile(`${file}.etag`, 'utf8')).toBe('old-tag');
+    expect((await readdir(directory)).sort()).toEqual(['icon.webp', 'icon.webp.etag']);
+  });
+});
+describe('exclusive catalog builds', () => {
+  it('rejects a second builder until the first has published and pruned', async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const ready = new Promise<void>((resolve) => (started = resolve));
+    const first = withScanBuildLock(directory, async () => {
+      started();
+      await held;
+      await writeScanAsset(directory, keptName, 'new shard');
+      await publishScanCatalog(directory, manifest());
+      return 'published';
+    });
+    await ready;
+    const second = vi.fn(async () => publishScanCatalog(directory, manifest()));
+    try {
+      await expect(withScanBuildLock(directory, second)).rejects.toMatchObject({ code: 'EEXIST' });
+      expect(second).not.toHaveBeenCalled();
+      // A rejected competitor must not remove the active builder's lock.
+      expect(await readdir(directory)).toEqual(['.build-lock']);
+    } finally {
+      release();
+      // Settle cleanup without masking a failed exclusion assertion above.
+      await Promise.allSettled([first]);
+    }
+    await expect(first).resolves.toBe('published');
+    await expect(readFile(join(directory, keptName), 'utf8')).resolves.toBe('new shard');
+    expect((await readdir(directory)).sort()).toEqual([keptName, 'catalog.json'].sort());
+    await expect(withScanBuildLock(directory, async () => 'next build')).resolves.toBe(
+      'next build'
+    );
+  });
+  it('releases the lock when a build fails', async () => {
+    await expect(
+      withScanBuildLock(directory, async () => {
+        throw new Error('build failed');
+      })
+    ).rejects.toThrow('build failed');
+    expect(await readdir(directory)).toEqual([]);
+    await expect(withScanBuildLock(directory, async () => 'retry')).resolves.toBe('retry');
   });
 });
 describe('atomic manifest publication and shard pruning', () => {

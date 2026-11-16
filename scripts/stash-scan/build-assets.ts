@@ -1,8 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import { readdir, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, readdir, rename, rm, rmdir, writeFile } from 'node:fs/promises';
+import { basename, dirname, resolve } from 'node:path';
 import type { ScanCatalog } from '@/utils/stashScan/types';
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+/** Hold from the first cache/shard write through manifest publication and pruning. */
+export async function withScanBuildLock<T>(output: string, build: () => Promise<T>): Promise<T> {
+  const lock = outputFile(output, '.build-lock');
+  // EEXIST rejects concurrent builds; never remove a lock acquired by another builder.
+  await mkdir(lock);
+  try {
+    return await build();
+  } finally {
+    await rmdir(lock);
+  }
+}
 export async function writeScanAsset(
   output: string,
   name: string,
@@ -50,8 +61,8 @@ async function readImageChunks(
 }
 export async function cacheImage(response: Response, file: string): Promise<Uint8Array> {
   const next = await boundedImage(response);
-  await writeFile(file, next);
-  await writeFile(`${file}.etag`, response.headers.get('etag') ?? '');
+  await writeScanAsset(dirname(file), basename(file), next);
+  await writeScanAsset(dirname(file), `${basename(file)}.etag`, response.headers.get('etag') ?? '');
   return next;
 }
 /** Replacements and deletions must stay direct children of the selected output directory. */

@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { cacheImage, publishScanCatalog, writeScanAsset } from '@@/scripts/stash-scan/build-assets';
+import {
+  cacheImage,
+  publishScanCatalog,
+  withScanBuildLock,
+  writeScanAsset,
+} from '@@/scripts/stash-scan/build-assets';
 import { addGridImage, readReferenceGrid } from '@@/scripts/stash-scan/references';
 import { FEATURE_VERSION } from '@/utils/stashScan/core/features';
 import { createIconIndex, type IconIndex } from '@/utils/stashScan/core/matcher';
@@ -122,8 +127,7 @@ async function writeShards(index: IconIndex): Promise<Record<string, ScanShard>>
   }
   return shards;
 }
-async function main() {
-  await Promise.all([mkdir(output, { recursive: true }), mkdir(cache, { recursive: true })]);
+async function buildCatalog() {
   const entries = await catalog();
   console.log(`Building local-recognition templates for ${entries.length} items…`);
   const { index, missing } = await buildTemplates(entries);
@@ -147,5 +151,9 @@ async function main() {
       compressedBytes: Object.values(shards).reduce((sum, shard) => sum + shard.bytes, 0),
     })
   );
+}
+async function main() {
+  await Promise.all([mkdir(output, { recursive: true }), mkdir(cache, { recursive: true })]);
+  await withScanBuildLock(output, buildCatalog);
 }
 await main();
