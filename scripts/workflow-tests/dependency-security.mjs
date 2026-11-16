@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, chmodSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, test } from 'node:test';
@@ -17,6 +17,7 @@ import { compositionBase } from '../checks/dependency-pr-base.mjs';
 import { eventBase, queueComposition, socketHead } from '../checks/dependency-security.mjs';
 import { evaluateSocket, socketWarnings } from '../checks/dependency-socket.mjs';
 import { compareRuntime } from '../checks/review-release-source.mjs';
+const cliLoader = new URL('./helpers/dependency-cli-loader.mjs', import.meta.url).href;
 const NOW = Date.parse('2026-11-02T00:00:00Z');
 const head = 'a'.repeat(40);
 const dates = { reviewedAt: '2026-11-01T00:00:00Z', expires: '2026-11-03T00:00:00Z' };
@@ -462,6 +463,8 @@ test('the offline source comparison rejects changed published code and names exc
     assert.equal(proof.comparisonSha256, comparisonDigest(proof.comparison));
     assert.equal(proof.comparison.length, 1);
     assert.equal(proof.comparison[0].method, 'identical');
+    assert.equal(proof.comparison[0].file, 'lib/index.js');
+    assert.equal(proof.comparison[0].source, 'lib/index.js');
     assert.deepEqual(proof.notCompared, ['dist/convenience.min.js']);
     assert.deepEqual(proof.entrypointsNotCompared, ['bin/tool', 'data.json']);
     const relativeRun = spawnSync(
@@ -478,7 +481,7 @@ test('the offline source comparison rejects changed published code and names exc
   }
 });
 test('the pre-install CLI runs no pnpm script or installation when the base dependency graph is unchanged', () => {
-  const root = mkdtempSync(join(tmpdir(), 'dependency-preflight-'));
+  const root = mkdtempSync(join(tmpdir(), 'dependency preflight '));
   try {
     const bin = join(root, 'bin');
     mkdirSync(bin);
@@ -488,40 +491,47 @@ test('the pre-install CLI runs no pnpm script or installation when the base depe
     writeFileSync(join(root, 'pnpm-lock.yaml'), lock);
     writeFileSync(join(root, 'event.json'), JSON.stringify({ before: head }));
     for (const name of ['pnpm', 'git']) {
-      const file = join(bin, name);
+      const file = join(bin, `${name}.cjs`);
       const body =
         name === 'pnpm'
           ? `if(process.argv[2]!=='config')process.exit(90);console.log(process.argv[4]==='minimumReleaseAge'?'10080':'[]');`
           : `process.stdout.write(process.argv[2]==='cat-file'?'${head} commit 100':process.argv[3].endsWith(':package.json')?${JSON.stringify(manifest)}:${JSON.stringify(lock)});`;
-      writeFileSync(file, `#!${process.execPath}\n${body}\n`);
-      chmodSync(file, 0o755);
+      writeFileSync(file, body);
     }
     const run = () =>
-      spawnSync(process.execPath, [resolve('scripts/checks/dependency-security.mjs')], {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          PATH: `${bin}:${process.env.PATH}`,
-          GITHUB_EVENT_PATH: join(root, 'event.json'),
-        },
-      });
+      spawnSync(
+        process.execPath,
+        ['--import', cliLoader, resolve('scripts/checks/dependency-security.mjs')],
+        {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            GITHUB_TOKEN: '',
+            GH_TOKEN: '',
+            GITHUB_EVENT_PATH: join(root, 'event.json'),
+          },
+        }
+      );
     const result = run();
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /dependency graph unchanged/);
     writeFileSync(
-      join(bin, 'gh'),
-      `#!${process.execPath}\nconsole.error('Unexpected API fallback');process.exit(91);`
+      join(bin, 'gh.cjs'),
+      `console.error('Unexpected API fallback');process.exit(91);`
     );
-    chmodSync(join(bin, 'gh'), 0o755);
     writeFileSync(
-      join(bin, 'git'),
-      `#!${process.execPath}\nprocess.stdout.write(process.argv[2]==='cat-file'?'${head} commit 100':'invalid JSON');`
+      join(bin, 'git.cjs'),
+      `process.stdout.write(process.argv[2]==='cat-file'?'${head} commit 100':'invalid JSON');`
     );
     const invalid = run();
     assert.notEqual(invalid.status, 0);
     assert.match(invalid.stderr, /JSON/);
     assert.doesNotMatch(invalid.stderr, /Unexpected API fallback/);
+    writeFileSync(join(bin, 'pnpm.cjs'), "console.error('Policy probe failed');process.exit(92);");
+    const failedCommand = run();
+    assert.notEqual(failedCommand.status, 0);
+    assert.match(failedCommand.stderr, /Policy probe failed/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -681,7 +691,7 @@ describe('authenticated PR dependency composition', () => {
     );
   }
   test('the pre-install CLI authenticates the PR parent and still rejects unreviewed artifacts', () => {
-    const root = mkdtempSync(join(tmpdir(), 'dependency-pr-parent-'));
+    const root = mkdtempSync(join(tmpdir(), 'dependency PR parent '));
     try {
       const { event, responses } = fixture();
       const merged = graph('2', '2');
@@ -714,25 +724,28 @@ describe('authenticated PR dependency composition', () => {
         git: `const command=process.argv[2];if(command==='rev-parse')process.stdout.write('${candidate}');else if(command==='cat-file')process.stdout.write('${oldBase} commit 100');else if(command==='show')process.stdout.write(process.argv[3].endsWith(':package.json')?${JSON.stringify(JSON.stringify(stale.manifest))}:${JSON.stringify(stale.lock)});else process.exit(91);`,
         gh: "const fs=require('node:fs');const key=process.argv[3];const data=JSON.parse(fs.readFileSync('responses.json','utf8'));if(!Object.hasOwn(data,key))throw new Error('Unexpected request '+key);fs.appendFileSync('requests.log',key+'\\n');console.log(JSON.stringify(data[key]));",
       };
+      mkdirSync(join(root, 'bin'));
       for (const [name, body] of Object.entries(scripts)) {
-        writeFileSync(join(root, name), `#!${process.execPath}\n${body}\n`);
-        chmodSync(join(root, name), 0o755);
+        writeFileSync(join(root, 'bin', `${name}.cjs`), body);
       }
       const run = () =>
-        spawnSync(process.execPath, [resolve('scripts/checks/dependency-security.mjs')], {
-          cwd: root,
-          encoding: 'utf8',
-          env: {
-            ...process.env,
-            PATH: `${root}:${process.env.PATH}`,
-            GITHUB_TOKEN: '',
-            GH_TOKEN: '',
-            GITHUB_ACTIONS: 'false',
-            GITHUB_REPOSITORY: repository,
-            GITHUB_SHA: candidate,
-            GITHUB_EVENT_PATH: join(root, 'event.json'),
-          },
-        });
+        spawnSync(
+          process.execPath,
+          ['--import', cliLoader, resolve('scripts/checks/dependency-security.mjs')],
+          {
+            cwd: root,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              GITHUB_TOKEN: '',
+              GH_TOKEN: '',
+              GITHUB_ACTIONS: 'false',
+              GITHUB_REPOSITORY: repository,
+              GITHUB_SHA: candidate,
+              GITHUB_EVENT_PATH: join(root, 'event.json'),
+            },
+          }
+        );
       const valid = run();
       assert.equal(valid.status, 0, valid.stdout + valid.stderr);
       assert.match(valid.stdout, /Dependency Security passed/);

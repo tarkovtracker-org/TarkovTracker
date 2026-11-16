@@ -195,6 +195,11 @@ change the version and the `SHA256` value to the `digest` GitHub records for the
 The four Vitest shards, dedicated Deno tests, Supabase validation, Worker validation, and production
 build retain their existing commands and environment behavior. Tests in `scripts/workflow-tests/` use
 Node's built-in runner via `pnpm run test:workflow`; their filenames deliberately avoid Vitest discovery.
+The [dependency-security portability workflow](../.github/workflows/dependency-security-portability.yml)
+runs its isolated suite without installation on Ubuntu and native Windows. See the workflow's
+test command, [test-only subprocess adapter](../scripts/workflow-tests/helpers/dependency-cli-loader.mjs),
+and [offline source-comparison tool](../scripts/checks/review-release-source.mjs) for execution and
+receipt details. These fixtures verify security checks; host CLI installation is outside their scope.
 
 #### Local validation selection
 

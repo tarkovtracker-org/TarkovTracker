@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { clientProgressDiagnostic } from '@/utils/progressDiagnosticEvent';
 import { createDefaultOwnedProgressData } from '@/utils/progressSanitizers';
 const { config } = vi.hoisted(() => ({
   config: {
@@ -38,6 +39,11 @@ describe('aggregate progress payload diagnostics', () => {
     expect(request).toMatchObject({ credentials: 'omit', referrerPolicy: 'no-referrer' });
     const body = JSON.parse(request!.body as string);
     expect(body.href).toBeNull();
+    expect(clientProgressDiagnostic(body)).toMatchObject({
+      event: 'progress_sync_payload',
+      outcome: 'accepted',
+      buildCommit: 'a'.repeat(40),
+    });
     expect(body.args[1]).toMatchObject({
       buildCommit: 'a'.repeat(40),
       requestWireBytes: new TextEncoder().encode(JSON.stringify(modes)).length,

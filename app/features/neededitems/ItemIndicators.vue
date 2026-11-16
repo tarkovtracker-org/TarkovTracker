@@ -1,7 +1,7 @@
 <template>
   <span
     v-if="foundInRaid || kappaRequired || lightkeeperRequired || isCraftable"
-    class="bg-surface-900/60 ml-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ring-1 ring-white/10"
+    class="bg-surface-900/60 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 ring-1 ring-white/10"
   >
     <AppTooltip v-if="foundInRaid" :text="foundInRaidTitle">
       <UIcon name="i-mdi-checkbox-marked-circle-outline" :class="firIconClass" />
@@ -15,7 +15,7 @@
     <AppTooltip v-if="isCraftable" :text="craftableTitleText">
       <button
         type="button"
-        class="inline-flex"
+        class="-m-0.5 inline-flex p-0.5"
         :aria-label="craftableTitleText"
         @click.stop="emit('craft')"
       >
@@ -39,13 +39,13 @@
       lightkeeperRequired?: boolean;
     }>(),
     {
-      craftableIconBaseClass: 'h-5 w-5',
+      craftableIconBaseClass: 'size-4',
       craftableIconClass: '',
       craftableTitle: '',
-      firIconClass: 'h-5 w-5',
-      kappaIconClass: 'h-5 w-5 text-kappa',
+      firIconClass: 'size-4 text-warning-300',
+      kappaIconClass: 'size-4 text-kappa',
       kappaRequired: false,
-      lightkeeperIconClass: 'h-5 w-5 text-lightkeeper',
+      lightkeeperIconClass: 'size-4 text-lightkeeper',
       lightkeeperRequired: false,
     }
   );

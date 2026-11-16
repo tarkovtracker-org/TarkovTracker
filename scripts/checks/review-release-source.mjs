@@ -3,10 +3,11 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { comparisonDigest, requireEvidence, sha256 } from './dependency-evidence.mjs';
 const require = createRequire(import.meta.url);
+const relativeFile = (root, path) => relative(root, path).split(sep).join('/');
 function files(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -37,7 +38,7 @@ function typescriptParity(published, source, format) {
 }
 function compareFile(packageRoot, sourceRoot, path) {
   const published = readFileSync(path);
-  const file = relative(packageRoot, path);
+  const file = relativeFile(packageRoot, path);
   const compiled = /^dist\/(esm|commonjs)\/([^/]+)\.js$/.exec(file);
   const source = compiled ? `src/${compiled[2]}.ts` : file;
   requireEvidence(
@@ -75,7 +76,7 @@ function unreviewedEntries(packageRoot, comparison) {
 export function compareRuntime(packageRoot, sourceRoot) {
   const runtime = files(packageRoot).filter((path) => /\.[cm]?js$/.test(path));
   const convenience = runtime.filter((path) =>
-    /^dist\/.*\.min\.js$/.test(relative(packageRoot, path))
+    /^dist\/.*\.min\.js$/.test(relativeFile(packageRoot, path))
   );
   const compared = runtime.filter((path) => !convenience.includes(path));
   requireEvidence(compared.length > 0, 'No runtime modules found');
@@ -83,7 +84,7 @@ export function compareRuntime(packageRoot, sourceRoot) {
   return {
     comparison,
     comparisonSha256: comparisonDigest(comparison),
-    notCompared: convenience.map((path) => relative(packageRoot, path)),
+    notCompared: convenience.map((path) => relativeFile(packageRoot, path)),
     entrypointsNotCompared: unreviewedEntries(packageRoot, comparison),
   };
 }

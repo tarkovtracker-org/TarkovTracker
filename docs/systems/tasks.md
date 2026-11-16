@@ -525,8 +525,11 @@ not invented when data is missing. Refresh both sections in the overlay; the app
 Extract and transit markers are pins: a 30 px shaded teardrop with a white border, a dark outer
 ring, a drop shadow and a small ground shadow, so they stand out on light and dark map areas. The
 teardrop's tip is the exact map position, and the pin grows slightly on hover or when opened. A
-white glyph inside names who can use the location: PMC (shield), Scav (skull), shared (two
-people), co-op (handshake), transit (transfer), and an exit glyph for an unknown faction.
+white glyph inside uses the familiar running-through-a-door exit symbol for shared and
+unknown-faction extracts, including Armored Train. PMC-only (shield), Scav-only (skull), co-op
+(handshake), and transit (transfer) retain distinct glyphs so access restrictions remain readable
+without relying on color. Shared and unknown-faction extracts keep their separate colors and
+their existing layer classification; sharing a glyph does not imply a known faction.
 `app/features/maps/utils/markerGlyphs.ts` owns the classification, path data, and pin markup; head
 colors come from the customizable marker palette. A pin's name appears beside it on hover, when
 it is tapped or clicked (until another pin or the map is clicked), for every pin once the view is
@@ -816,6 +819,32 @@ Collapse-by-default applies to list cards; map cards start expanded. Matching de
 their card. The dedicated chevron controls card expansion in both views. Hide-rewards applies
 to both list and map cards. Missing database columns use the existing preference-sync fallback,
 so new settings remain local until the compact-list preference migration is deployed.
+
+### Needed Items views
+
+Two independent toolbar choices replace the former list, grid and combined views and the grid
+card-style toggle:
+
+- **Show**: _Items_ (`groupByItem`) has one entry per item with every quest and hideout need added
+  together, split into FIR and non-FIR totals per source. _Needs_ has one entry per task objective
+  or hideout requirement.
+- **Layout**: _List_ (divided rows) or _Grid_ (tiles), stored as `neededItemsViewMode`.
+
+Every combination is built from the same pieces in `app/features/neededitems/`: `NeededItemEntry`
+(one need, `row` or `tile`), `NeededItemGroupEntry` (one item), `NeededItemThumb`,
+`NeededItemSource` (quest or station link, lock and level hints, status, teammates) and
+`NeededItemCounter`. The counter is the only tracking control: a collect toggle for single
+items, a stepper for counted ones, a read-only count once the parent is done, and a teammate
+note for needs kept only for teammates. Phones keep the stepper inline under the item name; no
+layout opens a modal to track a single need. An item entry with exactly one need tracks it in
+place; otherwise it opens the grouped details modal (per-need steppers and Smart Fill).
+
+`neededItemsCardStyle` remains a synced preference column for compatibility but no longer
+affects rendering. The `needed_items_view` analytics event keeps `view_mode`
+(`combined`, `list` or `grid`) and adds `layout`; switching layout in Items mode is tracked.
+Entries render in batches of 24 after an initial 30 rows or 24 tiles (half on narrow screens).
+Each entry looks up its task with the metadata store's indexed `getTaskById` instead of scanning
+every task; the station lookup scans the short hideout station list.
 
 ### Needed Items pooled objective search and grouping
 
