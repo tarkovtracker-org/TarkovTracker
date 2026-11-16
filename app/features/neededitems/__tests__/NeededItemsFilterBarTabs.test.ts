@@ -61,7 +61,7 @@ describe('NeededItemsFilterBar source tabs', () => {
       },
     });
     const group = wrapper.get('[role="group"]');
-    expect(group.attributes('aria-label')).toBe('Requirement filters');
+    expect(group.attributes('aria-label')).toBe('Needed item filters');
     const tabs = group.findAll('button');
     expect(
       tabs.map((tab) => [tab.get('.sr-only').text(), tab.get('.rounded-full').text()])

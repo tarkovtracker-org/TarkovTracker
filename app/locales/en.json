@@ -1347,7 +1347,7 @@
       }
     },
     "needed_items": {
-      "filter_tabs_label": "Requirement filters",
+      "filter_tabs_label": "Needed item filters",
       "loading": "Loading task and hideout data",
       "items_count": "{count} item | {count} items",
       "empty": "No items match your search.",
