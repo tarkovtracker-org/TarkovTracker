@@ -525,8 +525,11 @@ not invented when data is missing. Refresh both sections in the overlay; the app
 Extract and transit markers are pins: a 30 px shaded teardrop with a white border, a dark outer
 ring, a drop shadow and a small ground shadow, so they stand out on light and dark map areas. The
 teardrop's tip is the exact map position, and the pin grows slightly on hover or when opened. A
-white glyph inside names who can use the location: PMC (shield), Scav (skull), shared (two
-people), co-op (handshake), transit (transfer), and an exit glyph for an unknown faction.
+white glyph inside uses the familiar running-through-a-door exit symbol for shared and
+unknown-faction extracts, including Armored Train. PMC-only (shield), Scav-only (skull), co-op
+(handshake), and transit (transfer) retain distinct glyphs so access restrictions remain readable
+without relying on color. Shared and unknown-faction extracts keep their separate colors and
+their existing layer classification; sharing a glyph does not imply a known faction.
 `app/features/maps/utils/markerGlyphs.ts` owns the classification, path data, and pin markup; head
 colors come from the customizable marker palette. A pin's name appears beside it on hover, when
 it is tapped or clicked (until another pin or the map is clicked), for every pin once the view is
