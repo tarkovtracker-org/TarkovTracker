@@ -169,14 +169,14 @@
   function visible(row: ReviewedCell) {
     if (filter.value === 'check') {
       if (row.cell.key === activeKey.value) return !skipped(row);
-      return blocksImport(row, props.tracked);
+      return blocksImport(row);
     }
     return row.cell.key === activeKey.value || listed(row);
   }
   const visibleRows = computed(() => props.rows.filter(visible));
   /**
-   * Uncertain rows that no requirement can use stay in view under To check, below the rows
-   * that block, so a wrong guess for a needed item can still be caught. They open in place.
+   * Only settled, unneeded items belong in this group. Every incomplete row stays
+   * in the main list, regardless of its candidate shortlist.
    */
   const skippedRows = computed(() => (filter.value === 'check' ? props.rows.filter(skipped) : []));
   function toggle(key: number) {

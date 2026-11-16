@@ -59,25 +59,19 @@ export function needsReview(row: ReviewedCell): boolean {
   if (row.excluded) return false;
   return !row.reviewed || !row.itemId || !validQuantity(row.quantity);
 }
-/** The chosen item or any suggestion is one an eligible requirement uses. */
-function affectsImport(row: ReviewedCell, tracked: ReadonlySet<string>): boolean {
-  if (tracked.has(row.itemId)) return true;
-  return row.cell.candidates.some((candidate) => tracked.has(candidate.itemId));
-}
 /**
- * Must be checked before saving. An uncertain row whose suggestions no requirement uses
- * (a modded weapon, a crate) cannot change any count, so it does not block. Without a
- * `tracked` set every uncertain row blocks.
+ * A shortlist cannot establish irrelevance. Unsettled identities and amounts always block:
+ * even an impossible amount on a confident suggestion can expose a wrong identity.
  */
-export function blocksImport(row: ReviewedCell, tracked?: ReadonlySet<string>): boolean {
-  return needsReview(row) && (!tracked || affectsImport(row, tracked));
+export function blocksImport(row: ReviewedCell): boolean {
+  return needsReview(row);
 }
-/** How a row is shown: confirmed, to check, uncertain but not needed, or removed. */
+/** How a row is shown: confirmed, to check, settled but unneeded, or removed. */
 export type ReviewState = 'ok' | 'check' | 'skip' | 'removed';
 export function reviewState(row: ReviewedCell, tracked?: ReadonlySet<string>): ReviewState {
   if (row.excluded) return 'removed';
-  if (!needsReview(row)) return 'ok';
-  return blocksImport(row, tracked) ? 'check' : 'skip';
+  if (needsReview(row)) return 'check';
+  return tracked && !tracked.has(row.itemId) ? 'skip' : 'ok';
 }
 export function selectItem(row: ReviewedCell, item: ScanItem): void {
   row.itemId = item.id;
@@ -99,22 +93,26 @@ function addQuantity(total: ObservedTotals, row: ReviewedCell): void {
 }
 /**
  * Validates all included rows, then groups physical observations once, independent of
- * requirements. Uncertain rows that do not block (see `blocksImport`) are left out.
+ * requirements. Only settled rows can be filtered by the account's needed item IDs.
  */
 export function reviewedTotals(
   rows: ReviewedCell[],
   tracked?: ReadonlySet<string>
 ): ObservedTotals[] {
-  if (rows.some((row) => blocksImport(row, tracked))) throw scanError('review_required');
+  if (rows.some(blocksImport)) throw scanError('review_required');
   const totals = new Map<string, ObservedTotals>();
-  for (const row of rows.filter((entry) => !entry.excluded && !needsReview(entry))) {
+  for (const row of rows.filter((entry) => !entry.excluded)) {
+    assertQuantity(row);
+    if (tracked && !tracked.has(row.itemId)) continue;
     accumulateRow(totals, row);
   }
   return [...totals.values()];
 }
-function accumulateRow(totals: Map<string, ObservedTotals>, row: ReviewedCell): void {
+function assertQuantity(row: ReviewedCell): void {
   if (!Number.isSafeInteger(row.quantity) || Number(row.quantity) > SCAN_LIMITS.quantity)
     throw scanError('quantity');
+}
+function accumulateRow(totals: Map<string, ObservedTotals>, row: ReviewedCell): void {
   const total = totals.get(row.itemId) ?? { itemId: row.itemId, fir: 0, nonFir: 0, unknown: 0 };
   addQuantity(total, row);
   totals.set(row.itemId, total);

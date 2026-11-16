@@ -11,6 +11,11 @@ matches the MIT-licensed Cultist Circle recognition features against static, has
 pixel features, and corrections are neither uploaded nor persisted. The save contains
 reviewed requirement counts, an image fingerprint, and an idempotency key.
 
+**Try demo screenshot** loads the bundled, user-supplied 2560×1440 screenshot through the same
+worker and review/preview flow. Demo counts cannot be saved. Choosing a personal screenshot
+leaves demo mode; a late or cancelled demo download cannot replace that selection. The original
+PNG is at `public/img/demos/stash-1440p.png` and is also the offline regression fixture.
+
 ### Review and allocation
 
 - Recognition scores route review attention; they are not probabilities. Uncertain identities
@@ -38,10 +43,11 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
   and slots under 48 px leave the amount for the player. A count above the item's stack size
   is ignored, and a plain number other than 1 on an item that cannot stack sends the row to
   review.
-- An uncertain row blocks Continue only when its chosen item or one of its suggestions is used
-  by an eligible requirement (`blocksImport`). Others, such as modded weapons or crates, show as
-  "Not needed" under To check, are left out of the totals, and count again once the player
-  picks an item.
+- Every uncertain or unidentified item blocks Continue, even when none of its suggestions is
+  needed. A top-five shortlist cannot establish that an item is irrelevant. Unread or invalid
+  quantities also block, including an impossible count on an otherwise confident suggestion.
+  Only fully settled, unneeded items appear under "Not needed" and stay out of the totals.
+  Confirming the item and amount or explicitly excluding the region settles review.
 - Users can search the indexed catalog, exclude regions, split merged detections, and draw a
   manually sized item region when detection fails. Keyboard users can enter region coordinates
   and slot dimensions. Regions and split parts must be at least 8 pixels wide and high.
@@ -107,8 +113,13 @@ It never silently substitutes the store for a caller-supplied detached snapshot.
   `scripts/checks/stash-item-import-concurrency.mjs` — transaction and real-lock regressions.
 
 Rebuild assets with `pnpm stash-scan:build-index` using the current `json.tarkov.dev` regular
-item catalog and English names. Only `assets.tarkov.dev` grid images are accepted. The
-manifest lists items with unusable templates; they remain available for manual correction.
+item catalog and English names. Remote grid images come only from `assets.tarkov.dev`. A pinned
+local supplement for Pile of meds is also indexed, retaining the original upstream template.
+It uses the same artwork with current cache framing and a separately rendered label, avoiding
+bright art strokes contaminating the old label features. Provenance and reproduction are in
+[`scripts/stash-scan/references/README.md`](../../scripts/stash-scan/references/README.md); the
+builder verifies the supplement's hash before decoding it. No game files or fonts are read at
+runtime. The manifest lists items with unusable templates; they remain available for manual correction.
 Each shard is written to a temporary file and atomically replaced; the manifest is replaced last,
 so an interrupted build preserves the last complete index. Successful publication prunes only
 obsolete content-addressed shard files; icon downloads are streamed with a 4 MB limit.
@@ -117,6 +128,10 @@ Catalog files are content-addressed and loaded by detected slot size. This first
 English and regular-mode based; mode-exclusive items absent from it cannot be identified.
 Accuracy across languages, game updates, compression, UI scaling, and tooltips must be
 measured with representative labeled screenshots. Synthetic parity does not prove it.
+`scripts/stash-scan/screenshot.test.ts` runs the unmodified demo PNG through real shards and
+checks the five document counts, current meds matching, the old-reference skip regression,
+flash-drive ambiguity, and scaled/JPEG copies. It is a calibration fixture, not held-out
+accuracy evidence. The checked-in original is never recompressed by the test.
 
 ### Rollout and rollback
 

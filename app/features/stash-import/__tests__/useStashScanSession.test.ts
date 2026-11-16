@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { effectScope, ref } from 'vue';
+import { effectScope } from 'vue';
 import { useStashScanSession } from '@/features/stash-import/useStashScanSession';
 import type { ScanResult } from '@/utils/stashScan/types';
 const mocks = vi.hoisted(() => ({ request: vi.fn(), cancel: vi.fn() }));
@@ -146,16 +146,15 @@ describe('stash scan session', () => {
     expect(session.image.value).toBeDefined();
     scope.stop();
   });
-  it('counts and visits only rows that can change a requirement', async () => {
+  it('counts and visits uncertain identities even when no suggestion is tracked', async () => {
     const scope = effectScope();
-    const tracked = ref<ReadonlySet<string>>(new Set(['other']));
-    const session = scope.run(() => useStashScanSession(() => tracked.value))!;
+    const session = scope.run(() => useStashScanSession())!;
     await session.select([screenshot()]);
     // Both uncertain rows suggest only 'item', which no requirement uses.
-    expect(session.remaining.value).toBe(0);
-    expect(session.activeKey.value).toBeUndefined();
-    tracked.value = new Set(['item']);
     expect(session.remaining.value).toBe(2);
+    expect(session.activeKey.value).toBe(0);
+    session.next();
+    expect(session.activeKey.value).toBe(1);
     session.next();
     expect(session.activeKey.value).toBe(0);
     scope.stop();

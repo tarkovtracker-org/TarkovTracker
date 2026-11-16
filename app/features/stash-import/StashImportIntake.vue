@@ -46,6 +46,16 @@
           {{ $t('stash_import.choose_image') }}
         </UButton>
         <UButton
+          icon="i-mdi-image-outline"
+          variant="soft"
+          color="neutral"
+          :disabled="disabled"
+          :loading="demoLoading"
+          @click="$emit('demo')"
+        >
+          {{ $t('stash_import.try_demo') }}
+        </UButton>
+        <UButton
           v-if="canReadClipboard"
           icon="i-mdi-content-paste"
           variant="soft"
@@ -83,8 +93,9 @@
     stage: string;
     completed: number;
     total: number;
+    demoLoading?: boolean;
   }>();
-  const emit = defineEmits<{ files: [files: File[]]; pasteRequest: []; cancel: [] }>();
+  const emit = defineEmits<{ files: [files: File[]]; pasteRequest: []; cancel: []; demo: [] }>();
   const input = ref<HTMLInputElement>();
   const tips = [
     { key: 'open', icon: 'i-mdi-view-grid-outline' },

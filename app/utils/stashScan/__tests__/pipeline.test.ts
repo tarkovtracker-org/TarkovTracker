@@ -172,28 +172,48 @@ describe('observation review and quantity accounting', () => {
       false
     );
   });
-  it('lets uncertain rows that no requirement uses through, and leaves them out of totals', () => {
+  it('requires identity review even when the needed item is outside every suggestion', () => {
+    const meds = row({
+      itemId: 'mayo',
+      reviewed: false,
+      cell: cell({ candidates: [candidate('mayo', 0.72), candidate('mask', 0.71)] }),
+    });
+    const tracked = new Set(['meds']);
+    expect(blocksImport(meds)).toBe(true);
+    expect(reviewState(meds, tracked)).toBe('check');
+    expect(() => reviewedTotals([meds], tracked)).toThrow(error('review_required'));
+    expect(blocksImport({ ...meds, itemId: '', reviewed: true })).toBe(true);
+    expect(blocksImport({ ...meds, cell: cell({ candidates: [] }), itemId: '' })).toBe(true);
+    expect(blocksImport({ ...meds, excluded: true })).toBe(false);
+  });
+  it('groups only settled unneeded items, while unread amounts still block', () => {
     const weapon = row({
       itemId: 'rifle',
-      reviewed: false,
+      reviewed: true,
+      quantity: 1,
       cell: cell({ candidates: [candidate('rifle', 0.5), candidate('shotgun', 0.49)] }),
     });
     const tracked = new Set(['single']);
-    expect(needsReview(weapon)).toBe(true);
-    expect(blocksImport(weapon, tracked)).toBe(false);
+    expect(needsReview(weapon)).toBe(false);
+    expect(blocksImport(weapon)).toBe(false);
     expect(reviewState(weapon, tracked)).toBe('skip');
     expect(reviewedTotals([weapon, row()], tracked)).toEqual([
       { itemId: 'single', fir: 0, nonFir: 0, unknown: 1 },
     ]);
-    // A tracked suggestion, a tracked choice, or no tracked set at all still blocks.
-    const lookalike = { ...weapon, cell: cell({ candidates: [candidate('single', 0.5)] }) };
-    expect(blocksImport(lookalike, tracked)).toBe(true);
-    expect(blocksImport({ ...weapon, itemId: 'single' }, tracked)).toBe(true);
-    expect(blocksImport(weapon)).toBe(true);
-    expect(() => reviewedTotals([weapon])).toThrow(error('review_required'));
+    // Unknown identity and unread or contradictory amounts remain reviewable.
+    const lookalike = { ...weapon, reviewed: false };
+    expect(blocksImport(lookalike)).toBe(true);
+    const unread = { ...weapon, quantity: null };
+    expect(blocksImport(unread)).toBe(true);
+    expect(() => reviewedTotals([unread], tracked)).toThrow(error('review_required'));
+    expect(() => reviewedTotals([lookalike], tracked)).toThrow(error('review_required'));
+    expect(() =>
+      reviewedTotals([{ ...weapon, quantity: SCAN_LIMITS.quantity + 1 }], tracked)
+    ).toThrow(error('quantity'));
     expect(reviewState(row(), tracked)).toBe('ok');
     expect(reviewState(row({ excluded: true }), tracked)).toBe('removed');
     expect(reviewState(lookalike, tracked)).toBe('check');
+    expect(blocksImport({ ...weapon, itemId: '' })).toBe(true);
   });
   it('ignores excluded incomplete rows and automatically excludes detected empty slots', () => {
     expect(reviewCell(cell({ empty: true }), new Map()).excluded).toBe(true);

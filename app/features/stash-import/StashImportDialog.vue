@@ -25,7 +25,11 @@
               {{ $t('stash_import.title') }}
             </h2>
             <p class="text-surface-400 text-xs sm:text-sm">
-              {{ $t('stash_import.destination', { mode: modeLabel }) }}
+              {{
+                demoMode
+                  ? $t('stash_import.demo_destination')
+                  : $t('stash_import.destination', { mode: modeLabel })
+              }}
             </p>
           </div>
           <UButton
@@ -71,7 +75,9 @@
             :stage="stage"
             :completed="completed"
             :total="total"
+            :demo-loading="Boolean(demoController)"
             @files="intake"
+            @demo="useDemo"
             @paste-request="pasteFromClipboard"
             @cancel="cancel"
           />
@@ -175,6 +181,7 @@
   import { useStashScanSession } from '@/features/stash-import/useStashScanSession';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { reviewedTotals } from '@/utils/stashScan/review';
+  import { scanError } from '@/utils/stashScan/types';
   import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
   import type { ReviewedCell, ScanRect } from '@/utils/stashScan/types';
   type Step = 'intake' | 'review' | 'apply' | 'done';
@@ -210,12 +217,14 @@
     region,
     split,
     next,
-  } = useStashScanSession(tracked);
+  } = useStashScanSession();
   // Decode for display only once the worker has finished, so the two decodes never overlap.
   const { bitmap, failed: bitmapFailed } = useScreenshotBitmap(() =>
     result.value ? image.value : undefined
   );
   const step = ref<Step>('intake');
+  const demoMode = ref(false);
+  const demoController = shallowRef<AbortController>();
   const importMode = ref<ImportMode>('replace');
   const selected = ref<string[]>([]);
   const preview = shallowRef<PreviewData>();
@@ -310,9 +319,11 @@
       importer.signedIn.value &&
       liveChanges.value.length > 0 &&
       (decreaseCount.value === 0 || allowDecreases.value) &&
-      !applyLocked.value
+      !applyLocked.value &&
+      !demoMode.value
   );
   const applyHint = computed(() => {
+    if (demoMode.value) return t('stash_import.demo_no_save');
     if (!importer.signedIn.value) return t('stash_import.errors.sign_in');
     if (!liveChanges.value.length) return t('stash_import.no_changes');
     if (decreaseCount.value && !allowDecreases.value) return t('stash_import.confirm_first');
@@ -482,8 +493,10 @@
     selected.value = [];
     pendingRegion.value = undefined;
     blockedSource.value = false;
+    demoMode.value = false;
   }
-  async function intake(files: File[]) {
+  async function intake(files: File[], fromDemo = false) {
+    if (!fromDemo) cancelDemo();
     if (!canIntake.value) {
       if (step.value === 'apply') notice.value = 'stash_import.go_back_for_image';
       return;
@@ -491,12 +504,14 @@
     if (!(await leaveConflict())) return;
     resetImport();
     resetSelection();
+    demoMode.value = fromDemo;
     step.value = 'intake';
     await select(files);
     syncSelection();
     if (result.value) step.value = 'review';
   }
   async function startOver() {
+    cancelDemo();
     if (!(await leaveConflict())) return;
     clear();
     resetImport();
@@ -519,6 +534,40 @@
   }
   onMounted(() => document.addEventListener('paste', paste));
   onBeforeUnmount(() => document.removeEventListener('paste', paste));
+  onBeforeUnmount(cancelDemo);
+  function cancelDemo() {
+    demoController.value?.abort();
+    demoController.value = undefined;
+  }
+  async function useDemo() {
+    if (!canIntake.value) return;
+    cancelDemo();
+    const controller = new AbortController();
+    demoController.value = controller;
+    try {
+      await acceptDemo(controller, await demoFile(controller.signal));
+    } catch (failure) {
+      reportDemoFailure(controller, failure);
+    } finally {
+      settleDemo(controller);
+    }
+  }
+  async function demoFile(signal: AbortSignal): Promise<File> {
+    const response = await fetch('/img/demos/stash-1440p.png', { signal });
+    if (!response.ok) throw scanError('scan_failed');
+    return new File([await response.blob()], 'stash-demo.png', { type: 'image/png' });
+  }
+  async function acceptDemo(controller: AbortController, file: File) {
+    if (demoController.value !== controller) return;
+    await intake([file], true);
+    if (demoMode.value) notice.value = 'stash_import.demo_no_save';
+  }
+  function reportDemoFailure(controller: AbortController, failure: unknown) {
+    if (!controller.signal.aborted) report(failure);
+  }
+  function settleDemo(controller: AbortController) {
+    if (demoController.value === controller) demoController.value = undefined;
+  }
   async function paste(event: ClipboardEvent) {
     const files = Array.from(event.clipboardData?.files ?? []);
     if (!files.length) return;

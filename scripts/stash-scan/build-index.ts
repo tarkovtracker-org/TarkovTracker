@@ -3,9 +3,9 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { cacheImage, publishScanCatalog, writeScanAsset } from '@@/scripts/stash-scan/build-assets';
-import sharp from 'sharp';
+import { addGridImage, readReferenceGrid } from '@@/scripts/stash-scan/references';
 import { FEATURE_VERSION } from '@/utils/stashScan/core/features';
-import { addCatalogIcon, createIconIndex, type IconIndex } from '@/utils/stashScan/core/matcher';
+import { createIconIndex, type IconIndex } from '@/utils/stashScan/core/matcher';
 import { encodeScanShard } from '@/utils/stashScan/indexCodec';
 import {
   SCAN_LIMITS,
@@ -87,13 +87,9 @@ async function imageBytes(item: CatalogEntry): Promise<Uint8Array> {
   return cacheImage(response, file);
 }
 async function addItem(index: IconIndex, item: CatalogEntry): Promise<boolean> {
-  const bytes = await imageBytes(item);
-  const { data, info } = await sharp(bytes, { limitInputPixels: 1_000_000 })
-    .toColourspace('srgb')
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  return addCatalogIcon(index, { ...item, grid: { data, width: info.width, height: info.height } });
+  const upstream = await addGridImage(index, item, await imageBytes(item));
+  const reference = await readReferenceGrid(item.id);
+  return reference ? (await addGridImage(index, item, reference)) || upstream : upstream;
 }
 async function buildTemplates(entries: CatalogEntry[]) {
   const index = createIconIndex();

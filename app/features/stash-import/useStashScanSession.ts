@@ -10,10 +10,8 @@ import {
   type ScanResult,
   type ScanCommand,
 } from '@/utils/stashScan/types';
-/** `tracked` lists the item IDs eligible requirements use; only rows touching them block. */
-export function useStashScanSession(
-  tracked: () => ReadonlySet<string> | undefined = () => undefined
-) {
+/** Every included, unsettled row must be checked, independent of needed-item suggestions. */
+export function useStashScanSession() {
   const source = shallowRef<File>();
   const result = shallowRef<ScanResult>();
   const rows = ref<ReviewedCell[]>([]);
@@ -29,7 +27,7 @@ export function useStashScanSession(
   let scanner: ReturnType<typeof createStashScanner> | undefined;
   let generation = 0;
   const active = computed(() => rows.value.find((row) => row.cell.key === activeKey.value));
-  const blocking = (row: ReviewedCell) => blocksImport(row, tracked());
+  const blocking = (row: ReviewedCell) => blocksImport(row);
   const remaining = computed(() => rows.value.filter(blocking).length);
   const currentItems = computed(
     () => new Map(result.value?.catalog.items.map((item) => [item.id, item]) ?? [])

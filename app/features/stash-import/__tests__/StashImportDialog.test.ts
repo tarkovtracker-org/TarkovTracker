@@ -149,6 +149,7 @@ const saveNow = async (wrapper: ReturnType<typeof render>) => {
 describe('stash import flow', () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -185,6 +186,54 @@ describe('stash import flow', () => {
     expect(wrapper.find('[data-testid=stash-dropzone]').exists()).toBe(true);
     expect(wrapper.find('input[type=file]').attributes('accept')).toContain('image/png');
     expect(wrapper.text()).toContain('stash_import.drop_title');
+    wrapper.unmount();
+  });
+  it('loads the bundled demo through scanning and never enables saving its counts', async () => {
+    const fetchDemo = vi
+      .fn()
+      .mockResolvedValue(new Response(new Blob(['demo'], { type: 'image/png' })));
+    vi.stubGlobal('fetch', fetchDemo);
+    const wrapper = render();
+    await click(wrapper, 'try_demo');
+    expect(fetchDemo).toHaveBeenCalledWith(
+      '/img/demos/stash-1440p.png',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    expect(mocks.select.mock.lastCall?.[0][0]).toMatchObject({
+      name: 'stash-demo.png',
+      type: 'image/png',
+    });
+    await click(wrapper, 'continue');
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    expect(save(wrapper).attributes('disabled')).toBeDefined();
+    await saveNow(wrapper);
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.commit).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain('stash_import.demo_no_save');
+    wrapper.unmount();
+  });
+  it('does not let a late demo fetch replace a user-selected screenshot', async () => {
+    let finish!: (value: Response) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve;
+          })
+      )
+    );
+    const wrapper = render();
+    await button(wrapper, 'try_demo').trigger('click');
+    const ownFile = pasteFile();
+    await flushPromises();
+    finish(new Response(new Blob(['demo'], { type: 'image/png' })));
+    await flushPromises();
+    expect(mocks.select).toHaveBeenCalledExactlyOnceWith([ownFile]);
+    settle();
+    await click(wrapper, 'continue');
+    await wrapper.get('[data-testid=stash-mode-add] input').setValue(true);
+    expect(save(wrapper).attributes('disabled')).toBeUndefined();
     wrapper.unmount();
   });
   it.each([true, false])(

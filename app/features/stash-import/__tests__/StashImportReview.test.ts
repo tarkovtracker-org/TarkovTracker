@@ -33,7 +33,7 @@ function render(tracked: ReadonlySet<string>) {
   return mount(StashImportReview, {
     props: {
       result,
-      rows: [row(0, 'ledx', false), row(1, 'rifle', false), row(2, 'ledx', true)],
+      rows: [row(0, 'ledx', false), row(1, 'rifle', true), row(2, 'ledx', true)],
       tracked,
       remaining: 1,
       itemName: (id: string) => id,
@@ -51,14 +51,20 @@ function render(tracked: ReadonlySet<string>) {
   });
 }
 describe('StashImportReview', () => {
-  it('lists blocking rows first and keeps unneeded uncertain rows under their own heading', () => {
+  it('lists blocking rows first and separates settled, unneeded items', () => {
     const wrapper = render(new Set(['ledx']));
     expect(wrapper.findAll('.row').map((entry) => entry.text())).toEqual(['ledx', 'rifle']);
     expect(wrapper.text()).toContain('stash_import.skip_heading:1');
   });
-  it('shows no Not needed section when every uncertain row matters', () => {
+  it('keeps uncertain identities in To check when their suggestions are all unneeded', async () => {
+    const wrapper = render(new Set(['ledx']));
+    await wrapper.setProps({ rows: [row(0, 'mayo', false)], remaining: 1 });
+    expect(wrapper.findAll('.row').map((entry) => entry.text())).toEqual(['mayo']);
+    expect(wrapper.text()).not.toContain('stash_import.skip_heading');
+  });
+  it('shows no Not needed section when every settled item is needed', () => {
     const wrapper = render(new Set(['ledx', 'rifle']));
-    expect(wrapper.findAll('.row').map((entry) => entry.text())).toEqual(['ledx', 'rifle']);
+    expect(wrapper.findAll('.row').map((entry) => entry.text())).toEqual(['ledx']);
     expect(wrapper.text()).not.toContain('stash_import.skip_heading');
   });
   it('opens a Not needed row where it is instead of moving it into the main list', async () => {
