@@ -22,7 +22,6 @@ const GLYPH_HEIGHT = 10;
 export const STACK_DIGITS = { width: GLYPH_WIDTH, height: GLYPH_HEIGHT, rows: DIGITS } as const;
 /** Count text sits right-aligned in the bottom rows, under a raised FIR mark. */
 const BAND_HEIGHT = 13;
-const BAND_WIDTH = 44;
 /** Digits are about 8 template pixels tall; anything far off that is art or a mark. */
 const DIGIT_HEIGHT = 8;
 /** The last digit ends within this many template pixels of the right border. */
@@ -34,6 +33,8 @@ const CLEAR_GAP = 7;
 /** A digit must clearly beat the runner-up shape, or the count is left for the player. */
 const MIN_DIGIT_SCORE = 0.5;
 const MIN_DIGIT_MARGIN = 0.2;
+/** A count starting this close to the cell's left edge may have lost glyphs past it. */
+const EDGE_MARGIN = 3;
 const INK = 0.35;
 const NOISE_PIXELS = 3;
 const MIN_SLOT_PX = 48;
@@ -78,12 +79,12 @@ function ink(r: number, g: number, b: number): number {
   const max = Math.max(r, g, b);
   return Math.max(0, Math.min(1, (min - 90) / 100 - Math.max(0, max - min - 40) / 100));
 }
-/** The count band in native pixels, ending on the cell's bottom and right border lines. */
+/** The count band in native pixels: the cell's full inner width above its bottom border. */
 function band(image: RgbImage, cell: GridCell) {
   const scale = (cell.height - 1) / (cell.slotsHigh * TEMPLATE_SLOT_PX);
   const right = cell.x + cell.width - 1;
   const bottom = cell.y + cell.height - 1;
-  const left = Math.max(cell.x + 1, Math.round(right - BAND_WIDTH * scale));
+  const left = cell.x + 1;
   const top = Math.max(cell.y + 1, Math.round(bottom - (BAND_HEIGHT + 1) * scale));
   const width = right - left;
   const height = bottom - top;
@@ -212,14 +213,36 @@ export function readStackCount(image: RgbImage, cell: GridCell, markInCorner = f
   const { map, width, scale } = band(image, cell);
   const boxes = components(map, width).filter((box) => box.pixels >= NOISE_PIXELS * scale);
   const run = countRun(boxes, width, map.length / width, scale);
-  const zoneStart = run.length
-    ? run[0]!.x0 - CLEAR_GAP * scale
-    : width - 1 - (RIGHT_PADDING + DIGIT_HEIGHT) * scale;
-  const nearby = boxes.filter((box) => !run.includes(box) && box.x1 >= zoneStart);
-  if (nearby.length) return { kind: 'unclear' };
-  if (!run.length) return { kind: 'none' };
+  if (!run.length) return nearCorner(boxes, width, scale) ? { kind: 'unclear' } : { kind: 'none' };
+  if (!isolated(run, boxes, map, width, scale)) return { kind: 'unclear' };
   const digits = run.map((box) => readDigit(glyphVector(map, width, box)));
   if (digits.some((digit) => !digit || digit === '/') || digits[0] === '0')
     return { kind: 'unclear' };
   return { kind: 'number', value: Number(digits.join('')) };
+}
+/** Ink where a count would end means something covers the corner. */
+const nearCorner = (boxes: Box[], width: number, scale: number) =>
+  boxes.some((box) => box.x1 >= width - 1 - (RIGHT_PADDING + DIGIT_HEIGHT) * scale);
+/**
+ * The run is the whole number: nothing else close on its left, no other digit on its
+ * baseline (a thousands group can sit further left), and not cut off by the cell's edge.
+ */
+function isolated(
+  run: Box[],
+  boxes: Box[],
+  map: Float32Array,
+  width: number,
+  scale: number
+): boolean {
+  const first = run[0]!;
+  if (first.x0 / scale < EDGE_MARGIN) return false;
+  const top = Math.min(...run.map((box) => box.y0));
+  const bottom = Math.max(...run.map((box) => box.y1));
+  const onBaseline = (box: Box) => digitSized(box, scale) && box.y0 <= bottom && box.y1 >= top;
+  return !boxes.some(
+    (box) =>
+      !run.includes(box) &&
+      (box.x1 >= first.x0 - CLEAR_GAP * scale ||
+        (onBaseline(box) && readDigit(glyphVector(map, width, box)) !== undefined))
+  );
 }

@@ -13,6 +13,7 @@ function cellImage(pitch: number): { image: RgbImage; cell: GridCell } {
   return { image, cell: { x: 0, y: 0, width: size, height: size, slotsWide: 1, slotsHigh: 1 } };
 }
 function shade(image: RgbImage, x: number, y: number, value: number): void {
+  if (x < 0 || y < 0 || x >= image.width || y >= image.height) return;
   const v = Math.max(0, Math.min(255, Math.round(value)));
   image.data.set([v, v, v], (y * image.width + x) * 3);
 }
@@ -102,12 +103,22 @@ describe('stack count reading', () => {
     for (const [pitch, text] of [
       [84, '12/12'],
       [84, '12 412'],
+      [84, '12   412'],
       [42, '4'],
     ] as const) {
       const { image, cell } = cellImage(pitch);
       paintCount(image, pitch, text);
       expect(readStackCount(image, cell)).toEqual({ kind: 'unclear' });
     }
+  });
+  it('reads a long count across the whole slot, and refuses one cut off at its edge', () => {
+    const { image, cell } = cellImage(84);
+    // About 53 template pixels wide: more than the old fixed 44 px band.
+    paintCount(image, 84, '4224224');
+    expect(readStackCount(image, cell)).toEqual({ kind: 'number', value: 4224224 });
+    const clipped = cellImage(84);
+    paintCount(clipped.image, 84, '422422422');
+    expect(readStackCount(clipped.image, clipped.cell)).toEqual({ kind: 'unclear' });
   });
   it('does not read an item frame along the border as a 1', () => {
     const { image, cell } = cellImage(84);

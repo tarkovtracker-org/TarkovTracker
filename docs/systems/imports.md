@@ -31,10 +31,13 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
   renders differently), or a label of at least 0.93 that leads by 0.12 (a tinted or modded
   weapon). Items that share an icon or a short name tie on that signal and stay uncertain.
 - Stack counts are read from the bottom-right corner (`stackCount.ts`): right-aligned digits
-  matched against digit shapes averaged from catalog labels. A clear corner, or a FIR mark in
-  the corner itself, means one item. Look-alike digits (0, 5, 6, 8 often), slashes as in
-  `10/10`, spaced thousands, other ink near the count, and slots under 48 px leave the amount
-  for the player. A count above the item's stack size is ignored.
+  across the full inner width of the item, matched against digit shapes averaged from catalog
+  labels. A clear corner, or a FIR mark in the corner itself, means one item. Look-alike digits
+  (0, 5, 6, 8 often), slashes as in `10/10`, other ink near the count, another digit on its
+  baseline (a spaced thousands group), a count within 3 template px of the cell's left edge,
+  and slots under 48 px leave the amount for the player. A count above the item's stack size
+  is ignored, and a plain number other than 1 on an item that cannot stack sends the row to
+  review.
 - An uncertain row blocks Continue only when its chosen item or one of its suggestions is used
   by an eligible requirement (`blocksImport`). Others, such as modded weapons or crates, show as
   "Not needed" under To check, are left out of the totals, and count again once the player

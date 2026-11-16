@@ -42,7 +42,10 @@ function render(tracked: ReadonlySet<string>) {
       mocks: { $t: (key: string, values?: { count?: number }) => `${key}:${values?.count ?? ''}` },
       stubs: {
         UButton: { template: '<button><slot /></button>' },
-        StashReviewRow: { props: ['row'], template: '<div class="row">{{ row.itemId }}</div>' },
+        StashReviewRow: {
+          props: ['row', 'open'],
+          template: '<div class="row" :data-open="open">{{ row.itemId }}</div>',
+        },
       },
     },
   });
@@ -61,7 +64,9 @@ describe('StashImportReview', () => {
   it('opens a Not needed row where it is instead of moving it into the main list', async () => {
     const wrapper = render(new Set(['ledx']));
     await wrapper.setProps({ activeKey: 1 });
-    expect(wrapper.findAll('.row').map((entry) => entry.text())).toEqual(['ledx', 'rifle']);
+    const rows = wrapper.findAll('.row');
+    expect(rows.map((entry) => entry.text())).toEqual(['ledx', 'rifle']);
+    expect(rows.map((entry) => entry.attributes('data-open'))).toEqual(['false', 'true']);
     expect(wrapper.text()).toContain('stash_import.skip_heading:1');
   });
 });

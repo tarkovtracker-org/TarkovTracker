@@ -30,10 +30,14 @@ const strongSuggestion = (cell: ScanCell): boolean =>
 function suggestedItemId(cell: ScanCell): string {
   return (cell.candidates[0]?.score ?? 0) >= 0.5 ? cell.candidates[0]!.itemId : '';
 }
-/** Units on the item: one for items that cannot stack, else the count read from the icon. */
+/**
+ * Units on the item: the count read from the icon, if it fits the item. An item that cannot
+ * stack is one unit, unless the icon shows a different plain number, which means the
+ * identity is probably wrong. Capacity text such as "10/10" is never read as a number.
+ */
 function quantityFor(cell: ScanCell, item: ScanItem | undefined): number | null {
   if (!item) return null;
-  if (item.maxStack <= 1) return 1;
+  if (item.maxStack <= 1) return cell.stack === null || cell.stack === 1 ? 1 : null;
   return cell.stack !== null && cell.stack <= item.maxStack ? cell.stack : null;
 }
 export function reviewCell(cell: ScanCell, items: Map<string, ScanItem>): ReviewedCell {

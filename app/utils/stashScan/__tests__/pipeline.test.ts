@@ -138,6 +138,11 @@ describe('observation review and quantity accounting', () => {
     const reviewed = reviewCell(cell({ stack: 4 }), new Map());
     selectItem(reviewed, item('ammo', 60));
     expect(reviewed.quantity).toBe(4);
+    // An item that cannot stack showing a plain number other than 1 is probably misidentified.
+    const single = new Map([['single', item()]]);
+    expect(reviewCell(cell({ stack: 2 }), single).quantity).toBeNull();
+    expect(reviewCell(cell({ stack: null }), single).quantity).toBe(1);
+    expect(reviewCell(cell({ stack: 1 }), single).quantity).toBe(1);
   });
   it('accepts one decisive signal unless another candidate ties on it', () => {
     const items = new Map([
