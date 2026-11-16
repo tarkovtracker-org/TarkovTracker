@@ -7,7 +7,7 @@
       :aria-label="label(row.fir)"
       class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
     >
-      <span class="text-surface-300 text-xs" :class="row.fir ? 'text-warning-300' : ''">
+      <span class="text-xs" :class="row.fir ? 'text-warning-300' : 'text-surface-300'">
         {{ $t(row.fir ? 'common.fir' : 'needed_items.non_fir') }}
       </span>
       <ItemCountControls

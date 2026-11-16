@@ -7,6 +7,50 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import type { BreakdownSection } from '@/features/neededitems/NeededItemGroupBreakdown.vue';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
 type Need = NeededItemTaskObjective | NeededItemHideoutModule;
+// History entries outlive cards. Weak keys keep their version metadata alive only with the entry.
+const undoVersions = new WeakMap<object, Map<string, number>>();
+const revisionsByHistory = new WeakMap<object, Map<string, { revision: number }>>();
+function countRevision(
+  history: ReturnType<typeof useActionHistoryStore>,
+  key: string,
+  read: () => string
+) {
+  let records = revisionsByHistory.get(history);
+  if (!records) {
+    records = new Map();
+    revisionsByHistory.set(history, records);
+  }
+  const existing = records.get(key);
+  if (existing) return existing.revision;
+  const entry = { revision: 0 };
+  records.set(key, entry);
+  // Observe each semantic change synchronously, including A → B → A without timestamps.
+  // The detached scope survives card unmounts and stops when history releases this record.
+  const scope = effectScope(true);
+  scope.run(() => {
+    watch(read, () => entry.revision++, { flush: 'sync' });
+    watch(
+      () => [...history.undoStack],
+      (actions) => {
+        if (actions.some((action) => undoVersions.get(action)?.has(key))) return;
+        scope.stop();
+        records.delete(key);
+      }
+    );
+  });
+  return entry.revision;
+}
+function rebaseUndoVersions(
+  actions: object[],
+  restored: { key: string; before: number; after: number }[]
+) {
+  actions.forEach((action) => {
+    const versions = undoVersions.get(action);
+    restored.forEach(({ key, before, after }) => {
+      if (versions?.get(key) === before) versions.set(key, after);
+    });
+  });
+}
 export function useGroupedItemTracking(needs: () => Need[], itemName: () => string) {
   const store = useTarkovStore();
   const history = useActionHistoryStore();
@@ -18,18 +62,20 @@ export function useGroupedItemTracking(needs: () => Need[], itemName: () => stri
   const scope = () => `${$supabase.user.id ?? null}:${store.getCurrentGameMode()}`;
   const initialScope = scope();
   const isActive = () => scope() === initialScope;
+  const versionKey = (need: Need) => `${initialScope}:${need.needType}:${need.id}`;
   const record = (need: Need) => {
     const data = store.getCurrentProgressData();
     return need.needType === 'taskObjective'
       ? data.taskObjectives?.[need.id]
       : data.hideoutParts?.[need.id];
   };
-  // Persistence can reorder fields without changing progress. Compare values, including the
-  // timestamp, so Undo accepts normalization but never overwrites a newer edit.
+  // Persistence can reorder/default fields without changing progress.
   const recordVersion = (need: Need) => {
     const saved = record(need);
     return JSON.stringify([saved?.count ?? 0, saved?.complete ?? false, saved?.timestamp ?? 0]);
   };
+  const revision = (need: Need) =>
+    countRevision(history, versionKey(need), () => recordVersion(need));
   const currentCount = (need: Need) => {
     const saved = record(need);
     // Older checked objectives/parts can have a completion flag without a count.
@@ -118,8 +164,11 @@ export function useGroupedItemTracking(needs: () => Need[], itemName: () => stri
     const updates = planGroupedCountAdjustment(entries, count);
     if (!updates.length) return;
     const before = updates.map(({ target }) => ({ ...record(target.need) }));
+    const beforeVersions = updates.map(({ target }) => revision(target.need));
     updates.forEach(({ target, count: next }) => writeCount(target.need, next));
-    const after = updates.map(({ target }) => recordVersion(target.need));
+    const versions = new Map(
+      updates.map(({ target }) => [versionKey(target.need), revision(target.need)])
+    );
     const id = `needed-count-${crypto.randomUUID()}`;
     const title = t('needed_items.inline_counts.updated', { name: itemName() });
     history.pushAction({
@@ -127,14 +176,27 @@ export function useGroupedItemTracking(needs: () => Need[], itemName: () => stri
       description: title,
       undo: () => {
         const unchanged = updates.every(
-          ({ target }, index) =>
-            !isSelfCompleted(target.need) && recordVersion(target.need) === after[index]
+          ({ target }) =>
+            !isSelfCompleted(target.need) &&
+            revision(target.need) === versions.get(versionKey(target.need))
         );
         if (!isActive() || !unchanged)
           throw new Error(t('needed_items.inline_counts.undo_conflict'));
         updates.forEach(({ target }, index) => restore(target.need, before[index]!));
+        // A successful Undo can stamp completion again. Rebase only earlier snapshots that
+        // expected the exact state we restored, preserving guards against external changes.
+        rebaseUndoVersions(
+          history.undoStack,
+          updates.map(({ target }, index) => ({
+            key: versionKey(target.need),
+            before: beforeVersions[index]!,
+            after: revision(target.need),
+          }))
+        );
       },
     });
+    const action = history.undoStack.at(-1);
+    if (action) undoVersions.set(action, versions);
     toast.add({
       id: 'needed-items-count',
       title,

@@ -125,11 +125,21 @@ describe('NeededItemGroupEntry', () => {
     completion.done = true;
     const wrapper = mountEntry();
     expect(wrapper.text()).toContain('0 remaining');
-    expect(
-      wrapper
-        .findAll('[role="group"] button')
-        .every((button) => button.attributes('disabled') !== undefined)
-    ).toBe(true);
+    const buttons = wrapper.findAll('[role="group"] button');
+    expect(buttons).toHaveLength(6);
+    expect(buttons.every((button) => button.attributes('disabled') !== undefined)).toBe(true);
+  });
+  it('keeps grouped totals stable when Hide owned removes a filled requirement from results', async () => {
+    const wrapper = mountEntry({
+      group: { ...group, total: 7, currentCount: 1, taskNonFir: 0, taskNonFirCurrent: 0 },
+    });
+    const counter = wrapper.get('[role="group"][aria-label="Track Bolts (Non-FIR)"]');
+    expect(counter.text()).toContain('2/6');
+    expect(wrapper.text()).toContain('6 remaining');
+    await counter.get('button[aria-label="Increase Track Bolts (Non-FIR)"]').trigger('click');
+    expect(counter.text()).toContain('3/6');
+    expect(useTarkovStore().getObjectiveCount('regular')).toBe(2);
+    expect(useTarkovStore().getHideoutPartCount('part')).toBe(1);
   });
   it('opens the details when the thumbnail is clicked', async () => {
     const wrapper = mountEntry();

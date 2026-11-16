@@ -835,14 +835,17 @@ Every combination is built from the same pieces in `app/features/neededitems/`: 
 items, a stepper for counted ones, a read-only count once the parent is done, and a teammate
 note for needs kept only for teammates. Phones keep the stepper inline under the item name; no
 layout opens a modal to track a single need. Grouped entries use `NeededItemGroupTracking` with
-inline FIR and Non-FIR steppers and typed counts, alongside the remaining quantity (clamped at
-zero). Only the changed quantity is distributed: additions follow existing task/hideout priority,
+inline steppers and typed counts for the available FIR and Non-FIR totals, alongside the remaining
+quantity (clamped at zero). Only the changed quantity is distributed: additions follow existing task/hideout priority,
 and removals use reverse priority, preserving other allocations. Finished parent quests and
 built modules stay read-only and contribute a protected minimum. Counts and Undo are scoped to
 the current account and game mode; Undo survives a filtered-out card and rejects newer progress.
 The optional _See where it’s needed_ action opens per-need details and the existing Smart Fill
 replacement flow. The source badges count requirements in both modes; the result summary
 always states its units and also counts unique items when the switch is enabled.
+With Hide owned enabled, grouped counters and their source breakdown retain the full matching
+requirements, keeping tracked quantities and denominators stable as allocations fill. The
+remaining count determines whether an item is still needed; fully collected items disappear.
 
 `neededItemsCardStyle` remains a synced preference column for compatibility but no longer
 affects rendering. The `needed_items_view` analytics event keeps `view_mode`

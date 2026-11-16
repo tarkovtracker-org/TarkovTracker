@@ -21,6 +21,10 @@ describe('grouped count adjustments', () => {
     const fixed = { ...targets[0]!, current: 5, fixed: true };
     expect(plan([targets[1]!, fixed], -10)).toEqual([{ target: targets[1], count: 0 }]);
   });
+  it('never adds counts to a fixed target ahead of an editable target', () => {
+    const fixed = { ...targets[0]!, fixed: true };
+    expect(plan([fixed, targets[1]!], 10)).toEqual([{ target: targets[1], count: 9 }]);
+  });
   it.each([9, NaN, Infinity])('does nothing for unchanged or invalid totals (%s)', (value) => {
     expect(plan(targets, value)).toEqual([]);
   });

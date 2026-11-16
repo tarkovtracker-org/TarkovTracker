@@ -10,22 +10,25 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
 import { createTestLocaleMessages } from '#tests/test-helpers/i18nMessages';
 const finished = vi.hoisted(() => new Set<string>());
+const priorityTasks = vi.hoisted(
+  () => new Map<string, { id: string; kappaRequired?: boolean; minPlayerLevel?: number }>()
+);
 vi.mock('@/features/neededitems/useNeedSelfCompletion', () => ({
   useNeedSelfCompletion: () => ({
     isSelfCompleted: (need: { id: string }) => finished.has(need.id),
   }),
 }));
-vi.mock('@/composables/useItemDistribution', () => ({
-  useItemDistribution: () => ({
-    sortTaskObjectives: (needs: unknown[]) => needs,
-    sortHideoutModules: (needs: unknown[]) => needs,
-  }),
+vi.mock('@/stores/useMetadata', () => ({
+  useMetadataStore: () => ({ getTaskById: (id: string) => priorityTasks.get(id) }),
+}));
+vi.mock('@/stores/useProgress', () => ({
+  useProgressStore: () => ({ taskEvaluations: {}, getTeamIndex: (id: string) => id }),
 }));
 type Need = NeededItemTaskObjective | NeededItemHideoutModule;
 const task = (id: string, count: number, foundInRaid = false) =>
   ({ id, taskId: id, needType: 'taskObjective', count, foundInRaid }) as NeededItemTaskObjective;
-const part = (id: string, count: number) =>
-  ({ id, needType: 'hideoutModule', count }) as NeededItemHideoutModule;
+const part = (id: string, count: number, level = 1) =>
+  ({ id, needType: 'hideoutModule', count, hideoutModule: { level } }) as NeededItemHideoutModule;
 let wrapper: ReturnType<typeof mount>;
 const setup = (needs: Need[]) => {
   let tracking!: ReturnType<typeof useGroupedItemTracking>;
@@ -53,6 +56,7 @@ describe('inline grouped tracking', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     finished.clear();
+    priorityTasks.clear();
   });
   afterEach(() => wrapper?.unmount());
   it('preserves existing assignments and offers scoped undo', async () => {
@@ -76,6 +80,25 @@ describe('inline grouped tracking', () => {
     tracking.setCount(false, 4);
     expect(store.getObjectiveCount('fir')).toBe(2);
     expect(tracking.rows.value.map((row) => row.current)).toEqual([2, 4]);
+  });
+  it('uses the real Kappa/task/hideout priority instead of input order', () => {
+    priorityTasks.set('normal', { id: 'normal', minPlayerLevel: 1 });
+    priorityTasks.set('kappa', { id: 'kappa', kappaRequired: true, minPlayerLevel: 40 });
+    const store = useTarkovStore();
+    const tracking = setup([
+      part('high', 3, 2),
+      task('normal', 3),
+      part('low', 3, 1),
+      task('kappa', 3),
+    ]);
+    tracking.setCount(false, 2);
+    expect(store.getObjectiveCount('kappa')).toBe(2);
+    expect(store.getObjectiveCount('normal')).toBe(0);
+    tracking.setCount(false, 8);
+    expect(store.getObjectiveCount('kappa')).toBe(3);
+    expect(store.getObjectiveCount('normal')).toBe(3);
+    expect(store.getHideoutPartCount('low')).toBe(2);
+    expect(store.getHideoutPartCount('high')).toBe(0);
   });
   it('removes from the last allocation and leaves completed parents alone', () => {
     const store = useTarkovStore();
@@ -167,6 +190,55 @@ describe('inline grouped tracking', () => {
     });
     await useActionHistoryStore().undoLastAction();
     expect(store.getObjectiveCount('one')).toBe(0);
+  });
+  it('undoes successive edits across card remounts when one fills a part', async () => {
+    const store = useTarkovStore();
+    setup([part('one', 3)]).setCount(false, 1);
+    wrapper.unmount();
+    setup([part('one', 3)]).setCount(false, 3);
+    await useActionHistoryStore().undoLastAction();
+    expect(store.getHideoutPartCount('one')).toBe(1);
+    await useActionHistoryStore().undoLastAction();
+    expect(store.getHideoutPartCount('one')).toBe(0);
+    expect(useActionHistoryStore().undoStack).toHaveLength(0);
+  });
+  it('still rejects newer progress after a successful undo', async () => {
+    const store = useTarkovStore();
+    const tracking = setup([part('one', 3)]);
+    tracking.setCount(false, 1);
+    tracking.setCount(false, 3);
+    await useActionHistoryStore().undoLastAction();
+    store.$patch((state) => {
+      const current = state[state.currentGameMode].hideoutParts.one!;
+      current.timestamp = (current.timestamp ?? 0) + 1;
+    });
+    expect(() => useActionHistoryStore().undoStack.at(-1)!.undo()).toThrow();
+    expect(store.getHideoutPartCount('one')).toBe(1);
+  });
+  it('rejects count changes that return to the same value without a timestamp', () => {
+    const store = useTarkovStore();
+    const tracking = setup([task('one', 3)]);
+    tracking.setCount(false, 2);
+    store.setObjectiveCount('one', 1);
+    store.setObjectiveCount('one', 2);
+    expect(() => useActionHistoryStore().undoStack.at(-1)!.undo()).toThrow();
+    expect(store.getObjectiveCount('one')).toBe(2);
+  });
+  it('rebases the earlier version when Undo completes a part again', async () => {
+    const store = useTarkovStore();
+    const tracking = setup([part('one', 3)]);
+    tracking.setCount(false, 3);
+    tracking.setCount(false, 2);
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+    try {
+      await useActionHistoryStore().undoLastAction();
+      expect(store.getHideoutPartCount('one')).toBe(3);
+      await useActionHistoryStore().undoLastAction();
+      expect(store.getHideoutPartCount('one')).toBe(0);
+      expect(useActionHistoryStore().undoStack).toHaveLength(0);
+    } finally {
+      clock.mockRestore();
+    }
   });
   it('creates no history entry for an unchanged count', () => {
     const tracking = setup([task('one', 3)]);
