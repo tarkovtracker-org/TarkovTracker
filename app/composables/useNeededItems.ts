@@ -43,7 +43,6 @@ type FullItemsLoadOptions = {
   delayMs?: number;
 };
 type NeededItemsViewMode = 'list' | 'grid';
-type NeededItemsCardStyle = 'compact' | 'expanded';
 export interface UseNeededItemsOptions {
   perfDebug?: boolean | Ref<boolean> | ComputedRef<boolean>;
   search?: Ref<string>;
@@ -61,7 +60,6 @@ export interface UseNeededItemsReturn {
   sortBy: WritableComputedRef<NeededItemsSortBy>;
   sortDirection: WritableComputedRef<NeededItemsSortDirection>;
   viewMode: WritableComputedRef<NeededItemsViewMode>;
-  cardStyle: WritableComputedRef<NeededItemsCardStyle>;
   allItems: ComputedRef<(NeededItemTaskObjective | NeededItemHideoutModule)[]>;
   filteredItems: ComputedRef<(NeededItemTaskObjective | NeededItemHideoutModule)[]>;
   groupedItems: ComputedRef<GroupedNeededItem[]>;
@@ -142,10 +140,6 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const hideOwned = computed({
     get: () => preferencesStore.getNeededItemsHideOwned,
     set: (value) => preferencesStore.setNeededItemsHideOwned(value),
-  });
-  const cardStyle = computed({
-    get: () => preferencesStore.getNeededItemsCardStyle as NeededItemsCardStyle,
-    set: (value) => preferencesStore.setNeededItemsCardStyle(value),
   });
   const hideTeamItems = computed({
     get: () => preferencesStore.itemsTeamAllHidden,
@@ -551,17 +545,31 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     if (item.needType === 'hideoutModule') return stationMatchesSearch(item);
     return false;
   };
+  // Every view filter except ownership and search. The fuzzy search is the costly check, so
+  // it always runs after these.
+  const cheapViewFilters = [
+    passesCompletionFilter,
+    passesTypeFilter,
+    passesFirFilter,
+    passesSpecialEquipmentFilter,
+    passesKappaToggleFilter,
+    passesTeamToggleFilter,
+  ];
+  const passesCheapViewFilters = (item: NeededItemTaskObjective | NeededItemHideoutModule) =>
+    cheapViewFilters.every((passes) => passes(item));
+  // Every view filter except ownership, with search last. The grouped details modal uses this
+  // set so its Smart Fill targets do not disappear while counts change.
+  const passesViewFilters = (item: NeededItemTaskObjective | NeededItemHideoutModule) =>
+    passesCheapViewFilters(item) && passesSearchFilter(item);
+  // One pass over the list instead of a chain of array copies; owned needs skip the search.
   const filteredItems = computed(() => {
     const startedAt = perfDebug.value ? perfNow() : 0;
-    const result = allItems.value
-      .filter(passesCompletionFilter)
-      .filter(passesTypeFilter)
-      .filter(passesFirFilter)
-      .filter(passesSpecialEquipmentFilter)
-      .filter(passesKappaToggleFilter)
-      .filter(passesOwnershipToggleFilter)
-      .filter(passesTeamToggleFilter)
-      .filter(passesSearchFilter);
+    const result = allItems.value.filter(
+      (item) =>
+        passesCheapViewFilters(item) &&
+        passesOwnershipToggleFilter(item) &&
+        passesSearchFilter(item)
+    );
     const sorted = sortNeededItems(result);
     if (perfDebug.value) {
       logPerf('filtered-items', {
@@ -666,6 +674,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
             name: itemName,
             iconLink: itemData.iconLink,
             image512pxLink: itemData.image512pxLink,
+            backgroundColor: itemData.backgroundColor,
             wikiLink: itemData.wikiLink,
             link: itemData.link,
           },
@@ -728,15 +737,9 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     // Keep the modal's Smart Fill targets stable when item progress changes.
     // Ownership filtering is count-based, so build this from the same view
     // filters as `filteredItems` except `passesOwnershipToggleFilter`.
-    const modalNeeds = allItems.value
-      .filter(passesCompletionFilter)
-      .filter(passesTypeFilter)
-      .filter(passesFirFilter)
-      .filter(passesSpecialEquipmentFilter)
-      .filter(passesKappaToggleFilter)
-      .filter(passesTeamToggleFilter)
-      .filter(passesSearchFilter)
-      .filter(countsForSelf);
+    const modalNeeds = allItems.value.filter(
+      (item) => passesViewFilters(item) && countsForSelf(item)
+    );
     const map = new Map<
       string,
       {
@@ -782,7 +785,6 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     sortBy,
     sortDirection,
     viewMode,
-    cardStyle,
     allItems,
     filteredItems,
     groupedItems,

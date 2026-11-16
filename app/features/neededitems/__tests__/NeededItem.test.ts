@@ -46,9 +46,10 @@ vi.mock('@/stores/useProgress', () => ({
     teamStores: { friend: { getObjectiveCount: () => 1, getHideoutPartCount: () => 2 } },
   }),
 }));
-vi.mock('@/stores/useMetadata', () => ({
-  useMetadataStore: () => ({
-    tasks: [
+const metadata = vi.hoisted(() => ({
+  tasks: new Map([
+    [
+      'task',
       {
         id: 'task',
         name: 'Quest',
@@ -58,8 +59,15 @@ vi.mock('@/stores/useMetadata', () => ({
         lightkeeperRequired: true,
       },
     ],
-    hideoutStations: [{ id: 'station', name: 'Workbench' }],
+  ]),
+  stations: new Map([['station', { id: 'station', name: 'Workbench' }]]),
+}));
+vi.mock('@/stores/useMetadata', () => ({
+  useMetadataStore: () => ({
+    getTaskById: (id: string) => metadata.tasks.get(id),
+    getStationById: (id: string) => metadata.stations.get(id),
     alternativeTasks: {},
+    alternativeTaskSources: {},
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -104,21 +112,10 @@ const hideoutNeed = {
   item: { id: 'screw' },
   hideoutModule: { id: 'module', stationId: 'station', predecessors: ['previous'] },
 } as NeededItemHideoutModule;
-const render = (
-  need: NeededItemTaskObjective | NeededItemHideoutModule,
-  itemStyle: 'card' | 'row'
-) =>
+const render = (need: NeededItemTaskObjective | NeededItemHideoutModule, layout: 'tile' | 'row') =>
   mount(NeededItem, {
-    props: { need, itemStyle, initiallyVisible: true },
-    global: {
-      stubs: {
-        AsyncComponentWrapper: Probe,
-        LazyNeededItemSmallCard: Probe,
-        LazyNeededItemRow: Probe,
-        NeededItemSmallCard: Probe,
-        NeededItemRow: Probe,
-      },
-    },
+    props: { need, layout },
+    global: { stubs: { NeededItemEntry: Probe } },
   });
 describe('NeededItem progress wiring', () => {
   beforeEach(() =>
@@ -130,7 +127,7 @@ describe('NeededItem progress wiring', () => {
       moduleComplete: false,
     })
   );
-  it.each(['card', 'row'] as const)(
+  it.each(['tile', 'row'] as const)(
     'persists all %s task controls through shared progress',
     async (style) => {
       const wrapper = render(taskNeed, style);
@@ -156,8 +153,8 @@ describe('NeededItem progress wiring', () => {
     }
   );
   it('provides hiddenForSelf from the need Needed Items kept for teammates', async () => {
-    const hidden = render({ ...taskNeed, hiddenForSelf: true }, 'card');
-    const shown = render(taskNeed, 'card');
+    const hidden = render({ ...taskNeed, hiddenForSelf: true }, 'tile');
+    const shown = render(taskNeed, 'tile');
     await flushPromises();
     expect(hidden.get('output').text()).toContain('hidden:true');
     expect(hidden.get('output').text()).toContain(
@@ -166,7 +163,7 @@ describe('NeededItem progress wiring', () => {
     expect(shown.get('output').text()).toContain('hidden:false|hint:');
     expect(shown.get('output').text()).not.toContain('hidden_for_you_hint');
   });
-  it.each(['card', 'row'] as const)(
+  it.each(['tile', 'row'] as const)(
     'synchronizes %s hideout collection and completion',
     async (style) => {
       const wrapper = render(hideoutNeed, style);
