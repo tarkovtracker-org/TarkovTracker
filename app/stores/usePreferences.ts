@@ -220,7 +220,7 @@ export const preferencesDefaultState: PreferencesState = {
   neededTypeView: null,
   neededItemsViewMode: null,
   neededItemsFirFilter: null,
-  neededItemsGroupByItem: false,
+  neededItemsGroupByItem: true,
   neededItemsHideNonFirSpecialEquipment: false,
   neededItemsKappaOnly: false,
   neededItemsSortBy: 'priority',
@@ -530,7 +530,7 @@ export const usePreferencesStore = defineStore('preferences', {
       return normalizeNeededItemsFirFilter(state.neededItemsFirFilter);
     },
     getNeededItemsGroupByItem: (state) => {
-      return state.neededItemsGroupByItem ?? false;
+      return state.neededItemsGroupByItem ?? true;
     },
     getNeededItemsHideNonFirSpecialEquipment: (state) => {
       return state.neededItemsHideNonFirSpecialEquipment ?? false;
