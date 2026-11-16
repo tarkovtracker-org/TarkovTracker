@@ -1392,11 +1392,8 @@
       "view": {
         "list": "List",
         "grid": "Grid",
-        "show": "Show",
-        "items": "By item",
-        "items_hint": "One entry per item, with quest and hideout needs added together",
-        "needs": "By requirement",
-        "needs_hint": "One entry for every quest objective or hideout upgrade",
+        "show_once": "Show each item once",
+        "show_once_hint": "Add together quantities needed across quests and hideout upgrades.",
         "layout": "Layout"
       },
       "needs_count": "{count} requirement | {count} requirements",
@@ -2697,7 +2694,14 @@
     "needed": "needed",
     "view_requirements_for": "{requirements} for {name}",
     "remaining_count": "{count} remaining",
-    "view_requirements": "View {count} requirement | View {count} requirements",
+    "view_requirements": "See where it’s needed ({count})",
+    "inline_counts": {
+      "label": "Track {name} ({type})",
+      "increase": "Increase {name}",
+      "decrease": "Decrease {name}",
+      "updated": "Updated tracked counts for {name}",
+      "undo_conflict": "These counts changed after this edit. Undo cannot replace newer progress."
+    },
     "locked_before": "{count} before",
     "collected": "Collected",
     "mark_collected": "Mark as collected",

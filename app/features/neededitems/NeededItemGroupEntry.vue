@@ -30,15 +30,15 @@
           <UIcon name="i-mdi-chevron-right" class="size-4 shrink-0" aria-hidden="true" />
         </button>
       </div>
-      <NeededItemCounter
-        v-if="single"
-        class="relative z-10 shrink-0 self-end sm:self-auto"
-        v-bind="single.counter"
-        v-on="single.events"
+      <NeededItemGroupTracking
+        v-if="trackingRows.length"
+        :rows="trackingRows"
+        :label="trackingLabel"
+        @set-count="setCount"
       />
       <NeededItemGroupProgress
         v-else
-        class="w-full shrink-0 sm:w-36"
+        class="w-full sm:w-36"
         :current="group.currentCount"
         :total="group.total"
       />
@@ -75,9 +75,13 @@
       </p>
       <NeededItemGroupBreakdown centered :sections="sections" />
       <div class="mt-auto pt-1">
-        <div v-if="single" class="relative z-10 flex justify-center">
-          <NeededItemCounter wide v-bind="single.counter" v-on="single.events" />
-        </div>
+        <NeededItemGroupTracking
+          v-if="trackingRows.length"
+          wide
+          :rows="trackingRows"
+          :label="trackingLabel"
+          @set-count="setCount"
+        />
         <NeededItemGroupProgress v-else :current="group.currentCount" :total="group.total" />
       </div>
       <button
@@ -95,17 +99,11 @@
 <script setup lang="ts">
   import { useCraftableItem } from '@/composables/useCraftableItem';
   import ItemIndicators from '@/features/neededitems/ItemIndicators.vue';
-  import NeededItemCounter from '@/features/neededitems/NeededItemCounter.vue';
-  import NeededItemGroupBreakdown, {
-    type BreakdownSection,
-  } from '@/features/neededitems/NeededItemGroupBreakdown.vue';
+  import NeededItemGroupBreakdown from '@/features/neededitems/NeededItemGroupBreakdown.vue';
   import NeededItemGroupProgress from '@/features/neededitems/NeededItemGroupProgress.vue';
+  import NeededItemGroupTracking from '@/features/neededitems/NeededItemGroupTracking.vue';
   import NeededItemThumb from '@/features/neededitems/NeededItemThumb.vue';
-  import {
-    neededCountOf,
-    useNeededItemProgress,
-  } from '@/features/neededitems/useNeededItemProgress';
-  import { useNeedSelfCompletion } from '@/features/neededitems/useNeedSelfCompletion';
+  import { useGroupedItemTracking } from '@/features/neededitems/useGroupedItemTracking';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type {
     GroupedNeededItem,
@@ -115,7 +113,7 @@
   type Need = NeededItemTaskObjective | NeededItemHideoutModule;
   /**
    * One item with every quest and hideout need for it added together. Opening it shows
-   * the per-need breakdown and Smart Fill; an item with a single need is tracked in place.
+   * the per-need breakdown and Smart Fill; FIR and Non-FIR totals are tracked in place.
    */
   const props = withDefaults(
     defineProps<{
@@ -127,12 +125,27 @@
   );
   const emit = defineEmits<{ open: [itemId: string] }>();
   const { t } = useI18n({ useScope: 'global' });
-  const progress = useNeededItemProgress();
-  const { isSelfCompleted } = useNeedSelfCompletion();
+  const {
+    rows: trackingRows,
+    sections,
+    remaining,
+    setCount,
+  } = useGroupedItemTracking(
+    () => props.needs,
+    () => props.group.item.name
+  );
+  const trackingLabel = (fir: boolean) =>
+    t('needed_items.inline_counts.label', {
+      name: props.group.item.name,
+      type: t(fir ? 'common.fir' : 'needed_items.non_fir'),
+    });
+  const remainingCount = computed(() =>
+    props.needs.length ? remaining.value : Math.max(0, props.group.total - props.group.currentCount)
+  );
   const formatNumber = useLocaleNumberFormatter();
   const remainingLabel = computed(() =>
     t('needed_items.remaining_count', {
-      count: formatNumber(Math.max(0, props.group.total - props.group.currentCount)),
+      count: formatNumber(remainingCount.value),
     })
   );
   const requirementsLabel = computed(() =>
@@ -151,7 +164,7 @@
   // thumbnail sits above it too so its context menu (wiki, tarkov.dev, copy name) still works.
   const openButtonClass =
     'text-primary-400 mt-1 inline-flex items-center gap-1 text-xs leading-snug underline underline-offset-2 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-hidden focus-visible:after:ring-2 focus-visible:after:ring-primary-400 focus-visible:after:ring-inset';
-  const isComplete = computed(() => props.group.currentCount >= props.group.total);
+  const isComplete = computed(() => remainingCount.value === 0);
   const look = computed(() =>
     isComplete.value
       ? {
@@ -163,66 +176,12 @@
           tile: 'border-surface-700 bg-surface-850 hover:border-surface-600',
         }
   );
-  /** FIR and non-FIR needs stay separate: they are filled from different items. */
-  const sections = computed(() => {
-    const { group } = props;
-    return [
-      {
-        key: 'tasks-fir',
-        source: 'tasks',
-        fir: true,
-        current: group.taskFirCurrent,
-        total: group.taskFir,
-      },
-      {
-        key: 'tasks',
-        source: 'tasks',
-        fir: false,
-        current: group.taskNonFirCurrent,
-        total: group.taskNonFir,
-      },
-      {
-        key: 'hideout-fir',
-        source: 'hideout',
-        fir: true,
-        current: group.hideoutFirCurrent,
-        total: group.hideoutFir,
-      },
-      {
-        key: 'hideout',
-        source: 'hideout',
-        fir: false,
-        current: group.hideoutNonFirCurrent,
-        total: group.hideoutNonFir,
-      },
-    ].filter((section) => section.total > 0) as BreakdownSection[];
-  });
   const indicators = computed(() => ({
     foundInRaid: false,
     isCraftable: isCraftable.value,
     craftableTitle: craftableTitle.value,
     craftableIconClass: craftableIconClass.value,
   }));
-  /** A single need needs no breakdown: track it right here, read-only once it is finished. */
-  const single = computed(() => {
-    if (props.needs.length !== 1) return undefined;
-    const need = props.needs[0]!;
-    const neededCount = neededCountOf(need);
-    const done = isSelfCompleted(need);
-    return {
-      counter: {
-        currentCount: done ? neededCount : Math.min(progress.storedCountOf(need), neededCount),
-        neededCount,
-        done,
-      },
-      events: {
-        decrease: () => progress.decrease(need),
-        increase: () => progress.increase(need),
-        toggle: () => progress.toggle(need),
-        setCount: (count: number) => progress.setCount(need, count),
-      },
-    };
-  });
   function open() {
     emit('open', props.group.item.id);
   }

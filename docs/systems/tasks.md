@@ -822,23 +822,27 @@ so new settings remain local until the compact-list preference migration is depl
 Two independent toolbar choices replace the former list, grid and combined views and the grid
 card-style toggle:
 
-- **Show**: _By item_ (`groupByItem`) has one entry per item with every quest and hideout need
-  added together, split into FIR and non-FIR totals per source. _By requirement_ has one entry
-  per task objective or hideout requirement. By item is the default only when no grouping choice
-  was saved; existing true/false choices, layouts and filters are preserved.
+- **Show each item once** (`groupByItem`): when enabled, every quest and hideout need for an
+  item is added together. When disabled, each task objective or hideout requirement has its own
+  entry. The switch defaults on only when no grouping choice was saved; existing true/false
+  choices, layouts and filters are preserved.
 - **Layout**: _List_ (divided rows) or _Grid_ (tiles), stored as `neededItemsViewMode`.
 
 Every combination is built from the same pieces in `app/features/neededitems/`: `NeededItemEntry`
 (one need, `row` or `tile`), `NeededItemGroupEntry` (one item), `NeededItemThumb`,
 `NeededItemSource` (quest or station link, lock and level hints, status, teammates) and
-`NeededItemCounter`. The counter is the only tracking control: a collect toggle for single
+`NeededItemCounter`. Each requirement uses a collect toggle for single
 items, a stepper for counted ones, a read-only count once the parent is done, and a teammate
 note for needs kept only for teammates. Phones keep the stepper inline under the item name; no
-layout opens a modal to track a single need. An item entry with exactly one need tracks it in
-place; otherwise it opens the grouped details modal (per-need steppers and Smart Fill). Grouped
-entries prominently show the remaining quantity (clamped at zero) and a visible action naming
-the number of requirements in the details. The source badges count requirements in both modes;
-the result summary always states its units and also counts unique items in By item mode.
+layout opens a modal to track a single need. Grouped entries use `NeededItemGroupTracking` with
+inline FIR and Non-FIR steppers and typed counts, alongside the remaining quantity (clamped at
+zero). Only the changed quantity is distributed: additions follow existing task/hideout priority,
+and removals use reverse priority, preserving other allocations. Finished parent quests and
+built modules stay read-only and contribute a protected minimum. Counts and Undo are scoped to
+the current account and game mode; Undo survives a filtered-out card and rejects newer progress.
+The optional _See where it’s needed_ action opens per-need details and the existing Smart Fill
+replacement flow. The source badges count requirements in both modes; the result summary
+always states its units and also counts unique items when the switch is enabled.
 
 `neededItemsCardStyle` remains a synced preference column for compatibility but no longer
 affects rendering. The `needed_items_view` analytics event keeps `view_mode`

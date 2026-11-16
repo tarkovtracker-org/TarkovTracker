@@ -149,21 +149,20 @@ describe('NeededItemsFilterBar', () => {
     await list.trigger('click');
     expect(wrapper.emitted('update:viewMode')).toEqual([['list']]);
   });
-  it('switches between Items and Needs without touching the layout', async () => {
+  it('toggles showing each item once without changing the layout', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: createDefaultProps(),
       global: createDefaultGlobal(),
     });
-    expect(wrapper.emitted('update:groupByItem')).toBeUndefined();
-    const items = wrapper.get('[data-testid="needed-items-show-items"]');
-    expect(items.text()).toBe('page.needed_items.view.items');
-    expect(wrapper.get('[data-testid="needed-items-show-needs"]').attributes('aria-pressed')).toBe(
-      'true'
-    );
-    await items.trigger('click');
+    const toggle = wrapper.get('[data-testid="needed-items-show"] [role="switch"]');
+    expect(toggle.attributes('aria-checked')).toBe('false');
+    await toggle.trigger('click');
     expect(wrapper.emitted('update:groupByItem')).toEqual([[true]]);
     expect(wrapper.emitted('update:viewMode')).toBeUndefined();
+    await wrapper.setProps({ groupByItem: true });
+    await toggle.trigger('click');
+    expect(wrapper.emitted('update:groupByItem')).toEqual([[true], [false]]);
   });
   it('keeps the source tabs and the list controls on one bar', async () => {
     const NeededItemsFilterBar = await setup();

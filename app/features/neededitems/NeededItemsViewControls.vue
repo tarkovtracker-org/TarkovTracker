@@ -1,5 +1,12 @@
 <template>
   <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+    <PreferenceSwitch
+      v-model="groupByItem"
+      :label="$t('page.needed_items.view.show_once')"
+      :description="$t('page.needed_items.view.show_once_hint')"
+      test-id="needed-items-show"
+      class="w-full sm:w-60"
+    />
     <div
       v-for="control in controls"
       :key="control.key"
@@ -32,6 +39,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import PreferenceSwitch from '@/components/ui/PreferenceSwitch.vue';
   import type { NeededItemsViewMode } from '@/features/neededitems/neededItemsFilterNormalization';
   /**
    * Two independent choices: what one entry stands for (an item, or one quest/hideout need)
@@ -42,29 +50,6 @@
   const groupByItem = defineModel<boolean>('groupByItem', { required: true });
   const { t } = useI18n({ useScope: 'global' });
   const controls = computed(() => [
-    {
-      key: 'show',
-      label: t('page.needed_items.view.show'),
-      showText: true,
-      options: [
-        {
-          value: 'items',
-          icon: 'i-mdi-package-variant-closed',
-          label: t('page.needed_items.view.items'),
-          hint: t('page.needed_items.view.items_hint'),
-          active: groupByItem.value,
-          select: () => (groupByItem.value = true),
-        },
-        {
-          value: 'needs',
-          icon: 'i-mdi-format-list-checks',
-          label: t('page.needed_items.view.needs'),
-          hint: t('page.needed_items.view.needs_hint'),
-          active: !groupByItem.value,
-          select: () => (groupByItem.value = false),
-        },
-      ],
-    },
     {
       key: 'layout',
       label: t('page.needed_items.view.layout'),
