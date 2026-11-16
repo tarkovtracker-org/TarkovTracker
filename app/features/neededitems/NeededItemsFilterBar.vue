@@ -1,5 +1,8 @@
 <template>
   <div class="mb-4 space-y-2">
+    <p class="text-surface-400 px-1 text-xs">
+      {{ $t('page.needed_items.filter_tabs_label') }}
+    </p>
     <StatusTabBar
       v-model="activeFilter"
       :tabs="visibleFilterTabs"
@@ -96,13 +99,7 @@
   const isTabShown = (tab: FilterTab) =>
     tab.value !== 'completed' || tab.count > 0 || tab.value === filterType.value;
   const visibleFilterTabs = computed(() => props.filterTabs.filter(isTabShown));
-  const activeTabCount = computed(
-    () => props.filterTabs.find((tab) => tab.value === filterType.value)?.count
-  );
-  /**
-   * Items mode always explains the item/need totals. Needs mode only shows a count when
-   * search or filters make it differ from the selected tab's badge. Both parts pluralize.
-   */
+  /** Always name the unit: source badges count requirements in both presentation modes. */
   const countLabel = computed(() => {
     const needs = (count: number) => t('page.needed_items.needs_count', { count }, count);
     if (groupByItem.value) {
@@ -116,7 +113,6 @@
         needs: needs(props.ungroupedCount),
       });
     }
-    if (props.totalCount === activeTabCount.value) return '';
     return needs(props.totalCount);
   });
   // Kappa only narrows task needs, so it does nothing on the Hideout tab.

@@ -92,6 +92,25 @@ export function gameToLatLng(x: number, z: number): { lat: number; lng: number }
   return { lat: z, lng: x };
 }
 /**
+ * Converts a Leaflet LatLng back to game coordinates; the inverse of {@link gameToLatLng}.
+ * The map CRS already undoes the map rotation, so no rotation is applied here.
+ * @param latLng Leaflet lat/lng from the map's CRS
+ * @returns Game X and Z coordinates (the map has no height, so Y is unknown)
+ */
+export function latLngToGame(latLng: { lat: number; lng: number }): { x: number; z: number } {
+  return { x: latLng.lng, z: latLng.lat };
+}
+/**
+ * Formats a game coordinate for display and bug reports: two decimals, like the task data,
+ * with a dot separator in every locale so the value can be pasted into data files.
+ * @param value Game coordinate
+ * @returns Coordinate with two decimals, never "-0.00"
+ */
+export function formatGameCoordinate(value: number): string {
+  const fixed = value.toFixed(2);
+  return fixed === '-0.00' ? '0.00' : fixed;
+}
+/**
  * Converts an array of outline points (zone polygon) to Leaflet LatLng array.
  * @param outline Array of {x, z} points defining the zone boundary
  * @returns Array of Leaflet LatLng coordinates
