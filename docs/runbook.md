@@ -80,6 +80,10 @@ metrics; when targeting `/api/logs/client`, it has the same edge-protection prer
 browser log forwarding disabled when enabling these metrics alone. Verify delivery to the approved
 retention/query destination after rebuilding the application.
 
+The prepared private `/api/logs/progress` collector, production-only service binding,
+protection prerequisites, retention and staged verification are documented in
+[Aggregate progress diagnostics](progress-diagnostics.md). Preparation does not enable collection.
+
 ## Pre-Deploy Validation
 
 1. `pnpm run format:check`

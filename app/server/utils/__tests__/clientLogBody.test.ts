@@ -35,6 +35,10 @@ describe('client log body boundary', () => {
     '/api/logs/client/',
     '/api/logs/%63lient?x=1',
     '/api/logs/client%2f',
+    '/api/logs/progress',
+    '/api/logs/progress/',
+    '/api/logs/%70rogress?private=ignored',
+    '/api/logs/progress%2f',
   ])('drops oversized %s before the Pages adapter', async (path) => {
     const request = new Request(`https://tarkovtracker.org${path}`, {
       method: 'POST',

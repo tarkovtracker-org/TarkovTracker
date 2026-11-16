@@ -187,7 +187,7 @@ export default defineNuxtConfig({
       // e.g., "/api/tarkov/*" for public data endpoints
       publicRoutes:
         process.env.API_PUBLIC_ROUTES?.trim() ||
-        '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/security/tarkov-verify,/api/profile/*,/api/streamer/*,/api/twitch/*',
+        '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/logs/progress,/api/security/tarkov-verify,/api/profile/*,/api/streamer/*,/api/twitch/*',
       // Whether to trust proxy headers (X-Forwarded-For, etc.)
       // ONLY enable this if the server is behind a trusted proxy like Cloudflare
       trustProxy: resolveTrustProxySetting({
