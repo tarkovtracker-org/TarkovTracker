@@ -38,6 +38,21 @@ describe('useSafeLocale', () => {
     resetI18nReady();
     expect(useSafeLocale().value).toBe('ja');
   });
+  it('selects Turkish for a Turkish browser locale', async () => {
+    vi.stubGlobal('navigator', { ...window.navigator, language: 'tr-TR' });
+    const { resetI18nReady, useSafeLocale } = await import('@/composables/i18nHelpers');
+    resetI18nReady();
+    expect(useSafeLocale().value).toBe('tr');
+  });
+  it('restores a saved Turkish locale during anonymous bootstrap', async () => {
+    localStorage.setItem(
+      STORAGE_KEYS.preferences,
+      serializeUserScopedStorage({ localeOverride: 'tr' }, null)
+    );
+    const { resetI18nReady, useSafeLocale } = await import('@/composables/i18nHelpers');
+    resetI18nReady();
+    expect(useSafeLocale().value).toBe('tr');
+  });
   it('falls back to english when browser locale is not supported by the UI', async () => {
     vi.stubGlobal('navigator', { ...window.navigator, language: 'ar-SA' });
     const { resetI18nReady, useSafeLocale } = await import('@/composables/i18nHelpers');
