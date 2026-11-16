@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { nextTick, reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
@@ -17,6 +17,7 @@ const taskState = reactive({
 const preferencesState = reactive({
   collapseDefault: false,
   hideRewards: false,
+  hideCompletedObjectives: false,
   manualFail: false,
   primaryView: 'all',
   pinnedTaskIds: [] as string[],
@@ -79,7 +80,9 @@ vi.mock('@/stores/usePreferences', () => ({
     get getEnableManualTaskFail() {
       return preferencesState.manualFail;
     },
-    getHideCompletedTaskObjectives: false,
+    get getHideCompletedTaskObjectives() {
+      return preferencesState.hideCompletedObjectives;
+    },
     get getHideTaskRewards() {
       return preferencesState.hideRewards;
     },
@@ -208,6 +211,7 @@ describe('TaskCard appearance and expansion controls', () => {
     taskState.failed = false;
     preferencesState.collapseDefault = false;
     preferencesState.hideRewards = false;
+    preferencesState.hideCompletedObjectives = false;
     preferencesState.manualFail = false;
     preferencesState.primaryView = 'all';
     preferencesState.pinnedTaskIds = [];
@@ -221,6 +225,42 @@ describe('TaskCard appearance and expansion controls', () => {
     metadataStoreMock.storyChapters = [];
     metadataStoreMock.storyChaptersGameMode = null;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+  });
+  it('discloses completed objectives manually and responds to preference and completion changes', async () => {
+    taskState.complete = true;
+    preferencesState.hideCompletedObjectives = true;
+    const wrapper = await mountTaskCard({
+      objectives: [{ id: 'objective-1', type: 'visit', count: 1 }],
+    });
+    const toggle = wrapper.get('[data-testid="task-objectives-header"] button');
+    expect(toggle.attributes('aria-controls')).toBe('objectives-content-task-1');
+    const expectDisclosure = (expanded: boolean) => {
+      expect(toggle.attributes('aria-expanded')).toBe(String(expanded));
+      expect(wrapper.find('#objectives-content-task-1').exists()).toBe(expanded);
+      expect(wrapper.find('[data-testid="task-objectives"]').exists()).toBe(expanded);
+    };
+    expectDisclosure(false);
+    await toggle.trigger('click');
+    expectDisclosure(true);
+    await toggle.trigger('click');
+    expectDisclosure(false);
+    preferencesState.hideCompletedObjectives = false;
+    await nextTick();
+    expectDisclosure(true);
+    await toggle.trigger('click');
+    expectDisclosure(false);
+    await toggle.trigger('click');
+    expectDisclosure(true);
+    preferencesState.hideCompletedObjectives = true;
+    await nextTick();
+    expectDisclosure(false);
+    taskState.complete = false;
+    await nextTick();
+    expectDisclosure(true);
+    taskState.complete = true;
+    await nextTick();
+    expectDisclosure(false);
+    wrapper.unmount();
   });
   it('offers a task-local confirmation reset without touching objectives', async () => {
     const gated: Partial<Task> = {
