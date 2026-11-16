@@ -450,6 +450,9 @@
                           <p class="text-surface-300 text-[11px]">
                             {{ t('maps.help.resize') }}
                           </p>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.coordinates') }}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -486,14 +489,19 @@
           :class="props.fill ? 'h-full' : 'h-100 sm:h-125 lg:h-150'"
           :style="mapHeightStyle"
         />
-        <p
-          v-if="extractSource"
-          data-testid="map-extract-source"
-          class="text-surface-300 absolute bottom-2 left-2 z-650 max-w-[calc(100%-4rem)] rounded bg-black/70 px-1.5 py-0.5 text-[10px] leading-snug"
-          :title="extractSource.detail"
+        <div
+          class="pointer-events-none absolute bottom-2 left-2 z-650 flex max-w-[calc(100%-4rem)] flex-col items-start gap-1"
         >
-          {{ extractSource.label }} · {{ t('maps.extract_requirements.raid_notice') }}
-        </p>
+          <MapCursorCoordinates :map="mapInstance" :crosshair-shown="showKeyboardCursor" />
+          <p
+            v-if="extractSource"
+            data-testid="map-extract-source"
+            class="text-surface-300 pointer-events-auto rounded bg-black/70 px-1.5 py-0.5 text-[10px] leading-snug"
+            :title="extractSource.detail"
+          >
+            {{ extractSource.label }} · {{ t('maps.extract_requirements.raid_notice') }}
+          </p>
+        </div>
         <div
           v-if="showKeyboardCursor"
           aria-hidden="true"
@@ -619,6 +627,7 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
+  import MapCursorCoordinates from '@/features/maps/MapCursorCoordinates.vue';
   import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
   import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
   import {
