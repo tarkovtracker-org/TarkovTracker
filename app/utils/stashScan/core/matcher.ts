@@ -273,9 +273,10 @@ export function matchCell(features: CellFeatures, index: IconIndex): CellResult 
   if (isEmpty(features)) return { empty: true, matches: [], margin: 0 };
   const lowered = lowerText(features.text, features.textWidth, TEXT_ROW_LIFT);
   const templates = index.bySize.get(sizeKey(features.slotsWide, features.slotsHigh)) ?? [];
-  // The art list finds labels that already line up; the text list uses the usual offset.
+  // Text shortlists for both alignments, so a label that already lines up is never dropped.
   const coarse = new Set([
     ...coarseShortlist(features, templates, 'artCoarse'),
+    ...coarseShortlist(features, templates, 'text'),
     ...coarseShortlist({ ...features, text: lowered }, templates, 'text'),
   ]);
   const scored = [...coarse].map((template) => scoreTemplate(features, lowered, template));

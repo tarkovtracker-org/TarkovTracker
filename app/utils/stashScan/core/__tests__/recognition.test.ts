@@ -311,6 +311,22 @@ describe('art and glyph matching', () => {
     expect(result.matches[0]).toMatchObject({ itemId: 'target' });
     expect(result.matches[0]!.textScore).toBeGreaterThan(0.95);
   });
+  it('keeps a label that already lines up when the offset text and art lists miss it', () => {
+    // Labels as two bright bands. The decoy's bands sit two rows lower, so it matches the
+    // lowered cell text exactly, and its art matches the cell too.
+    const labelled = (seed: number, rows: number[]) => {
+      const target = image(64, 64);
+      paintIcon(target, seed);
+      for (const y of rows) for (let x = 4; x < 60; x++) pixel(target, x, y, [240, 240, 240]);
+      return target;
+    };
+    const index = createIconIndex();
+    add(index, 'target', labelled(7, [3, 4, 8, 9]));
+    // More decoy templates than either coarse list keeps.
+    for (let i = 0; i < 26; i++) add(index, 'decoy', labelled(2, [5, 6, 10, 11]));
+    const result = matchCell(features(labelled(2, [3, 4, 8, 9])), index);
+    expect(result.matches.map((match) => match.itemId)).toContain('target');
+  });
   it('rejects wrong catalog dimensions without mutating the index', () => {
     const index = createIconIndex();
     expect(

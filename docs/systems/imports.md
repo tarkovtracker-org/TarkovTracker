@@ -16,9 +16,10 @@ reviewed requirement counts, an image fingerprint, and an idempotency key.
 - Recognition scores route review attention; they are not probabilities. Uncertain identities
   and stack counts need correction. Quantities are units, never durability or remaining uses.
   FIR comes from the found-in-raid checkmark: each region's bottom-right corner, including the
-  spot above a stack or uses count, is correlated with the measured mark (`firMark.ts`). A
-  clear mark sets FIR; a covered mark, or slots under 40 px, leave FIR unknown, which can fill
-  only non-FIR requirements. Players can change any status.
+  spot above a stack or uses count, is correlated with the measured mark (`firMark.ts`). Only a
+  clear mark sets FIR. Every other region starts as FIR unknown, including items without the
+  mark, covered marks and slots under 40 px; unknown FIR can fill only non-FIR requirements.
+  Players set FIR or Not FIR for those, and can change any status.
   Totals above 1,000,000 units per item block Preview until quantities are corrected.
 - Grid detection also accepts a grey border beside a brighter coloured item frame (newer
   clients at 1440p) and a ridge up to `pitch / 40` pixels off its lattice line (JPEG blur).
