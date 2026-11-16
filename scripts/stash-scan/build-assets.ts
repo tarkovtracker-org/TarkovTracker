@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, rename, rm, rmdir, writeFile } from 'node:fs/promises';
+import { hostname } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import type { ScanCatalog } from '@/utils/stashScan/types';
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -8,9 +9,20 @@ export async function withScanBuildLock<T>(output: string, build: () => Promise<
   const lock = outputFile(output, '.build-lock');
   // EEXIST rejects concurrent builds; never remove a lock acquired by another builder.
   await mkdir(lock);
+  const owner = outputFile(lock, 'owner.json');
   try {
+    await writeFile(
+      owner,
+      JSON.stringify({
+        hostname: hostname(),
+        pid: process.pid,
+        acquiredAt: new Date().toISOString(),
+      }),
+      { flag: 'wx' }
+    );
     return await build();
   } finally {
+    await rm(owner, { force: true });
     await rmdir(lock);
   }
 }

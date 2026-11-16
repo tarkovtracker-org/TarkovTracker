@@ -9,7 +9,7 @@ renderings while upstream images catch up; they never change item metadata or co
 - `pile-of-meds-cache.png`: unchanged 64×64 RGBA icon recovered from the user's EFT icon cache
   on 2026-11-16, matching the screenshot from build `1.3.0.2.48779`. SHA-256:
   `253769910c9943081d4a1c875c7df2d97797e3ef9e2502b5327001eb1fbdd193`.
-- This is the same artwork as the upstream image, with different framing. Visible alpha bounds
+- This is the same artwork as the upstream image, with different framing. Bounds at alpha > 128
   are `(4,11)..(56,59)` here versus `(1,3)..(61,59)` in the upstream base image. The upstream
   base/grid image reported `Last-Modified: Wed, 08 Jan 2025 03:56:37 GMT` during inspection.
 - `pile-of-meds-grid.png`: the cache PNG flattened onto RGB `(25,43,52)`, with `Meds` rendered

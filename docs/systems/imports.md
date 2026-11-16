@@ -125,8 +125,14 @@ so an interrupted build preserves the last complete index. Successful publicatio
 obsolete content-addressed shard files; icon downloads are streamed with a 4 MB limit.
 Cached images and ETags are replaced atomically, with the complete image published first.
 An exclusive `public/stash-scan/.build-lock` directory covers the whole build, including cache
-writes and shard pruning. A second builder fails with `EEXIST`. After a process interruption,
-remove that empty lock directory only after confirming no catalog builder is still running.
+writes and shard pruning. A second builder fails with `EEXIST`. The lock's `owner.json` records
+the hostname, PID and acquisition time for recovery after an interrupted process. Locks never
+expire automatically: elapsed time or PID reuse must not let a second build steal an active lock.
+For recovery, inspect `owner.json` inside that lock directory on its recorded host, verify
+the owning process has exited and no other catalog builder is using this output, then delete
+only `owner.json` and the now-empty `.build-lock` directory. If the owner file is missing or
+incomplete, establish that all builders using this output have stopped before removing it.
+When ownership cannot be verified, leave the lock intact. Do not recursively remove the output.
 Feature version 2 recenters cropped rotated-label templates.
 Catalog files are content-addressed and loaded by detected slot size. This first catalog is
 English and regular-mode based; mode-exclusive items absent from it cannot be identified.

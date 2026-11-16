@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { hostname } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import {
   cacheImage,
@@ -11,7 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ScanCatalog } from '@/utils/stashScan/types';
 vi.mock('node:fs/promises', async (original) => {
   const actual = await original<typeof import('node:fs/promises')>();
-  return { ...actual, writeFile: vi.fn(actual.writeFile), rename: vi.fn(actual.rename) };
+  return {
+    ...actual,
+    writeFile: vi.fn(actual.writeFile),
+    rename: vi.fn(actual.rename),
+    rm: vi.fn(actual.rm),
+  };
 });
 const root = resolve('node_modules/.cache/stash-scan-build-tests');
 let directory: string;
@@ -33,6 +39,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
   vi.mocked(writeFile).mockReset();
   vi.mocked(rename).mockReset();
+  vi.mocked(rm).mockReset();
   // Destructive cleanup is limited to this test's resolved workspace-owned directory.
   expect(resolve(directory).startsWith(`${root}${sep}`)).toBe(true);
   await rm(directory, { recursive: true });
@@ -107,6 +114,67 @@ describe('bounded builder image responses', () => {
   });
 });
 describe('exclusive catalog builds', () => {
+  it('records the owner host, PID and acquisition time for safe manual recovery', async () => {
+    const before = Date.now();
+    await withScanBuildLock(directory, async () => {
+      const lock = join(directory, '.build-lock');
+      expect(await readdir(lock)).toEqual(['owner.json']);
+      const owner = JSON.parse(await readFile(join(lock, 'owner.json'), 'utf8'));
+      expect(owner).toEqual({
+        hostname: hostname(),
+        pid: process.pid,
+        acquiredAt: expect.any(String),
+      });
+      expect(Date.parse(owner.acquiredAt)).toBeGreaterThanOrEqual(before);
+      expect(Date.parse(owner.acquiredAt)).toBeLessThanOrEqual(Date.now());
+    });
+    expect(await readdir(directory)).toEqual([]);
+  });
+  it('cleans up partial owner metadata without starting the build', async () => {
+    const build = vi.fn(async () => 'built');
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    vi.mocked(writeFile).mockImplementationOnce(async (file, _data, options) => {
+      await actual.writeFile(file, 'partial owner', options);
+      throw new Error('owner write failed');
+    });
+    await expect(withScanBuildLock(directory, build)).rejects.toThrow('owner write failed');
+    expect(build).not.toHaveBeenCalled();
+    expect(await readdir(directory)).toEqual([]);
+  });
+  it.each(['publication', 'pruning'])('rejects a competitor during manifest %s', async (phase) => {
+    await writeFile(join(directory, oldName), 'old shard');
+    const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const second = vi.fn(async () => 'competing build');
+    const attempts: PromiseSettledResult<string>[] = [];
+    const probe = async () => {
+      attempts.push(...(await Promise.allSettled([withScanBuildLock(directory, second)])));
+    };
+    if (phase === 'publication') {
+      vi.mocked(rename).mockImplementation(async (from, to) => {
+        if (String(to) === join(directory, 'catalog.json')) await probe();
+        await actual.rename(from, to);
+      });
+    } else {
+      vi.mocked(rm).mockImplementation(async (file, options) => {
+        if (String(file) === join(directory, oldName)) await probe();
+        await actual.rm(file, options);
+      });
+    }
+    const result = await Promise.allSettled([
+      withScanBuildLock(directory, async () => {
+        await writeScanAsset(directory, keptName, 'new shard');
+        await publishScanCatalog(directory, manifest());
+      }),
+    ]);
+    expect(attempts).toEqual([
+      { status: 'rejected', reason: expect.objectContaining({ code: 'EEXIST' }) },
+    ]);
+    expect(second).not.toHaveBeenCalled();
+    expect(result).toEqual([{ status: 'fulfilled', value: undefined }]);
+    expect(await readFile(join(directory, keptName), 'utf8')).toBe('new shard');
+    expect(JSON.parse(await readFile(join(directory, 'catalog.json'), 'utf8'))).toEqual(manifest());
+    expect((await readdir(directory)).sort()).toEqual([keptName, 'catalog.json'].sort());
+  });
   it('rejects a second builder until the first has published and pruned', async () => {
     let release!: () => void;
     let started!: () => void;
