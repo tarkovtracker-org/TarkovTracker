@@ -1083,48 +1083,53 @@ describe('seasonal progress realtime synchronization', () => {
     await cleanupRealtimeListener();
     await expect(reconcileRemoteSnapshot()).rejects.toThrow('reader unavailable');
   });
-  it('waits for a newer reconnect snapshot before a superseded pre-retry reconcile resolves', async () => {
-    const { reconcileRemoteSnapshot, setupRealtimeListener } =
-      await import('@/stores/tarkov/realtimeListener');
-    const pendingModes: ((value: unknown) => void)[] = [];
-    supabaseContext.client.from.mockImplementation((table: string) => ({
-      select: () => ({
-        abortSignal() {
-          return this;
-        },
-        eq: () =>
-          table === 'user_progress'
-            ? { single: async () => ({ data: null, error: null }) }
-            : new Promise((resolve) => pendingModes.push(resolve)),
-      }),
-    }));
-    const modeRows = (level: number) => ({
-      data: [
-        {
-          game_mode: 'pvp',
-          season_number: 0,
-          progress_data: { ...structuredClone(defaultState.pvp), level },
-          updated_at: '2026-09-06T12:00:00Z',
-          progress_updated_at: '2026-09-06T12:00:00Z',
-        },
-      ],
-      error: null,
-    });
-    await setupRealtimeListener(store);
-    let settled = false;
-    const retry = reconcileRemoteSnapshot().finally(() => {
-      settled = true;
-    });
-    createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(pendingModes).toHaveLength(2);
-    pendingModes[0]?.(modeRows(10));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(settled).toBe(false);
-    pendingModes[1]?.(modeRows(25));
-    await retry;
-    expect(state.pvp.level).toBe(25);
-  });
+  it.each([false, true])(
+    'keeps the newest overlapping remote snapshot (old finishes last: %s)',
+    async (oldFinishesLast) => {
+      const { reconcileRemoteSnapshot, setupRealtimeListener } =
+        await import('@/stores/tarkov/realtimeListener');
+      const pendingModes: ((value: unknown) => void)[] = [];
+      supabaseContext.client.from.mockImplementation((table: string) => ({
+        select: () => ({
+          abortSignal() {
+            return this;
+          },
+          eq: () =>
+            table === 'user_progress'
+              ? { single: async () => ({ data: null, error: null }) }
+              : new Promise((resolve) => pendingModes.push(resolve)),
+        }),
+      }));
+      const modeRows = (level: number) => ({
+        data: [
+          {
+            game_mode: 'pvp',
+            season_number: 0,
+            progress_data: { ...structuredClone(defaultState.pvp), level },
+            updated_at: '2026-09-06T12:00:00Z',
+            progress_updated_at: '2026-09-06T12:00:00Z',
+          },
+        ],
+        error: null,
+      });
+      await setupRealtimeListener(store);
+      let settled = false;
+      const retry = reconcileRemoteSnapshot().finally(() => {
+        settled = true;
+      });
+      createdChannels[0]?.subscribeCallback?.('SUBSCRIBED');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(pendingModes).toHaveLength(2);
+      const first = oldFinishesLast ? 1 : 0;
+      pendingModes[first]?.(modeRows(oldFinishesLast ? 25 : 10));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(settled).toBe(oldFinishesLast);
+      pendingModes[1 - first]?.(modeRows(oldFinishesLast ? 10 : 25));
+      await retry;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(state.pvp.level).toBe(25);
+    }
+  );
   it('rejects a pre-retry reconcile whose snapshot could not be merged', async () => {
     const { reconcileRemoteSnapshot, setupRealtimeListener } =
       await import('@/stores/tarkov/realtimeListener');

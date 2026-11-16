@@ -2,6 +2,173 @@
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Stash screenshot import
+
+Needed Items → Import items from a screenshot reads one PNG, JPEG, or WebP on the device. Players
+drop, paste (Ctrl+V or the clipboard button) or choose the image, check the detected items, then
+pick how to save them. A dedicated worker decodes bounded pixels, detects grid regions, and
+matches the MIT-licensed Cultist Circle recognition features against static, hashed catalog shards. Screenshots,
+pixel features, and corrections are neither uploaded nor persisted. The save contains
+reviewed requirement counts, an image fingerprint, and an idempotency key.
+
+**Try demo screenshot** loads the bundled, user-supplied 2560×1440 screenshot through the same
+worker and review/preview flow. Demo counts cannot be saved. Choosing a personal screenshot
+leaves demo mode; a late or cancelled demo download cannot replace that selection. The original
+PNG is at `public/img/demos/stash-1440p.png` and is also the offline regression fixture.
+
+### Review and allocation
+
+- Recognition scores route review attention; they are not probabilities. Uncertain identities
+  and unread stack counts need correction. Quantities are units, never durability or remaining
+  uses.
+  FIR comes from the found-in-raid checkmark: each region's bottom-right corner, including the
+  spot above a stack or uses count, is correlated with the measured mark (`firMark.ts`). Only a
+  clear mark sets FIR. Every other region starts as FIR unknown, including items without the
+  mark, covered marks and slots under 40 px; unknown FIR can fill only non-FIR requirements.
+  Players set FIR or Not FIR for those, and can change any status.
+  Totals above 1,000,000 units per item block Preview until quantities are corrected.
+- Grid detection also accepts a grey border beside a brighter coloured item frame (newer
+  clients at 1440p) and a ridge up to `pitch / 40` pixels off its lattice line (JPEG blur).
+  Short-name text is compared both as captured and two template rows lower, where in-game
+  labels sit relative to Tarkov.dev icons.
+- A suggestion is confident on its combined score, or on one decisive signal when the other is
+  spoiled: art of at least 0.97 that leads every other candidate's art by 0.3 (a label the game
+  renders differently), or a label of at least 0.93 that leads by 0.12 (a tinted or modded
+  weapon). Items that share an icon or a short name tie on that signal and stay uncertain.
+- Stack counts are read from the bottom-right corner (`stackCount.ts`): right-aligned digits
+  across the full inner width of the item, matched against digit shapes averaged from catalog
+  labels. A clear corner, or a FIR mark in the corner itself, means one item. Look-alike digits
+  (0, 5, 6, 8 often), slashes as in `10/10`, other ink near the count, another digit on its
+  baseline (a spaced thousands group), a count within 3 template px of the cell's left edge,
+  and slots under 48 px leave the amount for the player. A count above the item's stack size
+  is ignored, and a plain number other than 1 on an item that cannot stack sends the row to
+  review.
+- Every uncertain or unidentified item blocks Continue, even when none of its suggestions is
+  needed. A top-five shortlist cannot establish that an item is irrelevant. Unread or invalid
+  quantities also block, including an impossible count on an otherwise confident suggestion.
+  Only fully settled, unneeded items appear under "Not needed" and stay out of the totals.
+  Confirming the item and amount or explicitly excluding the region settles review.
+- Users can search the indexed catalog, exclude regions, split merged detections, and draw a
+  manually sized item region when detection fails. Keyboard users can enter region coordinates
+  and slot dimensions. Regions and split parts must be at least 8 pixels wide and high.
+  Redrawing replaces overlapping regions; quantity corrections preserve requirement selections.
+  Redrawn or split rows get fresh review state even when their bounds stay the same; untouched
+  rows retain their corrections.
+- Each import updates explicitly selected requirements using the existing Smart Fill
+  priority/allocation policy, in one of two player-chosen modes:
+  - **Set counts from screenshot** (default) replaces each selected requirement's count with its
+    allocation from the screenshot. Re-running it with the same totals is idempotent. Decreases
+    require confirmation.
+  - **Add to current counts** fills only each requirement's missing units on top of its current
+    count (`distributeItems(..., { additive: true })`). Counts never decrease. Repeating it with
+    another screenshot of the same items adds again; the identical-file receipt check below is
+    the only duplicate protection.
+- Both modes allocate physical observations once across the selection. A hideout part ticked
+  complete without a stored count counts as full, as on the Hideout page, so add mode skips it
+  and set mode shows any lower count as a decrease. The save step shows the live
+  per-requirement before/after counts for the chosen mode. Save snapshots those numbers before
+  reading the cloud baseline and refuses to send anything different. Any change to the
+  decreasing requirements clears the decrease acknowledgement.
+- Unobserved items and unselected requirements remain unchanged. Completed tasks/modules,
+  teammate-only needs, weapon builds, alternative-item objectives, and non-handover task
+  objectives are excluded. Closed containers and off-screen inventory cannot be inferred.
+- Scanning is available to guests, but saving requires a signed-in, synchronized account.
+  Saving fixes the owner, game mode, active season, import mode, selected targets, and progress
+  snapshot. If another device changed progress first (`baseline_changed`), the dialog
+  reconciles, refreshes the shown counts and asks the player to save again. A screenshot
+  imported before a progress reset (`progress_reset`) cannot be saved again while its receipt is
+  retained (100 imports, 90 days), so the dialog explains that and disables Save instead of
+  looping. That block survives failed refreshes and later recovery retries. Other conflict reasons
+  reconcile and allow a fresh save with a new import ID.
+
+### Persistence
+
+`commit_stash_item_import` locks the owner's account and destination mode, checks the full
+expected JSON snapshot, validates bounded count updates, and saves counts and receipt in one
+transaction. A changed destination rejects the preview. Replayed import IDs return the live
+progress snapshot; identical pixel fingerprints are recognized within the same mode/season
+and reset epoch. Receipts retain the latest 100 imports per account. They are usable for 90
+days; expired rows are pruned lazily on a later import call and may remain stored until then.
+Set-counts mode does not inflate counts even after receipt expiry or a differently compressed screenshot.
+The RPC always writes absolute counts; add mode computes them in the browser from the
+snapshot the RPC checks, so a stale baseline is rejected rather than added to.
+Commit and receipt lookup share an owner-scoped limit of 60 calls per minute, enforced before
+request hashing and owner locks. Replays, duplicates, and conflicts also consume this budget.
+
+The migration also rejects an exact pre-import objective record arriving through stale
+ordinary sync while its receipt remains retained. New timestamped manual edits and explicit
+reset epochs remain valid. This guard is intentionally import-specific, not a replacement
+for the general sync merge policy. It hashes only changed objective keys and uses indexed
+receipt containment, preserving protection from older retained imports. Receipt lookup is
+owner-only; raw receipts are private.
+
+While reconciliation is required, ordinary sync rejects detached imperative snapshots with
+`null` and a warning; callers must merge changes into the store and retry after reconciliation.
+It never silently substitutes the store for a caller-supplied detached snapshot.
+
+### Files and validation
+
+- `app/features/stash-import/` — review, selection, preview, and save adapter.
+- `app/workers/stashScan.worker.ts`, `app/utils/stashScan/` — local decoding and recognition.
+- `scripts/stash-scan/build-index.ts`, `public/stash-scan/` — offline catalog build and assets.
+- `supabase/migrations/20261115033731_commit_stash_item_import.sql` — atomic save and receipts.
+- `supabase/tests/database/stash_item_import.test.sql` and
+  `scripts/checks/stash-item-import-concurrency.mjs` — transaction and real-lock regressions.
+
+Rebuild assets with `pnpm stash-scan:build-index` using the current `json.tarkov.dev` regular
+item catalog and English names. Remote grid images come only from `assets.tarkov.dev`. A pinned
+local supplement for Pile of meds is also indexed, retaining the original upstream template.
+It uses the same artwork with current cache framing and a separately rendered label, avoiding
+bright art strokes contaminating the old label features. Provenance and reproduction are in
+[`scripts/stash-scan/references/README.md`](../../scripts/stash-scan/references/README.md); the
+builder verifies the supplement's hash before decoding it. No game files or fonts are read at
+runtime. The manifest lists items with unusable templates; they remain available for manual correction.
+Each shard is written to a temporary file and atomically replaced; the manifest is replaced last,
+so an interrupted build preserves the last complete index. Successful publication prunes only
+obsolete content-addressed shard files; icon downloads are streamed with a 4 MB limit.
+Cached images and ETags are replaced atomically, with the complete image published first.
+An exclusive `public/stash-scan/.build-lock` directory covers the whole build, including cache
+writes and shard pruning. A second builder fails with `EEXIST`. The lock's `owner.json` records
+the hostname, PID and acquisition time for recovery after an interrupted process. Locks never
+expire automatically: elapsed time or PID reuse must not let a second build steal an active lock.
+For recovery, inspect `owner.json` inside that lock directory on its recorded host, verify
+the owning process has exited and no other catalog builder is using this output, then delete
+only `owner.json` and the now-empty `.build-lock` directory. If the owner file is missing or
+incomplete, establish that all builders using this output have stopped before removing it.
+When ownership cannot be verified, leave the lock intact. Do not recursively remove the output.
+Feature version 2 recenters cropped rotated-label templates.
+Catalog files are content-addressed and loaded by detected slot size. This first catalog is
+English and regular-mode based; mode-exclusive items absent from it cannot be identified.
+Accuracy across languages, game updates, compression, UI scaling, and tooltips must be
+measured with representative labeled screenshots. Synthetic parity does not prove it.
+`scripts/stash-scan/screenshot.test.ts` runs the unmodified demo PNG through real shards and
+checks the five document counts, current meds matching, the old-reference skip regression,
+flash-drive ambiguity, and scaled/JPEG copies. It is a calibration fixture, not held-out
+accuracy evidence. The checked-in original is never recompressed by the test.
+
+### Rollout and rollback
+
+Apply the additive migration before deploying the importing frontend. To roll back the feature,
+restore the previous frontend and retain receipts and the stale-sync guard so older queued writes
+cannot undo completed imports. No data backfill or destructive down migration is required.
+
+If the RPCs must also be disabled, ship this as a reviewed forward migration through the normal
+deployment pipeline. Revoke both public wrappers and private implementations; do not drop the
+trigger or receipt table. The database regression suite rehearses denied calls, preserved progress,
+and restoring the grants by rolling back the rehearsal transaction.
+
+```sql
+BEGIN;
+REVOKE EXECUTE ON FUNCTION
+  public.commit_stash_item_import(text, integer, uuid, text, jsonb, jsonb),
+  private.commit_stash_item_import(text, integer, uuid, text, jsonb, jsonb),
+  public.get_stash_item_import(text, integer, uuid),
+  private.get_stash_item_import(text, integer, uuid)
+FROM authenticated, service_role;
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+```
+
 ## Tarkov.dev profile import
 
 **Summary.** Settings → Data Management lets a user import their in-game profile (level derived

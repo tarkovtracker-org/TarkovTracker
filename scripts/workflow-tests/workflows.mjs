@@ -8,6 +8,30 @@ import { classifyPaths, fullJobs } from '../ci/validation-plan.mjs';
 import { fixture } from './helpers/automation-fixture.mjs';
 import { jobBlock, workflowEvent, workflowStep } from './helpers/workflow-blocks.mjs';
 const read = (path) => readFileSync(path, 'utf8');
+const unconditionalOverrideNames = (overrides) =>
+  [...overrides.matchAll(/^ {2}(.+?):[ \t]/gm)]
+    .map((match) => match[1].replace(/^(['"])(.*)\1$/, '$2').replace(/@\*$/, ''))
+    .filter((key) => !/[>:]/.test(key) && !key.slice(1).includes('@'));
+test('only unconditional root overrides permanently pin direct dependencies', () => {
+  const overrides = [
+    "  sharp: '0.35.5'",
+    "  '@nuxt/kit': '4.6.4'",
+    "  'sharp@<0.35.5': '0.35.5'",
+    "  '@nuxt/kit@<4.6.4': '4.6.4'",
+    "  'parent>sharp': '0.35.5'",
+    "  'glob@*': '14.0.3'",
+    '  "@scope/wild@*": "1.0.0"',
+    '  production-only:prod: "1.0.0"',
+    "  'development-only:dev': '1.0.0'",
+    '  "optional-only:optional": "1.0.0"',
+  ].join('\n');
+  assert.deepEqual(unconditionalOverrideNames(overrides), [
+    'sharp',
+    '@nuxt/kit',
+    'glob',
+    '@scope/wild',
+  ]);
+});
 test('Dependabot waits only for the authoritative aggregates supplied by repository workflows', () => {
   const gate = read('.github/workflows/dependabot-auto-merge.yml');
   const wait = workflowStep(jobBlock(gate, 'auto-merge'), 'Wait for checks');
@@ -86,15 +110,12 @@ test('Dependabot auto-merge covers every npm group except auth and billing', () 
 test('Dependabot ignores direct dependencies that a pnpm override pins', () => {
   const pkg = JSON.parse(read('package.json'));
   const direct = new Set(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }));
-  const workspace = read('pnpm-workspace.yaml');
+  const workspace = read('pnpm-workspace.yaml').replaceAll('\r\n', '\n');
   const overrides = workspace.slice(workspace.indexOf('\noverrides:\n') + 12).split(/\n\S/)[0];
-  const pinned = [...overrides.matchAll(/^ {2}'?([^:'\n]+?)'?:/gm)]
-    .map((m) => m[1])
-    .filter((key) => !key.includes('>'))
-    .map((key) => key.replace(/(?<=.)@[^@]*$/, ''))
-    .filter((name) => direct.has(name));
+  // Version-qualified overrides only affect matching releases; future updates remain eligible.
+  const pinned = unconditionalOverrideNames(overrides).filter((name) => direct.has(name));
   assert.ok(pinned.length > 0);
-  const config = read('.github/dependabot.yml');
+  const config = read('.github/dependabot.yml').replaceAll('\r\n', '\n');
   const npm = config.slice(0, config.indexOf('package-ecosystem: github-actions'));
   const ignore = npm.slice(npm.indexOf('    ignore:\n'), npm.indexOf('    groups:\n'));
   const unconditional = new Set(
