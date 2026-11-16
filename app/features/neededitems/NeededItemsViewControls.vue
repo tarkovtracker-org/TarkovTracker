@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center gap-2">
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
     <div
       v-for="control in controls"
       :key="control.key"

@@ -16,17 +16,19 @@
     <div class="flex min-w-0 flex-1 flex-col gap-x-3 gap-y-2 sm:flex-row sm:items-center">
       <div class="min-w-0 flex-1">
         <div class="flex min-w-0 items-center gap-1.5">
-          <button
-            type="button"
-            :class="[openButtonClass, 'truncate text-left']"
-            :aria-label="openLabel"
-            @click="open"
-          >
+          <h3 class="text-surface-50 truncate text-sm leading-snug font-semibold">
             {{ group.item.name }}
-          </button>
+          </h3>
           <ItemIndicators v-bind="indicators" class="relative z-10" @craft="goToCraftStation" />
         </div>
+        <p class="text-surface-50 mt-1 text-sm font-semibold tabular-nums">
+          {{ remainingLabel }}
+        </p>
         <NeededItemGroupBreakdown class="mt-1" :sections="sections" />
+        <button type="button" :class="openButtonClass" :aria-label="openLabel" @click="open">
+          {{ requirementsLabel }}
+          <UIcon name="i-mdi-chevron-right" class="size-4 shrink-0" aria-hidden="true" />
+        </button>
       </div>
       <NeededItemCounter
         v-if="single"
@@ -63,14 +65,14 @@
       @craft="goToCraftStation"
     />
     <div class="flex flex-1 flex-col gap-1.5 p-2.5">
-      <button
-        type="button"
-        :class="[openButtonClass, 'line-clamp-2 min-h-10 text-center']"
-        :aria-label="openLabel"
-        @click="open"
+      <h3
+        class="text-surface-50 line-clamp-2 min-h-10 text-center text-sm leading-snug font-semibold"
       >
         {{ group.item.name }}
-      </button>
+      </h3>
+      <p class="text-surface-50 text-center text-sm font-semibold tabular-nums">
+        {{ remainingLabel }}
+      </p>
       <NeededItemGroupBreakdown centered :sections="sections" />
       <div class="mt-auto pt-1">
         <div v-if="single" class="relative z-10 flex justify-center">
@@ -78,6 +80,15 @@
         </div>
         <NeededItemGroupProgress v-else :current="group.currentCount" :total="group.total" />
       </div>
+      <button
+        type="button"
+        :class="[openButtonClass, 'justify-center text-center']"
+        :aria-label="openLabel"
+        @click="open"
+      >
+        {{ requirementsLabel }}
+        <UIcon name="i-mdi-chevron-right" class="size-4 shrink-0" aria-hidden="true" />
+      </button>
     </div>
   </article>
 </template>
@@ -95,6 +106,7 @@
     useNeededItemProgress,
   } from '@/features/neededitems/useNeededItemProgress';
   import { useNeedSelfCompletion } from '@/features/neededitems/useNeedSelfCompletion';
+  import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type {
     GroupedNeededItem,
     NeededItemHideoutModule,
@@ -120,13 +132,22 @@
   const openLabel = computed(() =>
     t('needed_items.view_details_for', { name: props.group.item.name })
   );
+  const formatNumber = useLocaleNumberFormatter();
+  const remainingLabel = computed(() =>
+    t('needed_items.remaining_count', {
+      count: formatNumber(Math.max(0, props.group.total - props.group.currentCount)),
+    })
+  );
+  const requirementsLabel = computed(() =>
+    t('needed_items.view_requirements', { count: props.needs.length }, props.needs.length)
+  );
   const { isCraftable, craftableIconClass, craftableTitle, goToCraftStation } = useCraftableItem(
     () => props.group.item.id
   );
   // The whole entry opens the details; nested controls sit above this stretched target. The
   // thumbnail sits above it too so its context menu (wiki, tarkov.dev, copy name) still works.
   const openButtonClass =
-    'text-sm leading-snug font-semibold text-surface-50 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-hidden focus-visible:after:ring-2 focus-visible:after:ring-primary-400 focus-visible:after:ring-inset';
+    'text-primary-400 mt-1 inline-flex items-center gap-1 text-xs leading-snug underline underline-offset-2 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-hidden focus-visible:after:ring-2 focus-visible:after:ring-primary-400 focus-visible:after:ring-inset';
   const isComplete = computed(() => props.group.currentCount >= props.group.total);
   const look = computed(() =>
     isComplete.value

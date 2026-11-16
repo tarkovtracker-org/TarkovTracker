@@ -822,9 +822,10 @@ so new settings remain local until the compact-list preference migration is depl
 Two independent toolbar choices replace the former list, grid and combined views and the grid
 card-style toggle:
 
-- **Show**: _Items_ (`groupByItem`) has one entry per item with every quest and hideout need added
-  together, split into FIR and non-FIR totals per source. _Needs_ has one entry per task objective
-  or hideout requirement.
+- **Show**: _By item_ (`groupByItem`) has one entry per item with every quest and hideout need
+  added together, split into FIR and non-FIR totals per source. _By requirement_ has one entry
+  per task objective or hideout requirement. By item is the default only when no grouping choice
+  was saved; existing true/false choices, layouts and filters are preserved.
 - **Layout**: _List_ (divided rows) or _Grid_ (tiles), stored as `neededItemsViewMode`.
 
 Every combination is built from the same pieces in `app/features/neededitems/`: `NeededItemEntry`
@@ -834,7 +835,10 @@ Every combination is built from the same pieces in `app/features/neededitems/`: 
 items, a stepper for counted ones, a read-only count once the parent is done, and a teammate
 note for needs kept only for teammates. Phones keep the stepper inline under the item name; no
 layout opens a modal to track a single need. An item entry with exactly one need tracks it in
-place; otherwise it opens the grouped details modal (per-need steppers and Smart Fill).
+place; otherwise it opens the grouped details modal (per-need steppers and Smart Fill). Grouped
+entries prominently show the remaining quantity (clamped at zero) and a visible action naming
+the number of requirements in the details. The source badges count requirements in both modes;
+the result summary always states its units and also counts unique items in By item mode.
 
 `neededItemsCardStyle` remains a synced preference column for compatibility but no longer
 affects rendering. The `needed_items_view` analytics event keeps `view_mode`

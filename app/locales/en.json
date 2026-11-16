@@ -1347,7 +1347,7 @@
       }
     },
     "needed_items": {
-      "filter_tabs_label": "Needed item filters",
+      "filter_tabs_label": "Requirements by source",
       "loading": "Loading task and hideout data",
       "items_count": "{count} item | {count} items",
       "empty": "No items match your search.",
@@ -1393,13 +1393,13 @@
         "list": "List",
         "grid": "Grid",
         "show": "Show",
-        "items": "Items",
+        "items": "By item",
         "items_hint": "One entry per item, with quest and hideout needs added together",
-        "needs": "Needs",
+        "needs": "By requirement",
         "needs_hint": "One entry for every quest objective or hideout upgrade",
         "layout": "Layout"
       },
-      "needs_count": "{count} need | {count} needs",
+      "needs_count": "{count} requirement | {count} requirements",
       "items_and_needs": "{items} · {needs}",
       "teammates_label": "Teammates:"
     },
@@ -2696,6 +2696,8 @@
     "unknown_station": "Unknown Station",
     "needed": "needed",
     "view_details_for": "View details for {name}",
+    "remaining_count": "{count} remaining",
+    "view_requirements": "View {count} requirement | View {count} requirements",
     "locked_before": "{count} before",
     "collected": "Collected",
     "mark_collected": "Mark as collected",

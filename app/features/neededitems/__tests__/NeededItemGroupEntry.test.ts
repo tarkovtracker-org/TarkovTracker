@@ -56,7 +56,12 @@ const i18n = createI18n({
   fallbackWarn: false,
   messages: createTestLocaleMessages({
     common: { tasks: 'Tasks', hideout: 'Hideout', fir: 'FIR' },
-    needed_items: { view_details_for: 'Open {name}', aria: { increase_count: 'Add one' } },
+    needed_items: {
+      view_details_for: 'Open {name}',
+      remaining_count: '{count} remaining',
+      view_requirements: 'View {count} requirement | View {count} requirements',
+      aria: { increase_count: 'Add one' },
+    },
   }),
 });
 const need = { id: 'objective', needType: 'taskObjective', count: 4 } as NeededItemTaskObjective;
@@ -83,8 +88,21 @@ describe('NeededItemGroupEntry', () => {
     async (layout) => {
       const wrapper = mountEntry({ layout });
       const open = wrapper.get('button[aria-label="Open Bolts"]');
+      expect(open.text()).toBe('View 2 requirements');
+      expect(wrapper.text()).toContain('6 remaining');
       await open.trigger('click');
       expect(wrapper.emitted('open')).toEqual([['item']]);
+    }
+  );
+  it.each(['row', 'tile'] as const)(
+    'updates the remaining quantity without showing negative amounts in the %s layout',
+    async (layout) => {
+      const wrapper = mountEntry({ layout });
+      await wrapper.setProps({ group: { ...group, currentCount: 8 } });
+      expect(wrapper.text()).toContain('1 remaining');
+      await wrapper.setProps({ group: { ...group, currentCount: 12 } });
+      expect(wrapper.text()).toContain('0 remaining');
+      expect(wrapper.text()).not.toContain('-3 remaining');
     }
   );
   it('keeps the craft shortcut separate from opening the details', async () => {
@@ -103,6 +121,7 @@ describe('NeededItemGroupEntry', () => {
   it('tracks an item with a single need in place instead of a total', async () => {
     progress.count = 1;
     const wrapper = mountEntry({ needs: [need] });
+    expect(wrapper.get('button[aria-label="Open Bolts"]').text()).toBe('View 1 requirement');
     expect(wrapper.find('[role="progressbar"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('1/4');
     await wrapper.get('button[aria-label="Add one"]').trigger('click');

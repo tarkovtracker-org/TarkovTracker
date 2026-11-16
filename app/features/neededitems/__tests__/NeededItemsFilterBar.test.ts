@@ -32,7 +32,7 @@ const i18n = createI18n({
     page: {
       needed_items: {
         items_count: '{count} item | {count} items',
-        needs_count: '{count} need | {count} needs',
+        needs_count: '{count} requirement | {count} requirements',
         items_and_needs: '{items} · {needs}',
       },
     },
@@ -176,12 +176,12 @@ describe('NeededItemsFilterBar', () => {
     expect(bar?.contains(wrapper.get('[data-testid="needed-items-show"]').element)).toBe(true);
   });
   it.each([
-    { groupByItem: false, totalCount: 3, expected: null },
-    { groupByItem: false, totalCount: 2, expected: '2 needs' },
-    { groupByItem: false, totalCount: 1, expected: '1 need' },
-    { groupByItem: true, totalCount: 3, expected: '3 items · 3 needs' },
-    { groupByItem: true, totalCount: 1, ungroupedCount: 2, expected: '1 item · 2 needs' },
-  ])('shows a pluralized result count only when it adds information (%o)', async (props) => {
+    { groupByItem: false, totalCount: 3, expected: '3 requirements' },
+    { groupByItem: false, totalCount: 2, expected: '2 requirements' },
+    { groupByItem: false, totalCount: 1, expected: '1 requirement' },
+    { groupByItem: true, totalCount: 3, expected: '3 items · 3 requirements' },
+    { groupByItem: true, totalCount: 1, ungroupedCount: 2, expected: '1 item · 2 requirements' },
+  ])('always names the result count unit (%o)', async (props) => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: { ...createDefaultProps(), ...props },
