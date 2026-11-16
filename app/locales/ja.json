@@ -1098,7 +1098,12 @@
           "hidden_section_title": "マップから隠す ({count})",
           "hidden_section_description": "まだ追跡されていますが、地図には描かれていません。",
           "hidden_section_expand": "隠されたクエストを表示",
-          "hidden_section_collapse": "隠されたクエストを閉じる"
+          "hidden_section_collapse": "隠されたクエストを閉じる",
+          "legend_label": "Quest colors",
+          "legend_highlight_named": "Highlight {name} on the map",
+          "quest_color_named": "Color for {name}",
+          "reset_quest_color_named": "Use the automatic color for {name}",
+          "reset_quest_colors": "Reset quest colors"
         }
       },
       "pinned_tasks_section": "ピン留めされたタスク",
@@ -1345,7 +1350,6 @@
       "filter_tabs_label": "Needed item filters",
       "loading": "タスクとハイドアウトのデータを読み込み中",
       "items_count": "{count} item | {count} items",
-      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "検索条件に一致するアイテムはありませんでした。",
       "error": "必要なアイテムを読み込めません。",
       "filters": {
@@ -1388,9 +1392,16 @@
       "view": {
         "list": "リスト表示",
         "grid": "グリッド表示",
-        "combined": "結合表示"
+        "show": "表示",
+        "items": "アイテム",
+        "items_hint": "One entry per item, with quest and hideout needs added together",
+        "needs": "Needs",
+        "needs_hint": "One entry for every quest objective or hideout upgrade",
+        "layout": "レイアウト"
       },
-      "teammates_needed": "チームメイトはこれを必要としています"
+      "needs_count": "{count} need | {count} needs",
+      "items_and_needs": "{items} · {needs}",
+      "teammates_label": "Teammates:"
     },
     "settings": {
       "card": {
@@ -2083,11 +2094,6 @@
     "account": {
       "begin_deletion": "アカウント削除を開始"
     },
-    "debug_state": {
-      "title": "デバッグ状態",
-      "description": "バグ報告用に現在のトラッカー状態をJSONスナップショットとして取得します。ゲームモード、レベル、タスク完了状態、前提条件チェーンが含まれます。",
-      "copy_button": "デバッグ状態をコピー"
-    },
     "general": {
       "title": "一般設定",
       "privacy_mode": "プライバシーモード",
@@ -2120,6 +2126,27 @@
           "selected": "固定した目標",
           "shared_extract": "共有脱出ポイント",
           "coop_extract": "協力脱出ポイント"
+        },
+        "objective_colors": {
+          "title": "Objective colors",
+          "description": "Choose what an objective marker's color shows. Its icon always shows the objective type.",
+          "modes": {
+            "category": "カテゴリー",
+            "task": "Quest",
+            "type": "Objective type"
+          },
+          "mode_hints": {
+            "category": "Your, pinned and team objectives use the category colors below.",
+            "task": "Each quest gets its own color. Pick a quest's color under Choose quests on the Tasks map.",
+            "type": "Each objective type gets its own color, shown in the Layers panel's Objective icons key."
+          },
+          "palette": "Palette",
+          "palettes": {
+            "okabe_ito": "Okabe-Ito (7 colors)",
+            "tol_bright": "Tol bright (6 colors)",
+            "tol_muted": "Tol muted (9 colors)"
+          },
+          "palette_hint": "Each palette stays distinguishable with red-green and blue-yellow color blindness. Colors repeat once a map has more quests than the palette has colors."
         }
       },
       "links": {
@@ -2159,8 +2186,6 @@
       "reset_confirm": "データをリセット",
       "export_description": "PvP、PvE、シーズナルPvPモードの進捗データのバックアップをダウンロードします。",
       "export_button": "進捗バックアップをエクスポート",
-      "debug_export_button": "デバッグスナップショットをエクスポート",
-      "debug_export_description": "サインインの問題をデバッグするための、機密情報を除いたアカウントスナップショットをダウンロードします。認証トークン、メールアドレス、プロフィール画像は含まれません。",
       "import_backup_button": "TarkovTrackerのバックアップをインポート",
       "import_eft_logs_folder_button": "EFTログフォルダーをインポート",
       "recommended_badge": "推奨",
@@ -2173,8 +2198,12 @@
       "tarkov_dev_section_description": "レベル、ファクション、スキルを含むプロフィールメタデータをインポートします",
       "eft_logs_section_title": "EFTゲームログのインポート",
       "eft_logs_section_description": "ゲームログファイルから検出されたクエスト進捗をインポートします",
+      "bug_report_title": "Bug Report File",
+      "bug_report_description": "If something looks wrong, download this file and attach it to a GitHub issue, or copy it and paste it into Discord, so the problem can be reproduced. It includes your progress, settings, and browser details, but not sign-in tokens, email, or profile images. Nothing is sent automatically.",
+      "bug_report_download": "Download Bug Report File",
+      "bug_report_copy": "Copy Bug Report",
+      "bug_report_error_title": "Could Not Create Bug Report",
       "backup_restore_section_description": "バックアップをエクスポートするか、以前エクスポートしたファイルから復元します",
-      "debug_section_title": "デバッグスナップショット",
       "import_backup_title": "バックアップから復元",
       "import_backup_description": "TarkovTrackerのバックアップファイルから進捗を復元します",
       "import_preview_exported_at": "エクスポート済み",
@@ -2193,7 +2222,6 @@
       "import_error_title": "バックアップのインポートに失敗しました",
       "import_error_description": "バックアップをインポートできませんでした。もう一度お試しください。",
       "export_error_title": "エクスポートに失敗しました",
-      "debug_export_error_title": "デバッグデータのエクスポートに失敗しました",
       "reset_title": "進捗をリセット",
       "danger_zone_title": "危険ゾーン",
       "danger_zone_hint": "すべての進行状況をリセットすると、PvP、PvEおよびシーズンPvPのデータが完全に削除されます。この操作は元に戻せません。",
@@ -2234,6 +2262,33 @@
       "recovery_archive_current": "Locally saved progress",
       "recovery_archive_original": "Original device data",
       "recovery_archive_older": "Older edit {index}",
+      "recovery_copies_title": "Recovery copies",
+      "recovery_copies_description": "When a reset, a Seasonal rollover, or an older tab replaces progress that could otherwise be lost, such as changes that had not reached the cloud yet, TarkovTracker keeps a copy here. Copies are never restored on their own. Restore, download, or discard them here.",
+      "device_recovery_archive_link": "Download the progress saved in this browser (device recovery archive)",
+      "superseded_copy_label": "{mode} · replaced {date}",
+      "superseded_copy_label_season": "{mode} season {season} · replaced {date}",
+      "superseded_copy_summary": "Level {level} · {count} task | Level {level} · {count} tasks",
+      "superseded_other_season": "This copy is from an earlier season, so it can be downloaded but not restored into the current season.",
+      "superseded_restore": "Restore",
+      "superseded_restore_confirmation": "Replace your current {mode} progress ({current}) with this copy? Your current {mode} progress will be kept here as a recovery copy, and other modes are not changed.",
+      "superseded_restore_confirm": "Replace {mode} progress",
+      "superseded_restored": "{mode} progress restored. The copy stays here until you discard it.",
+      "superseded_restore_failed": "Could not restore this copy. Your progress was not changed.",
+      "superseded_restore_keep_failed": "Could not keep your current progress as a recovery copy, so nothing was restored. Free up browser storage and try again.",
+      "superseded_restore_unavailable": "Progress cannot be saved in this browser right now, so nothing was restored. Reload the page and try again.",
+      "superseded_copy_unavailable": "This recovery copy is no longer available.",
+      "superseded_download": "ダウンロード",
+      "superseded_download_failed": "Could not download this recovery copy.",
+      "superseded_discard": "Discard",
+      "superseded_discard_confirmation": "Discard this copy? This cannot be undone. Download it first if you might need it.",
+      "superseded_discard_confirm": "Discard copy",
+      "superseded_discard_failed": "Could not discard this recovery copy.",
+      "recovery_copies_added": "Added {count} recovery copy. Restore it under Recovery copies. | Added {count} recovery copies. Restore them under Recovery copies.",
+      "recovery_copies_already_present": "The copies in this file are already listed under Recovery copies.",
+      "recovery_copies_sign_in": "Sign in to restore recovery copies. They are kept for a signed-in account.",
+      "recovery_copies_add_failed": "Only {added} of {total} recovery copies could be saved in this browser. Free up browser storage and restore the file again.",
+      "invalid_superseded_archive": "This recovery copy file is invalid or uses an unsupported version. Nothing was imported.",
+      "superseded_archive_too_large": "This recovery copy file is too large (maximum 16 MiB).",
       "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
@@ -2312,7 +2367,11 @@
       "continue_with_device_data_remaining": "残りのデータで続ける",
       "redirect_message": "TarkovTrackerをご利用いただきありがとうございます。ダッシュボードにリダイレクトされます。",
       "go_to_dashboard": "ダッシュボードに移動",
-      "session_changed": "サインインしたアカウントが変更されました。このセッションではこれ以上の操作は行われません。"
+      "session_changed": "サインインしたアカウントが変更されました。このセッションではこれ以上の操作は行われません。",
+      "subscription_active": "Your subscription must end before you can delete your account. Open Supporter and select Manage subscription to cancel renewal, then return after your paid period ends. Your account and paid time have been kept.",
+      "billing_unavailable": "We could not verify that your subscription has ended. Your account has been kept. Please try again later.",
+      "recent_login_required": "Sign in again with your linked provider, then return to Settings and confirm deletion within five minutes. Your account and device data have been kept.",
+      "sign_in_again": "Sign in again"
     },
     "discord_link": {
       "title": "Discordアカウント",
@@ -2320,6 +2379,7 @@
       "link_account": "Discordアカウントをリンク",
       "login_to_link": "ログインしてDiscordアカウントをリンク",
       "linked_as": "{username}としてリンク済み",
+      "linked": "Discord account linked",
       "sync_roles": "Discordロールを同期",
       "error_title": "Discordリンクを利用できません",
       "not_in_guild_title": "Discordサーバーに参加",
@@ -2598,10 +2658,8 @@
       "title": "このデバイス上のデータ",
       "description": "サインアウトすると、このアカウントの進行状況がこのブラウザに保存されます。 クラウドに到達していない変更はサインイン時に同期することができます リセットまたは季節ロールオーバーによって変位された進行状況は、エクスポートのために別々に保持されます。 このデバイスのデータを削除すると、このアカウントの進行状況、リカバリコピー、および設定がブラウザから削除され、サインアウトします。",
       "cloud_unaffected": "クラウドの進行状況は削除されていません。このデバイス上の他のアカウントのデータは影響を受けません。",
-      "superseded_available": "{count} 進捗状況のリセットまたは季節のロールオーバーからの変更は、エクスポートのみここで保持されます。これらは自動的に復元または同期されません。",
-      "superseded_export": "エクスポートが進行状況に取って代わっています",
-      "superseded_export_error": "進行状況をエクスポートできませんでした",
       "remove_button": "この端末からこのアカウントのデータを削除します",
+      "recovery_copies_warning": "This also deletes {count} recovery copy for this account. Download it from Recovery copies in Backup & Restore first if you might need it. | This also deletes {count} recovery copies for this account. Download them from Recovery copies in Backup & Restore first if you might need them.",
       "confirm_title": "このアカウントのデータをこのデバイスから削除しますか？",
       "confirm_description": "このアカウントの進行状況、リカバリコピー、優先される進行状況エクスポート、および設定はこのブラウザから削除され、サインアウトされます。 クラウドの進行状況は、再度ログインすると利用可能です。",
       "pending_warning": "いくつかの進捗状況の変更はまだクラウドに保存されていません。 この端末のデータを削除すると永久に破棄されます。保存したい場合は、まず進捗状況をエクスポートしてください。",
@@ -2639,8 +2697,6 @@
     "needed": "必要",
     "view_details_for": "{name}の詳細を表示",
     "locked_before": "{count}より前",
-    "switch_to_expanded": "展開表示に切り替え",
-    "switch_to_compact": "コンパクト表示に切り替え",
     "collected": "獲得済み",
     "mark_collected": "獲得済みとしてマーク",
     "handed_over": "引き渡し済み",
@@ -2677,13 +2733,13 @@
     "not_collected": "未獲得",
     "hidden_for_you": "Hidden for you",
     "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
-    "click_to_collect": "クリックして獲得",
-    "click_to_uncollect": "クリックして獲得を解除",
     "modal": {
       "smart_fill_error": "スマート補充を適用できません",
       "reset_error": "アイテムの進捗をリセットできません",
       "unknown_error": "予期しないエラーが発生しました"
-    }
+    },
+    "for_teammates": "For teammates",
+    "collect": "Collect"
   },
   "skills": {
     "req": "必要",

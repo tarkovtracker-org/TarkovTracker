@@ -1098,7 +1098,12 @@
           "hidden_section_title": "지도에서 숨김 ({count})",
           "hidden_section_description": "추적은 계속되지만 지도에는 표시되지 않습니다.",
           "hidden_section_expand": "숨긴 임무 표시",
-          "hidden_section_collapse": "숨긴 임무 접기"
+          "hidden_section_collapse": "숨긴 임무 접기",
+          "legend_label": "Quest colors",
+          "legend_highlight_named": "Highlight {name} on the map",
+          "quest_color_named": "Color for {name}",
+          "reset_quest_color_named": "Use the automatic color for {name}",
+          "reset_quest_colors": "Reset quest colors"
         }
       },
       "pinned_tasks_section": "고정된 작업",
@@ -1345,7 +1350,6 @@
       "filter_tabs_label": "Needed item filters",
       "loading": "작업 및 힐아웃 데이터 불러오는 중",
       "items_count": "{count} item | {count} items",
-      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "검색과 일치하는 아이템이 없습니다.",
       "error": "필요 아이템을 불러올 수 없습니다.",
       "filters": {
@@ -1388,9 +1392,16 @@
       "view": {
         "list": "목록 보기",
         "grid": "그리드 보기",
-        "combined": "결합 보기"
+        "show": "표시",
+        "items": "아이템",
+        "items_hint": "One entry per item, with quest and hideout needs added together",
+        "needs": "Needs",
+        "needs_hint": "One entry for every quest objective or hideout upgrade",
+        "layout": "레이아웃"
       },
-      "teammates_needed": "팀원에게 필요한 아이템"
+      "needs_count": "{count} need | {count} needs",
+      "items_and_needs": "{items} · {needs}",
+      "teammates_label": "Teammates:"
     },
     "settings": {
       "card": {
@@ -2083,11 +2094,6 @@
     "account": {
       "begin_deletion": "계정 삭제 시작"
     },
-    "debug_state": {
-      "title": "디버그 상태",
-      "description": "버그 보고를 위해 현재 트래커 상태의 JSON 스냅샷을 캡처합니다. 게임 모드, 레벨, 작업 완료 상태 및 선행 조건 체인이 포함됩니다.",
-      "copy_button": "디버그 상태 복사"
-    },
     "general": {
       "title": "일반 환경설정",
       "privacy_mode": "개인정보 보호 모드",
@@ -2120,6 +2126,27 @@
           "selected": "고정된 목표",
           "shared_extract": "공통 추출",
           "coop_extract": "협력 추출"
+        },
+        "objective_colors": {
+          "title": "Objective colors",
+          "description": "Choose what an objective marker's color shows. Its icon always shows the objective type.",
+          "modes": {
+            "category": "카테고리",
+            "task": "Quest",
+            "type": "Objective type"
+          },
+          "mode_hints": {
+            "category": "Your, pinned and team objectives use the category colors below.",
+            "task": "Each quest gets its own color. Pick a quest's color under Choose quests on the Tasks map.",
+            "type": "Each objective type gets its own color, shown in the Layers panel's Objective icons key."
+          },
+          "palette": "Palette",
+          "palettes": {
+            "okabe_ito": "Okabe-Ito (7 colors)",
+            "tol_bright": "Tol bright (6 colors)",
+            "tol_muted": "Tol muted (9 colors)"
+          },
+          "palette_hint": "Each palette stays distinguishable with red-green and blue-yellow color blindness. Colors repeat once a map has more quests than the palette has colors."
         }
       },
       "links": {
@@ -2159,8 +2186,6 @@
       "reset_confirm": "데이터 초기화",
       "export_description": "PvP, PvE 및 Seasonal PvP 모드의 진행도 데이터 백업을 다운로드합니다.",
       "export_button": "진행도 백업 내보내기",
-      "debug_export_button": "디버그 스냅샷 내보내기",
-      "debug_export_description": "로그인 문제 디버깅을 위해 민감 정보가 제거된 계정 스냅샷을 다운로드합니다. 인증 토큰, 이메일 및 프로필 이미지는 제외됩니다.",
       "import_backup_button": "TarkovTracker 백업 가져오기",
       "import_eft_logs_folder_button": "EFT 로그 폴더 가져오기",
       "recommended_badge": "권장",
@@ -2173,8 +2198,12 @@
       "tarkov_dev_section_description": "레벨, 세력 및 스킬을 포함한 프로필 메타데이터 가져오기",
       "eft_logs_section_title": "EFT 게임 로그 가져오기",
       "eft_logs_section_description": "게임 로그 파일에서 감지된 퀘스트 진행도 가져오기",
+      "bug_report_title": "Bug Report File",
+      "bug_report_description": "If something looks wrong, download this file and attach it to a GitHub issue, or copy it and paste it into Discord, so the problem can be reproduced. It includes your progress, settings, and browser details, but not sign-in tokens, email, or profile images. Nothing is sent automatically.",
+      "bug_report_download": "Download Bug Report File",
+      "bug_report_copy": "Copy Bug Report",
+      "bug_report_error_title": "Could Not Create Bug Report",
       "backup_restore_section_description": "백업을 내보내거나 이전에 내보낸 파일에서 복원합니다.",
-      "debug_section_title": "디버그 스냅샷",
       "import_backup_title": "백업에서 복원",
       "import_backup_description": "TarkovTracker 백업 파일에서 진행도 복원",
       "import_preview_exported_at": "내보낸 시간",
@@ -2193,7 +2222,6 @@
       "import_error_title": "백업 가져오기 실패",
       "import_error_description": "백업을 가져올 수 없습니다. 다시 시도해 주세요.",
       "export_error_title": "내보내기 실패",
-      "debug_export_error_title": "디버그 내보내기 실패",
       "reset_title": "진행도 초기화",
       "danger_zone_title": "위험 구역",
       "danger_zone_hint": "진행 상황을 모두 초기화하면 PvP, PvE 및 시즌 PvP 데이터가 영구적으로 삭제됩니다. 이 작업은 취소할 수 없습니다.",
@@ -2234,6 +2262,33 @@
       "recovery_archive_current": "Locally saved progress",
       "recovery_archive_original": "Original device data",
       "recovery_archive_older": "Older edit {index}",
+      "recovery_copies_title": "Recovery copies",
+      "recovery_copies_description": "When a reset, a Seasonal rollover, or an older tab replaces progress that could otherwise be lost, such as changes that had not reached the cloud yet, TarkovTracker keeps a copy here. Copies are never restored on their own. Restore, download, or discard them here.",
+      "device_recovery_archive_link": "Download the progress saved in this browser (device recovery archive)",
+      "superseded_copy_label": "{mode} · replaced {date}",
+      "superseded_copy_label_season": "{mode} season {season} · replaced {date}",
+      "superseded_copy_summary": "Level {level} · {count} task | Level {level} · {count} tasks",
+      "superseded_other_season": "This copy is from an earlier season, so it can be downloaded but not restored into the current season.",
+      "superseded_restore": "Restore",
+      "superseded_restore_confirmation": "Replace your current {mode} progress ({current}) with this copy? Your current {mode} progress will be kept here as a recovery copy, and other modes are not changed.",
+      "superseded_restore_confirm": "Replace {mode} progress",
+      "superseded_restored": "{mode} progress restored. The copy stays here until you discard it.",
+      "superseded_restore_failed": "Could not restore this copy. Your progress was not changed.",
+      "superseded_restore_keep_failed": "Could not keep your current progress as a recovery copy, so nothing was restored. Free up browser storage and try again.",
+      "superseded_restore_unavailable": "Progress cannot be saved in this browser right now, so nothing was restored. Reload the page and try again.",
+      "superseded_copy_unavailable": "This recovery copy is no longer available.",
+      "superseded_download": "다운로드",
+      "superseded_download_failed": "Could not download this recovery copy.",
+      "superseded_discard": "Discard",
+      "superseded_discard_confirmation": "Discard this copy? This cannot be undone. Download it first if you might need it.",
+      "superseded_discard_confirm": "Discard copy",
+      "superseded_discard_failed": "Could not discard this recovery copy.",
+      "recovery_copies_added": "Added {count} recovery copy. Restore it under Recovery copies. | Added {count} recovery copies. Restore them under Recovery copies.",
+      "recovery_copies_already_present": "The copies in this file are already listed under Recovery copies.",
+      "recovery_copies_sign_in": "Sign in to restore recovery copies. They are kept for a signed-in account.",
+      "recovery_copies_add_failed": "Only {added} of {total} recovery copies could be saved in this browser. Free up browser storage and restore the file again.",
+      "invalid_superseded_archive": "This recovery copy file is invalid or uses an unsupported version. Nothing was imported.",
+      "superseded_archive_too_large": "This recovery copy file is too large (maximum 16 MiB).",
       "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
@@ -2312,7 +2367,11 @@
       "continue_with_device_data_remaining": "남은 데이터를 두고 계속",
       "redirect_message": "TarkovTracker를 사용해 주셔서 감사합니다. 대시보드로 리디렉션됩니다.",
       "go_to_dashboard": "대시보드로 이동",
-      "session_changed": "로그인된 계정이 변경되었습니다. 이 세션에서는 추가 조치가 수행되지 않습니다."
+      "session_changed": "로그인된 계정이 변경되었습니다. 이 세션에서는 추가 조치가 수행되지 않습니다.",
+      "subscription_active": "Your subscription must end before you can delete your account. Open Supporter and select Manage subscription to cancel renewal, then return after your paid period ends. Your account and paid time have been kept.",
+      "billing_unavailable": "We could not verify that your subscription has ended. Your account has been kept. Please try again later.",
+      "recent_login_required": "Sign in again with your linked provider, then return to Settings and confirm deletion within five minutes. Your account and device data have been kept.",
+      "sign_in_again": "Sign in again"
     },
     "discord_link": {
       "title": "Discord 계정",
@@ -2320,6 +2379,7 @@
       "link_account": "Discord 계정 연결",
       "login_to_link": "Discord를 연결하려면 로그인하세요",
       "linked_as": "{username}(으)로 연결됨",
+      "linked": "Discord account linked",
       "sync_roles": "Discord 역할 동기화",
       "error_title": "Discord 연결을 사용할 수 없음",
       "not_in_guild_title": "Discord 서버 참가",
@@ -2598,10 +2658,8 @@
       "title": "이 기기의 데이터",
       "description": "로그아웃해도 이 브라우저에 저장된 이 계정의 진행도는 유지되므로, 아직 클라우드에 도달하지 않은 변경 사항은 다시 로그인할 때 동기화될 수 있습니다. 초기화 또는 시즌 전환으로 대체된 진행도는 내보내기를 위해 별도로 보관됩니다. 이 기기의 데이터를 제거하면 이 브라우저에서 이 계정의 진행도, 복구 사본 및 환경설정이 삭제되고 로그아웃됩니다.",
       "cloud_unaffected": "클라우드 진행도는 삭제되지 않습니다. 이 기기에 저장된 다른 계정의 데이터에도 영향을 주지 않습니다.",
-      "superseded_available": "초기화 또는 시즌 전환으로 대체된 진행도 변경 사항 {count}건이 내보내기용으로만 이 자리에 보관됩니다. 자동으로 복원하거나 동기화되지 않습니다.",
-      "superseded_export": "대체된 진행도 내보내기",
-      "superseded_export_error": "대체된 진행도를 내보내지 못함",
       "remove_button": "이 기기에서 이 계정의 데이터 제거",
+      "recovery_copies_warning": "This also deletes {count} recovery copy for this account. Download it from Recovery copies in Backup & Restore first if you might need it. | This also deletes {count} recovery copies for this account. Download them from Recovery copies in Backup & Restore first if you might need them.",
       "confirm_title": "이 기기에서 이 계정의 데이터를 제거하시겠습니까?",
       "confirm_description": "이 계정의 진행도, 복구 사본, 대체된 진행도 내보내기 파일 및 환경설정이 이 브라우저에서 삭제되고 로그아웃됩니다. 다시 로그인하면 클라우드 진행도를 계속 사용할 수 있습니다.",
       "pending_warning": "일부 진행도 변경 사항이 아직 클라우드에 저장되지 않았습니다. 이 기기의 데이터를 제거하면 영구적으로 삭제됩니다. 보관하려면 먼저 진행도를 내보내세요.",
@@ -2639,8 +2697,6 @@
     "needed": "필요",
     "view_details_for": "{name} 세부 정보 보기",
     "locked_before": "이전 {count}개",
-    "switch_to_expanded": "펼친 보기로 전환",
-    "switch_to_compact": "간결 보기로 전환",
     "collected": "수집함",
     "mark_collected": "수집으로 표시",
     "handed_over": "인계함",
@@ -2677,13 +2733,13 @@
     "not_collected": "미수집",
     "hidden_for_you": "Hidden for you",
     "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
-    "click_to_collect": "클릭하여 수집",
-    "click_to_uncollect": "클릭하여 수집 해제",
     "modal": {
       "smart_fill_error": "스마트 채우기 적용 불가",
       "reset_error": "아이템 진행도 초기화 불가",
       "unknown_error": "예기치 않은 오류 발생"
-    }
+    },
+    "for_teammates": "For teammates",
+    "collect": "Collect"
   },
   "skills": {
     "req": "필요",
