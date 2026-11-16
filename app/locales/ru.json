@@ -1098,7 +1098,12 @@
           "hidden_section_title": "Скрыто с карты ({count})",
           "hidden_section_description": "По-прежнему отслеживалось, просто не нарисовать на карте.",
           "hidden_section_expand": "Показать скрытые квесты",
-          "hidden_section_collapse": "Свернуть скрытые квесты"
+          "hidden_section_collapse": "Свернуть скрытые квесты",
+          "legend_label": "Quest colors",
+          "legend_highlight_named": "Highlight {name} on the map",
+          "quest_color_named": "Color for {name}",
+          "reset_quest_color_named": "Use the automatic color for {name}",
+          "reset_quest_colors": "Reset quest colors"
         }
       },
       "pinned_tasks_section": "Закреплённые задания",
@@ -1345,7 +1350,6 @@
       "filter_tabs_label": "Needed item filters",
       "loading": "Загружаем данные заданий и убежища",
       "items_count": "{count} item | {count} items",
-      "unique_items_count": "{unique} unique ({total} total)",
       "empty": "Нет предметов, соответствующих вашему поиску.",
       "error": "Не удалось загрузить необходимые предметы.",
       "filters": {
@@ -1388,9 +1392,16 @@
       "view": {
         "list": "Отображение списком",
         "grid": "Отображение сеткой",
-        "combined": "Комбинированное отображение"
+        "show": "Показать",
+        "items": "Предметы",
+        "items_hint": "One entry per item, with quest and hideout needs added together",
+        "needs": "Needs",
+        "needs_hint": "One entry for every quest objective or hideout upgrade",
+        "layout": "Макет"
       },
-      "teammates_needed": "Товарищам по команде это нужно"
+      "needs_count": "{count} need | {count} needs",
+      "items_and_needs": "{items} · {needs}",
+      "teammates_label": "Teammates:"
     },
     "settings": {
       "card": {
@@ -2083,11 +2094,6 @@
     "account": {
       "begin_deletion": "Начать удаление аккаунта"
     },
-    "debug_state": {
-      "title": "Состояние отладки",
-      "description": "Создайте JSON-снимок текущего состояния трекера для отчёта об ошибке. В него входят режим игры, уровень, статусы выполнения заданий и цепочки предварительных условий.",
-      "copy_button": "Копировать состояние отладки"
-    },
     "general": {
       "title": "Общие настройки",
       "privacy_mode": "Режим стримера",
@@ -2120,6 +2126,27 @@
           "selected": "Закреплённая цель",
           "shared_extract": "Общий выход",
           "coop_extract": "Совместный выход"
+        },
+        "objective_colors": {
+          "title": "Objective colors",
+          "description": "Choose what an objective marker's color shows. Its icon always shows the objective type.",
+          "modes": {
+            "category": "Категории",
+            "task": "Quest",
+            "type": "Objective type"
+          },
+          "mode_hints": {
+            "category": "Your, pinned and team objectives use the category colors below.",
+            "task": "Each quest gets its own color. Pick a quest's color under Choose quests on the Tasks map.",
+            "type": "Each objective type gets its own color, shown in the Layers panel's Objective icons key."
+          },
+          "palette": "Palette",
+          "palettes": {
+            "okabe_ito": "Okabe-Ito (7 colors)",
+            "tol_bright": "Tol bright (6 colors)",
+            "tol_muted": "Tol muted (9 colors)"
+          },
+          "palette_hint": "Each palette stays distinguishable with red-green and blue-yellow color blindness. Colors repeat once a map has more quests than the palette has colors."
         }
       },
       "links": {
@@ -2159,8 +2186,6 @@
       "reset_confirm": "Сбросить",
       "export_description": "Скачайте резервную копию прогресса для режимов PvP и PvE.",
       "export_button": "Экспортировать резервную копию",
-      "debug_export_button": "Экспортировать отладочный снимок",
-      "debug_export_description": "Скачивает обезличенный снимок аккаунта для отладки проблем во время входа. Токены авторизации, email и изображения профиля исключены.",
       "import_backup_button": "Импортировать копию TarkovTracker",
       "import_eft_logs_folder_button": "Импортировать папку логов EFT",
       "recommended_badge": "Рекомендуется",
@@ -2173,8 +2198,12 @@
       "tarkov_dev_section_description": "Импортировать метаданные профиля, включая уровень, фракцию и навыки",
       "eft_logs_section_title": "Импорт логов игры EFT",
       "eft_logs_section_description": "Импортировать прогресс заданий из файлов игровых логов",
+      "bug_report_title": "Bug Report File",
+      "bug_report_description": "If something looks wrong, download this file and attach it to a GitHub issue, or copy it and paste it into Discord, so the problem can be reproduced. It includes your progress, settings, and browser details, but not sign-in tokens, email, or profile images. Nothing is sent automatically.",
+      "bug_report_download": "Download Bug Report File",
+      "bug_report_copy": "Copy Bug Report",
+      "bug_report_error_title": "Could Not Create Bug Report",
       "backup_restore_section_description": "Экспортировать резервную копию или восстановить из ранее экспортированного файла",
-      "debug_section_title": "Снимок для отладки",
       "import_backup_title": "Восстановить из резервной копии",
       "import_backup_description": "Восстановить прогресс из файла резервной копии TarkovTracker",
       "import_preview_exported_at": "Экспортировано",
@@ -2193,7 +2222,6 @@
       "import_error_title": "Ошибка резервного копирования",
       "import_error_description": "Ваша резервная копия не может быть импортирована. Пожалуйста, попробуйте еще раз.",
       "export_error_title": "Ошибка экспорта",
-      "debug_export_error_title": "Не удалось экспортировать отладочный снимок",
       "reset_title": "Сбросить прогресс",
       "danger_zone_title": "Опасная зона",
       "danger_zone_hint": "Сброс всего прогресса навсегда удаляет ваши данные для PvP, PvE и сезонных PvP. Это действие нельзя отменить.",
@@ -2234,6 +2262,33 @@
       "recovery_archive_current": "Locally saved progress",
       "recovery_archive_original": "Original device data",
       "recovery_archive_older": "Older edit {index}",
+      "recovery_copies_title": "Recovery copies",
+      "recovery_copies_description": "When a reset, a Seasonal rollover, or an older tab replaces progress that could otherwise be lost, such as changes that had not reached the cloud yet, TarkovTracker keeps a copy here. Copies are never restored on their own. Restore, download, or discard them here.",
+      "device_recovery_archive_link": "Download the progress saved in this browser (device recovery archive)",
+      "superseded_copy_label": "{mode} · replaced {date}",
+      "superseded_copy_label_season": "{mode} season {season} · replaced {date}",
+      "superseded_copy_summary": "Level {level} · {count} task | Level {level} · {count} tasks",
+      "superseded_other_season": "This copy is from an earlier season, so it can be downloaded but not restored into the current season.",
+      "superseded_restore": "Restore",
+      "superseded_restore_confirmation": "Replace your current {mode} progress ({current}) with this copy? Your current {mode} progress will be kept here as a recovery copy, and other modes are not changed.",
+      "superseded_restore_confirm": "Replace {mode} progress",
+      "superseded_restored": "{mode} progress restored. The copy stays here until you discard it.",
+      "superseded_restore_failed": "Could not restore this copy. Your progress was not changed.",
+      "superseded_restore_keep_failed": "Could not keep your current progress as a recovery copy, so nothing was restored. Free up browser storage and try again.",
+      "superseded_restore_unavailable": "Progress cannot be saved in this browser right now, so nothing was restored. Reload the page and try again.",
+      "superseded_copy_unavailable": "This recovery copy is no longer available.",
+      "superseded_download": "Скачать",
+      "superseded_download_failed": "Could not download this recovery copy.",
+      "superseded_discard": "Discard",
+      "superseded_discard_confirmation": "Discard this copy? This cannot be undone. Download it first if you might need it.",
+      "superseded_discard_confirm": "Discard copy",
+      "superseded_discard_failed": "Could not discard this recovery copy.",
+      "recovery_copies_added": "Added {count} recovery copy. Restore it under Recovery copies. | Added {count} recovery copies. Restore them under Recovery copies.",
+      "recovery_copies_already_present": "The copies in this file are already listed under Recovery copies.",
+      "recovery_copies_sign_in": "Sign in to restore recovery copies. They are kept for a signed-in account.",
+      "recovery_copies_add_failed": "Only {added} of {total} recovery copies could be saved in this browser. Free up browser storage and restore the file again.",
+      "invalid_superseded_archive": "This recovery copy file is invalid or uses an unsupported version. Nothing was imported.",
+      "superseded_archive_too_large": "This recovery copy file is too large (maximum 16 MiB).",
       "export_and_clear_older_copies": "Export and clear older copies"
     },
     "prestige_pvp": {
@@ -2312,7 +2367,11 @@
       "continue_with_device_data_remaining": "Продолжить с данными",
       "redirect_message": "Спасибо за использование TarkovTracker. Вы будете перенаправлены на панель.",
       "go_to_dashboard": "Перейти на панель",
-      "session_changed": "Ваша учетная запись изменена. В этой сессии никаких дальнейших действий не будет."
+      "session_changed": "Ваша учетная запись изменена. В этой сессии никаких дальнейших действий не будет.",
+      "subscription_active": "Your subscription must end before you can delete your account. Open Supporter and select Manage subscription to cancel renewal, then return after your paid period ends. Your account and paid time have been kept.",
+      "billing_unavailable": "We could not verify that your subscription has ended. Your account has been kept. Please try again later.",
+      "recent_login_required": "Sign in again with your linked provider, then return to Settings and confirm deletion within five minutes. Your account and device data have been kept.",
+      "sign_in_again": "Sign in again"
     },
     "discord_link": {
       "title": "Аккаунт Discord",
@@ -2320,6 +2379,7 @@
       "link_account": "Привязать аккаунт Discord",
       "login_to_link": "Войдите, чтобы привязать Discord",
       "linked_as": "Привязан как {username}",
+      "linked": "Discord account linked",
       "sync_roles": "Синхронизировать роли Discord",
       "error_title": "Связь с Discord недоступна",
       "not_in_guild_title": "Присоединитесь к серверу Discord",
@@ -2598,10 +2658,8 @@
       "title": "Данные на этом устройстве",
       "description": "Выход из аккаунта сохраняет сохраненный прогресс в этом браузере, так что изменения, которые еще не достигли облака, могут синхронизироваться при повторном входе. Прогресс, перемещаемый резюме, или сезонный опрокидыватель хранится отдельно для экспорта. Удаление данных этого устройства приводит к удалению прогресса, копий восстановления, настроек и настроек этого браузера и к выходу из него.",
       "cloud_unaffected": "Ваш прогресс в облаке не удалён. Остальные данные на этом устройстве не затронуты.",
-      "superseded_available": "Прогресс изменения(я) {count} после сброса или сезонные ролики сохраняются здесь только для экспорта. Они не будут восстановлены или синхронизированы автоматически.",
-      "superseded_export": "Экспортировать замененный прогресс",
-      "superseded_export_error": "Не удалось экспортировать замененный прогресс",
       "remove_button": "Удалить данные этого аккаунта с этого устройства",
+      "recovery_copies_warning": "This also deletes {count} recovery copy for this account. Download it from Recovery copies in Backup & Restore first if you might need it. | This also deletes {count} recovery copies for this account. Download them from Recovery copies in Backup & Restore first if you might need them.",
       "confirm_title": "Удалить данные этого аккаунта с этого устройства?",
       "confirm_description": "Прогресс этого аккаунта, копии восстановления, отложенный экспорт и настройки будут удалены из этого браузера, и вы будете отключены. Ваш прогресс в облаке остается доступным при повторном входе.",
       "pending_warning": "Некоторые изменения прогресса еще не были сохранены в облаке. Удаление данных этого устройства окончательно отменит их. Экспортируйте ваши успехи сначала, если вы хотите сохранить их.",
@@ -2639,8 +2697,6 @@
     "needed": "Нужен",
     "view_details_for": "Посмотреть подробности для {name}",
     "locked_before": "До: {count}",
-    "switch_to_expanded": "Переключиться на расширенный вид",
-    "switch_to_compact": "Переключиться на компактный вид",
     "collected": "Найдено",
     "mark_collected": "Отметить как найденное",
     "handed_over": "Сдано",
@@ -2677,13 +2733,13 @@
     "not_collected": "Не получено",
     "hidden_for_you": "Hidden for you",
     "hidden_for_you_hint": "You hid this task. It stays listed because teammates still need this item: {teammates}",
-    "click_to_collect": "Нажмите, чтобы получить",
-    "click_to_uncollect": "Нажмите, чтобы отменить получение",
     "modal": {
       "smart_fill_error": "Невозможно применить умное заполнение",
       "reset_error": "Невозможно сбросить прогресс предмета",
       "unknown_error": "Произошла неизвестная ошибка"
-    }
+    },
+    "for_teammates": "For teammates",
+    "collect": "Collect"
   },
   "skills": {
     "req": "Требование",
