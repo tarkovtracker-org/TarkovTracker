@@ -80,9 +80,12 @@ metrics; when targeting `/api/logs/client`, it has the same edge-protection prer
 browser log forwarding disabled when enabling these metrics alone. Verify delivery to the approved
 retention/query destination after rebuilding the application.
 
-The prepared private `/api/logs/progress` collector, production-only service binding,
+The production `/api/logs/progress` collector, production-only service binding,
 protection prerequisites, retention and staged verification are documented in
-[Aggregate progress diagnostics](progress-diagnostics.md). Preparation does not enable collection.
+[Aggregate progress diagnostics](progress-diagnostics.md). Production enables only
+the aggregate progress sink; general, root/local and preview logging stay disabled.
+The [approved rollout evidence](https://github.com/tarkovtracker-org/TarkovTracker/issues/960#issuecomment-6908809905)
+records the synthetic delivery/privacy checks and pre-activation PostgreSQL baseline.
 
 ## Pre-Deploy Validation
 

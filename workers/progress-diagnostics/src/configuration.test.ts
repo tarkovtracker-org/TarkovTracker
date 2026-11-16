@@ -14,10 +14,15 @@ describe('Pages collector isolation', () => {
     ]);
     expect(production.durable_objects).toEqual(root.durable_objects);
     expect(production.kv_namespaces).toEqual(root.kv_namespaces);
-    expect(production.vars).toEqual(root.vars);
+    expect(production.vars).toEqual({
+      ...root.vars,
+      NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL: '/api/logs/progress',
+    });
     expect(production.durable_objects.bindings[0]?.name).toBe('API_GATEWAY_LIMITER');
     expect(production.kv_namespaces[0]?.binding).toBe('TARKOV_DATA');
-    expect(production.vars.NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL).toBe('');
+    expect(root.vars.NUXT_PUBLIC_PROGRESS_DIAGNOSTIC_SINK_URL).toBe('');
+    expect(production.vars.NUXT_PUBLIC_CLIENT_LOG_SINK_URL).toBe('');
+    expect(preview.vars.NUXT_PUBLIC_CLIENT_LOG_SINK_URL).toBe('');
     expect(root.services).toEqual([]);
     expect(preview.services).toEqual([]);
     expect(preview.durable_objects.bindings).toEqual([]);
