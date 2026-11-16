@@ -965,6 +965,7 @@
         scav: props.showExtractToggle && hasScavExtracts.value,
         shared:
           props.showExtractToggle && (hasSharedExtracts.value || hasUnknownFactionExtracts.value),
+        unknownFaction: hasUnknownFactionExtracts.value,
         coop: props.showExtractToggle && hasCoopExtracts.value,
         transit: hasTransits.value,
         spawns: props.showSpawnToggle && hasPmcSpawns.value,

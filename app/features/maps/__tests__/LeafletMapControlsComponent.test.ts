@@ -366,12 +366,14 @@ describe('LeafletMap controls', () => {
     expect(row('transit').exists()).toBe(false);
     expect(row('pmc').attributes('aria-pressed')).toBe('true');
     expect(row('pmc').text()).toContain('PMC');
-    expect(row('shared').text()).toContain('Shared / unknown');
+    expect(row('shared').text()).toContain('Shared');
+    expect(row('shared').text()).toContain('Either faction');
+    expect(row('shared').text()).not.toContain('unknown');
     expect(
       row('shared')
         .findAll('svg path')
         .map((path) => path.attributes('d'))
-    ).toEqual([MAP_MARKER_GLYPH_PATHS.shared, MAP_MARKER_GLYPH_PATHS.extract]);
+    ).toEqual([MAP_MARKER_GLYPH_PATHS.shared]);
     expect(row('coop').text()).toContain('PMC and Scav together');
     await row('pmc').trigger('click');
     await row('shared').trigger('click');
@@ -386,6 +388,23 @@ describe('LeafletMap controls', () => {
     await toggle.trigger('click');
     expect(wrapper.find('[data-testid="map-layers-panel"]').exists()).toBe(false);
     expect(localStorage.getItem('map_layers_panel_open')).toBe('false');
+    wrapper.unmount();
+  });
+  it('labels the shared row honestly when an extract has no known faction', async () => {
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [
+          { id: 'unknown', name: 'Unknown exit', faction: null, position: { x: 1, z: 1 } },
+        ],
+      },
+    });
+    const row = await openLayersPanel(wrapper);
+    expect(row('shared').text()).toContain('Shared / unknown');
+    expect(row('shared').text()).toContain('Either faction, or faction not supplied');
+    expect(row('shared').findAll('svg path')).toHaveLength(1);
+    await row('shared').trigger('click');
+    expect(row('shared').attributes('aria-pressed')).toBe('false');
     wrapper.unmount();
   });
   it('attaches visible vehicle requirements and keyboard details that fit after resizing', async () => {

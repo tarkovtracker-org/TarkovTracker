@@ -19,6 +19,7 @@ const createInput = (available: Partial<MapLayerGroupsInput['available']> = {}) 
       pmc: true,
       scav: true,
       shared: true,
+      unknownFaction: false,
       coop: true,
       transit: true,
       spawns: true,
@@ -39,11 +40,11 @@ describe('buildMapLayerGroups', () => {
     expect(extracts.map((item) => item.swatch)).toEqual(['pmc', 'scav', 'shared', 'coop']);
     expect(extracts[0]!.color).toBe(MAP_MARKER_COLORS.PMC_EXTRACT);
     expect(extracts[0]!.visible).toBe(input.extracts.pmc);
-    expect(extracts[2]!.label).toBe('maps.layers.shared_or_unknown');
-    expect(extracts[2]!.hint).toBe('maps.layers.shared_or_unknown_hint');
-    expect(extracts[2]).toMatchObject({
-      secondaryGlyph: { kind: 'extract', color: MAP_MARKER_COLORS.DEFAULT_EXTRACT },
-    });
+    expect(extracts[2]!.label).toBe('maps.layers.shared');
+    expect(extracts[2]!.hint).toBe('maps.layers.shared_hint');
+    const shared = buildMapLayerGroups(createInput({ unknownFaction: true }))[1]!.items[2]!;
+    expect(shared.label).toBe('maps.layers.shared_or_unknown');
+    expect(shared.hint).toBe('maps.layers.shared_or_unknown_hint');
   });
   it('omits marker types the current map does not have', () => {
     expect(keysOf(createInput({ shared: false, transit: false, spawns: false }))).toEqual([
