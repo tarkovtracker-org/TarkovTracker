@@ -765,12 +765,13 @@ describe('LeafletMap controls', () => {
   it('renders localized help rows with their keyboard shortcuts in message slots', async () => {
     mapState.hasMultipleFloors = true;
     const wrapper = await mountMap();
-    expect(wrapper.findAll('kbd')).toHaveLength(9);
+    expect(wrapper.findAll('kbd')).toHaveLength(10);
     expect(wrapper.text()).toMatch(/WASD\s*\/\s*←↑↓→\s+or drag to pan/);
     expect(wrapper.text()).toMatch(/Shift\s*Scroll\s*\/\s*Q\/E\s+to zoom/);
     expect(wrapper.text()).toMatch(/R\s+to reset view/);
     expect(wrapper.text()).toMatch(/Ctrl\s*Scroll\s+to cycle floors/);
     expect(wrapper.text()).toMatch(/F\s+to click at cursor/);
+    expect(wrapper.text()).toMatch(/C\s+to copy the coordinates under the cursor/);
     const hint = wrapper.find('[data-testid="map-first-use-hint"]');
     expect(hint.exists()).toBe(true);
     expect(hint.text()).toMatch(/Ctrl \+ Scroll to change floors/);
@@ -778,7 +779,7 @@ describe('LeafletMap controls', () => {
   });
   it('hides floor help and the floor shortcut from the hint on single-floor maps', async () => {
     const wrapper = await mountMap();
-    expect(wrapper.findAll('kbd')).toHaveLength(7);
+    expect(wrapper.findAll('kbd')).toHaveLength(8);
     expect(wrapper.text()).not.toContain('to cycle floors');
     expect(wrapper.text()).not.toContain('Or use the floor panel.');
     const hint = wrapper.find('[data-testid="map-first-use-hint"]');

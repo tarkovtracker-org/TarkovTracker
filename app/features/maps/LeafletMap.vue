@@ -434,6 +434,20 @@
                               </kbd>
                             </template>
                           </i18n-t>
+                          <i18n-t
+                            keypath="maps.help.copy_coordinates"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #key>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'C' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
                           <p class="text-surface-300 text-[11px]">
                             {{ t('maps.help.click_marker') }}
                           </p>
@@ -492,7 +506,13 @@
         <div
           class="pointer-events-none absolute bottom-2 left-2 z-650 flex max-w-[calc(100%-4rem)] flex-col items-start gap-1"
         >
-          <MapCursorCoordinates :map="mapInstance" :crosshair-shown="showKeyboardCursor" />
+          <MapCursorCoordinates
+            :map="mapInstance"
+            :crosshair-shown="showKeyboardCursor"
+            :has-keyboard-focus="isMapKeyboardActive"
+            :map-name="props.map.name"
+            :floor="coordinatesFloor"
+          />
           <p
             v-if="extractSource"
             data-testid="map-extract-source"
@@ -683,6 +703,7 @@
   import { zoneOutlineStyle, zoneScreenSize } from '@/features/maps/utils/objectiveZoneOutline';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import { isEditableTarget } from '@/utils/editableTarget';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
@@ -828,6 +849,10 @@
     initialView: props.initialView ?? null,
     initialFloor: props.initialFloor,
   });
+  /** The floor named in copied coordinates, written as the floor panel shows it. */
+  const coordinatesFloor = computed(() =>
+    hasMultipleFloors.value ? selectedFloor.value.replace(/_/g, ' ') : null
+  );
   /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */
   const OBJECTIVE_DOT_RADIUS = OBJECTIVE_CHIP_SIZE / 2;
   /** Hit-test dots are invisible: the chip above them is the visible marker. */
@@ -1142,15 +1167,6 @@
       default:
         return null;
     }
-  };
-  const isEditableTarget = (target: EventTarget | null): boolean => {
-    if (!(target instanceof HTMLElement)) return false;
-    if (target.isContentEditable) return true;
-    return Boolean(
-      target.closest(
-        'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]'
-      )
-    );
   };
   const isMapKeyboardActive = (): boolean => {
     if (!mapInstance.value) return false;

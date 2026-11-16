@@ -620,6 +620,7 @@
     "placeholder": "this location",
     "floors": "Floors",
     "cursor_coordinates": "x: {x}, z: {z}",
+    "cursor_coordinates_copy_hint": "{key} copy",
     "extract_names": {
       "scav_underboat_hideout": "Hideout Under the Landing Stage"
     },
@@ -683,6 +684,7 @@
       "cycle_floors": "{keys} to cycle floors",
       "floor_panel": "Or use the floor panel.",
       "click_at_cursor": "{key} to click at cursor",
+      "copy_coordinates": "{key} to copy the coordinates under the cursor",
       "click_marker": "Click a marker for details.",
       "fullscreen": "Use the full screen button in the map controls.",
       "resize": "Drag the bottom edge of the map to resize.",
