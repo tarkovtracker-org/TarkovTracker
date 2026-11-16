@@ -11,7 +11,6 @@ export interface MapLayerItem {
   hint?: string;
   color: string;
   swatch: MapLayerSwatch;
-  secondaryGlyph?: { kind: MapMarkerGlyphKind; color: string };
   visible: Toggle;
 }
 export interface MapLayerGroup {
@@ -33,6 +32,7 @@ export interface MapLayerGroupsInput {
     pmc: boolean;
     scav: boolean;
     shared: boolean;
+    unknownFaction: boolean;
     coop: boolean;
     transit: boolean;
     spawns: boolean;
@@ -98,11 +98,12 @@ function extractItems({ t, colors, extracts, available }: MapLayerGroupsInput): 
     },
     {
       key: 'shared',
-      label: t('maps.layers.shared_or_unknown'),
-      hint: t('maps.layers.shared_or_unknown_hint'),
+      label: t(available.unknownFaction ? 'maps.layers.shared_or_unknown' : 'maps.layers.shared'),
+      hint: t(
+        available.unknownFaction ? 'maps.layers.shared_or_unknown_hint' : 'maps.layers.shared_hint'
+      ),
       color: colors.SHARED_EXTRACT,
       swatch: 'shared',
-      secondaryGlyph: { kind: 'extract', color: colors.DEFAULT_EXTRACT },
       visible: extracts.shared,
       available: available.shared,
     },

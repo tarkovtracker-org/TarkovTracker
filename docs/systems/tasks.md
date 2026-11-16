@@ -593,11 +593,12 @@ Extracts (PMC, Scav, Shared / unknown, Co-op), and Locations (Transit, PMC Spawn
 the markers it controls, including combined rows; hidden rows stay listed, dimmed with an
 eye-off icon. Task rows are always listed; extract and location rows appear only when the selected
 map has that marker type. The collapsed button shows how many rows are hidden, and the panel offers
-**Show all layers** while any are hidden. The combined Shared / unknown row depicts both the shared
-glyph/color and the generic exit glyph/default color; it controls either-faction exits and exits
-whose faction was not supplied without implying that unknown factions are shared. Shared and co-op
-extracts have their own toggles and start
-visible when either faction's extracts start visible; extracts without a known faction follow the
+**Show all layers** while any are hidden. The Shared row shows one exit glyph in the shared color.
+Only when the selected map has drawable extracts without a known faction does its label become
+Shared / unknown, with a hint that faction data was not supplied. It still shows one glyph and
+controls either-faction exits and unclassified exits without assigning a faction to the latter.
+Shared and co-op extracts have their own toggles and start visible when either faction's extracts
+start visible; extracts without a known faction follow the
 Shared row, which is listed whenever such extracts exist. Extracts start visible or hidden from
 **Settings > Maps > Show Extracts by Default** (`showMapExtracts`, synced as `show_map_extracts`).
 Turning an extract, transit or spawn row on or off (or using **Show all layers**) is remembered

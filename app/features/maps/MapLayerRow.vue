@@ -18,11 +18,6 @@
         :style="{ backgroundColor: item.color }"
       />
       <MapMarkerGlyph v-else :kind="glyphKind" :color="item.color" />
-      <MapMarkerGlyph
-        v-if="item.secondaryGlyph"
-        :kind="item.secondaryGlyph.kind"
-        :color="item.secondaryGlyph.color"
-      />
     </span>
     <span class="flex min-w-0 flex-1 flex-col">
       <span class="truncate font-medium" :class="visible ? 'text-surface-100' : 'text-surface-500'">
