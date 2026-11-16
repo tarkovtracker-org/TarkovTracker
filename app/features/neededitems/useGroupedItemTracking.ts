@@ -28,7 +28,7 @@ export function useGroupedItemTracking(needs: () => Need[], itemName: () => stri
   // timestamp, so Undo accepts normalization but never overwrites a newer edit.
   const recordVersion = (need: Need) => {
     const saved = record(need);
-    return JSON.stringify([saved?.count, saved?.complete, saved?.timestamp]);
+    return JSON.stringify([saved?.count ?? 0, saved?.complete ?? false, saved?.timestamp ?? 0]);
   };
   const currentCount = (need: Need) => {
     const saved = record(need);

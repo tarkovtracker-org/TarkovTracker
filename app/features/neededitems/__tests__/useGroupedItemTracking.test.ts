@@ -156,6 +156,18 @@ describe('inline grouped tracking', () => {
     expect(() => useActionHistoryStore().undoStack.at(-1)!.undo()).toThrow();
     expect(store.getObjectiveCount('one')).toBe(2);
   });
+  it('accepts persisted defaults when undoing a filled objective', async () => {
+    const store = useTarkovStore();
+    const tracking = setup([task('one', 3)]);
+    tracking.setCount(false, 3);
+    store.$patch((state) => {
+      const current = state[state.currentGameMode].taskObjectives.one!;
+      current.complete ??= false;
+      current.timestamp ??= 0;
+    });
+    await useActionHistoryStore().undoLastAction();
+    expect(store.getObjectiveCount('one')).toBe(0);
+  });
   it('creates no history entry for an unchanged count', () => {
     const tracking = setup([task('one', 3)]);
     tracking.setCount(false, 0);
