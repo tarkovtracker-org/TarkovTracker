@@ -876,9 +876,10 @@ item's displayed total stays aligned with its visible direct needs (#882: a LEDX
 added every "sell N of any item" pool). Progress writes stay bound to the objective ID regardless
 of which item identity is displayed.
 
-The grouped card total uses `filteredItems`, including the ownership filter. Its modal target list
-uses the same view filters except ownership, so owned direct needs can remain editable and resettable
-even when hidden from the card total. Resolve the modal's accepted-item suppression against the
+Result membership and underlying grouped data use `filteredItems`, including the ownership filter.
+Rendered grouped counters, their source breakdown and modal targets use the matching need list
+without ownership filtering, so owned direct needs remain counted, editable and resettable while
+the item is still needed. Resolve the modal's accepted-item suppression against the
 visible `filteredItems` set; recalculating it over the expanded modal targets can incorrectly hide a
 pooled objective that the card displays. Snapshot modal targets and collected totals when the modal
 opens, and close it if the active game mode changes. Mutations must be guarded against writing the
