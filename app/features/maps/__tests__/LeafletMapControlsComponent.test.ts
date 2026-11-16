@@ -367,6 +367,7 @@ describe('LeafletMap controls', () => {
     expect(row('pmc').attributes('aria-pressed')).toBe('true');
     expect(row('pmc').text()).toContain('PMC');
     expect(row('shared').text()).toContain('Shared');
+    expect(row('shared').text()).toContain('Either faction');
     expect(row('shared').text()).not.toContain('unknown');
     expect(
       row('shared')
@@ -400,6 +401,7 @@ describe('LeafletMap controls', () => {
     });
     const row = await openLayersPanel(wrapper);
     expect(row('shared').text()).toContain('Shared / unknown');
+    expect(row('shared').text()).toContain('Either faction, or faction not supplied');
     expect(row('shared').findAll('svg path')).toHaveLength(1);
     await row('shared').trigger('click');
     expect(row('shared').attributes('aria-pressed')).toBe('false');
