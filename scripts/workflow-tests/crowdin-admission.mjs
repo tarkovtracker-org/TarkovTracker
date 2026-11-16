@@ -430,7 +430,8 @@ test('only the supported non-English locale inventory can use the exemption', as
   const codes = [...readFileSync('app/utils/locales.ts', 'utf8').matchAll(/'([a-z]{2})'/g)]
     .map((match) => match[1])
     .filter((code) => code !== 'en');
-  assert.equal(codes.length, 12);
+  assert.equal(codes.length, 13);
+  assert.ok(codes.includes('tr'));
   for (const code of codes) {
     const f = fixture();
     f.files[0].filename = `app/locales/${code}.json`;
