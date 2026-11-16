@@ -32,7 +32,7 @@ const i18n = createI18n({
     page: {
       needed_items: {
         items_count: '{count} item | {count} items',
-        needs_count: '{count} need | {count} needs',
+        needs_count: '{count} requirement | {count} requirements',
         items_and_needs: '{items} · {needs}',
       },
     },
@@ -149,21 +149,20 @@ describe('NeededItemsFilterBar', () => {
     await list.trigger('click');
     expect(wrapper.emitted('update:viewMode')).toEqual([['list']]);
   });
-  it('switches between Items and Needs without touching the layout', async () => {
+  it('toggles showing each item once without changing the layout', async () => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: createDefaultProps(),
       global: createDefaultGlobal(),
     });
-    expect(wrapper.emitted('update:groupByItem')).toBeUndefined();
-    const items = wrapper.get('[data-testid="needed-items-show-items"]');
-    expect(items.text()).toBe('page.needed_items.view.items');
-    expect(wrapper.get('[data-testid="needed-items-show-needs"]').attributes('aria-pressed')).toBe(
-      'true'
-    );
-    await items.trigger('click');
+    const toggle = wrapper.get('[data-testid="needed-items-show"] [role="switch"]');
+    expect(toggle.attributes('aria-checked')).toBe('false');
+    await toggle.trigger('click');
     expect(wrapper.emitted('update:groupByItem')).toEqual([[true]]);
     expect(wrapper.emitted('update:viewMode')).toBeUndefined();
+    await wrapper.setProps({ groupByItem: true });
+    await toggle.trigger('click');
+    expect(wrapper.emitted('update:groupByItem')).toEqual([[true], [false]]);
   });
   it('keeps the source tabs and the list controls on one bar', async () => {
     const NeededItemsFilterBar = await setup();
@@ -176,12 +175,12 @@ describe('NeededItemsFilterBar', () => {
     expect(bar?.contains(wrapper.get('[data-testid="needed-items-show"]').element)).toBe(true);
   });
   it.each([
-    { groupByItem: false, totalCount: 3, expected: null },
-    { groupByItem: false, totalCount: 2, expected: '2 needs' },
-    { groupByItem: false, totalCount: 1, expected: '1 need' },
-    { groupByItem: true, totalCount: 3, expected: '3 items · 3 needs' },
-    { groupByItem: true, totalCount: 1, ungroupedCount: 2, expected: '1 item · 2 needs' },
-  ])('shows a pluralized result count only when it adds information (%o)', async (props) => {
+    { groupByItem: false, totalCount: 3, expected: '3 requirements' },
+    { groupByItem: false, totalCount: 2, expected: '2 requirements' },
+    { groupByItem: false, totalCount: 1, expected: '1 requirement' },
+    { groupByItem: true, totalCount: 3, expected: '3 items · 3 requirements' },
+    { groupByItem: true, totalCount: 1, ungroupedCount: 2, expected: '1 item · 2 requirements' },
+  ])('always names the result count unit (%o)', async (props) => {
     const NeededItemsFilterBar = await setup();
     const wrapper = mount(NeededItemsFilterBar, {
       props: { ...createDefaultProps(), ...props },

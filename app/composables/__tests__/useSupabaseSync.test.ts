@@ -688,6 +688,188 @@ describe('useSupabaseSync', () => {
       expect(sync.saveStatus.value.state).toBe('idle');
       sync.cleanup();
     });
+    it('gates imperative saves until a required reconciliation succeeds', async () => {
+      const reconcile = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValue(undefined);
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 3;
+      store.notifySubscriber();
+      sync.requireReconciliation!();
+      await expect(sync.syncToSupabase()).resolves.toBeNull();
+      expect(upsert).not.toHaveBeenCalled();
+      expect(sync.hasPendingChanges!()).toBe(true);
+      await expect(sync.retryNow()).resolves.toBe(true);
+      expect(reconcile).toHaveBeenCalledTimes(2);
+      expect(upsert).toHaveBeenLastCalledWith({ count: 3, user_id: 'user-1' });
+      sync.cleanup();
+    });
+    it('rejects detached imperative snapshots while reconciliation is required', async () => {
+      const reconcile = vi.fn(async () => {});
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 3;
+      sync.requireReconciliation!();
+      await expect(sync.syncToSupabase({ count: 9 })).resolves.toBeNull();
+      expect(reconcile).not.toHaveBeenCalled();
+      expect(upsert).not.toHaveBeenCalled();
+      expect(store.$state.count).toBe(3);
+      expect(sync.hasPendingChanges!()).toBe(true);
+      await sync.syncToSupabase();
+      expect(reconcile).toHaveBeenCalledOnce();
+      expect(upsert).toHaveBeenLastCalledWith({ count: 3, user_id: 'user-1' });
+      sync.cleanup();
+    });
+    it('drops queued stale payloads and does not acknowledge an in-flight save after the gate changes', async () => {
+      let release!: (result: { error: null }) => void;
+      upsert.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          })
+      );
+      const reconcile = vi.fn(async () => {});
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 1;
+      const first = sync.syncToSupabase();
+      store.$state.count = 2;
+      const queued = sync.syncToSupabase();
+      sync.requireReconciliation!();
+      release({ error: null });
+      await Promise.all([first, queued]);
+      expect(upsert).toHaveBeenCalledTimes(1);
+      expect(sync.hasPendingChanges!()).toBe(true);
+      store.$state.count = 4;
+      await sync.retryNow();
+      expect(reconcile).toHaveBeenCalledOnce();
+      expect(upsert).toHaveBeenLastCalledWith({ count: 4, user_id: 'user-1' });
+      sync.cleanup();
+    });
+    it('reconciles after pause/resume even when an external acknowledgement arrives', async () => {
+      const { store, sync } = await createRetryingSync(vi.fn(), () => readSnapshot());
+      const readSnapshot = () =>
+        sync.withSnapshot!(async () => {
+          store.$state.count = 7;
+        });
+      sync.pause();
+      sync.requireReconciliation!();
+      sync.acknowledgeExternalSave!({ count: 0 });
+      expect(sync.hasPendingChanges!()).toBe(true);
+      sync.resume();
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS[0]);
+      expect(upsert).toHaveBeenLastCalledWith({ count: 7, user_id: 'user-1' });
+      expect(sync.hasPendingChanges!()).toBe(false);
+      sync.cleanup();
+    });
+    it('fails closed without a reader for a required reconciliation', async () => {
+      const { useSupabaseSync } = await import('@/composables/supabase/useSupabaseSync');
+      const store = createMockStore({ count: 3 });
+      const sync = useSupabaseSync({ store, table: 'test_table' });
+      sync.requireReconciliation!();
+      await expect(sync.syncToSupabase()).resolves.toBeNull();
+      expect(upsert).not.toHaveBeenCalled();
+      expect(sync.hasPendingChanges!()).toBe(true);
+      sync.cleanup();
+    });
+    it('does not let an older snapshot clear a newer reconciliation requirement', async () => {
+      let finishRead!: () => void;
+      const reconcile = vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>((resolve) => {
+              finishRead = resolve;
+            })
+        )
+        .mockResolvedValue(undefined);
+      const { sync } = await createRetryingSync(vi.fn(), reconcile);
+      sync.requireReconciliation!();
+      const saving = sync.syncToSupabase();
+      expect(reconcile).toHaveBeenCalledOnce();
+      sync.requireReconciliation!();
+      finishRead();
+      await saving;
+      expect(reconcile).toHaveBeenCalledTimes(2);
+      expect(upsert).toHaveBeenCalledOnce();
+      sync.cleanup();
+    });
+    it('retains pending recovery when the only in-flight save completes after the gate opens', async () => {
+      let release!: (result: { error: null }) => void;
+      upsert.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          })
+      );
+      const { store, sync } = await createRetryingSync(
+        vi.fn(),
+        vi.fn(async () => {})
+      );
+      store.$state.count = 3;
+      const saving = sync.syncToSupabase();
+      sync.requireReconciliation!();
+      release({ error: null });
+      await saving;
+      expect(sync.hasPendingChanges!()).toBe(true);
+      sync.cleanup();
+    });
+    it('never revives pre-reconciliation queued payloads after a fast reader closes the gate', async () => {
+      let release!: (result: { error: null }) => void;
+      upsert.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          })
+      );
+      const reconcile = vi.fn(async () => {});
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 1;
+      const first = sync.syncToSupabase();
+      store.$state.count = 2;
+      const queued = sync.syncToSupabase();
+      sync.requireReconciliation!();
+      store.$state.count = 3;
+      const latest = sync.retryNow();
+      await Promise.resolve();
+      await Promise.resolve();
+      release({ error: null });
+      await Promise.all([first, queued, latest]);
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(upsert).toHaveBeenLastCalledWith({ count: 3, user_id: 'user-1' });
+      sync.cleanup();
+    });
+    it('blocks the transport abort retry when external reconciliation becomes required', async () => {
+      upsert.mockResolvedValueOnce({ error: { message: 'AbortError' } });
+      const reconcile = vi.fn().mockRejectedValue(new Error('offline'));
+      const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+      store.$state.count = 3;
+      const saving = sync.syncToSupabase();
+      await Promise.resolve();
+      sync.requireReconciliation!();
+      await vi.advanceTimersByTimeAsync(150);
+      await saving;
+      expect(upsert).toHaveBeenCalledOnce();
+      expect(sync.hasPendingChanges!()).toBe(true);
+      sync.cleanup();
+    });
+    it('does not revive an aborted payload when a fast reconciliation finishes during its retry delay', async () => {
+      upsert.mockResolvedValueOnce({ error: { message: 'AbortError' } });
+      const { store, sync } = await createRetryingSync(
+        vi.fn(),
+        vi.fn(async () => {})
+      );
+      store.$state.count = 1;
+      const first = sync.syncToSupabase();
+      await Promise.resolve();
+      sync.requireReconciliation!();
+      store.$state.count = 9;
+      const latest = sync.retryNow();
+      await vi.advanceTimersByTimeAsync(150);
+      await Promise.all([first, latest]);
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(upsert).toHaveBeenLastCalledWith({ count: 9, user_id: 'user-1' });
+      sync.cleanup();
+    });
     it('acknowledges a state saved outside the controller without uploading it again', async () => {
       const { store, sync } = await createRetryingSync();
       store.$state.count = 3;

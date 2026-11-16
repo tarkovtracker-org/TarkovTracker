@@ -134,7 +134,7 @@ describe('usePreferencesStore', () => {
       expect(store.neededTypeView).toBeNull();
       expect(store.neededItemsViewMode).toBeNull();
       expect(store.neededItemsFirFilter).toBeNull();
-      expect(store.neededItemsGroupByItem).toBe(false);
+      expect(store.neededItemsGroupByItem).toBe(true);
       expect(store.neededItemsHideNonFirSpecialEquipment).toBe(false);
       expect(store.neededItemsKappaOnly).toBe(false);
       expect(store.neededItemsSortBy).toBe('priority');
@@ -857,9 +857,9 @@ describe('usePreferencesStore', () => {
       store.neededItemsFirFilter = 'fir';
       expect(store.getNeededItemsFirFilter).toBe('fir');
     });
-    it('should return default false for neededItemsGroupByItem', () => {
+    it('should return default true for neededItemsGroupByItem', () => {
       const store = usePreferencesStore();
-      expect(store.getNeededItemsGroupByItem).toBe(false);
+      expect(store.getNeededItemsGroupByItem).toBe(true);
     });
     it('should return set neededItemsGroupByItem value', () => {
       const store = usePreferencesStore();

@@ -525,8 +525,11 @@ not invented when data is missing. Refresh both sections in the overlay; the app
 Extract and transit markers are pins: a 30 px shaded teardrop with a white border, a dark outer
 ring, a drop shadow and a small ground shadow, so they stand out on light and dark map areas. The
 teardrop's tip is the exact map position, and the pin grows slightly on hover or when opened. A
-white glyph inside names who can use the location: PMC (shield), Scav (skull), shared (two
-people), co-op (handshake), transit (transfer), and an exit glyph for an unknown faction.
+white glyph inside uses the familiar running-through-a-door exit symbol for shared and
+unknown-faction extracts, including Armored Train. PMC-only (shield), Scav-only (skull), co-op
+(handshake), and transit (transfer) retain distinct glyphs so access restrictions remain readable
+without relying on color. Shared and unknown-faction extracts keep their separate colors and
+their existing layer classification; sharing a glyph does not imply a known faction.
 `app/features/maps/utils/markerGlyphs.ts` owns the classification, path data, and pin markup; head
 colors come from the customizable marker palette. A pin's name appears beside it on hover, when
 it is tapped or clicked (until another pin or the map is clicked), for every pin once the view is
@@ -822,19 +825,30 @@ so new settings remain local until the compact-list preference migration is depl
 Two independent toolbar choices replace the former list, grid and combined views and the grid
 card-style toggle:
 
-- **Show**: _Items_ (`groupByItem`) has one entry per item with every quest and hideout need added
-  together, split into FIR and non-FIR totals per source. _Needs_ has one entry per task objective
-  or hideout requirement.
+- **Show each item once** (`groupByItem`): when enabled, every quest and hideout need for an
+  item is added together. When disabled, each task objective or hideout requirement has its own
+  entry. The switch defaults on only when no grouping choice was saved; existing true/false
+  choices, layouts and filters are preserved.
 - **Layout**: _List_ (divided rows) or _Grid_ (tiles), stored as `neededItemsViewMode`.
 
 Every combination is built from the same pieces in `app/features/neededitems/`: `NeededItemEntry`
 (one need, `row` or `tile`), `NeededItemGroupEntry` (one item), `NeededItemThumb`,
 `NeededItemSource` (quest or station link, lock and level hints, status, teammates) and
-`NeededItemCounter`. The counter is the only tracking control: a collect toggle for single
+`NeededItemCounter`. Each requirement uses a collect toggle for single
 items, a stepper for counted ones, a read-only count once the parent is done, and a teammate
 note for needs kept only for teammates. Phones keep the stepper inline under the item name; no
-layout opens a modal to track a single need. An item entry with exactly one need tracks it in
-place; otherwise it opens the grouped details modal (per-need steppers and Smart Fill).
+layout opens a modal to track a single need. Grouped entries use `NeededItemGroupTracking` with
+inline steppers and typed counts for the available FIR and Non-FIR totals, alongside the remaining
+quantity (clamped at zero). Only the changed quantity is distributed: additions follow existing task/hideout priority,
+and removals use reverse priority, preserving other allocations. Finished parent quests and
+built modules stay read-only and contribute a protected minimum. Counts and Undo are scoped to
+the current account and game mode; Undo survives a filtered-out card and rejects newer progress.
+The optional _See where it’s needed_ action opens per-need details and the existing Smart Fill
+replacement flow. The source badges count requirements in both modes; the result summary
+always states its units and also counts unique items when the switch is enabled.
+With Hide owned enabled, grouped counters and their source breakdown retain the full matching
+requirements, keeping tracked quantities and denominators stable as allocations fill. The
+remaining count determines whether an item is still needed; fully collected items disappear.
 
 `neededItemsCardStyle` remains a synced preference column for compatibility but no longer
 affects rendering. The `needed_items_view` analytics event keeps `view_mode`
@@ -865,9 +879,10 @@ item's displayed total stays aligned with its visible direct needs (#882: a LEDX
 added every "sell N of any item" pool). Progress writes stay bound to the objective ID regardless
 of which item identity is displayed.
 
-The grouped card total uses `filteredItems`, including the ownership filter. Its modal target list
-uses the same view filters except ownership, so owned direct needs can remain editable and resettable
-even when hidden from the card total. Resolve the modal's accepted-item suppression against the
+Result membership and underlying grouped data use `filteredItems`, including the ownership filter.
+Rendered grouped counters, their source breakdown and modal targets use the matching need list
+without ownership filtering, so owned direct needs remain counted, editable and resettable while
+the item is still needed. Resolve the modal's accepted-item suppression against the
 visible `filteredItems` set; recalculating it over the expanded modal targets can incorrectly hide a
 pooled objective that the card displays. Snapshot modal targets and collected totals when the modal
 opens, and close it if the active game mode changes. Mutations must be guarded against writing the

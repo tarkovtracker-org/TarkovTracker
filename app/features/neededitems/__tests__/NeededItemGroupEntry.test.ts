@@ -1,17 +1,13 @@
 import { mount } from '@vue/test-utils';
+import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed } from 'vue';
 import { createI18n } from 'vue-i18n';
 import NeededItemGroupEntry from '@/features/neededitems/NeededItemGroupEntry.vue';
-import type { GroupedNeededItem, NeededItemTaskObjective } from '@/types/tarkov';
+import en from '@/locales/en.json';
+import { useTarkovStore } from '@/stores/useTarkov';
+import type { GroupedNeededItem } from '@/types/tarkov';
 import { createTestLocaleMessages } from '#tests/test-helpers/i18nMessages';
-const progress = vi.hoisted(() => ({
-  count: 0,
-  increase: vi.fn(),
-  decrease: vi.fn(),
-  toggle: vi.fn(),
-  setCount: vi.fn(),
-}));
 const craft = vi.hoisted(() => ({ go: vi.fn() }));
 const completion = vi.hoisted(() => ({ done: false }));
 vi.mock('@/features/neededitems/useNeedSelfCompletion', () => ({
@@ -25,14 +21,10 @@ vi.mock('@/composables/useCraftableItem', () => ({
     goToCraftStation: craft.go,
   }),
 }));
-vi.mock('@/features/neededitems/useNeededItemProgress', () => ({
-  neededCountOf: (need: { count?: number }) => need.count || 1,
-  useNeededItemProgress: () => ({
-    storedCountOf: () => progress.count,
-    increase: progress.increase,
-    decrease: progress.decrease,
-    toggle: progress.toggle,
-    setCount: progress.setCount,
+vi.mock('@/composables/useItemDistribution', () => ({
+  useItemDistribution: () => ({
+    sortTaskObjectives: (needs: unknown[]) => needs,
+    sortHideoutModules: (needs: unknown[]) => needs,
   }),
 }));
 vi.mock('@/utils/formatters', () => ({ useLocaleNumberFormatter: () => String }));
@@ -54,15 +46,16 @@ const i18n = createI18n({
   locale: 'en',
   missingWarn: false,
   fallbackWarn: false,
-  messages: createTestLocaleMessages({
-    common: { tasks: 'Tasks', hideout: 'Hideout', fir: 'FIR' },
-    needed_items: { view_details_for: 'Open {name}', aria: { increase_count: 'Add one' } },
-  }),
+  messages: createTestLocaleMessages(en),
 });
-const need = { id: 'objective', needType: 'taskObjective', count: 4 } as NeededItemTaskObjective;
+const needs = [
+  { id: 'fir', taskId: 'fir', needType: 'taskObjective', count: 3, foundInRaid: true },
+  { id: 'regular', taskId: 'regular', needType: 'taskObjective', count: 2 },
+  { id: 'part', needType: 'hideoutModule', count: 4 },
+] as InstanceType<typeof NeededItemGroupEntry>['$props']['needs'];
 const mountEntry = (props: Partial<InstanceType<typeof NeededItemGroupEntry>['$props']> = {}) =>
   mount(NeededItemGroupEntry, {
-    props: { group, needs: [need, { ...need, id: 'other' }], layout: 'row', ...props },
+    props: { group, needs, layout: 'row', ...props },
     global: {
       plugins: [i18n],
       stubs: {
@@ -74,7 +67,10 @@ const mountEntry = (props: Partial<InstanceType<typeof NeededItemGroupEntry>['$p
   });
 describe('NeededItemGroupEntry', () => {
   beforeEach(() => {
-    progress.count = 0;
+    setActivePinia(createPinia());
+    const store = useTarkovStore();
+    store.setObjectiveCount('fir', 1);
+    store.setObjectiveCount('regular', 2);
     completion.done = false;
     vi.clearAllMocks();
   });
@@ -82,8 +78,13 @@ describe('NeededItemGroupEntry', () => {
     'opens the details from its named button in the %s layout',
     async (layout) => {
       const wrapper = mountEntry({ layout });
-      const open = wrapper.get('button[aria-label="Open Bolts"]');
-      await open.trigger('click');
+      const open = wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'See where it’s needed (3)');
+      expect(open).toBeDefined();
+      expect(open!.attributes('aria-label')).toBe('See where it’s needed (3) for Bolts');
+      expect(wrapper.text()).toContain('6 remaining');
+      await open!.trigger('click');
       expect(wrapper.emitted('open')).toEqual([['item']]);
     }
   );
@@ -97,23 +98,48 @@ describe('NeededItemGroupEntry', () => {
     const wrapper = mountEntry();
     const sections = wrapper.findAll('li .sr-only').map((section) => section.text());
     expect(sections).toEqual(['Tasks FIR 1/3', 'Tasks 2/2', 'Hideout 0/4']);
-    expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('3');
-    expect(wrapper.get('[role="progressbar"]').attributes('aria-valuemax')).toBe('9');
+    expect(wrapper.get('[role="group"][aria-label="Track Bolts (FIR)"]').text()).toContain('1/3');
+    expect(wrapper.get('[role="group"][aria-label="Track Bolts (Non-FIR)"]').text()).toContain(
+      '2/6'
+    );
   });
-  it('tracks an item with a single need in place instead of a total', async () => {
-    progress.count = 1;
-    const wrapper = mountEntry({ needs: [need] });
-    expect(wrapper.find('[role="progressbar"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain('1/4');
-    await wrapper.get('button[aria-label="Add one"]').trigger('click');
-    expect(progress.increase).toHaveBeenCalledWith(need);
-    expect(wrapper.emitted('open')).toBeUndefined();
-  });
-  it('shows a finished single need read-only, as Needs mode does', () => {
+  it.each(['row', 'tile'] as const)(
+    'edits multi-use counts inline in the %s layout without opening details',
+    async (layout) => {
+      const wrapper = mountEntry({ layout });
+      const counter = wrapper.get('[role="group"][aria-label="Track Bolts (Non-FIR)"]');
+      await counter.get('button[aria-label="Increase Track Bolts (Non-FIR)"]').trigger('click');
+      expect(useTarkovStore().getHideoutPartCount('part')).toBe(1);
+      expect(useTarkovStore().getObjectiveCount('regular')).toBe(2);
+      expect(wrapper.emitted('open')).toBeUndefined();
+      expect(wrapper.text()).toContain('5 remaining');
+      await counter.get('button[aria-label="Track Bolts (Non-FIR)"]').trigger('click');
+      const input = counter.get('input');
+      await input.setValue(4);
+      await input.trigger('keydown.enter');
+      expect(useTarkovStore().getHideoutPartCount('part')).toBe(2);
+      expect(wrapper.emitted('open')).toBeUndefined();
+    }
+  );
+  it('keeps completed parents read-only', () => {
     completion.done = true;
-    const wrapper = mountEntry({ needs: [need] });
-    expect(wrapper.text()).toContain('4/4');
-    expect(wrapper.find('button[aria-label="Add one"]').exists()).toBe(false);
+    const wrapper = mountEntry();
+    expect(wrapper.text()).toContain('0 remaining');
+    const buttons = wrapper.findAll('[role="group"] button');
+    expect(buttons).toHaveLength(6);
+    expect(buttons.every((button) => button.attributes('disabled') !== undefined)).toBe(true);
+  });
+  it('keeps grouped totals stable when Hide owned removes a filled requirement from results', async () => {
+    const wrapper = mountEntry({
+      group: { ...group, total: 7, currentCount: 1, taskNonFir: 0, taskNonFirCurrent: 0 },
+    });
+    const counter = wrapper.get('[role="group"][aria-label="Track Bolts (Non-FIR)"]');
+    expect(counter.text()).toContain('2/6');
+    expect(wrapper.text()).toContain('6 remaining');
+    await counter.get('button[aria-label="Increase Track Bolts (Non-FIR)"]').trigger('click');
+    expect(counter.text()).toContain('3/6');
+    expect(useTarkovStore().getObjectiveCount('regular')).toBe(2);
+    expect(useTarkovStore().getHideoutPartCount('part')).toBe(1);
   });
   it('opens the details when the thumbnail is clicked', async () => {
     const wrapper = mountEntry();
