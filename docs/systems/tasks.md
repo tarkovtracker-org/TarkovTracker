@@ -508,14 +508,14 @@ signal. Timers describe the configured arrival/activation window, not a guarante
 usable afterward. Lighthouse's PvE train window differs from PvP's and is shown per mode.
 
 Curated cues cover what the definitions do not describe: green flares for
-[Mira Avenue](https://tarkov.help/en/map/ground-zero/home),
-[Railroad Passage](https://tarkov.help/en/map/customs/home),
-[Power Line Passage](https://tarkov.help/en/map/woods/home), and
-[Klimov Street](https://tarkov.help/en/map/streets/extractions/extract-klimov-street); a flare of
+Mira Avenue,
+Railroad Passage,
+Power Line Passage, and
+Klimov Street; a flare of
 unconfirmed color for Path to River; green smoke for
-[ZB-016](https://tarkov.help/en/map/woods/extractions/zb-016-extraction-point),
-[ZB-014](https://tarkov.help/en/map/woods/extractions/zb-014-extraction-point) (with its key), and
-[Old Gas Station](https://tarkov.help/en/map/customs/extractions/old-gas-station-extraction-point);
+ZB-016,
+ZB-014 (with its key), and
+Old Gas Station;
 and the Factory emergency exit key beside ZB-013's activation requirement. Smoke is an
 availability signal, not a flare the player must bring. Additional activation steps and cues are
 not invented when data is missing. Refresh both sections in the overlay; the app keeps no copy.
