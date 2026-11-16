@@ -37,7 +37,7 @@ export function useProductAnalytics(): {
   trackLoginStarted: (provider: OAuthProvider) => void;
   trackLoginSucceeded: (provider?: OAuthProvider) => void;
   trackNeededItemsView: (input: {
-    cardStyle?: 'compact' | 'expanded';
+    layout?: 'grid' | 'list';
     previousView?: 'combined' | 'grid' | 'list';
     source: 'change' | 'page_load';
     view: 'combined' | 'grid' | 'list';
@@ -77,18 +77,18 @@ export function useProductAnalytics(): {
     });
   };
   const trackNeededItemsView = ({
-    cardStyle,
+    layout,
     previousView,
     source,
     view,
   }: {
-    cardStyle?: 'compact' | 'expanded';
+    layout?: 'grid' | 'list';
     previousView?: 'combined' | 'grid' | 'list';
     source: 'change' | 'page_load';
     view: 'combined' | 'grid' | 'list';
   }) => {
     trackEvent('needed_items_view', {
-      card_style: view === 'grid' ? cardStyle : undefined,
+      layout,
       previous_view_mode: previousView,
       source,
       view_mode: view,

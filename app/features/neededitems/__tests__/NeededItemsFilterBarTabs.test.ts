@@ -40,7 +40,6 @@ const props = {
   sortBy: 'priority' as const,
   sortDirection: 'desc' as const,
   hideOwned: false,
-  cardStyle: 'expanded' as const,
 };
 describe('NeededItemsFilterBar source tabs', () => {
   beforeEach(() => setActivePinia(createPinia()));

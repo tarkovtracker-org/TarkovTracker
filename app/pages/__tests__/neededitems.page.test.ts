@@ -11,6 +11,7 @@ const createMockNeededItemsState = (options: {
   groupByItem?: boolean;
   itemsLoading?: boolean;
   emptyState?: boolean;
+  itemCount?: number;
 }) => {
   const {
     neededItem = createDefaultNeededItem(),
@@ -18,8 +19,15 @@ const createMockNeededItemsState = (options: {
     groupByItem = false,
     itemsLoading = false,
     emptyState = false,
+    itemCount = 1,
   } = options;
-  const items = emptyState || !neededItem ? [] : [neededItem];
+  const items =
+    emptyState || !neededItem
+      ? []
+      : Array.from({ length: itemCount }, (_, index) => ({
+          ...neededItem,
+          id: index ? `${neededItem.id}-${index}` : neededItem.id,
+        }));
   const groupedItems = computed(() =>
     emptyState
       ? []
@@ -41,11 +49,9 @@ const createMockNeededItemsState = (options: {
   );
   const groupByItemRef = ref(groupByItem);
   const viewModeRef = ref(viewMode);
-  const cardStyleRef = ref<'compact' | 'expanded'>('compact');
   return {
     activeFilter: ref('all'),
     allItems: computed(() => items),
-    cardStyle: cardStyleRef,
     displayItems: computed(() => (groupByItemRef.value ? groupedItems.value : items)),
     ensureNeededItemsData: vi.fn(),
     filteredItems: computed(() => items),
@@ -78,28 +84,15 @@ const createMockNeededItemsState = (options: {
     viewMode: viewModeRef,
   };
 };
-const createMockUseNeededItems = (options: {
-  neededItem?: NeededItemTaskObjective | null;
-  viewMode?: 'list' | 'grid';
-  groupByItem?: boolean;
-  itemsLoading?: boolean;
-  emptyState?: boolean;
-}) => {
+type SetupOptions = Parameters<typeof createMockNeededItemsState>[0] & { belowMd?: boolean };
+const createMockUseNeededItems = (options: SetupOptions) => {
   const state = createMockNeededItemsState(options);
   return {
     state,
     useNeededItems: () => state,
   };
 };
-const setup = async (
-  options: {
-    neededItem?: NeededItemTaskObjective | null;
-    viewMode?: 'list' | 'grid';
-    groupByItem?: boolean;
-    itemsLoading?: boolean;
-    emptyState?: boolean;
-  } = {}
-) => {
+const setup = async (options: SetupOptions = {}) => {
   vi.resetModules();
   useInfiniteScrollMock = vi.fn(() => ({ checkAndLoadMore: vi.fn() }));
   trackNeededItemsViewMock = vi.fn();
@@ -115,8 +108,8 @@ const setup = async (
   }));
   vi.doMock('@/composables/useSharedBreakpoints', () => ({
     useSharedBreakpoints: () => ({
-      belowMd: ref(false),
-      lgAndUp: ref(true),
+      belowMd: ref(options.belowMd ?? false),
+      lgAndUp: ref(!options.belowMd),
       xs: ref(false),
     }),
   }));
@@ -131,14 +124,13 @@ const setup = async (
 const defaultGlobalStubs = {
   NeededItemsFilterBar: { template: '<div data-testid="filter-bar" />' },
   NeededItem: {
-    props: ['need', 'itemStyle'],
-    template: '<div data-testid="needed-item" :data-style="itemStyle" />',
+    props: ['need', 'layout'],
+    template: '<div data-testid="needed-item" :data-layout="layout" />',
   },
-  NeededItemGroupedCard: {
-    props: ['groupedItem'],
-    template: '<div data-testid="grouped-item" />',
+  NeededItemGroupEntry: {
+    props: ['group', 'layout'],
+    template: '<div data-testid="grouped-item" :data-layout="layout" />',
   },
-  UCard: { template: '<div><slot /></div>' },
   UIcon: true,
 };
 describe('needed items page', () => {
@@ -207,30 +199,23 @@ describe('needed items page', () => {
     });
   });
   describe('view mode rendering', () => {
-    it('renders list style items in list view mode', async () => {
-      const { NeededItemsPage } = await setup({ viewMode: 'list' });
-      const wrapper = await mountSuspended(NeededItemsPage, {
-        global: { stubs: defaultGlobalStubs },
-      });
-      expect(wrapper.find('[data-testid="filter-bar"]').exists()).toBe(true);
-      const items = wrapper.findAll('[data-testid="needed-item"]');
-      expect(items.length).toBeGreaterThan(0);
-      items.forEach((item) => {
-        expect(item.attributes('data-style')).toBe('row');
-      });
-    });
-    it('renders card style items in grid view mode', async () => {
-      const { NeededItemsPage } = await setup({ viewMode: 'grid' });
-      const wrapper = await mountSuspended(NeededItemsPage, {
-        global: { stubs: defaultGlobalStubs },
-      });
-      expect(wrapper.find('[data-testid="filter-bar"]').exists()).toBe(true);
-      const items = wrapper.findAll('[data-testid="needed-item"]');
-      expect(items.length).toBeGreaterThan(0);
-      items.forEach((item) => {
-        expect(item.attributes('data-style')).toBe('card');
-      });
-    });
+    it.each([
+      { groupByItem: false, viewMode: 'list', testId: 'needed-item', layout: 'row' },
+      { groupByItem: false, viewMode: 'grid', testId: 'needed-item', layout: 'tile' },
+      { groupByItem: true, viewMode: 'list', testId: 'grouped-item', layout: 'row' },
+      { groupByItem: true, viewMode: 'grid', testId: 'grouped-item', layout: 'tile' },
+    ] as const)(
+      'renders $testId entries as $layout tiles or rows in the $viewMode layout',
+      async ({ groupByItem, viewMode, testId, layout }) => {
+        const { NeededItemsPage } = await setup({ groupByItem, viewMode });
+        const wrapper = await mountSuspended(NeededItemsPage, {
+          global: { stubs: defaultGlobalStubs },
+        });
+        const entries = wrapper.findAll(`[data-testid="${testId}"]`);
+        expect(entries.length).toBeGreaterThan(0);
+        entries.forEach((entry) => expect(entry.attributes('data-layout')).toBe(layout));
+      }
+    );
   });
   it('tracks the initial needed items view on page load', async () => {
     const { NeededItemsPage } = await setup({ viewMode: 'grid' });
@@ -238,7 +223,7 @@ describe('needed items page', () => {
       global: { stubs: defaultGlobalStubs },
     });
     expect(trackNeededItemsViewMock).toHaveBeenCalledWith({
-      cardStyle: 'compact',
+      layout: 'grid',
       previousView: undefined,
       source: 'page_load',
       view: 'grid',
@@ -250,7 +235,7 @@ describe('needed items page', () => {
       global: { stubs: defaultGlobalStubs },
     });
     expect(trackNeededItemsViewMock).toHaveBeenNthCalledWith(1, {
-      cardStyle: undefined,
+      layout: 'list',
       previousView: undefined,
       source: 'page_load',
       view: 'combined',
@@ -260,12 +245,39 @@ describe('needed items page', () => {
     await nextTick();
     expect(trackNeededItemsViewMock).toHaveBeenCalledTimes(2);
     expect(trackNeededItemsViewMock).toHaveBeenNthCalledWith(2, {
-      cardStyle: 'compact',
+      layout: 'grid',
       previousView: 'combined',
       source: 'change',
       view: 'grid',
     });
+    // Items in a grid is a distinct view now, so the layout switch alone is tracked.
+    state.groupByItem.value = true;
+    await nextTick();
+    state.viewMode.value = 'list';
+    await nextTick();
+    expect(trackNeededItemsViewMock).toHaveBeenCalledTimes(4);
+    expect(trackNeededItemsViewMock).toHaveBeenLastCalledWith({
+      layout: 'list',
+      previousView: 'combined',
+      source: 'change',
+      view: 'combined',
+    });
   });
+  it.each([
+    { viewMode: 'list', belowMd: false, expected: 30 },
+    { viewMode: 'grid', belowMd: false, expected: 24 },
+    { viewMode: 'list', belowMd: true, expected: 15 },
+    { viewMode: 'grid', belowMd: true, expected: 12 },
+  ] as const)(
+    'renders $expected $viewMode entries first (narrow screen: $belowMd)',
+    async ({ viewMode, belowMd, expected }) => {
+      const { NeededItemsPage } = await setup({ viewMode, belowMd, itemCount: 60 });
+      const wrapper = await mountSuspended(NeededItemsPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(wrapper.findAll('[data-testid="needed-item"]')).toHaveLength(expected);
+    }
+  );
   it('keeps grid infinite-scroll incremental to avoid heavy eager loading', async () => {
     const { NeededItemsPage } = await setup({ viewMode: 'grid' });
     await mountSuspended(NeededItemsPage, {

@@ -649,7 +649,7 @@ export interface NeededItemHideoutModule extends NeededItemBase {
 }
 export type GroupedItemInfo = Pick<
   TarkovItem,
-  'id' | 'iconLink' | 'image512pxLink' | 'wikiLink' | 'link'
+  'id' | 'iconLink' | 'image512pxLink' | 'wikiLink' | 'link' | 'backgroundColor'
 > & {
   /** Item display name (required - items without names are filtered out during grouping) */
   name: string;

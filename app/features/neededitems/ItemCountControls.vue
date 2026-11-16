@@ -1,20 +1,19 @@
 <template>
-  <div class="flex items-center gap-0.5">
-    <div class="bg-surface-700 flex items-center rounded-lg border border-white/20 shadow-sm">
-      <AppTooltip :text="decreaseText">
-        <button
-          type="button"
-          :disabled="disabled"
-          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-l-lg transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-          :class="sizeClasses.button"
-          :aria-label="decreaseText"
-          @click="$emit('decrease')"
-        >
-          <UIcon name="i-mdi-minus" :class="sizeClasses.icon" />
-        </button>
-      </AppTooltip>
+  <div class="flex items-center gap-1">
+    <div class="bg-surface-700 flex items-center rounded-md border border-white/15 shadow-sm">
+      <button
+        type="button"
+        :disabled="disabled"
+        class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-l-md transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        :class="sizeClasses.button"
+        :title="decreaseText"
+        :aria-label="decreaseText"
+        @click="$emit('decrease')"
+      >
+        <UIcon name="i-mdi-minus" :class="sizeClasses.icon" />
+      </button>
       <div
-        class="bg-surface-800 flex items-center justify-center border-x border-white/20"
+        class="bg-surface-800 flex items-center justify-center border-x border-white/15"
         :class="sizeClasses.value"
       >
         <template v-if="isEditing">
@@ -25,64 +24,60 @@
             :min="0"
             :max="neededCount"
             :aria-label="$t('needed_items.aria.enter_count')"
-            class="bg-surface-900 focus:ring-primary-500 light:text-surface-50 h-full w-full text-center font-semibold text-white focus:ring-2 focus:outline-none focus:ring-inset"
+            class="bg-surface-900 focus:ring-primary-500 light:text-surface-50 h-full w-full text-center font-semibold text-white tabular-nums focus:ring-2 focus:outline-none focus:ring-inset"
             :class="sizeClasses.text"
             @blur="commitEdit"
             @keydown.enter="commitEdit"
             @keydown.escape="cancelEdit"
           />
         </template>
-        <template v-else>
-          <AppTooltip :text="$t('needed_items.aria.click_to_enter_value')">
-            <button
-              type="button"
-              :disabled="disabled"
-              class="hover:bg-surface-600 light:text-surface-50 h-full w-full font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              :class="sizeClasses.text"
-              :aria-label="$t('needed_items.aria.click_to_enter_value')"
-              @click="startEdit"
-            >
-              {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
-            </button>
-          </AppTooltip>
-        </template>
-      </div>
-      <AppTooltip :text="increaseText">
         <button
+          v-else
           type="button"
           :disabled="disabled"
-          class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-r-lg transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-          :class="sizeClasses.button"
-          :aria-label="increaseText"
-          @click="$emit('increase')"
+          class="hover:bg-surface-600 light:text-surface-50 h-full w-full font-semibold text-white tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          :class="sizeClasses.text"
+          :title="$t('needed_items.aria.click_to_enter_value')"
+          :aria-label="$t('needed_items.aria.click_to_enter_value')"
+          @click="startEdit"
         >
-          <UIcon name="i-mdi-plus" :class="sizeClasses.icon" />
+          {{ formatNumber(currentCount) }}/{{ formatNumber(neededCount) }}
         </button>
-      </AppTooltip>
-    </div>
-    <AppTooltip :text="toggleLabel">
+      </div>
       <button
         type="button"
         :disabled="disabled"
-        class="flex items-center justify-center rounded-lg border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-        :aria-label="toggleLabel"
-        :class="[
-          sizeClasses.button,
-          isComplete
-            ? 'bg-success-600 border-success-500 hover:bg-success-700 text-white'
-            : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/20 hover:text-white',
-        ]"
-        @click="$emit('toggle')"
+        class="text-surface-200 hover:bg-surface-600 active:bg-surface-500 light:hover:text-surface-50 flex items-center justify-center rounded-r-md transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+        :class="sizeClasses.button"
+        :title="increaseText"
+        :aria-label="increaseText"
+        @click="$emit('increase')"
       >
-        <UIcon name="i-mdi-check-circle" :class="sizeClasses.icon" />
+        <UIcon name="i-mdi-plus" :class="sizeClasses.icon" />
       </button>
-    </AppTooltip>
+    </div>
+    <button
+      type="button"
+      :disabled="disabled"
+      class="flex items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      :title="toggleLabel"
+      :aria-label="toggleLabel"
+      :class="[
+        sizeClasses.button,
+        isComplete
+          ? 'bg-success-600 border-success-500 hover:bg-success-700 text-white'
+          : 'bg-surface-700 text-surface-200 hover:bg-surface-600 light:hover:text-surface-50 border-white/15 hover:text-white',
+      ]"
+      @click="$emit('toggle')"
+    >
+      <UIcon name="i-mdi-check-circle" :class="sizeClasses.icon" />
+    </button>
   </div>
 </template>
 <script setup lang="ts">
   import { useCountEditController } from '@/composables/useCountEditController';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
-  type ItemCountControlsSize = 'xs' | 'sm' | 'responsive';
+  type ItemCountControlsSize = 'xs' | 'sm' | 'md' | 'tile' | 'responsive';
   const SIZE_CLASSES: Record<
     ItemCountControlsSize,
     { button: string; icon: string; value: string; text: string }
@@ -98,6 +93,20 @@
       icon: 'h-3.5 w-3.5',
       value: 'h-6 min-w-10',
       text: 'px-1 text-xs',
+    },
+    // 32px targets, comfortable for touch: the default stepper in Needed Items rows.
+    md: {
+      button: 'h-8 w-8',
+      icon: 'h-4 w-4',
+      value: 'h-8 min-w-12',
+      text: 'px-1.5 text-sm',
+    },
+    // Two-column phone tiles are ~150px wide; step down to 28px there only.
+    tile: {
+      button: 'h-7 w-7 sm:h-8 sm:w-8',
+      icon: 'h-4 w-4',
+      value: 'h-7 min-w-10 sm:h-8 sm:min-w-12',
+      text: 'px-1 text-xs sm:px-1.5 sm:text-sm',
     },
     responsive: {
       button: 'h-5 w-5 sm:h-6 sm:w-6 lg:h-8 lg:w-8',

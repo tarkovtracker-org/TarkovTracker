@@ -1,14 +1,11 @@
 <template>
-  <div class="mb-6 space-y-3">
+  <div class="mb-4 space-y-2">
     <StatusTabBar
       v-model="activeFilter"
       :tabs="visibleFilterTabs"
       :group-label="$t('page.needed_items.filter_tabs_label')"
     >
       <template #actions>
-        <UBadge color="neutral" variant="soft" size="md" class="shrink-0 px-3 py-1.5 text-sm">
-          {{ countLabel }}
-        </UBadge>
         <NeededItemsFiltersPopover
           v-model:fir-filter="firFilter"
           v-model:hide-owned="hideOwned"
@@ -26,18 +23,30 @@
           :label="$t('page.needed_items.sort.label')"
           leading-icon="i-mdi-sort"
           :direction="sortDirection"
-          select-class="w-32 sm:w-40"
+          select-class="w-32 sm:w-36"
           @toggle-direction="toggleSortDirection"
         />
-        <div aria-hidden="true" class="hidden h-6 w-px bg-white/10 sm:block" />
-        <NeededItemsViewModeToggle
+        <NeededItemsViewControls
           v-model:view-mode="viewMode"
           v-model:group-by-item="groupByItem"
-          v-model:card-style="cardStyle"
+          class="ml-auto sm:ml-0"
         />
       </template>
     </StatusTabBar>
-    <ActiveFilterChips test-id-prefix="needed-items-active-filters" :filters="activeFilters" />
+    <div
+      v-if="countLabel || activeFilters.length"
+      class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-1"
+    >
+      <span
+        v-if="countLabel"
+        data-testid="needed-items-count"
+        class="text-surface-400 shrink-0 text-xs tabular-nums"
+        aria-live="polite"
+      >
+        {{ countLabel }}
+      </span>
+      <ActiveFilterChips test-id-prefix="needed-items-active-filters" :filters="activeFilters" />
+    </div>
   </div>
 </template>
 <script setup lang="ts">
@@ -49,7 +58,7 @@
     normalizeNeededItemsSortBy,
   } from '@/features/neededitems/neededItemsFilterNormalization';
   import NeededItemsFiltersPopover from '@/features/neededitems/NeededItemsFiltersPopover.vue';
-  import NeededItemsViewModeToggle from '@/features/neededitems/NeededItemsViewModeToggle.vue';
+  import NeededItemsViewControls from '@/features/neededitems/NeededItemsViewControls.vue';
   import type { FilterTab } from '@/composables/useNeededItems';
   import type {
     NeededItemsFilterType,
@@ -57,10 +66,7 @@
     NeededItemsSortBy,
     NeededItemsSortDirection,
   } from '@/features/neededitems/neededitems-constants';
-  import type {
-    NeededItemsCardStyle,
-    NeededItemsViewMode,
-  } from '@/features/neededitems/neededItemsFilterNormalization';
+  import type { NeededItemsViewMode } from '@/features/neededitems/neededItemsFilterNormalization';
   import type { ActiveFilter } from '@/types/filters';
   const props = defineProps<{
     filterTabs: FilterTab[];
@@ -79,7 +85,6 @@
   const sortBy = defineModel<NeededItemsSortBy>('sortBy', { required: true });
   const sortDirection = defineModel<NeededItemsSortDirection>('sortDirection', { required: true });
   const hideOwned = defineModel<boolean>('hideOwned', { required: true });
-  const cardStyle = defineModel<NeededItemsCardStyle>('cardStyle', { required: true });
   const { t } = useI18n({ useScope: 'global' });
   const activeFilter = computed({
     get: () => filterType.value,
@@ -91,14 +96,29 @@
   const isTabShown = (tab: FilterTab) =>
     tab.value !== 'completed' || tab.count > 0 || tab.value === filterType.value;
   const visibleFilterTabs = computed(() => props.filterTabs.filter(isTabShown));
-  const countLabel = computed(() =>
-    groupByItem.value && props.ungroupedCount !== props.totalCount
-      ? t('page.needed_items.unique_items_count', {
-          unique: props.totalCount,
-          total: props.ungroupedCount,
-        })
-      : t('page.needed_items.items_count', { count: props.totalCount }, props.totalCount)
+  const activeTabCount = computed(
+    () => props.filterTabs.find((tab) => tab.value === filterType.value)?.count
   );
+  /**
+   * Items mode always explains the item/need totals. Needs mode only shows a count when
+   * search or filters make it differ from the selected tab's badge. Both parts pluralize.
+   */
+  const countLabel = computed(() => {
+    const needs = (count: number) => t('page.needed_items.needs_count', { count }, count);
+    if (groupByItem.value) {
+      const items = t(
+        'page.needed_items.items_count',
+        { count: props.totalCount },
+        props.totalCount
+      );
+      return t('page.needed_items.items_and_needs', {
+        items,
+        needs: needs(props.ungroupedCount),
+      });
+    }
+    if (props.totalCount === activeTabCount.value) return '';
+    return needs(props.totalCount);
+  });
   // Kappa only narrows task needs, so it does nothing on the Hideout tab.
   const isKappaDisabled = computed(() => filterType.value === 'hideout');
   interface FilterChipDescriptor {

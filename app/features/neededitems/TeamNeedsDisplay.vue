@@ -1,36 +1,32 @@
 <template>
-  <div class="flex flex-col items-center text-xs">
-    <div class="text-surface-400 mb-1 flex items-center gap-1">
-      <UIcon name="i-mdi-account-group" class="h-4 w-4" />
-      <span>{{ $t('page.needed_items.teammates_needed') }}</span>
-    </div>
-    <div class="flex flex-wrap justify-center gap-1">
-      <UBadge
-        v-for="userNeed in teamNeeds"
-        :key="userNeed.user"
-        color="primary"
-        variant="soft"
-        size="sm"
-        class="flex items-center gap-1"
-      >
-        <UIcon name="i-mdi-account" class="h-3 w-3" />
-        <span>{{ getDisplayName(userNeed.user) }}</span>
-        <span class="text-surface-300">
+  <span class="text-surface-300 inline-flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5">
+    <UIcon
+      name="i-mdi-account-group"
+      class="text-surface-400 size-3.5 shrink-0"
+      aria-hidden="true"
+    />
+    <span class="text-surface-400">{{ $t('page.needed_items.teammates_label') }}</span>
+    <template v-for="(userNeed, index) in teamNeeds" :key="userNeed.user">
+      <span class="break-words">
+        {{ getDisplayName(userNeed.user) }}
+        <span class="text-surface-400 tabular-nums">
           {{ formatNumber(userNeed.count) }}/{{ formatNumber(neededCount) }}
         </span>
-      </UBadge>
-    </div>
-  </div>
+        <span v-if="index < teamNeeds.length - 1" aria-hidden="true">,</span>
+      </span>
+    </template>
+  </span>
 </template>
 <script setup lang="ts">
   import { useProgressStore } from '@/stores/useProgress';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type { NeededItemTeamNeed } from '@/features/neededitems/neededitem-keys';
-  const formatNumber = useLocaleNumberFormatter();
+  /** Teammates who still need this, with their counts. Wraps rather than truncating. */
   defineProps<{
     teamNeeds: NeededItemTeamNeed[];
     neededCount: number;
   }>();
+  const formatNumber = useLocaleNumberFormatter();
   const progressStore = useProgressStore();
   const getDisplayName = (user: string) => progressStore.getDisplayName(user);
 </script>
