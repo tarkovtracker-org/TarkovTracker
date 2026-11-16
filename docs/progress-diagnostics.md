@@ -3,7 +3,8 @@
 Operational runbook for [#960](https://github.com/tarkovtracker-org/TarkovTracker/issues/960).
 Production configuration enables the dedicated `/api/logs/progress` sink. Root/local
 and preview collection remain disabled, and the general client logger stays disabled
-in every environment. Deployment and verification evidence is recorded in #960;
+in every environment. The [approved rollout evidence](https://github.com/tarkovtracker-org/TarkovTracker/issues/960#issuecomment-6908809905)
+records the hosted synthetic gates and pre-activation PostgreSQL baseline;
 repeat the gates below before reactivating collection after a suspension.
 
 ## Boundaries
