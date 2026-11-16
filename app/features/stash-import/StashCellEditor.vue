@@ -190,12 +190,15 @@
   );
   /** Unknown items stay editable; a non-stackable identity is always exactly one unit. */
   const stackable = computed(() => !props.row.itemId || maxQuantity.value > 1);
-  const canConfirm = computed(
+  const validQuantity = computed(
     () =>
-      Boolean(props.row.itemId) &&
       Number.isSafeInteger(props.row.quantity) &&
       Number(props.row.quantity) >= 1 &&
       Number(props.row.quantity) <= maxQuantity.value
+  );
+  /** Confirming an item that cannot stack also settles it at one unit. */
+  const canConfirm = computed(
+    () => Boolean(props.row.itemId) && (!stackable.value || validQuantity.value)
   );
   const canSplit = computed(
     () =>
@@ -214,7 +217,11 @@
     emit('change', { raidStatus: status });
   }
   function confirm() {
-    emit('change', { reviewed: true, excluded: false });
+    emit('change', {
+      reviewed: true,
+      excluded: false,
+      ...(stackable.value ? {} : { quantity: 1 }),
+    });
     emit('next');
   }
   function exclude() {

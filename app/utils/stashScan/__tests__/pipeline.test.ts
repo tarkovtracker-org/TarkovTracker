@@ -143,6 +143,11 @@ describe('observation review and quantity accounting', () => {
     expect(reviewCell(cell({ stack: 2 }), single).quantity).toBeNull();
     expect(reviewCell(cell({ stack: null }), single).quantity).toBe(1);
     expect(reviewCell(cell({ stack: 1 }), single).quantity).toBe(1);
+    // Choosing that item explicitly settles it at one unit, so the row can be confirmed.
+    const doubted = reviewCell(cell({ stack: 2 }), single);
+    selectItem(doubted, item());
+    expect(doubted.quantity).toBe(1);
+    expect(needsReview(doubted)).toBe(false);
   });
   it('accepts one decisive signal unless another candidate ties on it', () => {
     const items = new Map([

@@ -76,6 +76,40 @@ describe('non-stackable items', () => {
     expect(wrapper.findAll('input[type=radio]')).toHaveLength(3);
     wrapper.unmount();
   });
+  it('confirms an item that cannot stack as one unit when the icon showed another number', async () => {
+    // The scan left the amount empty because the icon showed "2" on a one-unit item.
+    const row = {
+      cell: { key: 0, candidates: [], slotsWide: 1, slotsHigh: 1, stack: 2 },
+      itemId: 'item',
+      quantity: null,
+      reviewed: true,
+      raidStatus: 'unknown',
+      excluded: false,
+    } as unknown as ReviewedCell;
+    const wrapper = mount(StashCellEditor, {
+      props: {
+        row,
+        items: [{ id: 'item', name: 'Item', shortName: 'Item', maxStack: 1, width: 1, height: 1 }],
+      },
+      global: {
+        mocks: { $t: (key: string) => key },
+        stubs: {
+          UIcon: true,
+          UButton: {
+            props: ['disabled'],
+            template: '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+          },
+        },
+      },
+    });
+    const confirm = wrapper
+      .findAll('button')
+      .find((entry) => entry.text() === 'stash_import.confirm_next')!;
+    expect(confirm.attributes('disabled')).toBeUndefined();
+    await confirm.trigger('click');
+    expect(wrapper.emitted('change')?.[0]?.[0]).toMatchObject({ reviewed: true, quantity: 1 });
+    wrapper.unmount();
+  });
 });
 describe('correction search', () => {
   it.each(['injector', 'SJ6', 'abc123'])('finds an item using %s', async (query) => {

@@ -81,7 +81,8 @@ export function reviewState(row: ReviewedCell, tracked?: ReadonlySet<string>): R
 }
 export function selectItem(row: ReviewedCell, item: ScanItem): void {
   row.itemId = item.id;
-  row.quantity = quantityFor(row.cell, item);
+  // The player chose this item, so one that cannot stack is one unit whatever the icon shows.
+  row.quantity = item.maxStack <= 1 ? 1 : quantityFor(row.cell, item);
   row.reviewed = true;
   row.excluded = false;
 }
