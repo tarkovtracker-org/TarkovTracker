@@ -315,6 +315,21 @@ describe('item comparison', () => {
     expect(wrapper.text()).toContain('stash_import.compare_fir_seen');
     const icons = wrapper.findAll('[role=group] button img').map((img) => img.attributes('src'));
     expect(icons).toEqual(['item-icon.png', 'other-icon.png']);
+    await wrapper.get('[data-testid=stash-compare-reference]').trigger('error');
+    expect(wrapper.find('[data-testid=stash-compare-reference]').exists()).toBe(false);
+    await wrapper.findAll('[aria-label="stash_import.matches"] button')[1]!.trigger('click');
+    const selected = wrapper.emitted('change')![0]![0] as ReviewedCell;
+    expect(selected.itemId).toBe('other');
+    await wrapper.setProps({ row: selected });
+    expect(wrapper.get('[data-testid=stash-compare-reference]').attributes('src')).toBe(
+      'other-icon.png'
+    );
+    expect(
+      wrapper.get('[aria-label="stash_import.matches"] button[aria-pressed=true]').text()
+    ).toBe('Other');
+    await wrapper.setProps({ imageFor: () => undefined });
+    expect(wrapper.find('[data-testid=stash-compare-reference]').exists()).toBe(false);
+    expect(wrapper.find('u-icon-stub[name="i-mdi-image-off-outline"]').exists()).toBe(true);
     await wrapper.setProps({ row: { ...row, itemId: '' } });
     expect(wrapper.find('[data-testid=stash-compare-reference]').exists()).toBe(false);
     expect(wrapper.text()).toContain('stash_import.compare_none');

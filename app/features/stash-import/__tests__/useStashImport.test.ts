@@ -28,6 +28,7 @@ const h = vi.hoisted(() => ({
     currentGameMode: 'pvp',
     tasksObjectivesHydrated: true,
     hideoutStations: [{ id: 'station', name: 'Station' }],
+    getItemById: vi.fn<(id: string) => Partial<TarkovItem> | undefined>(),
     getTaskById: (id: string) => ({ id, name: id, minPlayerLevel: 1 }),
   },
 }));
@@ -500,5 +501,23 @@ describe('reviewed stash import persistence', () => {
       'stash_import.errors.save_unknown'
     );
     expect(sanitizeOwnedProgressData(state.pvp)).toEqual(preview.local);
+  });
+});
+describe('stash item image fallbacks', () => {
+  it.each([
+    [{ gridImageLink: 'grid', image512pxLink: 'large', iconLink: 'icon' }, 'grid', 'icon'],
+    [{ image512pxLink: 'large', iconLink: 'icon' }, 'large', 'icon'],
+    [{ gridImageLink: 'grid', image512pxLink: 'large' }, 'grid', 'large'],
+    [{ image512pxLink: 'large' }, 'large', 'large'],
+    [{ gridImageLink: 'grid' }, 'grid', 'grid'],
+    [{ iconLink: 'icon' }, 'icon', 'icon'],
+    [{}, undefined, undefined],
+  ])('selects the best available comparison and suggestion image from %j', (item, grid, icon) => {
+    h.metadata.getItemById.mockReturnValue(item);
+    expect(useStashImport([]).itemImages('item')).toEqual({ grid, icon });
+  });
+  it('returns no images for an unknown metadata item', () => {
+    h.metadata.getItemById.mockReturnValue(undefined);
+    expect(useStashImport([]).itemImages('missing')).toBeUndefined();
   });
 });

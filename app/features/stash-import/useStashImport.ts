@@ -354,7 +354,7 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
     if (!item) return undefined;
     return {
       grid: item.gridImageLink || item.image512pxLink || item.iconLink,
-      icon: item.iconLink || item.gridImageLink,
+      icon: item.iconLink || item.image512pxLink || item.gridImageLink,
     };
   }
   return {

@@ -1,5 +1,5 @@
 <template>
-  <div class="flex min-h-0 flex-col gap-3">
+  <div class="flex min-h-0 min-w-0 flex-col gap-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <p class="text-surface-200 text-sm" aria-live="polite">
         <span class="text-surface-50 font-semibold">

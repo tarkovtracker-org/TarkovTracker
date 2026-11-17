@@ -11,7 +11,8 @@
   import type { ScanRect } from '@/utils/stashScan/types';
   /**
    * Draws one region of the shared decoded screenshot. Thumbnails are letterboxed into a
-   * square; `native` keeps the region's own pixels and shape so CSS can show it large.
+   * square; `native` keeps the region's pixels and shape up to 1024px so large manual crops
+   * cannot allocate another full-screenshot backing store for a 160px preview.
    */
   const props = defineProps<{
     bitmap?: ImageBitmap;
@@ -20,11 +21,14 @@
   }>();
   const SIZE = 96;
   const canvas = ref<HTMLCanvasElement>();
+  const nativeScale = computed(() =>
+    Math.min(1, 1024 / Math.max(1, props.cell.width, props.cell.height))
+  );
   const canvasWidth = computed(() =>
-    props.native ? Math.max(1, Math.round(props.cell.width)) : SIZE
+    props.native ? Math.max(1, Math.round(props.cell.width * nativeScale.value)) : SIZE
   );
   const canvasHeight = computed(() =>
-    props.native ? Math.max(1, Math.round(props.cell.height)) : SIZE
+    props.native ? Math.max(1, Math.round(props.cell.height * nativeScale.value)) : SIZE
   );
   function draw() {
     const context = canvas.value?.getContext('2d');
