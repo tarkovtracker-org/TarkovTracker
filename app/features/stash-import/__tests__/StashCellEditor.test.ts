@@ -271,3 +271,53 @@ describe('region coordinate editor', () => {
     wrapper.unmount();
   });
 });
+describe('item comparison', () => {
+  it('shows the selected item picture beside the screenshot region and candidate icons', async () => {
+    const row = {
+      cell: {
+        key: 0,
+        x: 0,
+        y: 0,
+        width: 126,
+        height: 63,
+        slotsWide: 2,
+        slotsHigh: 1,
+        candidates: [{ itemId: 'other', score: 0.5, artScore: 0.5, textScore: 0.5 }],
+        fir: true,
+      },
+      itemId: 'item',
+      quantity: 1,
+      raidStatus: 'fir',
+    } as unknown as ReviewedCell;
+    const images: Record<string, { grid?: string; icon?: string }> = {
+      item: { grid: 'item-grid.png', icon: 'item-icon.png' },
+      other: { icon: 'other-icon.png' },
+    };
+    const wrapper = mount(StashCellEditor, {
+      props: {
+        row,
+        items: [
+          { id: 'item', name: 'Item', shortName: 'Item', maxStack: 1, width: 2, height: 1 },
+          { id: 'other', name: 'Other', shortName: 'Other', maxStack: 1, width: 2, height: 1 },
+        ],
+        imageFor: (id: string) => images[id],
+      },
+      global: { mocks: { $t: (key: string) => key }, stubs: { UIcon: true, UButton: true } },
+    });
+    const screenshot = wrapper.get('[data-testid=stash-compare-screenshot]');
+    expect([screenshot.attributes('width'), screenshot.attributes('height')]).toEqual([
+      '126',
+      '63',
+    ]);
+    expect(wrapper.get('[data-testid=stash-compare-reference]').attributes('src')).toBe(
+      'item-grid.png'
+    );
+    expect(wrapper.text()).toContain('stash_import.compare_fir_seen');
+    const icons = wrapper.findAll('[role=group] button img').map((img) => img.attributes('src'));
+    expect(icons).toEqual(['item-icon.png', 'other-icon.png']);
+    await wrapper.setProps({ row: { ...row, itemId: '' } });
+    expect(wrapper.find('[data-testid=stash-compare-reference]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('stash_import.compare_none');
+    wrapper.unmount();
+  });
+});

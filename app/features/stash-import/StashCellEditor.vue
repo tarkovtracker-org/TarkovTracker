@@ -1,5 +1,11 @@
 <template>
   <div class="space-y-4">
+    <StashCellCompare
+      :row="row"
+      :bitmap="bitmap"
+      :item-name="selectedName"
+      :reference="reference"
+    />
     <div class="space-y-2">
       <p class="text-surface-300 text-xs font-semibold tracking-wide uppercase">
         {{ $t('stash_import.which_item') }}
@@ -26,7 +32,7 @@
           v-for="item in choices"
           :key="item.id"
           type="button"
-          class="flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors"
+          class="flex w-full items-center gap-2.5 rounded-md border px-2 py-1.5 text-left text-sm transition-colors"
           :class="
             row.itemId === item.id
               ? 'border-primary-400 bg-primary-500/15 text-surface-50'
@@ -35,8 +41,24 @@
           :aria-pressed="row.itemId === item.id"
           @click="choose(item)"
         >
-          <span class="min-w-0 truncate">{{ item.name }}</span>
-          <UIcon v-if="row.itemId === item.id" name="i-mdi-check" class="text-primary-300" />
+          <span
+            class="bg-surface-950 flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-sm"
+            aria-hidden="true"
+          >
+            <img
+              v-if="iconOf(item.id)"
+              :src="iconOf(item.id)"
+              alt=""
+              loading="lazy"
+              class="size-full object-contain"
+            />
+          </span>
+          <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+          <UIcon
+            v-if="row.itemId === item.id"
+            name="i-mdi-check"
+            class="text-primary-300 shrink-0"
+          />
         </button>
         <p v-if="!choices.length" class="text-surface-400 px-1 py-2 text-sm">
           {{ $t(search ? 'stash_import.no_search_results' : 'stash_import.no_suggestions') }}
@@ -143,6 +165,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import StashCellCompare from '@/features/stash-import/StashCellCompare.vue';
   import { canSplitRegion } from '@/utils/stashScan/regions';
   import { selectItem } from '@/utils/stashScan/review';
   import {
@@ -150,8 +173,14 @@
     type RaidStatus,
     type ReviewedCell,
     type ScanItem,
+    type ScanItemImages,
   } from '@/utils/stashScan/types';
-  const props = defineProps<{ row: ReviewedCell; items: ScanItem[] }>();
+  const props = defineProps<{
+    row: ReviewedCell;
+    items: ScanItem[];
+    bitmap?: ImageBitmap;
+    imageFor?: (id: string) => ScanItemImages | undefined;
+  }>();
   const emit = defineEmits<{
     next: [];
     split: [columns: number, rows: number];
@@ -171,6 +200,13 @@
     }
   );
   const itemsById = computed(() => new Map(props.items.map((item) => [item.id, item])));
+  const selectedName = computed(() => itemsById.value.get(props.row.itemId)?.name ?? '');
+  const iconOf = (id: string) => props.imageFor?.(id)?.icon;
+  const reference = computed(() => {
+    if (!props.row.itemId) return undefined;
+    const images = props.imageFor?.(props.row.itemId);
+    return images?.grid || images?.icon;
+  });
   const matchesSearch = (item: ScanItem, query: string) =>
     [item.name, item.shortName, item.id].some((value) => value.toLocaleLowerCase().includes(query));
   const choices = computed(() => {

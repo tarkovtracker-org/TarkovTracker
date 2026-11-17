@@ -62,6 +62,7 @@
           :bitmap="bitmap"
           :tracked="tracked"
           :item-name="itemName"
+          :image-for="imageFor"
           @toggle="toggle(row.cell.key)"
           @next="$emit('next')"
           @split="(columns, rows) => $emit('split', columns, rows)"
@@ -87,6 +88,7 @@
             :bitmap="bitmap"
             :tracked="tracked"
             :item-name="itemName"
+            :image-for="imageFor"
             @toggle="toggle(row.cell.key)"
             @next="$emit('next')"
             @split="(columns, rows) => $emit('split', columns, rows)"
@@ -116,7 +118,7 @@
 <script setup lang="ts">
   import StashReviewRow from '@/features/stash-import/StashReviewRow.vue';
   import { blocksImport, reviewState } from '@/utils/stashScan/review';
-  import type { ReviewedCell, ScanResult } from '@/utils/stashScan/types';
+  import type { ReviewedCell, ScanItemImages, ScanResult } from '@/utils/stashScan/types';
   const props = defineProps<{
     result: ScanResult;
     rows: ReviewedCell[];
@@ -124,6 +126,7 @@
     remaining: number;
     bitmap?: ImageBitmap;
     itemName: (id: string) => string;
+    imageFor?: (id: string) => ScanItemImages | undefined;
   }>();
   const emit = defineEmits<{
     next: [];

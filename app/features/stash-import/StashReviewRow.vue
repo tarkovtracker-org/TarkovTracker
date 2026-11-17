@@ -7,7 +7,7 @@
       :aria-controls="editorId"
       @click="$emit('toggle')"
     >
-      <StashCellThumb class="size-10" :bitmap="bitmap" :cell="row.cell" />
+      <StashCellThumb class="size-14" :bitmap="bitmap" :cell="row.cell" />
       <span class="min-w-0 flex-1">
         <span class="block truncate text-sm" :class="look.name">{{ title }}</span>
         <span class="text-surface-400 block text-xs">{{ detail }}</span>
@@ -18,6 +18,8 @@
       <StashCellEditor
         :row="row"
         :items="items"
+        :bitmap="bitmap"
+        :image-for="imageFor"
         @next="$emit('next')"
         @split="(columns, rows) => $emit('split', columns, rows)"
         @change="$emit('change', $event)"
@@ -29,7 +31,7 @@
   import StashCellEditor from '@/features/stash-import/StashCellEditor.vue';
   import StashCellThumb from '@/features/stash-import/StashCellThumb.vue';
   import { reviewState } from '@/utils/stashScan/review';
-  import type { ReviewedCell, ScanItem } from '@/utils/stashScan/types';
+  import type { ReviewedCell, ScanItem, ScanItemImages } from '@/utils/stashScan/types';
   const props = defineProps<{
     row: ReviewedCell;
     items: ScanItem[];
@@ -37,6 +39,7 @@
     bitmap?: ImageBitmap;
     tracked?: ReadonlySet<string>;
     itemName: (id: string) => string;
+    imageFor?: (id: string) => ScanItemImages | undefined;
   }>();
   defineEmits<{
     toggle: [];

@@ -74,6 +74,7 @@ vi.mock('@/features/stash-import/useStashImport', () => ({
     prepare: mocks.prepare,
     commit: mocks.commit,
     recover: mocks.recover,
+    itemImages: () => undefined,
     estimate: (_totals: unknown, selection: string[], mode: 'add' | 'replace') => ({
       changes: mocks.changes[mode].filter((change) => selection.includes(`hideout:${change.id}`)),
       excess: 0,

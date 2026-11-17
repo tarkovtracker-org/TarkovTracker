@@ -119,6 +119,7 @@
               :remaining="remaining"
               :bitmap="bitmap"
               :item-name="itemName"
+              :image-for="importer.itemImages"
               @next="next"
               @split="split"
               @change="updateActive"
