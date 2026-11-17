@@ -23,6 +23,13 @@ export interface ScanItem {
   height: number;
   maxStack: number;
 }
+/** Item pictures from the live item data, for showing the player what a match looks like. */
+export interface ScanItemImages {
+  /** The item as drawn in a stash grid, at its in-game size. */
+  grid?: string;
+  /** The square icon. */
+  icon?: string;
+}
 export interface ScanShard {
   file: string;
   sha256: string;

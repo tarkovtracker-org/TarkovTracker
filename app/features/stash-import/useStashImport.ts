@@ -14,7 +14,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { getGameModeSeasonNumber, type GameMode } from '@/utils/constants';
 import { isRecord, sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
-import { scanError } from '@/utils/stashScan/types';
+import { scanError, type ScanItemImages } from '@/utils/stashScan/types';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
 import type { ObservedTotals } from '@/utils/stashScan/review';
 type Need = NeededItemTaskObjective | NeededItemHideoutModule;
@@ -348,9 +348,19 @@ export function useStashImport(needs: MaybeRefOrGetter<Need[]>) {
     assertDestination(preview);
     return status === 'found';
   }
+  /** Live item pictures; the scan catalog only carries names and sizes. */
+  function itemImages(id: string): ScanItemImages | undefined {
+    const item = metadata.getItemById(id);
+    if (!item) return undefined;
+    return {
+      grid: item.gridImageLink || item.image512pxLink || item.iconLink,
+      icon: item.iconLink || item.image512pxLink || item.gridImageLink,
+    };
+  }
   return {
     targets,
     trackedItemIds,
+    itemImages,
     estimate,
     prepare,
     commit,
