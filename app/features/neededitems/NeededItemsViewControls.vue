@@ -1,12 +1,26 @@
 <template>
-  <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-    <PreferenceSwitch
-      v-model="groupByItem"
-      :label="$t('page.needed_items.view.show_once')"
-      :description="$t('page.needed_items.view.show_once_hint')"
-      test-id="needed-items-show"
-      class="w-full sm:w-60"
-    />
+  <div class="flex flex-wrap items-center gap-2">
+    <div class="flex items-center">
+      <PreferenceSwitch
+        v-model="groupByItem"
+        :label="$t('page.needed_items.view.show_once')"
+        test-id="needed-items-show"
+      />
+      <UPopover>
+        <UButton
+          size="xs"
+          color="neutral"
+          variant="ghost"
+          icon="i-mdi-information-outline"
+          :aria-label="$t('page.needed_items.view.show_once_hint')"
+        />
+        <template #content>
+          <p class="max-w-64 px-3 py-2 text-sm">
+            {{ $t('page.needed_items.view.show_once_hint') }}
+          </p>
+        </template>
+      </UPopover>
+    </div>
     <div
       v-for="control in controls"
       :key="control.key"

@@ -2,7 +2,6 @@ import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { neededCountOf } from '@/features/neededitems/neededItemFilters';
 import { isCurrencyItemId } from '@/utils/constants';
 import { inferNewBeginningPrestigeLevel } from '@/utils/prestige';
-import { SEO_ORIGIN } from '@/utils/routeSeo';
 import { normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   Task,
@@ -14,6 +13,7 @@ import type {
   TarkovTasksCoreQueryResult,
   TarkovItem,
 } from '@/types/tarkov';
+import { fetchPublicPvpCatalog } from '~/server/utils/publicPvpCatalog';
 interface Row {
   name: string;
   count: number;
@@ -27,16 +27,6 @@ interface Group {
   source: string;
   level?: number;
   rows: Row[];
-}
-// Builds have no private overlay bindings. Use the corrected public catalogs,
-// with no player ID, credentials, or incoming request headers.
-async function catalog<T>(path: string) {
-  const response = await $fetch<{ data: T }>(`${SEO_ORIGIN}/api/tarkov/${path}`, {
-    query: { gameMode: 'pvp', lang: 'en' },
-    timeout: 20000,
-    retry: 1,
-  });
-  return response.data;
 }
 const bySource = (a: Group, b: Group) =>
   a.source.localeCompare(b.source, 'en') || (a.level ?? 0) - (b.level ?? 0);
@@ -128,10 +118,10 @@ function hideoutChecklist(hideout: TarkovHideoutQueryResult, itemName: ItemName)
 }
 export async function loadItemChecklist() {
   const [core, objectives, items, hideout] = await Promise.all([
-    catalog<TarkovTasksCoreQueryResult>('tasks-core'),
-    catalog<TarkovTaskObjectivesQueryResult>('tasks-objectives'),
-    catalog<TarkovItemsQueryResult>('items-lite'),
-    catalog<TarkovHideoutQueryResult>('hideout'),
+    fetchPublicPvpCatalog<TarkovTasksCoreQueryResult>('tasks-core'),
+    fetchPublicPvpCatalog<TarkovTaskObjectivesQueryResult>('tasks-objectives'),
+    fetchPublicPvpCatalog<TarkovItemsQueryResult>('items-lite'),
+    fetchPublicPvpCatalog<TarkovHideoutQueryResult>('hideout'),
   ]);
   const names = new Map(items.items.map((item) => [item.id, item.name]));
   const itemName = (item: TarkovItem) => names.get(item.id) ?? item.name;
