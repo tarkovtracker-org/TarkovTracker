@@ -5,7 +5,7 @@ const PURGE_CHECK_TTL_MS = 60_000;
 let purgeTime = 0;
 let nextPurgeCheckAt = 0;
 let purgeCheck: Promise<number> | undefined;
-export async function readTarkovCacheMeta(event: H3Event) {
+function buildAuditQuery(event: H3Event) {
   const config = useRuntimeConfig(event);
   const supabaseUrl = config.supabaseUrl;
   const supabaseServiceKey = config.supabaseServiceKey;
@@ -16,7 +16,7 @@ export async function readTarkovCacheMeta(event: H3Event) {
     !supabaseServiceKey.trim()
   ) {
     logger.warn('Supabase not configured - skipping cache meta lookup');
-    return { data: { lastPurgeAt: null } };
+    return null;
   }
   const supabaseUrlValue = supabaseUrl.trim();
   const supabaseServiceKeyValue = supabaseServiceKey.trim();
@@ -28,21 +28,27 @@ export async function readTarkovCacheMeta(event: H3Event) {
       supabaseUrl: supabaseUrlValue,
       error: error instanceof Error ? error.message : String(error),
     });
-    return { data: { lastPurgeAt: null } };
+    return null;
   }
   url.searchParams.set('select', 'created_at,details');
   url.searchParams.set('action', 'eq.cache_purge');
   url.searchParams.set('order', 'created_at.desc');
   url.searchParams.set('details', 'cs.{"success":true}');
   url.searchParams.set('limit', '1');
+  return { url, serviceKey: supabaseServiceKeyValue };
+}
+export async function readTarkovCacheMeta(event: H3Event) {
+  const query = buildAuditQuery(event);
+  if (!query) return { data: { lastPurgeAt: null } };
+  const { url, serviceKey } = query;
   let response: Response;
   const requestTimeoutMs = 2500;
   try {
     const timeoutSignal = AbortSignal.timeout(requestTimeoutMs);
     response = await fetch(url.toString(), {
       headers: {
-        apikey: supabaseServiceKeyValue,
-        Authorization: `Bearer ${supabaseServiceKeyValue}`,
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
@@ -67,6 +73,9 @@ export async function readTarkovCacheMeta(event: H3Event) {
     });
     return { data: { lastPurgeAt: null } };
   }
+  return readAuditResponse(response, url);
+}
+async function readAuditResponse(response: Response, url: URL) {
   if (!response.ok) {
     let bodySnippet: string;
     try {

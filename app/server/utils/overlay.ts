@@ -750,21 +750,24 @@ const collectStoryUnlocks = (chapters: Record<string, Record<string, unknown>> =
   }
   return byTask;
 };
+type ApplyOverlayOptions = {
+  bypassCache?: boolean;
+  gameMode?: string;
+  locale?: string;
+  purgedAt?: number;
+  scheduleRefresh?: OverlayRefreshScheduler;
+};
+function fetchOverlayForApplication(options: ApplyOverlayOptions): Promise<OverlayFetchResult> {
+  const purgedAt = options.purgedAt ?? 0;
+  return cacheTimestamp < purgedAt
+    ? fetchOverlayAfterPurge(purgedAt)
+    : fetchOverlay(Boolean(options.bypassCache), options.scheduleRefresh);
+}
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
-  options: {
-    bypassCache?: boolean;
-    gameMode?: string;
-    locale?: string;
-    purgedAt?: number;
-    scheduleRefresh?: OverlayRefreshScheduler;
-  } = {}
+  options: ApplyOverlayOptions = {}
 ): Promise<T & { dataOverlay: OverlayMeta }> {
-  const purgedAt = options.purgedAt ?? 0;
-  const { overlay, meta } =
-    cacheTimestamp < purgedAt
-      ? await fetchOverlayAfterPurge(purgedAt)
-      : await fetchOverlay(Boolean(options.bypassCache), options.scheduleRefresh);
+  const { overlay, meta } = await fetchOverlayForApplication(options);
   const result = { ...data, dataOverlay: meta } as T & { dataOverlay: OverlayMeta };
   if (!overlay || !data?.data) {
     return result;

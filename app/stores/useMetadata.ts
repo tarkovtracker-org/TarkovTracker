@@ -174,7 +174,9 @@ const objectiveCatalogCacheKey = (scope: string) => {
   const key = `${TASK_OBJECTIVES_CACHE_VERSION}-${scope}`;
   return purgeTime ? `${key}-${purgeTime}` : key;
 };
-const canCacheObjectiveCatalog = (response: FetchSuccess<unknown>) => {
+const shouldPersistMetadata = (cacheType: CacheType, response: FetchSuccess<unknown>) => {
+  if (typeof window === 'undefined') return false;
+  if (cacheType !== 'tasks-objectives') return true;
   const purgeTime = observedObjectivePurgeTime();
   return !purgeTime || Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime;
 };
@@ -1067,10 +1069,7 @@ export const useMetadataStore = defineStore('metadata', {
         }
         processData(response.data);
         // Step 4: Store in IndexedDB for future visits
-        if (
-          typeof window !== 'undefined' &&
-          (cacheType !== 'tasks-objectives' || canCacheObjectiveCatalog(response))
-        ) {
+        if (shouldPersistMetadata(cacheType, response)) {
           setCachedData(cacheType, cacheKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
             logger.error(`[MetadataStore] Error caching ${logName} data:`, err)
           );
@@ -1607,7 +1606,7 @@ export const useMetadataStore = defineStore('metadata', {
         }));
         const deduped = this.dedupeObjectiveIds(modeTasks as Task[]).tasks;
         const counts = Object.fromEntries(this.buildObjectiveCountMap(deduped));
-        if (typeof window !== 'undefined' && canCacheObjectiveCatalog(response)) {
+        if (shouldPersistMetadata('tasks-objectives', response)) {
           setCachedData(
             'tasks-objectives' as CacheType,
             cacheKey,
