@@ -38,6 +38,16 @@ describe('cleanCloudflareOutput', () => {
     expect(readFileSync(asset, 'utf8')).toBe(bare);
     expect(statSync(unchanged).mtimeMs).toBe(1000000);
   });
+  it('continues cleaning other files after a write failure', () => {
+    writeFileSync(join(root, 'a.js'), bare);
+    writeFileSync(join(root, 'b.js'), bare);
+    vi.mocked(writeFileSync).mockImplementationOnce(() => {
+      throw new Error('write failed');
+    });
+    cleanCloudflareOutput('cloudflare', root);
+    const contents = ['a.js', 'b.js'].map((file) => readFileSync(join(root, file), 'utf8'));
+    expect(contents.sort()).toEqual(['', bare]);
+  });
   it('continues after an output file vanishes and tolerates a missing directory', () => {
     writeFileSync(join(root, 'a.js'), bare);
     writeFileSync(join(root, 'b.js'), bare);

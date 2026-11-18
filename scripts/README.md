@@ -15,6 +15,7 @@ hooks, previews, releases) and [`docs/systems/`](../docs/systems/README.md) (pre
 | [`checks/`](./checks/)                 | Formatting, linting, and consistency checks you can run locally or in CI. |
 | [`ci/`](./ci/)                         | CI job planning, result gates, and GitHub automation helpers.             |
 | [`codex-review/`](./codex-review/)     | Tool agents use to request or wait for a Codex PR review.                 |
+| [`nuxt/`](./nuxt/)                     | Build-time helpers for Nuxt hooks.                                        |
 | [`ops/`](./ops/)                       | Read-only production database observer.                                   |
 | [`precompute/`](./precompute/)         | Scheduled pipeline that precomputes Tarkov data into Cloudflare KV.       |
 | [`preview/`](./preview/)               | `/preview` pipeline that deploys a PR to Cloudflare Pages.                |
@@ -31,13 +32,13 @@ one place and is grouped by purpose.
 
 ## File extensions and naming
 
-| Pattern            | Meaning                                                                  |
-| ------------------ | ------------------------------------------------------------------------ |
-| `*.mjs`            | Node.js script using ES modules (`import`). Runs with `node`, no build.  |
-| `*.sh`             | Bash script. Run with `bash`.                                            |
-| `*.ts`             | TypeScript run with `tsx` (only `precompute/`, which imports app code).  |
-| `ops/prod-db`      | Extensionless Bash wrapper so the command reads `scripts/ops/prod-db …`. |
-| `*.test.mjs`       | Vitest tests, run by `pnpm run test`.                                    |
-| `*-tests.mjs`      | `node --test` tests in `codex-review/`, run by `pnpm run test:workflow`. |
-| `workflow-tests/*` | `node --test` tests, run by `pnpm run test:workflow`.                    |
-| `*.smoke.mjs`      | Playwright smoke tests for previews; Vitest never picks them up.         |
+| Pattern            | Meaning                                                                    |
+| ------------------ | -------------------------------------------------------------------------- |
+| `*.mjs`            | Node.js script using ES modules (`import`). Runs with `node`, no build.    |
+| `*.sh`             | Bash script. Run with `bash`.                                              |
+| `*.ts`             | TypeScript loaded by Nuxt, Vitest or the precompute pipeline.              |
+| `ops/prod-db`      | Extensionless Bash wrapper so the command reads `scripts/ops/prod-db â€¦`. |
+| `*.test.mjs`       | Vitest tests, run by `pnpm run test`.                                      |
+| `*-tests.mjs`      | `node --test` tests in `codex-review/`, run by `pnpm run test:workflow`.   |
+| `workflow-tests/*` | `node --test` tests, run by `pnpm run test:workflow`.                      |
+| `*.smoke.mjs`      | Playwright smoke tests for previews; Vitest never picks them up.           |
