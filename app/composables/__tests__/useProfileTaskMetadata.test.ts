@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { effectScope, ref } from 'vue';
 import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
 import { useMetadataStore } from '@/stores/useMetadata';
+import * as asyncUtils from '@/utils/async';
 import { localizeMetadata } from '@/utils/metadataLocalization';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { getTarkovAccessState } from '@/utils/tarkovApiFetch';
 import * as cache from '@/utils/tarkovCache';
 import { projectDuplicateObjectiveProgress } from '@/utils/taskNormalization';
@@ -24,6 +26,7 @@ vi.mock('@/utils/tarkovApiFetch', async (importOriginal) => {
 });
 beforeEach(() => {
   setActivePinia(createPinia());
+  localStorage.clear();
   vi.spyOn(cache, 'getCachedData').mockResolvedValue(null);
   vi.spyOn(cache, 'setCachedData').mockResolvedValue();
 });
@@ -32,8 +35,168 @@ afterEach(() => {
   accessGate.pending = null;
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  localStorage.clear();
 });
 describe('profile mode metadata', () => {
+  it('fences a profile objective cache read that crosses a purge and writes only the current key', async () => {
+    const purge = '2026-11-18T13:00:00Z';
+    const scopedKey = `neutral-v1-regular-${Date.parse(purge)}`;
+    const staleRead = createDeferred<unknown>();
+    const fresh = { tasks: [{ id: 'task', objectives: [{ id: 'fresh' }] }] };
+    vi.mocked(cache.getCachedData).mockImplementation(async (type, key) => {
+      if (type === 'tasks-core')
+        return { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } as never;
+      if (type === 'tasks-objectives')
+        return (key === scopedKey ? fresh : staleRead.promise) as never;
+      if (type === 'prestige') return { prestige: [] } as never;
+      return { editions: [], storyChapters: [] } as never;
+    });
+    const fetch = vi.fn(
+      async (
+        _url: string,
+        options: { onResponse?: (context: { response: Response }) => unknown }
+      ) => {
+        await options.onResponse?.({
+          response: new Response(null, {
+            headers: { 'X-Cache-Status': 'PRECOMPUTE', 'X-Catalog-Release': '1795000000000' },
+          }),
+        });
+        return { data: fresh };
+      }
+    );
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await vi.waitFor(() =>
+      expect(cache.getCachedData).toHaveBeenCalledWith(
+        'tasks-objectives',
+        'neutral-v1-regular',
+        'en'
+      )
+    );
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
+    staleRead.resolve({ tasks: [{ id: 'task', objectives: [{ id: 'stale' }] }] });
+    await flushPromises();
+    expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('fresh');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(cache.setCachedData).toHaveBeenCalledWith(
+      'tasks-objectives',
+      scopedKey,
+      'en',
+      fresh,
+      expect.any(Number),
+      expect.any(Function)
+    );
+    expect(
+      vi
+        .mocked(cache.setCachedData)
+        .mock.calls.some(
+          ([type, key]) => type === 'tasks-objectives' && key === 'neutral-v1-regular'
+        )
+    ).toBe(false);
+    scope.stop();
+  });
+  it('rejects a profile network objective response started before the purge and never caches it unscoped', async () => {
+    const purge = '2026-11-18T13:00:00Z';
+    const scopedKey = `neutral-v1-regular-${Date.parse(purge)}`;
+    const staleResponse = createDeferred<unknown>();
+    const fresh = { tasks: [{ id: 'task', objectives: [{ id: 'fresh' }] }] };
+    vi.mocked(cache.getCachedData).mockImplementation(async (type, key) => {
+      if (type === 'tasks-core')
+        return { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } as never;
+      if (type === 'tasks-objectives') return (key === scopedKey ? fresh : null) as never;
+      if (type === 'prestige') return { prestige: [] } as never;
+      return { editions: [], storyChapters: [] } as never;
+    });
+    vi.spyOn(asyncUtils, 'delay').mockResolvedValue();
+    let reads = 0;
+    const fetch = vi.fn(
+      async (
+        _url: string,
+        options: { onResponse?: (context: { response: Response }) => unknown }
+      ) => {
+        const body = ++reads === 1 ? await staleResponse.promise : fresh;
+        await options.onResponse?.({
+          response: new Response(null, {
+            headers: { 'X-Cache-Status': 'PRECOMPUTE', 'X-Catalog-Release': '1795000000000' },
+          }),
+        });
+        return { data: body };
+      }
+    );
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
+    staleResponse.resolve({ tasks: [{ id: 'task', objectives: [{ id: 'stale' }] }] });
+    await flushPromises();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('fresh');
+    expect(
+      vi
+        .mocked(cache.setCachedData)
+        .mock.calls.some(
+          ([type, key]) => type === 'tasks-objectives' && key === 'neutral-v1-regular'
+        )
+    ).toBe(false);
+    scope.stop();
+  });
+  it('reuses current generation objective caches without an extra profile request', async () => {
+    const purge = '2026-11-18T13:00:00Z';
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
+    const key = `neutral-v1-regular-${Date.parse(purge)}`;
+    vi.mocked(cache.getCachedData).mockImplementation(async (type, requested) => {
+      if (type === 'tasks-core')
+        return { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } as never;
+      if (type === 'tasks-objectives')
+        return {
+          tasks: [{ id: 'task', objectives: [{ id: requested === key ? 'fresh' : 'stale' }] }],
+        } as never;
+      if (type === 'prestige') return { prestige: [] } as never;
+      return { editions: [], storyChapters: [] } as never;
+    });
+    const fetch = vi.fn();
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await flushPromises();
+    expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('fresh');
+    expect(cache.getCachedData).toHaveBeenCalledWith('tasks-objectives', key, 'en');
+    expect(fetch).not.toHaveBeenCalled();
+    scope.stop();
+  });
+  it.each([undefined, null, [], 'invalid'])(
+    'caches chapters only when optional objectives are valid: %j',
+    async (objectives) => {
+      const chapter = {
+        id: 'tour',
+        name: 'Tour',
+        normalizedName: 'tour',
+        order: 1,
+        wikiLink: '',
+        ...(objectives === undefined ? {} : { objectives }),
+      };
+      vi.stubGlobal(
+        '$fetch',
+        vi.fn(async (url: string) => {
+          if (url.endsWith('/tasks-core'))
+            return { data: { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } };
+          if (url.endsWith('/tasks-objectives')) return { data: { tasks: [] } };
+          if (url.endsWith('/prestige')) return { data: { prestige: [] } };
+          return { data: { editions: [], storyChapters: [chapter] } };
+        })
+      );
+      const scope = effectScope();
+      scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')));
+      await flushPromises();
+      const writes = vi
+        .mocked(cache.setCachedData)
+        .mock.calls.filter(([type]) => type === 'editions');
+      expect(writes).toHaveLength(objectives === undefined ? 1 : 0);
+      scope.stop();
+    }
+  );
   it.each([
     ['tasks-core', null],
     ['tasks-core', {}],

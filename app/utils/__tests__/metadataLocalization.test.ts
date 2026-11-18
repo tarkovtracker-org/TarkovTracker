@@ -69,9 +69,14 @@ describe('metadata string cache', () => {
   it('checks cached language eligibility without a network request', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('$fetch', fetch);
-    expect(await hasCachedGameDataStrings({}, 'de')).toBe(false);
-    vi.mocked(cache.getCachedData).mockResolvedValue({ '@tt:regular:items:name': 'Name' });
-    expect(await hasCachedGameDataStrings({}, 'de')).toBe(true);
+    const owner = {};
+    const key = '@tt:regular:items:name';
+    expect(await hasCachedGameDataStrings(owner, 'de', { name: key })).toBe(false);
+    vi.mocked(cache.getCachedData).mockResolvedValue({ '@tt:regular:items:unrelated': 'Other' });
+    expect(await hasCachedGameDataStrings(owner, 'de', { name: key })).toBe(false);
+    vi.mocked(cache.getCachedData).mockResolvedValue({ [key]: 'Name' });
+    expect(await hasCachedGameDataStrings(owner, 'de', { name: key })).toBe(true);
+    expect(cache.getCachedData).toHaveBeenCalledWith('strings', 'strings-v1', 'de');
     expect(fetch).not.toHaveBeenCalled();
   });
   it('shares a table across reactive owners and independent abort signals', async () => {

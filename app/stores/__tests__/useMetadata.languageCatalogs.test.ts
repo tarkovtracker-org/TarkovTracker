@@ -250,4 +250,29 @@ describe('language-neutral metadata catalogs', () => {
       expect.anything()
     );
   });
+  it('uses a fresh-only retry and retains the rendered catalog when that retry returns 503', async () => {
+    const store = useMetadataStore();
+    store.tasks = [{ id: 'last-good', name: 'Last good' }] as never;
+    vi.mocked(cache.getCachedData).mockImplementation(async (type) =>
+      type === 'strings' ? (tables.en as never) : null
+    );
+    let reads = 0;
+    const unavailable = Object.assign(new Error('Catalog unavailable'), { statusCode: 503 });
+    const fetch = vi.fn(async (url: string, options: { query: Record<string, string> }) => {
+      if (url.endsWith('/strings')) return { data: { strings: tables.en } };
+      if (++reads === 1)
+        return {
+          data: { tasks: [{ id: 'task', name: '@tt:retired:name' }], maps: [], traders: [] },
+        };
+      expect(options.query.cacheBust).toBe('1');
+      throw unavailable;
+    });
+    vi.stubGlobal('$fetch', fetch);
+    await expect(store.fetchTasksCoreData()).rejects.toMatchObject({
+      name: 'MissingGameDataStringError',
+      cause: unavailable,
+    });
+    expect(reads).toBe(2);
+    expect(store.tasks[0]).toMatchObject({ id: 'last-good', name: 'Last good' });
+  });
 });

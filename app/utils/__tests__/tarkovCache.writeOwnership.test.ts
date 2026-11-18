@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, expect, it, vi } from 'vitest';
+import { logger } from '@/utils/logger';
 import { claimMetadataCacheWrite } from '@/utils/metadataLocalization';
 import { getCachedData, setCachedData } from '@/utils/tarkovCache';
 vi.mock('@/utils/logger', () => ({
@@ -22,6 +23,9 @@ it('checks write ownership after opening IndexedDB and preserves the newest cach
   const currentClaim = claimMetadataCacheWrite(owner, 'tasks-core/neutral-v1-regular/en');
   await old;
   expect(await getCachedData('tasks-core', 'neutral-v1-regular', 'en')).toBeNull();
+  expect(logger.debug).not.toHaveBeenCalledWith(
+    '[TarkovCache] Cache STORED: tarkov-tasks-core-neutral-v1-regular-en'
+  );
   await setCachedData(
     'tasks-core',
     'neutral-v1-regular',
@@ -34,4 +38,12 @@ it('checks write ownership after opening IndexedDB and preserves the newest cach
   expect(await getCachedData('tasks-core', 'neutral-v1-regular', 'en')).toEqual({
     name: 'Current',
   });
+  expect(
+    vi
+      .mocked(logger.debug)
+      .mock.calls.filter(
+        ([message]) =>
+          message === '[TarkovCache] Cache STORED: tarkov-tasks-core-neutral-v1-regular-en'
+      )
+  ).toHaveLength(1);
 });

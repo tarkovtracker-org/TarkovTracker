@@ -69,6 +69,38 @@ describe('Tarkov browser access', () => {
       '1795000000000'
     );
   });
+  it('waits for an asynchronous final response hook before resolving the gated request', async () => {
+    const hook = Promise.withResolvers<undefined>();
+    const onResponse = vi.fn(() => hook.promise);
+    network.mockResolvedValueOnce(json()).mockResolvedValueOnce(json({ data: [] }));
+    let settled = false;
+    const pending = tarkovApiFetch('/api/tarkov/tasks-objectives', { onResponse }).then((value) => {
+      settled = true;
+      return value;
+    });
+    await vi.waitFor(() => expect(onResponse).toHaveBeenCalledTimes(1));
+    await flush();
+    expect(settled).toBe(false);
+    hook.resolve(undefined);
+    await expect(pending).resolves.toEqual({ data: [] });
+  });
+  it('propagates an asynchronous final response hook rejection through the gated request', async () => {
+    const hook = Promise.withResolvers<undefined>();
+    const error = new Error('Response hook failed');
+    const failedHook = hook.promise.then(() => {
+      throw error;
+    });
+    void failedHook.catch(() => {});
+    const onResponse = vi.fn(() => failedHook);
+    network.mockResolvedValueOnce(json()).mockResolvedValueOnce(json({ data: [] }));
+    const pending = tarkovApiFetch('/api/tarkov/tasks-objectives', { onResponse }).then(
+      (value) => ({ value }),
+      (failure) => ({ failure })
+    );
+    await vi.waitFor(() => expect(onResponse).toHaveBeenCalledTimes(1));
+    hook.resolve(undefined);
+    await expect(pending).resolves.toEqual({ failure: error });
+  });
   it('shares the initial probe and reuses its release', async () => {
     network.mockResolvedValueOnce(json());
     expect(await Promise.all([ensureTarkovAccess(), ensureTarkovAccess()])).toEqual([1, 1]);

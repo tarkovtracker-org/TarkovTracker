@@ -165,12 +165,25 @@ export async function localizeMetadata<T>(
   return localizeGameData(data, strings);
 }
 /** Retry one incompatible network snapshot after refreshing the current string inventory. */
+async function retryLocalizedCatalog<T>(
+  load: (fresh: boolean) => Promise<T>,
+  failure: MissingGameDataStringError,
+  signal?: AbortSignal
+): Promise<T> {
+  try {
+    return await load(true);
+  } catch (cause) {
+    signal?.throwIfAborted();
+    failure.cause = cause;
+    throw failure;
+  }
+}
 export async function fetchLocalizedMetadata<T>(
   owner: object,
-  context: { load: () => Promise<T>; language: string; signal?: AbortSignal }
+  context: { load: (fresh: boolean) => Promise<T>; language: string; signal?: AbortSignal }
 ): Promise<{ neutral: T; localized: T }> {
-  const load = async () => {
-    const neutral = await context.load();
+  const load = async (fresh = false) => {
+    const neutral = await context.load(fresh);
     const localized = await localizeMetadata(owner, neutral, context.language, context.signal);
     return { neutral, localized };
   };
@@ -178,6 +191,6 @@ export async function fetchLocalizedMetadata<T>(
     return await load();
   } catch (error) {
     if (!(error instanceof MissingGameDataStringError)) throw error;
-    return load();
+    return retryLocalizedCatalog(load, error, context.signal);
   }
 }

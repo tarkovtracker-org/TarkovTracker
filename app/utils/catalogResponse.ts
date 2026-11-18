@@ -28,13 +28,13 @@ export async function fetchTarkovCatalog<T>(
   let snapshot: CatalogResponseSnapshot | undefined;
   const payload = await tarkovApiFetch<T>(endpoint, {
     ...options,
-    onResponse: ({ response }) => {
+    onResponse: async ({ response }) => {
       snapshot = {
         status: response.headers.get('x-cache-status'),
         release: response.headers.get('x-catalog-release'),
         purgeGeneration,
       };
-      options.onResponse?.({ response });
+      await options.onResponse?.({ response });
     },
   });
   if (snapshot && payload !== null && typeof payload === 'object')

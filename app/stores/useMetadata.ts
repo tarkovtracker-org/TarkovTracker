@@ -453,11 +453,25 @@ const finishTaskCoreRefresh = (
 };
 type CriticalCacheData = {
   scope: string;
+  purgeGeneration?: number;
   tasksCore: TarkovTasksCoreQueryResult;
   hideout: TarkovHideoutQueryResult;
   prestige: TarkovPrestigeQueryResult;
   editions: CachedEditions;
 };
+type CriticalCacheCandidate = {
+  scope: string;
+  purgeGeneration: number;
+  tasksCore: TarkovTasksCoreQueryResult | null;
+  hideout: TarkovHideoutQueryResult | null;
+  prestige: TarkovPrestigeQueryResult | null;
+  editions: CachedEditions | null;
+};
+const isCompleteCriticalCache = (
+  candidate: CriticalCacheCandidate
+): candidate is CriticalCacheData & { purgeGeneration: number } =>
+  [candidate.tasksCore, candidate.hideout, candidate.prestige].every(Boolean) &&
+  isProgressionCatalog(candidate.editions);
 type CachedEditions = {
   editions?: GameEdition[];
   storyChapters?: StoryChapter[];
@@ -554,7 +568,7 @@ type ProgressionCatalog = CachedEditions & {
   storyChapters: StoryChapter[];
 };
 const isProgressionCatalog = (
-  overlay: CachedEditions | undefined
+  overlay: CachedEditions | null | undefined
 ): overlay is ProgressionCatalog => {
   if (!overlay) return false;
   if (!Array.isArray(overlay.storyChapters)) return false;
@@ -648,7 +662,8 @@ const loadProgressionCatalog = async (
       `editions/${EDITIONS_CACHE_VERSION}-${context.mode}/en`
     );
     const { neutral: overlay, localized } = await fetchLocalizedMetadata(state, {
-      load: () => fetchProgressionCatalog(context.mode, context.forceRefresh, context.signal),
+      load: (fresh) =>
+        fetchProgressionCatalog(context.mode, context.forceRefresh || fresh, context.signal),
       language: context.language,
       signal: context.signal,
     });
@@ -837,6 +852,27 @@ export const useMetadataStore = defineStore('metadata', {
       buildPrestigeTaskMap(state.tasks, state.prestigeLevels),
   },
   actions: {
+    getCachePurgeGeneration(): number {
+      return observedObjectivePurgeTime(this);
+    },
+    getObjectiveCatalogCacheKey(mode: string): string {
+      return objectiveCatalogCacheKey(this, mode);
+    },
+    fetchCatalogResponse<T>(config: {
+      cacheType: CacheType;
+      endpoint: string;
+      query: Record<string, string>;
+      signal?: AbortSignal;
+      isCurrent: () => boolean;
+    }): Promise<FetchResponse<T>> {
+      return fetchMetadataForCache<T>(
+        this,
+        config.cacheType,
+        config.endpoint,
+        { signal: config.signal, query: config.query },
+        config.isCurrent
+      );
+    },
     async initialize(options?: { forceRefresh?: boolean; gameMode?: GameMode }) {
       const forceRefresh = options?.forceRefresh ?? false;
       const perfTimer = perfStart('[Metadata] initialize');
@@ -973,6 +1009,8 @@ export const useMetadataStore = defineStore('metadata', {
       try {
         const apiGameMode = this.getApiGameMode();
         const scope = `${apiGameMode}-${language}`;
+        await this.checkCachePurge();
+        const purgeGeneration = this.getCachePurgeGeneration();
         // Load all critical cache entries in parallel
         const [tasksCore, hideout, prestige, editions] = await Promise.all([
           getCachedData<TarkovTasksCoreQueryResult>(
@@ -992,18 +1030,11 @@ export const useMetadataStore = defineStore('metadata', {
           ),
           readCachedEditions(this, apiGameMode),
         ]);
-        if (
-          tasksCore &&
-          hideout &&
-          prestige &&
-          editions &&
-          Array.isArray(editions.editions) &&
-          editions.editions.every(isGameEdition) &&
-          Array.isArray(editions.storyChapters)
-        ) {
+        const bundle = { scope, purgeGeneration, tasksCore, hideout, prestige, editions };
+        if (isCompleteCriticalCache(bundle)) {
           logger.debug('[MetadataStore] Critical cache: ALL PRESENT');
-          const bundle = { scope, tasksCore, hideout, prestige, editions };
-          return translate ? await localizeMetadata(this, bundle, language) : bundle;
+          const localized = translate ? await localizeMetadata(this, bundle, language) : bundle;
+          return purgeGeneration === this.getCachePurgeGeneration() ? localized : null;
         }
         logger.debug('[MetadataStore] Critical cache: MISSING some entries');
         return null;
@@ -1204,12 +1235,15 @@ export const useMetadataStore = defineStore('metadata', {
         const { neutral: response, localized: localizedResponse } = await fetchLocalizedMetadata(
           this,
           {
-            load: () =>
+            load: (fresh) =>
               fetchMetadataForCache<T>(
                 this,
                 cacheType,
                 endpoint,
-                { signal: config.signal, query: effectiveQueryParams },
+                {
+                  signal: config.signal,
+                  query: fresh ? { ...effectiveQueryParams, cacheBust: '1' } : effectiveQueryParams,
+                },
                 isCurrentRequestContext
               ),
             language: requestLanguage,
@@ -1361,9 +1395,6 @@ export const useMetadataStore = defineStore('metadata', {
         (options.isOwner?.() ?? true);
       const { deferHeavy = false, cachedData = null } = options;
       const perfTimer = perfStart('[Metadata] fetchAllData', { forceRefresh, deferHeavy });
-      this.checkCachePurge().catch((err) =>
-        logger.warn('[MetadataStore] Background cache purge check failed:', err)
-      );
       // Run cleanup once per session
       if (typeof window !== 'undefined') {
         cleanupExpiredCache().catch((err) =>
@@ -1377,6 +1408,11 @@ export const useMetadataStore = defineStore('metadata', {
       let editionsPromise: Promise<void> = Promise.resolve();
       let tasksCorePromise: Promise<void>;
       try {
+        await this.checkCachePurge().catch((err) =>
+          logger.warn('[MetadataStore] Cache purge check failed:', err)
+        );
+        throwIfAborted(options.signal);
+        if (!isCurrent()) return;
         const cacheApplied =
           !forceRefresh && cachedData !== null && this.applyCriticalCachedData(cachedData);
         await this.fetchBootstrapData(forceRefresh, options.signal);
@@ -1439,7 +1475,8 @@ export const useMetadataStore = defineStore('metadata', {
       const itemsLitePromise = this.fetchItemsLiteData(forceRefresh, options.signal);
       void itemsLitePromise.catch(() => {});
       let taskObjectivesPromise: Promise<void> = Promise.resolve();
-      if (this.tasks.length && deferHeavy) {
+      const deferTaskHydration = this.tasks.length > 0 && deferHeavy;
+      if (deferTaskHydration) {
         queueIdleTask(
           () =>
             isCurrent()
@@ -1459,7 +1496,7 @@ export const useMetadataStore = defineStore('metadata', {
         void taskObjectivesPromise.catch(() => {});
       }
       // Only defer non-critical task rewards
-      if (this.tasks.length && deferHeavy) {
+      if (deferTaskHydration) {
         const rewardsRequestVersion = promiseStore.taskRewardsRequestVersion;
         queueIdleTask(
           () => {
@@ -2144,6 +2181,7 @@ export const useMetadataStore = defineStore('metadata', {
       );
     },
     applyCriticalCachedData(cachedData: CriticalCacheData): boolean {
+      if ((cachedData.purgeGeneration ?? 0) !== this.getCachePurgeGeneration()) return false;
       const scope = `${this.getApiGameMode()}-${this.languageCode}`;
       if (cachedData.scope !== scope || !cachedData.editions.editions?.every(isGameEdition))
         return false;

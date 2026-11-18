@@ -390,12 +390,16 @@ export async function setCachedData<T>(
       version: CACHE_CONFIG.DB_VERSION,
       sizeBytes,
     };
+    let stored = false;
     await executeDatabaseTransaction<undefined>(
       'readwrite',
-      (store) => (isCurrent() ? store.put(cacheEntry) : store.getKey(cacheKey)),
+      (store) => {
+        stored = isCurrent();
+        return stored ? store.put(cacheEntry) : store.getKey(cacheKey);
+      },
       `set ${type}`
     );
-    logger.debug(`[TarkovCache] Cache STORED: ${cacheKey}`);
+    if (stored) logger.debug(`[TarkovCache] Cache STORED: ${cacheKey}`);
   } catch (error) {
     logger.error('[TarkovCache] Error storing cached data:', error);
     throw error;

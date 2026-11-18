@@ -80,6 +80,8 @@ describe('useMetadataStore fetchEditionsData', () => {
           })[type as 'editions'] as never
       );
       const cached = await store.loadCriticalCacheData();
+      for (const type of ['tasks-core', 'hideout', 'prestige', 'editions'])
+        expect(read).toHaveBeenCalledWith(type, 'neutral-v1-regular', 'en');
       expect(cached?.editions.editions?.[0]?.id).toBe('current');
       expect(cached).not.toBeNull();
       store.applyCriticalCachedData(cached!);
