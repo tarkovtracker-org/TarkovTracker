@@ -174,6 +174,7 @@ const AppTooltipStub = {
   template: '<span><slot /></span>',
 };
 const QuestObjectivesStub = {
+  props: ['objectives'],
   template: '<div data-testid="task-objectives" />',
 };
 const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
@@ -195,7 +196,6 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
         ContextMenuItem: ContextMenuItemStub,
         NuxtImg: true,
         QuestObjectives: QuestObjectivesStub,
-        QuestObjectivesSkeleton: { template: '<div data-testid="objectives-skeleton" />' },
         TaskCardActions: TaskCardActionsStub,
         TaskCardBackground: TaskCardBackgroundStub,
         TaskCardBadges: TaskCardBadgesStub,
@@ -233,18 +233,26 @@ describe('TaskCard appearance and expansion controls', () => {
   it('offers a retry on a cold card and shows recovered objectives in place', async () => {
     metadataStoreMock.tasksObjectivesError = new Error('offline');
     metadataStoreMock.tasksObjectivesHydrated = false;
+    const cachedTask = reactive<Task>({ id: 'task-1', objectives: [] });
+    metadataStoreMock.getTaskById.mockImplementation(() => cachedTask);
+    metadataStoreMock.fetchTaskObjectivesData.mockImplementationOnce(() => {
+      metadataStoreMock.tasksObjectivesError = null;
+      metadataStoreMock.tasksObjectivesHydrated = true;
+      cachedTask.objectives = [{ id: 'restored' }];
+    });
     const wrapper = await mountTaskCard();
     const objectives = wrapper.get('#objectives-content-task-1');
-    expect(objectives.find('[data-testid="objectives-skeleton"]').exists()).toBe(false);
+    expect(objectives.get('[role="status"]').text()).toBe(
+      en.page.tasks.questcard.objectives_load_error
+    );
     const retry = objectives.get('button');
     expect(retry.text()).toBe(en.common.retry);
     await retry.trigger('click');
     expect(metadataStoreMock.fetchTaskObjectivesData).toHaveBeenCalledExactlyOnceWith();
-    await wrapper.setProps({
-      task: { ...wrapper.props('task'), objectives: [{ id: 'restored' }] },
-    });
     expect(objectives.find('button').exists()).toBe(false);
-    expect(objectives.find('[data-testid="task-objectives"]').exists()).toBe(true);
+    expect(wrapper.getComponent(QuestObjectivesStub).props('objectives')).toEqual([
+      { id: 'restored' },
+    ]);
     wrapper.unmount();
   });
   it('discloses completed objectives manually and responds to preference and completion changes', async () => {

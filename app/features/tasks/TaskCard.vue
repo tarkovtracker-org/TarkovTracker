@@ -235,24 +235,11 @@
               :id="`objectives-content-${task.id}`"
               :class="compactClasses.objectivesBody"
             >
-              <div
-                v-if="showObjectivesSkeleton && metadataStore.tasksObjectivesError"
-                class="flex items-center gap-2"
-              >
-                <span role="status">{{ t('page.tasks.questcard.objectives_load_error') }}</span>
-                <UButton
-                  size="xs"
-                  variant="soft"
-                  @click.stop="metadataStore.fetchTaskObjectivesData()"
-                >
-                  {{ t('common.retry') }}
-                </UButton>
-              </div>
-              <QuestObjectivesSkeleton
-                v-else-if="showObjectivesSkeleton"
+              <QuestObjectivesPlaceholder
+                v-if="showObjectivesPlaceholder"
+                :error="metadataStore.tasksObjectivesError"
                 :objectives="relevantViewObjectives"
-                :irrelevant-count="irrelevantObjectives.length"
-                :uncompleted-irrelevant="uncompletedIrrelevantObjectives.length"
+                @retry="metadataStore.fetchTaskObjectivesData()"
               />
               <QuestObjectives
                 v-else
@@ -360,7 +347,7 @@
   import { useTaskHiding } from '@/features/tasks/composables/useTaskHiding';
   import { useTaskRequirements } from '@/features/tasks/composables/useTaskRequirements';
   import QuestObjectives from '@/features/tasks/QuestObjectives.vue';
-  import QuestObjectivesSkeleton from '@/features/tasks/QuestObjectivesSkeleton.vue';
+  import QuestObjectivesPlaceholder from '@/features/tasks/QuestObjectivesPlaceholder.vue';
   import { formatExpectedStatuses } from '@/features/tasks/requirement-format';
   import { impactEligibleTaskIdsKey } from '@/features/tasks/task-context';
   import {
@@ -827,7 +814,7 @@
   const uncompletedIrrelevantObjectives = computed(
     () => categorizedObjectives.value.uncompletedIrrelevant
   );
-  const showObjectivesSkeleton = computed(() => {
+  const showObjectivesPlaceholder = computed(() => {
     // If we have objectives (from props or store fallback), no skeleton needed
     if (taskObjectives.value.length > 0) return false;
     // No objectives yet - show skeleton while loading or not yet hydrated
