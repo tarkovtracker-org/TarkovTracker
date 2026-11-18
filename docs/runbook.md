@@ -1459,7 +1459,9 @@ plus three independently validated whole English import snapshots. Follow the
    imports. It checks raw response digest/length, release timestamp, precompute
    source, cache policy, and overlay identity, retrying one concurrent release
    change. A `STALE` fallback does not certify the active release.
-6. Purge browser game metadata with the existing Tarkov data purge workflow, then
+6. Wait at least 90 seconds after the successful producer readback, then confirm
+   the same release is still active. If it changed, verify the new release and
+   restart the wait. Purge browser metadata with **Purge Game Data**, then
    measure the uncached language switch and return to a fresh cached language.
    Require one `strings` request and zero game-data requests respectively. Check
    mode-specific objective translations with stable task/objective IDs. Retain

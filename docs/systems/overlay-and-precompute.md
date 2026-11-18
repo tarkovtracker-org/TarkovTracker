@@ -362,7 +362,10 @@ catalog cache and does not read these Pages catalog objects.
 5. Promote the Tracker reader only after those objects are available in the
    production namespace. Run `pnpm run verify:overlay` against production and
    require all 43 scopes and three imports to be current.
-6. Purge browser game metadata through the existing Tarkov data purge workflow.
+6. Allow at least 90 seconds after the producer confirms the active pointer write
+   before purging browser metadata. This covers the default 60-second KV read cache
+   in other colos. Recheck the intended manifest immediately before the Tarkov data
+   purge. If publication changed, verify the new release and restart the wait.
    Measure a first switch into an uncached language and a return to a fresh cached
    language. Require one strings request and zero game-data requests respectively,
    with mode-specific objective text and stable IDs in each mode.

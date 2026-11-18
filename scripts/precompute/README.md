@@ -36,8 +36,9 @@ Those temporary entries are outside the neutral release contract.
 4. Inspect the uploaded `overlay-precompute-manifest` artifact. Require the matching
    `catalogRelease.overlaySha`, every catalog/language scope, successful readbacks,
    and all three import results before promoting the new reader.
-5. Verify production with `pnpm run verify:overlay`, invalidate browser metadata
-   through the existing Tarkov data purge, and record the language-switch evidence.
+5. Verify production with `pnpm run verify:overlay`. Allow 90 seconds after the
+   successful pointer readback for KV propagation. Recheck the intended release
+   before using **Purge Game Data**, then record the language-switch evidence.
 
 A filtered maintenance run leaves the neutral manifest untouched. Preview namespaces
 need their own complete release and imports. Use a reviewed producer with the
