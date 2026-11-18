@@ -211,6 +211,8 @@
     "tarkov_cache_purged_description": "Tarkov data cache has been cleared. Users will receive fresh data.",
     "full_cache_purged_title": "Full Cache Purged",
     "full_cache_purged_description": "All cached content has been cleared from Cloudflare.",
+    "purge_audit_failed_title": "Cache Cleared With a Warning",
+    "purge_audit_failed_description": "Cloudflare cleared the cache, but the audit record could not be saved. Some users may still see stale game data.",
     "purge_failed_title": "Purge Failed",
     "purge_failed_description": "Failed to purge cache",
     "audit_log_title": "Admin Audit Log",

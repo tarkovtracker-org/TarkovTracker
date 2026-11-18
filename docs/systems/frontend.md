@@ -187,6 +187,11 @@ upstream failures have stable codes. `useEdgeFunctions` preserves the response e
 `data`; `AdminCacheCard` maps recognized codes through `admin.error.*` and uses a generic localized
 fallback for older or unknown errors. Upstream purge details remain in server logs.
 
+If Cloudflare clears the cache and the audit insert fails, the function returns HTTP 200 with
+`success: true` and `auditWriteFailed: true`. `AdminCacheCard` warns that the audit record is missing
+and leaves the last recorded purge timestamp alone. The audit row drives browser and objective
+Worker cache generation updates for Tarkov data.
+
 ## Boot-time asset-failure recovery
 
 **Summary**: When a hashed chunk or the entry module fails to load — for example, a stale

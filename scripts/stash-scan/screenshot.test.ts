@@ -44,7 +44,7 @@ async function decode(bytes: Buffer): Promise<RgbImage> {
     .toBuffer({ resolveWithObject: true });
   return { data, width: info.width, height: info.height };
 }
-function region(image: RgbImage, rect: ScanRect, key = 0): ScanCell {
+function region(image: RgbImage, rect: ScanRect): ScanCell {
   const matched = matchCell(
     cellFeatures(image, rect.x, rect.y, rect.width, rect.height, rect.slotsWide, rect.slotsHigh),
     index
@@ -54,7 +54,7 @@ function region(image: RgbImage, rect: ScanRect, key = 0): ScanCell {
   const count = readStackCount(image, rect, fir && mark.lift <= 2);
   return {
     ...rect,
-    key,
+    key: 0,
     empty: matched.empty,
     margin: matched.margin,
     candidates: matched.matches,
@@ -70,16 +70,23 @@ describe('user-supplied 1440p demo screenshot', () => {
     const grid = detectGrid(image);
     expect(grid.pitch).toBe(84);
     expect(grid.cells.length).toBeGreaterThanOrEqual(155);
-    const rows = grid.cells.map((rect, key) => reviewCell(region(image, rect, key), items));
-    const counts = [
-      ['6a317b9692cfdcddcb02a58e', 1],
-      ['6a3181f178450ec91c0ea1aa', 2],
-      ['6a31824878450ec91c0ea1ae', 4],
-      ['6a3182dc6cd8de21cf0a3a7d', 1],
-      ['6a31830dde69ceafd805afa0', 2],
+    // Use the detected rectangles at the five known locations in this exact PNG.
+    const documents = [
+      { x: 747, y: 872, itemId: '6a317b9692cfdcddcb02a58e', quantity: 1 },
+      { x: 831, y: 872, itemId: '6a3181f178450ec91c0ea1aa', quantity: 2 },
+      { x: 1167, y: 872, itemId: '6a31824878450ec91c0ea1ae', quantity: 4 },
+      { x: 1503, y: 872, itemId: '6a3182dc6cd8de21cf0a3a7d', quantity: 1 },
+      { x: 1587, y: 872, itemId: '6a31830dde69ceafd805afa0', quantity: 2 },
     ] as const;
-    for (const [itemId, quantity] of counts)
-      expect(rows.find((row) => row.itemId === itemId)).toMatchObject({ quantity, reviewed: true });
+    for (const { x, y, itemId, quantity } of documents) {
+      const rect = grid.cells.find((cell) => cell.x === x && cell.y === y);
+      expect(rect, `expected a detected document cell at (${x}, ${y})`).toBeDefined();
+      expect(reviewCell(region(image, rect!), items)).toMatchObject({
+        itemId,
+        quantity,
+        reviewed: true,
+      });
+    }
   });
   it('matches meds on both current framing and a cleanly rendered label', async () => {
     const row = reviewCell(region(await decode(source), medsRect), items);
