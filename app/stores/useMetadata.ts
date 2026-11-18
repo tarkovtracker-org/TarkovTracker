@@ -315,6 +315,7 @@ interface MetadataState {
   prestigeLoading: boolean;
   editionsLoading: boolean;
   error: Error | null;
+  tasksObjectivesError: Error | null;
   hideoutError: Error | null;
   itemsError: Error | null;
   mapSpawnsError: Error | null;
@@ -618,6 +619,7 @@ export const useMetadataStore = defineStore('metadata', {
     prestigeLoading: false,
     editionsLoading: false,
     error: null,
+    tasksObjectivesError: null,
     hideoutError: null,
     itemsError: null,
     mapSpawnsError: null,
@@ -965,6 +967,7 @@ export const useMetadataStore = defineStore('metadata', {
         | 'editionsLoading';
       errorKey?:
         | 'error'
+        | 'tasksObjectivesError'
         | 'hideoutError'
         | 'itemsError'
         | 'mapSpawnsError'
@@ -1028,6 +1031,7 @@ export const useMetadataStore = defineStore('metadata', {
         | 'editionsLoading';
       errorKey?:
         | 'error'
+        | 'tasksObjectivesError'
         | 'hideoutError'
         | 'itemsError'
         | 'mapSpawnsError'
@@ -1548,6 +1552,7 @@ export const useMetadataStore = defineStore('metadata', {
         },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'tasksObjectivesPending',
+        errorKey: 'tasksObjectivesError',
         processData: (data, response) => {
           const currentKey = objectiveCatalogCacheKey(this, requestGameMode);
           if (!response && cacheKey !== currentKey) return;
@@ -2151,6 +2156,7 @@ export const useMetadataStore = defineStore('metadata', {
         traders: data.traders?.length ?? 0,
       });
       this.tasksObjectivesPending = (data.tasks?.length ?? 0) > 0;
+      this.tasksObjectivesError = null;
       this.tasksObjectivesHydrated = false;
       this.tasksRewardsHydrated = false;
       this.objectiveModeCountDifferences = markRaw({});
@@ -2693,6 +2699,7 @@ export const useMetadataStore = defineStore('metadata', {
       this.objectiveModeCountDifferencesHydrated = false;
       getPromiseStore(this).taskCatalogEpoch += 1;
       this.tasksObjectivesPending = false;
+      this.tasksObjectivesError = null;
       this.tasksObjectivesHydrated = false;
       this.tasksRewardsHydrated = false;
       this.mapSpawnsLoaded = false;
