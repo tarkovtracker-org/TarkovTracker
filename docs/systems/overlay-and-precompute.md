@@ -106,7 +106,7 @@ locale-only correction in the [overlay locale source directory](https://github.c
 entity name, previous value, and supporting evidence. Run overlay validation,
 tests, typecheck, and build. Submit sources and let the overlay release workflow
 publish both generated artifacts. The complete producer contract is in the overlay
-repository�s [neutral overlay guide](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/NEUTRAL_OVERLAY.md). `OVERLAY_URL` and
+repository's [neutral overlay guide](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/NEUTRAL_OVERLAY.md). `OVERLAY_URL` and
 `NEUTRAL_OVERLAY_URL` can select the matching legacy and neutral artifacts. Pin
 both to the same immutable release or source revision when overriding defaults.
 
