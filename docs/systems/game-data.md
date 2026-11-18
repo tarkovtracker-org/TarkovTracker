@@ -42,9 +42,10 @@ from `SUPPORTED_LOCALES` and `LOCALE_TO_API_MAPPING`.
 | `/api/tarkov/access-check`         | operational      | Browser clearance probe                                  |
 
 The ten neutral datasets accept `gameMode`; their release keys have no language
-component. `strings?lang=` covers all modes in one response. Every neutral catalog
-and strings response has `Cache-Control: no-store`, `X-Cache-Status: PRECOMPUTE`,
-and `X-Catalog-Release`. Overlay-bearing scopes also include overlay identity
+component. `strings?lang=` covers all modes in one response. Fresh production catalog and strings responses carry
+`Cache-Control: no-store`, `X-Cache-Status: PRECOMPUTE`, and `X-Catalog-Release`.
+A last-good response carries `X-Cache-Status: STALE`. The development builder
+returns its result directly without the production snapshot headers. Overlay-bearing scopes also include overlay identity
 headers. Bootstrap and map-spawns are upstream-only and have no `dataOverlay`.
 
 Every GET endpoint has an explicit HEAD counterpart. Unknown `/api/tarkov/*`

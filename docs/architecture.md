@@ -407,7 +407,7 @@ for the server's `Retry-After` delay. An ordinary probe
 failure rejects its callers without showing the gate, and the next request probes again.
 Gated GETs keep `$fetch`'s single transient retry. Shared-profile loads start their request budget after access is released.
 Cloudflare owns clearance; application
-verification does not authorize CDN hits. The clearance gate runs before catalog reads.
+verification does not authorize CDN hits. When enabled, the browser client checks clearance before requesting a catalog. Server-side callers and direct public reads do not use this client gate.
 
 Game data is prepared from `json.tarkov.dev` by the scheduled producer, then served
 through Nuxt snapshot readers. Internal modes map to upstream endpoints as

@@ -66,18 +66,19 @@ reasons without raw private payloads. Missing data or any failed check exits non
 
 ## Files
 
-| File                        | Responsibility                                                  |
-| --------------------------- | --------------------------------------------------------------- |
-| `run.ts`                    | Trusted CLI entry point and run diagnostics                     |
-| `catalog-release.ts`        | Immutable neutral object staging, readback, complete activation |
-| `import-snapshots.ts`       | Whole English snapshot generation and validation                |
-| `kv.ts`                     | Bounded KV REST reads and writes                                |
-| `check-overlay.ts`          | End-to-end served-release and import verification               |
-| `verify-catalog-release.ts` | Exact scope, provenance, bytes, headers, and timestamp checks   |
-| `verify-overlay.ts`         | Import comparison and historical localized-fleet comparison     |
-| `nuxt-imports.ts`           | Stand-in for Nuxt auto-imports in standalone scripts            |
-| `tsconfig.json`             | Script TypeScript settings                                      |
-| `__tests__/`                | Producer and verifier regression tests                          |
+| File                        | Responsibility                                                           | Run by                                         |
+| --------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| `run.ts`                    | Trusted CLI and publication diagnostics                                  | Precompute Tarkov Data workflow                |
+| `precompute.ts`             | Legacy localized publication during migration, TTL and filter validation | run.ts and snapshot producers                  |
+| `catalog-release.ts`        | Immutable object staging, readback, and pointer activation               | run.ts                                         |
+| `import-snapshots.ts`       | Whole English import generation and validation                           | run.ts                                         |
+| `kv.ts`                     | Bounded KV reads and writes                                              | run.ts and catalog-release.ts                  |
+| `check-overlay.ts`          | Served-release and import verification                                   | pnpm run verify:overlay                        |
+| `verify-catalog-release.ts` | Exact scope, digest, headers, age and source checks                      | check-overlay.ts                               |
+| `verify-overlay.ts`         | Whole English import comparison and freshness window                     | check-overlay.ts and verify-catalog-release.ts |
+| `nuxt-imports.ts`           | Standalone Nuxt import shim                                              | Script TypeScript configuration                |
+| `tsconfig.json`             | Standalone module aliases and compiler settings                          | tsx and tsc                                    |
+| `__tests__/`                | Producer and verifier regressions                                        | Vitest                                         |
 
 The complete architecture and release rules are in
 [Overlay and precompute](../../docs/systems/overlay-and-precompute.md#precompute-workflow).

@@ -13,7 +13,8 @@ import { validateGameMode } from '@/server/utils/tarkov-cache-config';
 import { CATALOG_LANGUAGES, CATALOG_MANIFEST_KEY } from '@/utils/catalogDatasets';
 import type { CatalogDataset, CatalogRelease } from '@/utils/catalogDatasets';
 function catalogLanguage(input: unknown) {
-  const lang = typeof input === 'string' ? input.toLowerCase() : 'en';
+  const first = Array.isArray(input) ? input[0] : input;
+  const lang = typeof first === 'string' ? first.toLowerCase() : 'en';
   return CATALOG_LANGUAGES.includes(lang) ? lang : 'en';
 }
 const logger = createLogger('CatalogSnapshot');

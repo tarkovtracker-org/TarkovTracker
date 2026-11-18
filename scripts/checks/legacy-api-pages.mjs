@@ -269,7 +269,25 @@ test('compiled production readers serve all 43 immutable catalog objects with ex
   const response = await harness.fetch('https://tarkovtracker.org/api/tarkov/overlay-status');
   assert.equal(response.status, 200);
   const manifest = await response.json();
-  assert.equal(Object.keys(manifest.entries).length, 43);
+  const datasets = [
+    'bootstrap',
+    'tasks-core',
+    'tasks-objectives',
+    'tasks-rewards',
+    'hideout',
+    'items-lite',
+    'items',
+    'prestige',
+    'editions',
+    'map-spawns',
+  ];
+  const modes = ['regular', 'pve', 'pvp-season'];
+  const languages = ['cs', 'de', 'en', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'tr', 'zh'];
+  const expected = [
+    ...datasets.flatMap((dataset) => modes.map((mode) => `${dataset}/${mode}`)),
+    ...languages.map((lang) => `strings/${lang}`),
+  ];
+  assert.deepEqual(Object.keys(manifest.entries).sort(), expected.sort());
   assert.equal(manifest.overlaySha, 'a'.repeat(64));
   for (const [scope, entry] of Object.entries(manifest.entries))
     await assertCatalogObject(scope, entry, manifest);

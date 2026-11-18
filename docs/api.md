@@ -184,8 +184,15 @@ Fetches core task data (tasks, maps, traders) without objectives or rewards.
         "minPlayerLevel": 1
       }
     ],
-    "maps": [],
-    "traders": []
+    "maps": [
+      { "id": "55f2d3fd4bdc2d5f408b4567", "name": "@tt:regular:maps:55f2d3fd4bdc2d5f408b4567 Name" }
+    ],
+    "traders": [
+      {
+        "id": "54cb50c76803fa8b248b4571",
+        "name": "@tt:regular:traders:54cb50c76803fa8b248b4571 Nickname"
+      }
+    ]
   }
 }
 ```

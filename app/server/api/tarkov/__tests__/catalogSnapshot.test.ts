@@ -70,6 +70,12 @@ describe('catalog snapshot routes', () => {
       key,
     ]);
   });
+  it('uses the first language when the strings query repeats it', async () => {
+    const { request } = serve('strings', 'strings/de');
+    const response = await request(new Request('https://example.test/?lang=de&lang=en'));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(body);
+  });
   it('selects one German table across game modes', async () => {
     const { request } = serve('strings', 'strings/de');
     for (const mode of ['pve', 'pvp-season', 'regular']) {

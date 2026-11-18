@@ -141,8 +141,10 @@ catalog generation uses `neutralOverlay.ts` and publishes immutable results.
   overlay keeps an id-less `{ name, prestigeLevel }` reference verbatim, so it is not a loss and gets
   no diagnostic; only a declared gate the normalization had to drop becomes a
   `requirementDiagnostics` entry ([canonical task progression](./tasks.md#canonical-task-progression)).
-- The legacy loader can retain its last-good overlay after a fetch failure. A failed
-  neutral build keeps the prior activated release available.
+- The legacy loader can retain its last-good overlay after a fetch failure. Failure before the neutral
+  manifest is written leaves the previous release active. A failed readback after
+  the write leaves the new pointer potentially active. Verify its release identity
+  and served objects before retrying or promoting a reader.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
 - In the legacy artifact, `locales[locale]` patches fields after shared and mode
   corrections. The neutral sidecar compiles those corrections into key overrides
