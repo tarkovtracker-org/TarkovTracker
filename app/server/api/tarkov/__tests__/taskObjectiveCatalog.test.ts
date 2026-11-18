@@ -147,6 +147,11 @@ describe('objective catalog cache admission', () => {
         fetchedAt: new Date(purgedAt + 1000).toISOString(),
       });
     }
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining(`tarkovPurge=${purgedAt}`),
+      expect.objectContaining({ cache: 'no-store' })
+    );
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
   it.each(['regular', 'pve', 'pvp-season'])(

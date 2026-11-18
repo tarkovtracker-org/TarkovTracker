@@ -1,8 +1,8 @@
+import { TASK_OBJECTIVES_PURGE_CHECK_TTL_MS } from '@/utils/taskCatalogCache';
 import type { H3Event } from 'h3';
 import { normalizeSupabaseUrl } from '~/server/utils/adminSupabase';
 import { createLogger } from '~/server/utils/logger';
 const logger = createLogger('TarkovCacheMeta');
-const PURGE_CHECK_TTL_MS = 60_000;
 let purgeTime = 0;
 let nextPurgeCheckAt = 0;
 let purgeCheck: Promise<number> | undefined;
@@ -116,7 +116,7 @@ export function getTarkovCachePurgeTime(event: H3Event): Promise<number> {
       return purgeTime;
     })
     .finally(() => {
-      nextPurgeCheckAt = Date.now() + PURGE_CHECK_TTL_MS;
+      nextPurgeCheckAt = Date.now() + TASK_OBJECTIVES_PURGE_CHECK_TTL_MS;
       purgeCheck = undefined;
     });
   return purgeCheck;

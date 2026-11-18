@@ -22,6 +22,7 @@ import {
   getPromiseRequestKeyStore,
   getPromiseStore,
 } from '@/stores/tarkov/promiseStore';
+import { delay } from '@/utils/async';
 import {
   API_GAME_MODES,
   API_SUPPORTED_LANGUAGES,
@@ -54,7 +55,10 @@ import {
   getCachedData,
   setCachedData,
 } from '@/utils/tarkovCache';
-import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
+import {
+  TASK_OBJECTIVES_CACHE_VERSION,
+  TASK_OBJECTIVES_PURGE_CHECK_TTL_MS,
+} from '@/utils/taskCatalogCache';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   FinishRewards,
@@ -1458,7 +1462,11 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * Fetch task objectives and fail conditions data
      */
-    async fetchTaskObjectivesData(forceRefresh = false, signal?: AbortSignal) {
+    async fetchTaskObjectivesData(
+      forceRefresh = false,
+      signal?: AbortSignal,
+      retryStaleOverlay = true
+    ): Promise<void> {
       throwIfAborted(signal);
       const promises = getPromiseStore(this);
       if (promises.cachePurgePromise) {
@@ -1482,6 +1490,7 @@ export const useMetadataStore = defineStore('metadata', {
         );
         return;
       }
+      let needsRetry = false;
       await this.fetchWithCache<TarkovTaskObjectivesQueryResult>({
         cacheType: 'tasks-objectives' as CacheType,
         cacheKey,
@@ -1496,7 +1505,10 @@ export const useMetadataStore = defineStore('metadata', {
         loadingKey: 'tasksObjectivesPending',
         processData: (data, response) => {
           if (cacheKey !== objectiveCatalogCacheKey(this, requestGameMode)) return;
-          if (response && !hasCurrentObjectiveOverlay(this, response)) return;
+          if (response && !hasCurrentObjectiveOverlay(this, response)) {
+            needsRetry = true;
+            return;
+          }
           promises.taskObjectiveHydrationScope = requestKey;
           this.mergeTaskObjectives(data.tasks, {
             rebuildDerivedData: false,
@@ -1520,6 +1532,20 @@ export const useMetadataStore = defineStore('metadata', {
         promiseKey: 'taskObjectivesPromise',
         promiseRequestKey: requestKey,
       });
+      if (needsRetry && retryStaleOverlay) {
+        await this.retryTaskObjectiveCatalog(requestLanguage, requestGameMode, signal);
+      }
+    },
+    async retryTaskObjectiveCatalog(
+      language: string,
+      gameMode: string,
+      signal?: AbortSignal
+    ): Promise<void> {
+      // Allow a warm Worker to re-read the purge marker before trying once more.
+      await delay(TASK_OBJECTIVES_PURGE_CHECK_TTL_MS + 5000, signal);
+      if (language === this.languageCode && gameMode === this.getApiGameMode()) {
+        await this.fetchTaskObjectivesData(false, signal, false);
+      }
     },
     async fetchObjectiveModeCountDifferences(forceRefresh = false, signal?: AbortSignal) {
       throwIfAborted(signal);

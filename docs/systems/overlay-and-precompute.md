@@ -150,10 +150,13 @@ HTTP responses use `no-store` so the CDN and browser HTTP caches cannot bypass t
 Objective hydration waits for any in-flight browser purge check before using local data. The
 client keys its local objective entries and count memo by the observed purge timestamp, which it
 keeps in memory even when persisting the marker fails.
-It only applies or persists a network catalog whose overlay was fetched at or after that timestamp.
-After a scoped Tarkov data purge, the next generation requires an overlay fetched since that purge
-and returns 503 if it cannot refresh. Older generations expire on their existing retention
-schedule. A background refresh failure still retains a good stale entry in the current generation.
+It only applies or persists a network catalog whose overlay was fetched for the active purge
+generation. When a warm Worker still sends an older catalog, the browser makes one retry after
+the Worker's one-minute marker check interval. After a scoped Tarkov data purge, the next
+generation uses a purge-specific upstream overlay URL with HTTP caching disabled. The request
+can use up to five seconds for overlay refresh and returns 503 if it cannot refresh. Older
+generations expire on their existing retention schedule. A background refresh failure retains a
+good stale entry in the current generation.
 Other objective consumers may omit the query version and still use the current Worker key.
 Core KV release keys and objective precompute are unaffected.
 

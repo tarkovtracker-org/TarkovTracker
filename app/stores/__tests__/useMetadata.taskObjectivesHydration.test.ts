@@ -1,6 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMetadataStore } from '@/stores/useMetadata';
+import * as asyncUtils from '@/utils/async';
 import { GAME_MODES } from '@/utils/constants';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import * as cacheUtils from '@/utils/tarkovCache';
@@ -101,6 +102,30 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
       catalog.data,
       expect.any(Number)
     );
+  });
+  it('retries once when a warm Worker returns the prior purge generation', async () => {
+    const wait = vi.spyOn(asyncUtils, 'delay').mockResolvedValue();
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, '2025-01-03T00:00:00Z');
+    const store = useMetadataStore();
+    store.tasks = [{ id: 'task-1', objectives: [] }] as Task[];
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
+    const catalog = {
+      data: {
+        tasks: [{ id: 'task-1', failConditions: [], objectives: [{ id: 'bunker', count: 3 }] }],
+      },
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ...catalog, dataOverlay: { fetchedAt: '2025-01-02T00:00:00Z' } })
+      .mockResolvedValueOnce({ ...catalog, dataOverlay: { fetchedAt: '2025-01-04T00:00:00Z' } });
+    vi.stubGlobal('$fetch', fetchMock);
+    await store.fetchTaskObjectivesData();
+    expect(wait).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(store.tasks[0]?.objectives?.[0]?.id).toBe('bunker');
+    expect(store.tasksObjectivesHydrated).toBe(true);
   });
   it('reports handled count failures without marking them stale', async () => {
     const store = useMetadataStore();
