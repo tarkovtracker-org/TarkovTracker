@@ -67,7 +67,7 @@ async function logAdminAction(
   action: string,
   details: Record<string, unknown>,
   req: Request
-): Promise<boolean> {
+): Promise<{ auditWriteFailed?: true }> {
   try {
     const ipAddress =
       req.headers.get('cf-connecting-ip') ||
@@ -82,10 +82,10 @@ async function logAdminAction(
       user_agent: userAgent,
     });
     if (error) throw error;
-    return true;
+    return {};
   } catch (error) {
     console.error('[admin-cache-purge] Failed to log audit action:', error);
-    return false;
+    return { auditWriteFailed: true };
   }
 }
 function errorResponse(code: number, message: string): CloudflarePurgeResponse {
@@ -357,7 +357,7 @@ Deno.serve(async (req) => {
     if (purgeType === 'twitch-config' && purgeResult.success) {
       scheduleBackgroundTask(() => repurgeTwitchConfigCache(zoneId, apiToken, baseUrl));
     }
-    const auditWritten = await logAdminAction(
+    const auditResult = await logAdminAction(
       supabase,
       user.id,
       PURGE_AUDIT_ACTION[purgeType],
@@ -386,7 +386,7 @@ Deno.serve(async (req) => {
         purgeType: purgeType,
         cloudflareResultId: purgeResult.result?.id,
         timestamp: new Date().toISOString(),
-        ...(!auditWritten && { auditWriteFailed: true }),
+        ...auditResult,
       },
       200,
       req

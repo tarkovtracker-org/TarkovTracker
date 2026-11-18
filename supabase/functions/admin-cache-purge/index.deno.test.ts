@@ -109,6 +109,9 @@ Deno.test('admin-cache-purge reports the cache and audit outcomes', async (t) =>
         assertEquals(body.auditWriteFailed, true);
         assertEquals(JSON.stringify(body).includes('private audit detail'), false);
         assertEquals(errorLog.calls.length, logsBefore + 1);
+        const [message, error] = errorLog.calls[logsBefore].args;
+        assertEquals(message, '[admin-cache-purge] Failed to log audit action:');
+        assertEquals(error?.message, 'private audit detail');
       });
     }
     await t.step(

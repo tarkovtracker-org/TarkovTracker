@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive, ref } from 'vue';
 import AdminCacheCard from '@/features/admin/AdminCacheCard.vue';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { PurgeCacheResponse } from '@/types/edge';
 const purgeCacheMock = vi.fn(
   async (purgeType: PurgeCacheResponse['purgeType']): Promise<PurgeCacheResponse> => ({
@@ -89,8 +90,12 @@ const mountCard = () => {
 describe('AdminCacheCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    purgeCacheMock.mockReset();
     systemStoreState.isAdmin = true;
     supabaseUser.loggedIn = true;
+  });
+  afterEach(() => {
+    localStorage.removeItem(STORAGE_KEYS.adminLastPurge);
   });
   it('requires confirmation before purging all cache', async () => {
     const wrapper = mountCard();
@@ -107,6 +112,12 @@ describe('AdminCacheCard', () => {
   it.each(['tarkov-data', 'all'] as const)(
     'warns when the %s purge audit is missing',
     async (purgeType) => {
+      const previousPurge = JSON.stringify({
+        type: 'Tarkov data',
+        timestamp: '2026-02-23T00:00:00.000Z',
+        expiresAt: Date.now() + 60_000,
+      });
+      localStorage.setItem(STORAGE_KEYS.adminLastPurge, previousPurge);
       purgeCacheMock.mockResolvedValueOnce({
         success: true,
         message: 'Cache purged',
@@ -115,6 +126,8 @@ describe('AdminCacheCard', () => {
         auditWriteFailed: true,
       });
       const wrapper = mountCard();
+      await flushPromises();
+      expect(wrapper.text()).toContain('admin.last_purge_description');
       const click = (label: string) =>
         wrapper
           .findAll('button')
@@ -133,7 +146,8 @@ describe('AdminCacheCard', () => {
           color: 'warning',
         })
       );
-      expect(wrapper.text()).not.toContain('admin.last_purge_description');
+      expect(wrapper.text()).toContain('admin.last_purge_description');
+      expect(localStorage.getItem(STORAGE_KEYS.adminLastPurge)).toBe(previousPurge);
       wrapper.unmount();
     }
   );
