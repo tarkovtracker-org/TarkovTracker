@@ -1,7 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
 import { resolveBuildCommit } from './app/utils/buildCommit';
@@ -29,9 +29,9 @@ import {
   SHELL_DRAWER_EXPANDED_WIDTH,
   SHELL_DRAWER_RAIL_STORAGE_KEY,
 } from './app/utils/shellConfig';
-import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
 import { THEME_BOOT_SCRIPT } from './app/utils/theme';
 import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
+import { cleanCloudflareOutput, filterAutoImports } from './scripts/nuxt/buildHooks';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const appDir = resolve(__dirname, 'app');
 const nuxtRequire = createRequire(createRequire(import.meta.url).resolve('nuxt/package.json'));
@@ -252,33 +252,7 @@ export default defineNuxtConfig({
     },
     hooks: {
       async compiled(nitro) {
-        if (!String(nitro.options.preset || '').includes('cloudflare')) {
-          return;
-        }
-        const walk = (dir: string) => {
-          let entries: Dirent[];
-          try {
-            entries = readdirSync(dir, { withFileTypes: true, encoding: 'utf8' });
-          } catch {
-            return;
-          }
-          for (const entry of entries) {
-            const full = join(dir, entry.name);
-            if (entry.isDirectory()) {
-              walk(full);
-              continue;
-            }
-            if (!/\.(m?js|cjs)$/.test(entry.name)) continue;
-            try {
-              const source = readFileSync(full, 'utf8');
-              const next = stripBareNodeImports(source);
-              if (next !== source) writeFileSync(full, next);
-            } catch {
-              // Skip if the path vanished mid-walk (should not happen mid-build).
-            }
-          }
-        };
-        walk(nitro.options.output.serverDir);
+        cleanCloudflareOutput(nitro.options.preset, nitro.options.output.serverDir);
       },
     },
   },
@@ -489,32 +463,7 @@ export default defineNuxtConfig({
         assertPrerenderedDocuments(nitro.options.output.publicDir);
       });
     },
-    'imports:extend': (imports: Array<{ as?: string; from?: string; name: string }>) => {
-      const blockedImports = [
-        { names: new Set(['meta']), sourcePattern: '/app/utils/perf' },
-        { names: new Set(['string']), sourcePattern: '/app/utils/constants' },
-        { names: new Set(['string']), sourcePattern: '/app/utils/mapTime' },
-        { names: new Set(['string']), sourcePattern: '/app/utils/skillHelpers' },
-        { names: new Set(['actions']), sourcePattern: '/app/stores/useApp' },
-        { names: new Set(['getters']), sourcePattern: '/app/stores/useApp' },
-        { names: new Set(['actions']), sourcePattern: '/app/stores/useTarkov' },
-        {
-          names: new Set(['options']),
-          sourcePattern: '@nuxt/ui/dist/runtime/composables/useResizable',
-        },
-      ];
-      for (let index = imports.length - 1; index >= 0; index -= 1) {
-        const imported = imports[index];
-        if (!imported) continue;
-        const source = imported.from ?? '';
-        const exposedName = imported.as ?? imported.name;
-        const shouldBlock = blockedImports.some(
-          ({ names, sourcePattern }) =>
-            source.includes(sourcePattern) && (names.has(imported.name) || names.has(exposedName))
-        );
-        if (shouldBlock) imports.splice(index, 1);
-      }
-    },
+    'imports:extend': filterAutoImports,
   },
   image: {
     domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS, ...YOUTUBE_IMAGE_DOMAINS],
