@@ -9,22 +9,11 @@
       <summary class="text-surface-200 cursor-pointer py-3 text-sm font-medium">
         {{ t(`common.${category}`) }}
       </summary>
-      <div
-        v-for="group in checklist[category]"
-        :key="group.source + (group.level ?? '')"
-        class="mb-4"
-      >
-        <h3 class="text-surface-200 font-medium">
-          {{ group.source }}
-          <template v-if="group.level != null">
-            · {{ t('common.level') }} {{ group.level }}
-          </template>
-        </h3>
+      <div v-for="group in checklist[category]" :key="group.id" class="mb-4">
+        <h2 class="text-surface-200 font-medium">{{ groupHeading(group) }}</h2>
         <ul class="text-surface-300 ml-5 list-disc text-sm">
           <li v-for="(row, index) in group.rows" :key="index" class="py-0.5 wrap-break-word">
-            {{ row.count }} × {{ row.name }}
-            <span v-if="row.fir">· {{ t('common.found_in_raid_required') }}</span>
-            <span v-if="row.optional">· {{ t('common.optional') }}</span>
+            {{ rowLabel(row) }}
           </li>
         </ul>
       </div>
@@ -37,4 +26,18 @@
   prerenderRoutes('/data/needed-items-pvp.json');
   const { data: checklist, error } = await useLazyFetch('/data/needed-items-pvp.json');
   if (import.meta.prerender && error.value) throw createError(error.value);
+  type ChecklistGroup = NonNullable<typeof checklist.value>['tasks'][number];
+  const groupHeading = (group: ChecklistGroup) => {
+    if (group.level != null) return `${group.source} · ${t('common.level')} ${group.level}`;
+    if (group.prestige) return `${group.source} · ${t('common.prestige')} ${group.prestige}`;
+    return [group.source, group.faction].filter(Boolean).join(' · ');
+  };
+  const rowLabel = (row: ChecklistGroup['rows'][number]) =>
+    [
+      `${row.count} × ${row.name}`,
+      row.fir && t('common.found_in_raid_required'),
+      row.optional && t('common.optional'),
+    ]
+      .filter(Boolean)
+      .join(' · ');
 </script>

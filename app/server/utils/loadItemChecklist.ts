@@ -1,9 +1,12 @@
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import { isCurrencyItemId } from '@/utils/constants';
+import { inferNewBeginningPrestigeLevel } from '@/utils/prestige';
 import { SEO_ORIGIN } from '@/utils/routeSeo';
 import { normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
+  Task,
   TaskObjective,
+  NeededItemTaskObjective,
   TarkovHideoutQueryResult,
   TarkovItemsQueryResult,
   TarkovTaskObjectivesQueryResult,
@@ -17,6 +20,9 @@ interface Row {
   optional?: boolean;
 }
 interface Group {
+  id: string;
+  faction?: string;
+  prestige?: number | null;
   source: string;
   level?: number;
   rows: Row[];
@@ -34,6 +40,30 @@ async function catalog<T>(path: string) {
 const bySource = (a: Group, b: Group) =>
   a.source.localeCompare(b.source, 'en') || (a.level ?? 0) - (b.level ?? 0);
 type ItemName = (item: TarkovItem) => string | undefined;
+function questRow(
+  need: NeededItemTaskObjective,
+  objective: TaskObjective | undefined,
+  itemName: ItemName
+): Row[] {
+  // An objective can accept thousands of alternatives. Its description gives
+  // the shared condition without listing every eligible item.
+  const { description, optional } = objective ?? {};
+  const name = need.acceptedItems ? description : itemName(need.item);
+  return name ? [{ name, count: need.count, fir: need.foundInRaid, optional }] : [];
+}
+function questGroup(task: Task, rows: Row[]): Group[] {
+  if (!task.name || !rows.length) return [];
+  const faction = task.factionName === 'Any' ? undefined : task.factionName;
+  return [
+    {
+      id: task.id,
+      source: task.name,
+      faction,
+      prestige: inferNewBeginningPrestigeLevel(task),
+      rows,
+    },
+  ];
+}
 function taskChecklist(
   core: TarkovTasksCoreQueryResult,
   objectives: TarkovTaskObjectivesQueryResult,
@@ -54,14 +84,9 @@ function taskChecklist(
       );
       const rows = (byTask.get(task.id) ?? []).flatMap((need) => {
         const objective = objectivesById.get(need.sourceObjectiveId ?? need.id);
-        // Some hand-ins accept thousands of alternatives. The game's objective
-        // describes the shared condition and carries its weapon/build restrictions.
-        const name = need.acceptedItems ? objective?.description : itemName(need.item);
-        return name
-          ? [{ name, count: need.count, fir: need.foundInRaid, optional: objective?.optional }]
-          : [];
+        return questRow(need, objective, itemName);
       });
-      return task.name && rows.length ? [{ source: task.name, rows }] : [];
+      return questGroup(task, rows);
     })
     .sort(bySource);
 }
@@ -75,7 +100,7 @@ function hideoutChecklist(hideout: TarkovHideoutQueryResult, itemName: ItemName)
   const byLevel = Map.groupBy(needs, (need) => need.hideoutModule.id);
   return Array.from(byLevel.values())
     .flatMap((requirements) => {
-      const { stationId, level } = requirements[0]!.hideoutModule;
+      const { id, stationId, level } = requirements[0]!.hideoutModule;
       const source = stationNames.get(stationId);
       const rows = requirements.flatMap((need) => {
         const name = itemName(need.item);
@@ -83,7 +108,7 @@ function hideoutChecklist(hideout: TarkovHideoutQueryResult, itemName: ItemName)
           ? [{ name, count: need.count, fir: need.foundInRaid }]
           : [];
       });
-      return source && rows.length ? [{ source, level, rows }] : [];
+      return source && rows.length ? [{ id, source, level, rows }] : [];
     })
     .sort(bySource);
 }
