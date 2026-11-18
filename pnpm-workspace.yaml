@@ -47,7 +47,8 @@ overrides:
   minimatch: '11.0.3'
   node-forge: '1.4.3'
   npm: '^11.18.0'
-  'npm>picomatch': '^4.0.4'
+  # Source-verified backport for GHSA-fc5q-39xc-vjpf. Covers both transitive major lines.
+  picomatch: 'npm:@ryotsu/picomatch@4.0.7-a'
   object-assign: 'npm:@socketregistry/object-assign@^1'
   path-parse: 'npm:@socketregistry/path-parse@^1'
   safe-buffer: 'npm:@socketregistry/safe-buffer@^1'
