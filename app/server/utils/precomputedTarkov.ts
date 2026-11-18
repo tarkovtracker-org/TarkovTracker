@@ -1,19 +1,6 @@
-/**
- * Shared contract for precomputed heavy-route payloads stored in Cloudflare KV.
- *
- * The scheduled GitHub Actions precompute workflow
- * (.github/workflows/precompute-tarkov-data.yml, via scripts/precompute) runs
- * the heavy fetch/adapt/overlay pipeline off the request path and writes the
- * final payload to KV. The Nitro request handlers read it back through
- * edgeCache, which keeps every colo warm without ever running the multi-MB
- * transform inside a request invocation (the cause of Cloudflare Error 1102
- * on cold, low-traffic colos).
- *
- * Both sides import this module so key format and envelope shape stay in sync.
- */
+/** Shared KV binding and envelope validation for the independent English import snapshots. */
 const PRECOMPUTED_KV_BINDING = 'TARKOV_DATA';
 const PRECOMPUTED_ENVELOPE_VERSION = 2;
-const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v3';
 export type PrecomputedEnvelope<T> = {
   payload: T;
   overlay: { version: string; sha256: string } | null;
@@ -23,9 +10,6 @@ export type PrecomputedEnvelope<T> = {
 export type PrecomputedKvReader = {
   get: (key: string, type: 'json' | 'text') => Promise<unknown>;
 };
-export function buildTasksCorePrecomputedKey(lang: string, gameMode: string): string {
-  return `tasks-core-${TASKS_CORE_PRECOMPUTED_VERSION}-${lang}-${gameMode}`;
-}
 export type CatalogKvReader = PrecomputedKvReader & {
   get: (key: string, type: 'stream') => Promise<unknown>;
 };

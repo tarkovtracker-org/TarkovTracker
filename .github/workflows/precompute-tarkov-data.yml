@@ -1,13 +1,7 @@
 name: Precompute Tarkov Data
-# Runs the heavy tasks-core fetch/adapt/overlay pipeline off Cloudflare and
-# writes the resulting payloads to the TARKOV_DATA KV namespace (7-day TTL).
-# The Pages request handlers read these entries via edgeCache's `precomputed`
-# option; a missed run degrades to slightly stale data. EFT log imports read
-# only the English tasks-import snapshots, so they fail once those expire.
-#
-# Runs here instead of a scheduled Worker because the account is on the
-# Workers Free tier (10ms CPU/invocation), which cannot fit even a single
-# lang x gameMode transform.
+# Publish neutral mode catalogs, language tables, and independent English import snapshots.
+# Catalog activation follows a successful readback of every immutable gzip object. A missed
+# run leaves the last complete catalog release available for its seven-day TTL.
 #
 # Requires (see scripts/precompute/run.ts):
 #   environment production-precompute - main branch only; credentials below must not exist at repository scope
@@ -22,11 +16,11 @@ on:
   workflow_dispatch:
     inputs:
       lang:
-        description: 'Restrict to one language (e.g. en). Empty runs all.'
+        description: 'Use en only for a targeted English import refresh. Empty runs the complete catalog release.'
         required: false
         type: string
       gameMode:
-        description: 'Restrict to one game mode (regular, pve, or pvp-season). Empty runs all.'
+        description: 'Target one English import snapshot (regular, pve, or pvp-season). Empty runs all modes.'
         required: false
         type: string
       expectedOverlaySha:
@@ -41,7 +35,7 @@ permissions:
   issues: write
 jobs:
   precompute:
-    name: Precompute tasks-core payloads
+    name: Precompute catalogs and language tables
     if: github.ref == 'refs/heads/main'
     environment: production-precompute
     runs-on: ubuntu-24.04

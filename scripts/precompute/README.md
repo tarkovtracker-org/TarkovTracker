@@ -22,9 +22,8 @@ bounds stored-object lifetime.
 The same run refreshes three independent whole English import snapshots. Their
 scope, age, progress-critical task/objective structure, and overlay provenance
 remain independently validated. They use `tasks-import-json-v1-en-<mode>` keys.
-During migration the workflow also refreshes the 48 legacy localized entries.
-Retire that producer only after the new reader passes production verification.
-Those temporary entries are outside the neutral release contract.
+The 48 legacy localized entries were retained through reader verification.
+The producer now refreshes only the neutral release and English import snapshots.
 
 ## Preseed and promote
 
