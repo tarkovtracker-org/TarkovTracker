@@ -22,7 +22,7 @@ import {
   type OwnedRealtimeChannel,
   type SupabaseRealtimeChannel,
 } from '@/utils/realtimeChannel';
-import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
+import { isRealtimeSuspended, subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
@@ -270,16 +270,36 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     release.hold(owned, removeOwnedChannel(owned, 'TeamStore'));
     await release.release(owned.topic);
   };
+  const retryRecoveryLeave = async (
+    retryVersion: number,
+    owned: OwnedRealtimeChannel | null
+  ): Promise<boolean> => {
+    if (!owned || (await release.release(owned.topic))) return canBuild(retryVersion);
+    if (!canBuild(retryVersion)) return false;
+    const removal = removeOwnedChannel(owned, 'TeamStore');
+    release.hold(owned, removal);
+    return await removal;
+  };
+  const recover = async (retryVersion: number, owned: OwnedRealtimeChannel | null) => {
+    if (!canBuild(retryVersion)) return;
+    try {
+      if (await retryRecoveryLeave(retryVersion, owned)) await refreshForRequest(retryVersion);
+    } catch (error) {
+      logger.warn('[TeamStore] Channel recovery failed', error);
+    }
+    if (!channel.value && deps.getTeamId()) queueRecovery(retryVersion, owned);
+  };
+  const queueRecovery = (retryVersion: number, owned: OwnedRealtimeChannel | null) => {
+    if (!canBuild(retryVersion)) return;
+    retryTimeout = setTimeout(() => {
+      retryTimeout = null;
+      void recover(retryVersion, owned);
+    }, CHANNEL_RETRY_DELAY_MS);
+  };
   const scheduleRecovery = () => {
+    const owned = channel.value;
     const retryVersion = ++version;
-    void cleanup().then(() => {
-      if (disposed || retryVersion !== version) return;
-      retryTimeout = setTimeout(() => {
-        retryTimeout = null;
-        if (disposed || retryVersion !== version) return;
-        void refresh();
-      }, CHANNEL_RETRY_DELAY_MS);
-    });
+    void cleanup().then(() => queueRecovery(retryVersion, owned));
   };
   const recordStatusFailure = (status: string, error?: Error) => {
     const failed = logChannelSubscribeFailure('TeamStore', status, error, {
@@ -312,8 +332,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     dispatchHydration(teamId);
   };
   /**
-   * A closed or failed channel is no longer joined, so drop the binding and let
-   * the next membership event rebuild it.
+   * Drop the joined binding on failure and rebuild a terminally closed channel.
    *
    * Recovery can replace the owned channel before it rejoins, so the
    * missed-progress refresh is carried across that replacement.
@@ -327,7 +346,8 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     if (previouslyJoined.has(owned)) hydrationTeam = teamId;
     joinedTeamId = null;
     joinedFilter = undefined;
-    recordStatusFailure(status, error);
+    if (status === 'CLOSED') scheduleRecovery();
+    else recordStatusFailure(status, error);
   };
   /**
    * Reacts to every subscribe status rather than only `SUBSCRIBED`.
@@ -379,7 +399,9 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     const owned: OwnedTeamChannel = { channel: next, client, topic };
     channel.value = owned;
     if (client.realtime && isRealtimeSuspended(client.realtime)) previouslyJoined.add(owned);
-    next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));
+    subscribeRealtimeChannel(client.realtime, next, (status, error) =>
+      handleStatus(owned, teamId, progressFilter, status, error)
+    );
   };
   const canBuild = (setupVersion: number): boolean => !disposed && setupVersion === version;
   const setup = async (setupVersion: number): Promise<void> => {
@@ -439,12 +461,12 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     dispatchHydration(joinedTeamId);
     return true;
   };
-  const refresh = async (): Promise<void> => {
-    const requestVersion = ++version;
+  const refreshForRequest = async (requestVersion: number): Promise<void> => {
     if (!(await refreshMembersForRequest(requestVersion))) return;
     if (reuseCurrentBinding()) return;
     await setup(requestVersion);
   };
+  const refresh = (): Promise<void> => refreshForRequest(++version);
   return {
     cleanup,
     dispose: () => {

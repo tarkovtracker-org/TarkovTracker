@@ -79,6 +79,7 @@ const createHarness = (options: { removeStatus?: string | Promise<string> } = {}
     channels,
     client,
     deps,
+    getChannels: () => [...open.values()] as unknown as ReturnType<SupabaseClient['getChannels']>,
     isTopicOpen: (topic: string) => open.has(topic),
     refreshMembers,
     removeChannel,
@@ -130,12 +131,21 @@ describe('createTeamChannelController', () => {
     'reconciles a suspended first join (suspended at creation: %s)',
     async (suspendedAtCreation) => {
       const harness = createHarness();
-      const transport = { connect: vi.fn(), disconnect: vi.fn(), getChannels: () => [] };
+      const transport = {
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        getChannels: harness.getChannels,
+        setAuth: vi.fn(async () => {}),
+      };
       Object.assign(harness.client, { realtime: transport });
       const page = Object.assign(new EventTarget(), {
         visibilityState: 'hidden' as DocumentVisibilityState,
       });
-      const releaseVisibility = installRealtimeVisibility(transport, page);
+      const releaseVisibility = installRealtimeVisibility(
+        transport,
+        async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+        page
+      );
       const controller = createTeamChannelController(harness.deps);
       const hydrated = vi.fn();
       window.addEventListener('teammate-progress-reconnected', hydrated);
@@ -173,10 +183,19 @@ describe('createTeamChannelController', () => {
     async (ownerSuspended) => {
       const owner = createHarness();
       const replacement = createHarness();
-      const transport = { connect: vi.fn(), disconnect: vi.fn(), getChannels: () => [] };
+      const transport = {
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        getChannels: () => [],
+        setAuth: vi.fn(async () => {}),
+      };
       Object.assign(ownerSuspended ? owner.client : replacement.client, { realtime: transport });
       const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });
-      const releaseVisibility = installRealtimeVisibility(transport, page);
+      const releaseVisibility = installRealtimeVisibility(
+        transport,
+        async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+        page
+      );
       const controller = createTeamChannelController(owner.deps);
       try {
         await controller.refresh();
@@ -322,6 +341,37 @@ describe('createTeamChannelController', () => {
     await controller.refresh();
     expect(harness.removeChannel).toHaveBeenCalledTimes(1);
     expect(harness.channels).toHaveLength(2);
+  });
+  it('recovers from a terminal close before a first join without a membership event', async () => {
+    const harness = createHarness();
+    const controller = createTeamChannelController(harness.deps);
+    try {
+      await controller.refresh();
+      harness.channels[0]!.status!('CLOSED', new Error('Deferred join failed'));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(harness.removeChannel).toHaveBeenCalledWith(harness.channels[0]);
+      expect(harness.channels).toHaveLength(2);
+    } finally {
+      await controller.dispose();
+    }
+  });
+  it('retries a failed leave and member refresh after a terminal close', async () => {
+    const harness = createHarness();
+    const controller = createTeamChannelController(harness.deps);
+    try {
+      await controller.refresh();
+      harness.removeChannel.mockRejectedValueOnce(new Error('Disconnect failed'));
+      harness.refreshMembers.mockResolvedValueOnce(false);
+      harness.channels[0]!.status!('CLOSED', new Error('Deferred join failed'));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(harness.removeChannel).toHaveBeenCalledTimes(2);
+      expect(harness.channels).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(harness.refreshMembers).toHaveBeenCalledTimes(3);
+      expect(harness.channels).toHaveLength(2);
+    } finally {
+      await controller.dispose();
+    }
   });
   it('drops the binding and rebuilds after the channel closes', async () => {
     const harness = createHarness();

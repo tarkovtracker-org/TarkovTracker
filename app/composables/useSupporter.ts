@@ -10,7 +10,9 @@ import {
   removeOwnedChannel,
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
+import { subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
 import { refreshSupabaseSession } from '@/utils/supabaseAuth';
+import type { SupabaseClient } from '@supabase/supabase-js';
 export interface SupporterStatus {
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
   status: 'active' | 'past_due' | 'expired' | 'cancelled';
@@ -136,6 +138,46 @@ export function useSupporter() {
       finishStatusRequest(userId, requestVersion, success);
     }
   }
+  function subscribeToSupporterChanges(
+    client: SupabaseClient,
+    topic: string,
+    userId: string,
+    requestVersion: number
+  ) {
+    let initialReadStarted = false;
+    const nextChannel = client.channel(topic).on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'supporters',
+        filter: `user_id=eq.${userId}`,
+      },
+      () => {
+        if (requestVersion !== subscriptionRequestVersion) return;
+        fetchStatus(userId).catch((err) => {
+          logger.error('Realtime supporter status refresh failed', { userId, err });
+        });
+      }
+    );
+    const readStatus = () => {
+      initialReadStarted = true;
+      void fetchStatus(userId);
+    };
+    const joinedImmediately = subscribeRealtimeChannel(
+      client.realtime,
+      nextChannel,
+      (status, err) => {
+        if (requestVersion !== subscriptionRequestVersion) return;
+        logChannelSubscribeFailure('Supporter', status, err, { userId });
+        // Subscribe reports either a join or a failure. Read once even if the initial join fails.
+        if (status !== 'SUBSCRIBED' && initialReadStarted) return;
+        readStatus();
+      }
+    );
+    if (!joinedImmediately) readStatus();
+    return nextChannel;
+  }
   async function subscribe(userId: string): Promise<boolean> {
     if (!$supabase || !userId) return false;
     if (channel && channelUserId === userId) {
@@ -160,39 +202,16 @@ export function useSupporter() {
     if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return false;
     if (channel || channelUserId) return false;
     const client = $supabase.client;
-    let initialReadStarted = false;
     let resolveInitial!: (success: boolean) => void;
     const promise = new Promise<boolean>((resolve) => {
       resolveInitial = resolve;
     });
-    const pending = { userId, promise, resolve: resolveInitial };
-    initialRead = pending;
-    const nextChannel = client
-      .channel(topic)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'supporters',
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          if (requestVersion !== subscriptionRequestVersion) return;
-          fetchStatus(userId).catch((err) => {
-            logger.error('Realtime supporter status refresh failed', { userId, err });
-          });
-        }
-      )
-      .subscribe((status, err) => {
-        if (requestVersion !== subscriptionRequestVersion) return;
-        logChannelSubscribeFailure('Supporter', status, err, { userId });
-        // Subscribe reports either a join or a failure. Read once even if the initial join fails.
-        if (status !== 'SUBSCRIBED' && initialReadStarted) return;
-        initialReadStarted = true;
-        void fetchStatus(userId);
-      });
-    channel = { channel: nextChannel, client, topic };
+    initialRead = { userId, promise, resolve: resolveInitial };
+    channel = {
+      channel: subscribeToSupporterChanges(client, topic, userId, requestVersion),
+      client,
+      topic,
+    };
     channelUserId = userId;
     return promise;
   }

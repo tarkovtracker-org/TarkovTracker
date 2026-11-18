@@ -2,7 +2,7 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { hasSupabaseAuthSessionHint } from '@/utils/clientStorage';
 import { logger } from '@/utils/logger';
-import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
+import { installRealtimeVisibility, isRealtimeSuspended } from '@/utils/realtimeVisibility';
 import { shouldUseOfflineSupabaseFallback } from '@/utils/runtimeConfig';
 import {
   createOwnerFencedAuthStorage,
@@ -333,6 +333,7 @@ export default defineNuxtPlugin({
         authInvalidationToken += 1;
       }
       hydrateFromSession(session);
+      resumeRealtimeWhenAuthenticated(session);
       if (event !== 'SIGNED_OUT') return;
       // `signOut()` tears channels down itself. Scheduling a second removal here
       // could tear down channels recreated right after sign-out, so skip it.
@@ -340,6 +341,22 @@ export default defineNuxtPlugin({
       setTimeout(() => {
         void removeAllRealtimeChannels();
       }, 0);
+    };
+    const resumeRealtimeWhenAuthenticated = (session: Session | null) => {
+      const transport = supabaseClient?.realtime;
+      if (session?.access_token && transport && isRealtimeSuspended(transport)) transport.connect();
+    };
+    const readRealtimeSession = async (client: SupabaseClient) => {
+      const version = authInvalidationToken;
+      const ownerId = user.id;
+      const { data, error } = await client.auth.getSession();
+      if (error) throw error;
+      const session = data.session;
+      if (!session?.access_token || session.user.id !== ownerId) return null;
+      return {
+        accessToken: session.access_token,
+        isCurrent: () => version === authInvalidationToken && ownerId === user.id,
+      };
     };
     const createSupabaseClient = async (): Promise<SupabaseClient> => {
       try {
@@ -356,7 +373,9 @@ export default defineNuxtPlugin({
         });
         authStorage = fencedStorage;
         if (client.realtime) {
-          const disposeVisibility = installRealtimeVisibility(client.realtime);
+          const disposeVisibility = installRealtimeVisibility(client.realtime, () =>
+            readRealtimeSession(client)
+          );
           if (import.meta.hot) import.meta.hot.dispose(disposeVisibility);
         }
         supabaseClient = client;

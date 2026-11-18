@@ -49,7 +49,11 @@ import {
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
 import { startRealtimeRecovery } from '@/utils/realtimeRecovery';
-import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
+import {
+  isRealtimeBackgroundSuspended,
+  isRealtimeSuspended,
+  subscribeRealtimeChannel,
+} from '@/utils/realtimeVisibility';
 import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
@@ -411,9 +415,7 @@ async function runSetupRealtimeListener(
     latestLegacyMetadataUpdateTime = updateTime;
     return true;
   };
-  const isCurrentRealtimeUser = () =>
-    stillOwnsSetup(currentUserId, generation) &&
-    !($supabase.client.realtime && isRealtimeSuspended($supabase.client.realtime));
+  const isCurrentRealtimeUser = () => stillOwnsSetup(currentUserId, generation);
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (
     payload: { new: unknown; old: unknown },
@@ -533,7 +535,8 @@ async function runSetupRealtimeListener(
   const topic = progressTopic(currentUserId);
   const createProgressChannel = () => {
     const channel = client.channel(topic);
-    const acceptsPayload = () => channel === owned.channel && !replacing;
+    const acceptsPayload = () =>
+      channel === owned.channel && !replacing && !isRealtimeSuspended(client.realtime);
     return channel
       .on(
         'postgres_changes' as const,
@@ -575,8 +578,9 @@ async function runSetupRealtimeListener(
   let refreshGeneration = 0;
   // The refresh is stale once a newer reconnect starts, the user changes, or the
   // socket is suspended.
+  const isBackgroundSuspended = () => isRealtimeBackgroundSuspended(client.realtime);
   const snapshotIsStale = (request: number): boolean =>
-    !isCurrentRealtimeUser() || request !== refreshGeneration;
+    !isCurrentRealtimeUser() || request !== refreshGeneration || isBackgroundSuspended();
   const readProgressSnapshotRows = (signal: AbortSignal) =>
     Promise.all([
       client
@@ -698,7 +702,7 @@ async function runSetupRealtimeListener(
       subscribeOwnedChannel();
     },
     isCurrent: () => setupStillOwnsChannel(owned, currentUserId, generation),
-    isSuspended: () => Boolean(client.realtime && isRealtimeSuspended(client.realtime)),
+    isSuspended: isBackgroundSuspended,
     onDegraded: (degraded) => {
       liveUpdatesDegraded.value = degraded;
     },
@@ -710,7 +714,7 @@ async function runSetupRealtimeListener(
   const subscribeOwnedChannel = () => {
     const subscribing = owned;
     try {
-      subscribing.channel.subscribe((status, error) => {
+      subscribeRealtimeChannel(client.realtime, subscribing.channel, (status, error) => {
         if (replacing || !setupStillOwnsChannel(subscribing, currentUserId, generation)) return;
         recovery.onStatus(status, error);
       });

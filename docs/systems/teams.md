@@ -101,11 +101,11 @@ path.
   not create one Postgres Changes channel per teammate.
 - The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
   mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
-  filter changed, and any non-subscribed status drops the binding so the next event rebuilds.
-- Subscribe callbacks log every status that is not `SUBSCRIBED` or `CLOSED`; an own-progress
-  `CLOSED` before the first join still fails that join. Five consecutive failures
-  tear the team channel down and schedule one rebuild a minute later, replacing Realtime's unbounded
-  rejoin loop with a bounded retry cycle.
+  filter changed, and unsuccessful subscribe statuses clear the recorded binding.
+- After a terminal `CLOSED` or five consecutive join failures, the client cleans up the channel and
+  schedules recovery for one minute later. If the old channel cannot leave cleanly or the member
+  refresh fails, the client retries a minute later. Recovery stops when its request is superseded or
+  the team is gone.
 - Clients hydrate teammate progress only from materialized normalized rows in the authorized mode
   and active season. Missing or placeholder rows never invoke `get_teammate_legacy_progress` or
   overwrite hydrated progress. A failed reconnect read retains the previous snapshot. Account-wide

@@ -7,6 +7,7 @@ import { GAME_MODE_VALUES, getGameModeSeasonNumber } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 import type { WithRemoteSnapshot } from '@/utils/pendingState';
+import type { SupabaseRealtimeChannel } from '@/utils/realtimeChannel';
 const showProgressMerged = vi.fn();
 type FakeChannel = {
   topic: string;
@@ -72,7 +73,8 @@ const {
       realtime: {
         connect: vi.fn(),
         disconnect: vi.fn().mockResolvedValue(undefined),
-        getChannels: vi.fn(() => []),
+        getChannels: vi.fn(() => [] as SupabaseRealtimeChannel[]),
+        setAuth: vi.fn(async () => {}),
       },
       from: vi.fn(),
       // Mirrors `RealtimeClient.channel()`: an open topic returns the live channel.
@@ -679,7 +681,11 @@ describe('seasonal progress realtime synchronization', () => {
   it('ignores late progress events while the shared transport is suspended', async () => {
     vi.useFakeTimers();
     const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });
-    const disposeVisibility = installRealtimeVisibility(supabaseContext.client.realtime, page);
+    const disposeVisibility = installRealtimeVisibility(
+      supabaseContext.client.realtime,
+      async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+      page
+    );
     try {
       const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
       await setupRealtimeListener(store);
@@ -696,6 +702,56 @@ describe('seasonal progress realtime synchronization', () => {
       expect(state.pvp.level).toBe(defaultState.pvp.level);
     } finally {
       disposeVisibility();
+      vi.useRealTimers();
+    }
+  });
+  it('automatically merges a foreground REST snapshot after both socket open attempts fail', async () => {
+    vi.useFakeTimers();
+    const transport = supabaseContext.client.realtime;
+    const connect = transport.connect;
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    const disposeVisibility = installRealtimeVisibility(transport, async () => ({
+      accessToken: 'user-token',
+      isCurrent: () => true,
+    }));
+    try {
+      const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
+      await setupRealtimeListener(store);
+      transport.getChannels.mockReturnValue([
+        createdChannels[0] as unknown as SupabaseRealtimeChannel,
+      ]);
+      visibility.mockReturnValue('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(60_000);
+      connect.mockImplementation(() => {
+        throw new Error('Socket unavailable');
+      });
+      const metadata = Promise.withResolvers<{ data: { game_edition: number }; error: null }>();
+      supabaseContext.client.from.mockClear().mockImplementation((table: string) => ({
+        select: () => ({
+          abortSignal() {
+            return this;
+          },
+          eq: () =>
+            table === 'user_progress'
+              ? { single: () => metadata.promise }
+              : Promise.resolve({ data: [], error: null }),
+        }),
+      }));
+      visibility.mockReturnValue('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(connect).toHaveBeenCalledTimes(2);
+      expect(supabaseContext.client.from).toHaveBeenCalledWith('user_progress');
+      expect(supabaseContext.client.from).toHaveBeenCalledWith('user_game_mode_progress');
+      metadata.resolve({ data: { game_edition: 2 }, error: null });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(state.gameEdition).toBe(2);
+    } finally {
+      disposeVisibility();
+      visibility.mockRestore();
+      connect.mockReset();
+      transport.getChannels.mockReturnValue([]);
       vi.useRealTimers();
     }
   });
