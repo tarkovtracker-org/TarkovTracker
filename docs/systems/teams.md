@@ -102,9 +102,10 @@ path.
 - The team channel records itself as bound only after `SUBSCRIBED`, so a silently failed join is never
   mistaken for a live one. Membership events rebuild it only when the topic or teammate-progress
   filter changed, and unsuccessful subscribe statuses clear the recorded binding.
-- A terminal `CLOSED` or five consecutive join failures trigger channel recovery. Recovery backs
-  off for a minute between attempts if the old channel cannot leave cleanly or the member refresh
-  fails, and stops when its request is superseded or the team is gone.
+- After a terminal `CLOSED` or five consecutive join failures, the client cleans up the channel and
+  schedules recovery for one minute later. If the old channel cannot leave cleanly or the member
+  refresh fails, the client retries a minute later. Recovery stops when its request is superseded or
+  the team is gone.
 - Clients hydrate teammate progress only from materialized normalized rows in the authorized mode
   and active season. Missing or placeholder rows never invoke `get_teammate_legacy_progress` or
   overwrite hydrated progress. A failed reconnect read retains the previous snapshot. Account-wide
