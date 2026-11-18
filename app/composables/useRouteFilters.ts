@@ -111,7 +111,7 @@ const createRouteSyncer =
     // once the page navigated away, so its filters never land on the next page.
     queueQueryWrite(() => {
       if (router.currentRoute.value.path !== path) return;
-      return router[method]({ query: buildNextQuery() });
+      return router[method]({ query: buildNextQuery(), hash: router.currentRoute.value.hash });
     })
       .catch((error) => {
         logger.error('[useRouteFilters] Navigation failed:', error);
