@@ -260,10 +260,12 @@ describe('language-neutral metadata catalogs', () => {
     const unavailable = Object.assign(new Error('Catalog unavailable'), { statusCode: 503 });
     const fetch = vi.fn(async (url: string, options: { query: Record<string, string> }) => {
       if (url.endsWith('/strings')) return { data: { strings: tables.en } };
-      if (++reads === 1)
+      if (++reads === 1) {
+        expect(options.query).not.toHaveProperty('cacheBust');
         return {
           data: { tasks: [{ id: 'task', name: '@tt:retired:name' }], maps: [], traders: [] },
         };
+      }
       expect(options.query.cacheBust).toBe('1');
       throw unavailable;
     });
