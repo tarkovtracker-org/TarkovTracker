@@ -356,9 +356,28 @@ export function applyLocaleOverlay<T extends { id: string }>(
   });
 }
 type ObjectiveAddEntry = Record<string, unknown>;
+type ObjectiveText = {
+  resolve: (value: string) => string;
+  itemDescription: (name: string) => string;
+};
+const DEFAULT_OBJECTIVE_TEXT: ObjectiveText = {
+  resolve: (value) => value,
+  itemDescription: (name) => `Hand over the found in raid item: ${name}`,
+};
 const DEFAULT_OVERLAY_OBJECTIVE_TYPE = 'giveItem';
 const DEFAULT_OVERLAY_OBJECTIVE_COUNT = 1;
-export function expandObjectiveAdditions(additions: unknown[]): ObjectiveAddEntry[] {
+function inferAdditionType(
+  entry: ObjectiveAddEntry,
+  resolvedDescription: string
+): string | undefined {
+  // Default display text cannot supply type evidence absent from the source entry.
+  const description = typeof entry.description === 'string' ? resolvedDescription : undefined;
+  return inferObjectiveType({ ...entry, description });
+}
+export function expandObjectiveAdditions(
+  additions: unknown[],
+  text: ObjectiveText = DEFAULT_OBJECTIVE_TEXT
+): ObjectiveAddEntry[] {
   const expanded: ObjectiveAddEntry[] = [];
   for (const [index, entry] of additions.entries()) {
     if (!isPlainObject(entry)) continue;
@@ -368,9 +387,10 @@ export function expandObjectiveAdditions(additions: unknown[]): ObjectiveAddEntr
       typeof entry.description === 'string'
         ? entry.description
         : 'Hand over the found in raid item';
-    const foundInRaid = inferFoundInRaid(description, entry);
+    const resolvedDescription = text.resolve(description);
+    const foundInRaid = inferFoundInRaid(resolvedDescription, entry);
     const count = typeof entry.count === 'number' ? entry.count : DEFAULT_OVERLAY_OBJECTIVE_COUNT;
-    const inferredType = inferObjectiveType(entry);
+    const inferredType = inferAdditionType(entry, resolvedDescription);
     const normalizedType =
       typeof inferredType === 'string' && inferredType.trim().length > 0
         ? inferredType.trim()
@@ -389,7 +409,7 @@ export function expandObjectiveAdditions(additions: unknown[]): ObjectiveAddEntr
           type: objectiveType ?? DEFAULT_OVERLAY_OBJECTIVE_TYPE,
           count,
           foundInRaid,
-          description: `Hand over the found in raid item: ${itemName}`,
+          description: text.itemDescription(itemName),
           items: [item],
         });
       }
@@ -427,13 +447,16 @@ export function getObjectiveItemIds(objective: Record<string, unknown>): Set<str
   if (isPlainObject(questItem) && typeof questItem.id === 'string') ids.add(questItem.id);
   return ids;
 }
-export function applyTaskObjectiveAdditions<T extends { id: string }>(task: T): T {
+export function applyTaskObjectiveAdditions<T extends { id: string }>(
+  task: T,
+  text: ObjectiveText = DEFAULT_OBJECTIVE_TEXT
+): T {
   if (!isPlainObject(task)) return task;
   const obj = task as Record<string, unknown>;
   const additions = Array.isArray(obj.objectivesAdd) ? obj.objectivesAdd : [];
   if (additions.length === 0) return task;
   const existing = Array.isArray(obj.objectives) ? obj.objectives : [];
-  const expanded = expandObjectiveAdditions(additions);
+  const expanded = expandObjectiveAdditions(additions, text);
   if (expanded.length === 0) return task;
   const existingItemIds = new Set<string>();
   for (const objective of existing) {
@@ -518,7 +541,8 @@ export function applyMapExtractAdditions<T extends { id: string }>(map: T): T {
 }
 type OverlayTaskAddition = Record<string, unknown> & { id: string };
 function normalizeTaskAdditions(
-  additions: Record<string, Record<string, unknown>> | undefined
+  additions: Record<string, Record<string, unknown>> | undefined,
+  text: ObjectiveText = DEFAULT_OBJECTIVE_TEXT
 ): OverlayTaskAddition[] {
   if (!additions) return [];
   return Object.values(additions)
@@ -527,9 +551,10 @@ function normalizeTaskAdditions(
     })
     .map((entry) => {
       const factionName = typeof entry.factionName === 'string' ? entry.factionName : 'Any';
-      const objectives = normalizeObjectiveList(entry.objectives);
+      const objectives = normalizeObjectiveList(entry.objectives, text.resolve);
       const failConditions = normalizeObjectiveList(
-        entry.failConditions === undefined ? [] : entry.failConditions
+        entry.failConditions === undefined ? [] : entry.failConditions,
+        text.resolve
       );
       return { ...entry, factionName, objectives, failConditions };
     });
@@ -656,11 +681,14 @@ function applyTaskPatchNormalization<T extends { id: string }>(
   return task;
 }
 /** Overlay additions never pass through the adapter, so their raw gates are all still readable. */
-function applyTaskAdditionNormalization<T extends { id: string }>(task: T): T {
+function applyTaskAdditionNormalization<T extends { id: string }>(
+  task: T,
+  text: ObjectiveText = DEFAULT_OBJECTIVE_TEXT
+): T {
   const record = task as Record<string, unknown>;
   if ('traderRequirements' in record) applyTraderRequirementSplit(record);
   applyDeclaredGateNormalization(record, []);
-  return applyTaskObjectiveAdditions(task);
+  return applyTaskObjectiveAdditions(task, text);
 }
 function mergeModeCorrections(
   shared: Record<string, Record<string, unknown>> | undefined,
@@ -770,6 +798,9 @@ const collectStoryUnlocks = (chapters: Record<string, Record<string, unknown>> =
   return byTask;
 };
 type ApplyOverlayOptions = {
+  text?: ObjectiveText;
+  /** An already validated snapshot keeps neutral datasets on one overlay identity. */
+  snapshot?: OverlayFetchResult;
   bypassCache?: boolean;
   gameMode?: string;
   locale?: string;
@@ -777,6 +808,7 @@ type ApplyOverlayOptions = {
   scheduleRefresh?: OverlayRefreshScheduler;
 };
 function fetchOverlayForApplication(options: ApplyOverlayOptions): Promise<OverlayFetchResult> {
+  if (options.snapshot) return Promise.resolve(options.snapshot);
   const purgedAt = options.purgedAt ?? 0;
   return isOverlayCurrentForPurge(purgedAt)
     ? fetchOverlay(Boolean(options.bypassCache), options.scheduleRefresh)
@@ -803,15 +835,15 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
       result.data.tasks as Array<{ id: string }>,
       mergedTasks,
       { normalize: applyTaskPatchNormalization }
-    ).map(applyTaskObjectiveAdditions);
-    const normalizedAdditions = normalizeTaskAdditions(mergedTasksAdd);
+    ).map((task) => applyTaskObjectiveAdditions(task, options.text));
+    const normalizedAdditions = normalizeTaskAdditions(mergedTasksAdd, options.text);
     logger.info(
       `Overlay tasksAdd: ${normalizedAdditions.length} additions after filtering disabled`
     );
     const addedTasks = applyEntityOverlay(normalizedAdditions, mergedTasks, {
       logLabel: 'tasksAdd',
       logEvenWhenZero: false,
-    }).map(applyTaskAdditionNormalization);
+    }).map((task) => applyTaskAdditionNormalization(task, options.text));
     const existingIds = new Set(correctedTasks.map((task) => task.id));
     const dedupedAdditions = addedTasks.filter((task) => !existingIds.has(task.id));
     logger.info(`Overlay tasksAdd: ${dedupedAdditions.length} additions after dedupe`);

@@ -114,7 +114,7 @@ describe('fetchTarkovJsonEndpoint', () => {
         gameMode: 'pvp-season',
         deps: { fetcher },
       })
-    ).rejects.toThrow('Unsupported json.tarkov.dev season translation path');
+    ).rejects.toThrow('Unsupported json.tarkov.dev translation path');
   });
   it('localizes grouped season perks with English fallback using the published paths', async () => {
     const fetcher = createFetcher({
@@ -437,7 +437,7 @@ describe('fetchTarkovJsonEndpoint', () => {
         'https://json.tarkov.dev/regular/season_en': { data: { 'season.name': 'Season' } },
       });
       await expect(fetchTarkovJsonEndpoint('season', { deps: { fetcher } })).rejects.toThrow(
-        'Unsupported json.tarkov.dev season translation path'
+        'Unsupported json.tarkov.dev translation path'
       );
     }
   );
