@@ -306,7 +306,10 @@ test('shadow workflow cannot deploy, publish statuses, or pass secrets to candid
   assert.match(container, /--mount "type=bind,source=\$candidate_dir,target=\/workspace"/);
   assert.match(container, /--read-only --tmpfs \/tmp/);
   assert.match(container, /--cap-drop ALL --security-opt no-new-privileges/);
-  assert.match(container, /node:24\.22\.3-bookworm-slim@sha256:[a-f0-9]{64}/);
+  assert.match(
+    container,
+    /^  node:24\.22\.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 \\\r?$/m
+  );
   assert.doesNotMatch(container, /ACTIONS_RUNTIME_TOKEN|ACTIONS_CACHE_URL|docker\.sock/);
   assert.match(
     workflowStep(
