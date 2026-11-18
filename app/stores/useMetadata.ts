@@ -188,27 +188,71 @@ const storedObjectivePurgeTime = () =>
   Date.parse(readPurgeStorage(CACHE_PURGE_STORAGE_KEY) ?? '') || 0;
 const observedObjectivePurgeTime = (store: object) =>
   Math.max(getPromiseStore(store).observedCachePurgeTime, storedObjectivePurgeTime());
-const objectiveCatalogCacheKey = (store: object, scope: string) => {
-  const purgeTime = observedObjectivePurgeTime(store);
+const buildObjectiveCatalogCacheKey = (scope: string, purgeTime: number) => {
   const key = `${TASK_OBJECTIVES_CACHE_VERSION}-${scope}`;
   return purgeTime ? `${key}-${purgeTime}` : key;
 };
-const hasCurrentObjectiveOverlay = (store: object, response: FetchSuccess<unknown>) => {
-  const purgeTime = observedObjectivePurgeTime(store);
-  return !purgeTime || Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime;
-};
+const objectiveCatalogCacheKey = (store: object, scope: string) =>
+  buildObjectiveCatalogCacheKey(scope, observedObjectivePurgeTime(store));
+const hasObjectiveOverlaySince = (response: FetchSuccess<unknown>, purgeTime: number) =>
+  !purgeTime || Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime;
+const hasCurrentObjectiveOverlay = (store: object, response: FetchSuccess<unknown>) =>
+  hasObjectiveOverlaySince(response, observedObjectivePurgeTime(store));
 const assertCurrentObjectiveCounts = (store: object, response: FetchSuccess<unknown>) => {
   if (!hasCurrentObjectiveOverlay(store, response)) {
     throw new Error('Objective catalog predates the latest cache purge');
   }
 };
-const shouldPersistMetadata = (
+type MetadataCacheScope = {
+  cacheType: CacheType;
+  cacheKey: string;
+  language: string;
+  mode: string;
+};
+async function readMetadataCache<T>(store: object, scope: MetadataCacheScope) {
+  const cached = await getCachedData<T>(scope.cacheType, scope.cacheKey, scope.language);
+  if (
+    scope.cacheType === 'tasks-objectives' &&
+    scope.cacheKey !== objectiveCatalogCacheKey(store, scope.mode)
+  ) {
+    return null;
+  }
+  return cached;
+}
+const metadataWriteKey = (
+  store: object,
+  scope: MetadataCacheScope,
+  response: FetchSuccess<unknown>
+): string | null => {
+  if (typeof window === 'undefined') return null;
+  if (scope.cacheType !== 'tasks-objectives') return scope.cacheKey;
+  const purgeTime = observedObjectivePurgeTime(store);
+  return hasObjectiveOverlaySince(response, purgeTime)
+    ? buildObjectiveCatalogCacheKey(scope.mode, purgeTime)
+    : null;
+};
+const isStaleObjectiveCatalog = (store: object, cacheType: CacheType, response: unknown) =>
+  cacheType === 'tasks-objectives' &&
+  isFetchSuccess(response) &&
+  !hasCurrentObjectiveOverlay(store, response);
+async function fetchMetadataForCache<T>(
   store: object,
   cacheType: CacheType,
-  response: FetchSuccess<unknown>
-) =>
-  typeof window !== 'undefined' &&
-  (cacheType !== 'tasks-objectives' || hasCurrentObjectiveOverlay(store, response));
+  endpoint: string,
+  options: { signal?: AbortSignal; query: Record<string, string> },
+  isCurrent: () => boolean
+): Promise<FetchResponse<T>> {
+  const fetchCatalog = () => tarkovApiFetch<FetchResponse<T>>(endpoint, options);
+  const response = await fetchCatalog();
+  if (!isStaleObjectiveCatalog(store, cacheType, response)) return response;
+  // Give a warm Worker one marker-check interval before sharing a single retry.
+  await delay(TASK_OBJECTIVES_PURGE_CHECK_TTL_MS + 5000, options.signal);
+  if (!isCurrent()) return response;
+  const retry = await fetchCatalog();
+  return isStaleObjectiveCatalog(store, cacheType, retry)
+    ? { error: 'Objective catalog still predates the latest cache purge after retry' }
+    : retry;
+}
 const lastPurgeCheckTime = (sessionCheckAt: number) => {
   const storedCheckAt = Number(readPurgeStorage(CACHE_PURGE_CHECK_STORAGE_KEY));
   return Number.isFinite(storedCheckAt) ? Math.max(sessionCheckAt, storedCheckAt) : sessionCheckAt;
@@ -1031,7 +1075,9 @@ export const useMetadataStore = defineStore('metadata', {
         promiseRequestId,
         throwOnError = false,
       } = config;
-      const requestScope = `${this.getApiGameMode()}-${this.languageCode}`;
+      const mode = this.getApiGameMode();
+      const cacheScope = { cacheType, cacheKey, language: cacheLanguage, mode };
+      const requestScope = `${mode}-${this.languageCode}`;
       const isCurrentRequestContext = (ignoreAbort = false): boolean =>
         canApplyRequestSignal(config.signal, ignoreAbort) &&
         `${this.getApiGameMode()}-${this.languageCode}` === requestScope &&
@@ -1043,7 +1089,7 @@ export const useMetadataStore = defineStore('metadata', {
       // Step 1: Check IndexedDB cache (unless forcing refresh)
       if (!forceRefresh && typeof window !== 'undefined') {
         try {
-          const cached = await getCachedData<T>(cacheType, cacheKey, cacheLanguage);
+          const cached = await readMetadataCache<T>(this, cacheScope);
           throwIfAborted(config.signal);
           if (cached) {
             logger.debug(
@@ -1081,10 +1127,13 @@ export const useMetadataStore = defineStore('metadata', {
         const effectiveQueryParams = forceRefresh
           ? { ...queryParams, cacheBust: '1' }
           : queryParams;
-        const response = await tarkovApiFetch<FetchResponse<T>>(endpoint, {
-          signal: config.signal,
-          query: effectiveQueryParams,
-        });
+        const response = await fetchMetadataForCache<T>(
+          this,
+          cacheType,
+          endpoint,
+          { signal: config.signal, query: effectiveQueryParams },
+          isCurrentRequestContext
+        );
         throwIfAborted(config.signal);
         if (isFetchError(response)) {
           // Log full response for debugging
@@ -1128,8 +1177,9 @@ export const useMetadataStore = defineStore('metadata', {
         }
         processData(response.data, response);
         // Step 4: Store in IndexedDB for future visits
-        if (shouldPersistMetadata(this, cacheType, response)) {
-          setCachedData(cacheType, cacheKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
+        const writeKey = metadataWriteKey(this, cacheScope, response);
+        if (writeKey !== null) {
+          setCachedData(cacheType, writeKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
             logger.error(`[MetadataStore] Error caching ${logName} data:`, err)
           );
         }
@@ -1462,11 +1512,7 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * Fetch task objectives and fail conditions data
      */
-    async fetchTaskObjectivesData(
-      forceRefresh = false,
-      signal?: AbortSignal,
-      retryStaleOverlay = true
-    ): Promise<void> {
+    async fetchTaskObjectivesData(forceRefresh = false, signal?: AbortSignal): Promise<void> {
       throwIfAborted(signal);
       const promises = getPromiseStore(this);
       if (promises.cachePurgePromise) {
@@ -1490,7 +1536,6 @@ export const useMetadataStore = defineStore('metadata', {
         );
         return;
       }
-      let needsRetry = false;
       await this.fetchWithCache<TarkovTaskObjectivesQueryResult>({
         cacheType: 'tasks-objectives' as CacheType,
         cacheKey,
@@ -1504,12 +1549,10 @@ export const useMetadataStore = defineStore('metadata', {
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'tasksObjectivesPending',
         processData: (data, response) => {
-          if (cacheKey !== objectiveCatalogCacheKey(this, requestGameMode)) return;
-          if (response && !hasCurrentObjectiveOverlay(this, response)) {
-            needsRetry = true;
-            return;
-          }
-          promises.taskObjectiveHydrationScope = requestKey;
+          const currentKey = objectiveCatalogCacheKey(this, requestGameMode);
+          if (!response && cacheKey !== currentKey) return;
+          if (response && !hasCurrentObjectiveOverlay(this, response)) return;
+          promises.taskObjectiveHydrationScope = `${requestLanguage}-${currentKey}`;
           this.mergeTaskObjectives(data.tasks, {
             rebuildDerivedData: false,
             repairFailedTaskStates: false,
@@ -1532,20 +1575,6 @@ export const useMetadataStore = defineStore('metadata', {
         promiseKey: 'taskObjectivesPromise',
         promiseRequestKey: requestKey,
       });
-      if (needsRetry && retryStaleOverlay) {
-        await this.retryTaskObjectiveCatalog(requestLanguage, requestGameMode, signal);
-      }
-    },
-    async retryTaskObjectiveCatalog(
-      language: string,
-      gameMode: string,
-      signal?: AbortSignal
-    ): Promise<void> {
-      // Allow a warm Worker to re-read the purge marker before trying once more.
-      await delay(TASK_OBJECTIVES_PURGE_CHECK_TTL_MS + 5000, signal);
-      if (language === this.languageCode && gameMode === this.getApiGameMode()) {
-        await this.fetchTaskObjectivesData(false, signal, false);
-      }
     },
     async fetchObjectiveModeCountDifferences(forceRefresh = false, signal?: AbortSignal) {
       throwIfAborted(signal);

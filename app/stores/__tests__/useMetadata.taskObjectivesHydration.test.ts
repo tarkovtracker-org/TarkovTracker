@@ -31,6 +31,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
   });
   it('rebuilds derived task data when objectives load before items', async () => {
     const store = useMetadataStore();
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
     store.tasks = [
       {
         id: 'task-1',
@@ -65,6 +66,8 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     expect(store.tasksObjectivesHydrated).toBe(true);
   });
   it('does not persist objective data that predates an observed cache purge', async () => {
+    const retry = Promise.withResolvers<undefined>();
+    const wait = vi.spyOn(asyncUtils, 'delay').mockReturnValue(retry.promise);
     const setCached = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
     const store = useMetadataStore();
     vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
@@ -90,10 +93,11 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     const purge = '2026-11-18T14:01:00Z';
     localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
     oldResponse.resolve({ ...catalog, dataOverlay: { fetchedAt: '2026-11-18T14:00:00Z' } });
-    await pending;
+    await vi.waitFor(() => expect(wait).toHaveBeenCalledOnce());
     expect(setCached).not.toHaveBeenCalled();
     expect(store.tasks[0]?.objectives?.[0]?.count).toBe(1);
-    await store.fetchTaskObjectivesData(true);
+    retry.resolve(undefined);
+    await pending;
     expect(store.tasks[0]?.objectives?.[0]?.count).toBe(3);
     expect(setCached).toHaveBeenCalledWith(
       'tasks-objectives',
@@ -103,27 +107,42 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
       expect.any(Number)
     );
   });
-  it('retries once when a warm Worker returns the prior purge generation', async () => {
-    const wait = vi.spyOn(asyncUtils, 'delay').mockResolvedValue();
+  it('shares the retry and only merges the current objective catalog', async () => {
+    const retry = Promise.withResolvers<undefined>();
+    const wait = vi.spyOn(asyncUtils, 'delay').mockReturnValue(retry.promise);
     vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
     vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
     localStorage.setItem(STORAGE_KEYS.cachePurgeAt, '2025-01-03T00:00:00Z');
     const store = useMetadataStore();
     store.tasks = [{ id: 'task-1', objectives: [] }] as Task[];
     vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
-    const catalog = {
-      data: {
-        tasks: [{ id: 'task-1', failConditions: [], objectives: [{ id: 'bunker', count: 3 }] }],
-      },
-    };
+    const merge = vi.spyOn(store, 'mergeTaskObjectives');
+    const objectives = [{ id: 'bunker', count: 3 }];
+    const tasks = [{ id: 'task-1', failConditions: [], objectives }];
+    const oldTasks = [{ ...tasks[0], objectives: [{ id: 'old-bunker', count: 1 }] }];
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ...catalog, dataOverlay: { fetchedAt: '2025-01-02T00:00:00Z' } })
-      .mockResolvedValueOnce({ ...catalog, dataOverlay: { fetchedAt: '2025-01-04T00:00:00Z' } });
+      .mockResolvedValueOnce({
+        data: { tasks: oldTasks },
+        dataOverlay: { fetchedAt: '2025-01-02T00:00:00Z' },
+      })
+      .mockResolvedValueOnce({
+        data: { tasks },
+        dataOverlay: { fetchedAt: '2025-01-04T00:00:00Z' },
+      });
     vi.stubGlobal('$fetch', fetchMock);
-    await store.fetchTaskObjectivesData();
-    expect(wait).toHaveBeenCalledOnce();
+    const first = store.fetchTaskObjectivesData();
+    await vi.waitFor(() => expect(wait).toHaveBeenCalledOnce());
+    const finished = vi.fn();
+    const second = store.fetchTaskObjectivesData().then(finished);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(merge).not.toHaveBeenCalled();
+    expect(finished).not.toHaveBeenCalled();
+    retry.resolve(undefined);
+    await Promise.all([first, second]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(merge).toHaveBeenCalledExactlyOnceWith(tasks, expect.anything());
     expect(store.tasks[0]?.objectives?.[0]?.id).toBe('bunker');
     expect(store.tasksObjectivesHydrated).toBe(true);
   });
