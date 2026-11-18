@@ -1,10 +1,19 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive, ref } from 'vue';
 import AdminCacheCard from '@/features/admin/AdminCacheCard.vue';
-const purgeCacheMock = vi.fn(async () => ({ timestamp: '2026-02-24T00:00:00.000Z' }));
+import { STORAGE_KEYS } from '@/utils/storageKeys';
+import type { PurgeCacheResponse } from '@/types/edge';
+const purgeCacheMock = vi.fn(
+  async (purgeType: PurgeCacheResponse['purgeType']): Promise<PurgeCacheResponse> => ({
+    success: true,
+    message: 'Cache purged',
+    purgeType,
+    timestamp: '2026-02-24T00:00:00.000Z',
+  })
+);
 const toastAddMock = vi.fn();
 const systemStoreState = reactive({
   isAdmin: true,
@@ -81,8 +90,12 @@ const mountCard = () => {
 describe('AdminCacheCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    purgeCacheMock.mockReset();
     systemStoreState.isAdmin = true;
     supabaseUser.loggedIn = true;
+  });
+  afterEach(() => {
+    localStorage.removeItem(STORAGE_KEYS.adminLastPurge);
   });
   it('requires confirmation before purging all cache', async () => {
     const wrapper = mountCard();
@@ -96,6 +109,48 @@ describe('AdminCacheCard', () => {
     expect(purgeCacheMock).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+  it.each(['tarkov-data', 'all'] as const)(
+    'warns when the %s purge audit is missing',
+    async (purgeType) => {
+      const previousPurge = JSON.stringify({
+        type: 'Tarkov data',
+        timestamp: '2026-02-23T00:00:00.000Z',
+        expiresAt: Date.now() + 60_000,
+      });
+      localStorage.setItem(STORAGE_KEYS.adminLastPurge, previousPurge);
+      purgeCacheMock.mockResolvedValueOnce({
+        success: true,
+        message: 'Cache purged',
+        purgeType,
+        timestamp: '2026-02-24T00:00:00.000Z',
+        auditWriteFailed: true,
+      });
+      const wrapper = mountCard();
+      await flushPromises();
+      expect(wrapper.text()).toContain('admin.last_purge_description');
+      const click = (label: string) =>
+        wrapper
+          .findAll('button')
+          .find((button) => button.text() === label)!
+          .trigger('click');
+      if (purgeType === 'all') await click('Purge Everything');
+      await click(
+        purgeType === 'all' ? 'admin.confirm_purge_button' : 'admin.purge_game_data_button'
+      );
+      await flushPromises();
+      expect(purgeCacheMock).toHaveBeenCalledExactlyOnceWith(purgeType);
+      expect(toastAddMock).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          title: 'admin.purge_audit_failed_title',
+          description: 'admin.purge_audit_failed_description',
+          color: 'warning',
+        })
+      );
+      expect(wrapper.text()).toContain('admin.last_purge_description');
+      expect(localStorage.getItem(STORAGE_KEYS.adminLastPurge)).toBe(previousPurge);
+      wrapper.unmount();
+    }
+  );
   it.each([
     [{ data: { code: 'cache_purge_failed' } }, 'admin.error.cache_purge_failed'],
     [{ data: { code: 'service_config_missing' } }, 'admin.error.service_config_missing'],

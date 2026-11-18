@@ -112,6 +112,15 @@
     return true;
   };
   const updateLastPurgeIfValid = (result: PurgeCacheResponse, purgeType: string): boolean => {
+    if (result.auditWriteFailed) {
+      toast.add({
+        title: t('admin.purge_audit_failed_title'),
+        description: t('admin.purge_audit_failed_description'),
+        color: 'warning',
+        icon: 'i-mdi-alert',
+      });
+      return false;
+    }
     if (result.timestamp) {
       setLastPurge({ type: purgeType, timestamp: result.timestamp });
       return true;
