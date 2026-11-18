@@ -143,12 +143,18 @@ sequenceDiagram
   a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
 The objective endpoint requires nonempty overlay version/SHA before caching a generated response.
-A missing private overlay returns 503; background refresh failure retains a good stale entry.
-`json-v4` retires earlier objective entries in the server cache, browser request query, and local
-metadata-store cache together. Other objective consumers may omit the query version; the server
-still reads only the current versioned key. The operator purge targets current and retired objective keys across
-all supported languages and the three upstream modes. This does not alter the core KV release
-keys or introduce general objective precompute.
+Objective cache version `json-v5` starts a new HTTP URL and local metadata-store cache namespace.
+The per-colo Worker cache also keys final catalogs by language, game mode, and the latest
+successful Tarkov purge timestamp. Each isolate checks the audit log at most once a minute.
+HTTP responses use `no-store` so the CDN and browser HTTP caches cannot bypass the Worker check.
+The client keys its local objective entries by the observed purge timestamp and only persists a
+catalog with an overlay fetched at or after that timestamp. A late response cannot refill the
+active IndexedDB generation with the old catalog.
+After a scoped Tarkov data purge, the next generation requires an overlay fetched since that purge
+and returns 503 if it cannot refresh. Older generations expire on their existing retention
+schedule. A background refresh failure still retains a good stale entry in the current generation.
+Other objective consumers may omit the query version and still use the current Worker key.
+Core KV release keys and objective precompute are unaffected.
 
 The raw overlay JSON and `OVERLAY_TOKEN` remain server-side. The browser consumes corrected
 task/objective data and overlay identity metadata; applied corrections are therefore visible in

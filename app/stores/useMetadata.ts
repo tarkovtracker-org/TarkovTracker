@@ -2,7 +2,12 @@ import { defineStore } from 'pinia';
 import { extractLanguageCode, useSafeLocale } from '@/composables/i18nHelpers';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import mapsData from '@/data/maps.json';
-import { type FetchResponse, isFetchError, isFetchSuccess } from '@/stores/tarkov/fetchResponse';
+import {
+  type FetchResponse,
+  type FetchSuccess,
+  isFetchError,
+  isFetchSuccess,
+} from '@/stores/tarkov/fetchResponse';
 import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemPicker';
 import {
   getMetadataGameMode,
@@ -160,6 +165,19 @@ const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
 const CACHE_PURGE_CHECK_TTL_MS = 5 * 60 * 1000;
 const CACHE_PURGE_CHECK_TIMEOUT_MS = 2500;
 const CACHE_PURGE_CHECK_STORAGE_KEY = STORAGE_KEYS.cachePurgeCheckAt;
+const observedObjectivePurgeTime = () =>
+  typeof window === 'undefined'
+    ? 0
+    : Date.parse(localStorage.getItem(CACHE_PURGE_STORAGE_KEY) ?? '') || 0;
+const objectiveCatalogCacheKey = (scope: string) => {
+  const purgeTime = observedObjectivePurgeTime();
+  const key = `${TASK_OBJECTIVES_CACHE_VERSION}-${scope}`;
+  return purgeTime ? `${key}-${purgeTime}` : key;
+};
+const canCacheObjectiveCatalog = (response: FetchSuccess<unknown>) => {
+  const purgeTime = observedObjectivePurgeTime();
+  return !purgeTime || Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime;
+};
 // Exported type for craft sources used by components
 export type CraftSource = { stationId: string; stationName: string; stationLevel: number };
 export interface MetadataStoreTaskLookup {
@@ -761,7 +779,7 @@ export const useMetadataStore = defineStore('metadata', {
         ),
         getCachedData<TarkovTaskObjectivesQueryResult>(
           'tasks-objectives',
-          `${TASK_OBJECTIVES_CACHE_VERSION}-${mode}`,
+          objectiveCatalogCacheKey(mode),
           language
         ),
         getCachedData<TarkovTaskRewardsQueryResult>(
@@ -1049,7 +1067,10 @@ export const useMetadataStore = defineStore('metadata', {
         }
         processData(response.data);
         // Step 4: Store in IndexedDB for future visits
-        if (typeof window !== 'undefined') {
+        if (
+          typeof window !== 'undefined' &&
+          (cacheType !== 'tasks-objectives' || canCacheObjectiveCatalog(response))
+        ) {
           setCachedData(cacheType, cacheKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
             logger.error(`[MetadataStore] Error caching ${logName} data:`, err)
           );
@@ -1412,10 +1433,11 @@ export const useMetadataStore = defineStore('metadata', {
       }
       const requestLanguage = this.languageCode;
       const requestGameMode = this.getApiGameMode();
-      const requestKey = `${requestLanguage}-${requestGameMode}`;
+      const cacheKey = objectiveCatalogCacheKey(requestGameMode);
+      const requestKey = `${requestLanguage}-${cacheKey}`;
       await this.fetchWithCache<TarkovTaskObjectivesQueryResult>({
         cacheType: 'tasks-objectives' as CacheType,
-        cacheKey: `${TASK_OBJECTIVES_CACHE_VERSION}-${requestGameMode}`,
+        cacheKey,
         cacheLanguage: requestLanguage,
         endpoint: '/api/tarkov/tasks-objectives',
         queryParams: {
@@ -1546,7 +1568,7 @@ export const useMetadataStore = defineStore('metadata', {
       const existing = memo.get(apiGameMode);
       if (existing && !forceRefresh && requestSignals.get(existing) === signal && !signal?.aborted)
         return existing;
-      const cacheKey = `${TASK_OBJECTIVES_CACHE_VERSION}-counts-${apiGameMode}`;
+      const cacheKey = objectiveCatalogCacheKey(`counts-${apiGameMode}`);
       const promise = (async () => {
         if (!forceRefresh && typeof window !== 'undefined') {
           const cached = await getCachedData<Record<string, number>>(
@@ -1585,7 +1607,7 @@ export const useMetadataStore = defineStore('metadata', {
         }));
         const deduped = this.dedupeObjectiveIds(modeTasks as Task[]).tasks;
         const counts = Object.fromEntries(this.buildObjectiveCountMap(deduped));
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && canCacheObjectiveCatalog(response)) {
           setCachedData(
             'tasks-objectives' as CacheType,
             cacheKey,

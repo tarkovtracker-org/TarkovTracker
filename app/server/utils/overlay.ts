@@ -57,6 +57,7 @@ let cachedOverlay: OverlayData | null = null;
 let cacheTimestamp = 0;
 let overlayRefreshPromise: Promise<OverlayFetchResult> | null = null;
 let nextOverlayRefreshAt = 0;
+let lastOverlayRefreshStartedAt = 0;
 const OVERLAY_CACHE_TTL = 3600000; // 1 hour in milliseconds
 const OVERLAY_REFRESH_RETRY_MS = 60000;
 const FETCH_TIMEOUT_MS = 5000; // 5 seconds
@@ -101,6 +102,7 @@ function buildOverlayMeta(
     generated,
     sha256,
     sourceUrl: OVERLAY_URL_WITH_BUSTER,
+    fetchedAt: overlay ? new Date(cacheTimestamp).toISOString() : undefined,
     unconsumedSections: overlay ? unknownOverlaySections(overlay) : [],
     ...extra,
   };
@@ -177,7 +179,6 @@ async function processOverlayResponse(
   logger.info(`Loaded overlay v${cachedOverlay.$meta!.version}`);
   lastOverlayMeta = buildOverlayMeta(cachedOverlay, 'fresh', {
     unconsumedSections: unconsumed,
-    fetchedAt: new Date(now).toISOString(),
     cacheAgeMs: 0,
   });
   return { overlay: cachedOverlay, meta: lastOverlayMeta };
@@ -205,6 +206,7 @@ function startOverlayRefresh(now: number): {
   started: boolean;
 } {
   if (overlayRefreshPromise) return { promise: overlayRefreshPromise, started: false };
+  lastOverlayRefreshStartedAt = now;
   const promise = refreshOverlay(now)
     .then((result) => {
       nextOverlayRefreshAt =
@@ -249,6 +251,24 @@ export async function fetchOverlay(
     return buildCachedOverlayResult(now, 'stale');
   }
   return await startOverlayRefresh(now).promise;
+}
+async function fetchOverlayAfterPurge(purgedAt: number): Promise<OverlayFetchResult> {
+  if (overlayRefreshPromise && lastOverlayRefreshStartedAt < purgedAt) {
+    await overlayRefreshPromise;
+  }
+  const now = Date.now();
+  if (
+    overlayRefreshPromise ||
+    lastOverlayRefreshStartedAt < purgedAt ||
+    now >= nextOverlayRefreshAt
+  ) {
+    const result = await startOverlayRefresh(now).promise;
+    if (cacheTimestamp >= purgedAt) return result;
+  }
+  return {
+    overlay: null,
+    meta: buildOverlayMeta(null, 'missing', { error: 'Overlay refresh pending after cache purge' }),
+  };
 }
 /**
  * Apply overlay corrections to an array of entities
@@ -736,13 +756,15 @@ export async function applyOverlay<T extends { data?: OverlayTargetData }>(
     bypassCache?: boolean;
     gameMode?: string;
     locale?: string;
+    purgedAt?: number;
     scheduleRefresh?: OverlayRefreshScheduler;
   } = {}
 ): Promise<T & { dataOverlay: OverlayMeta }> {
-  const { overlay, meta } = await fetchOverlay(
-    Boolean(options.bypassCache),
-    options.scheduleRefresh
-  );
+  const purgedAt = options.purgedAt ?? 0;
+  const { overlay, meta } =
+    cacheTimestamp < purgedAt
+      ? await fetchOverlayAfterPurge(purgedAt)
+      : await fetchOverlay(Boolean(options.bypassCache), options.scheduleRefresh);
   const result = { ...data, dataOverlay: meta } as T & { dataOverlay: OverlayMeta };
   if (!overlay || !data?.data) {
     return result;
