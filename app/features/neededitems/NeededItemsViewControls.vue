@@ -1,10 +1,11 @@
 <template>
-  <div class="flex flex-wrap items-center gap-2">
-    <div class="flex items-center">
+  <div class="flex min-w-0 items-center sm:gap-2">
+    <div class="flex min-w-0 items-center">
       <PreferenceSwitch
         v-model="groupByItem"
         :label="$t('page.needed_items.view.show_once')"
         test-id="needed-items-show"
+        class="min-w-0 max-sm:gap-0.5 max-sm:px-0"
       />
       <UPopover>
         <UButton
@@ -27,7 +28,7 @@
       role="group"
       :aria-label="control.label"
       :data-testid="`needed-items-${control.key}`"
-      class="bg-surface-950 flex items-center gap-0.5 rounded-md p-0.5 ring-1 ring-white/10"
+      class="bg-surface-950 flex shrink-0 items-center gap-0.5 rounded-md p-0.5 ring-1 ring-white/10"
     >
       <UButton
         v-for="option in control.options"
