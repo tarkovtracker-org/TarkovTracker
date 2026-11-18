@@ -3,6 +3,7 @@ import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
+import { isGameDataString, upstreamStringKey } from '@/utils/gameDataStrings';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
 import { assertTaskImportSource } from '@/utils/taskImportCatalog';
 import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
@@ -60,7 +61,7 @@ const HIDEOUT_SKILL_REQUIREMENT_SKILLS: Record<string, { id: string; name: strin
   },
 };
 type JsonRecord = Record<string, unknown>;
-type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'season' | 'tasks' | 'traders';
+export type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'season' | 'tasks' | 'traders';
 type TarkovJsonEnvelope<T = unknown> = {
   data: T;
   translations?: string[];
@@ -79,9 +80,10 @@ type TarkovJsonDependencies = {
   logger?: Pick<typeof logger, 'error' | 'warn'>;
   sleep?: (ms: number) => Promise<void>;
 };
-type TarkovJsonOptions = {
+export type TarkovJsonOptions = {
   gameMode?: ValidGameMode;
   lang?: string;
+  neutral?: boolean;
   baseUrl?: string;
   maxRetries?: number;
   timeoutMs?: number;
@@ -411,6 +413,27 @@ function applyTranslations<T>(
   return (translated as TarkovJsonEnvelope<T>).data;
 }
 const resolveLogger = (options: TarkovJsonOptions) => options.deps?.logger ?? logger;
+function neutralizeEnvelope<T>(
+  baseResponse: TarkovJsonEnvelope<T>,
+  endpoint: TarkovJsonEndpoint,
+  options: TarkovJsonOptions
+): T {
+  const translated = (baseResponse.translations ?? []).reduce<unknown>(
+    (current, path) =>
+      applyTranslationPath(
+        current,
+        path,
+        (key) =>
+          isGameDataString(key)
+            ? key
+            : upstreamStringKey(options.gameMode ?? 'regular', endpoint, key),
+        resolveLogger(options),
+        true
+      ),
+    baseResponse
+  );
+  return (translated as TarkovJsonEnvelope<T>).data;
+}
 async function localizeEnvelope<T>(
   baseResponse: TarkovJsonEnvelope<T>,
   endpoint: TarkovJsonEndpoint,
@@ -434,13 +457,35 @@ async function localizeEnvelope<T>(
     endpoint === 'season'
   );
 }
+const translateEnvelope = <T>(
+  response: TarkovJsonEnvelope<T>,
+  endpoint: TarkovJsonEndpoint,
+  options: TarkovJsonOptions
+): T | Promise<T> =>
+  options.neutral
+    ? neutralizeEnvelope(response, endpoint, options)
+    : localizeEnvelope(response, endpoint, options);
 export async function fetchTarkovJsonEndpoint<T>(
   endpoint: TarkovJsonEndpoint,
   options: TarkovJsonOptions = {}
 ): Promise<T> {
   const response = await fetchEnvelope<T>(buildPath(endpoint, options), options);
-  return localizeEnvelope(response, endpoint, options);
+  return translateEnvelope(response, endpoint, options);
 }
+/** Fetch only one flat translation envelope. Dataset requests never call this in neutral mode. */
+export async function fetchTarkovJsonStrings(
+  endpoint: TarkovJsonEndpoint,
+  options: TarkovJsonOptions
+): Promise<Record<string, unknown>> {
+  const response = await fetchEnvelope<JsonRecord>(
+    buildPath(endpoint, options, options.lang ?? ENGLISH_LANGUAGE),
+    options
+  );
+  if (!isRecord(response.data)) throw new Error('Invalid upstream translation table');
+  return response.data;
+}
+const catalogLink = (value: unknown): string | undefined =>
+  isGameDataString(value) ? `@tt:link:${value.slice(4)}` : toTrustedGameLinkUrl(value);
 function adaptCategoryRef(value: unknown, context: AdapterContext) {
   const raw = readRecordRef(value, context.itemCategoriesById);
   if (!raw) return undefined;
@@ -464,8 +509,8 @@ const ITEM_STRING_FIELDS = [
 function adaptItemFields(raw: JsonRecord, id: string): JsonRecord {
   const fields: JsonRecord = {
     id: typeof raw.id === 'string' ? raw.id : id,
-    link: toTrustedGameLinkUrl(raw.link),
-    wikiLink: toTrustedGameLinkUrl(raw.wikiLink),
+    link: catalogLink(raw.link),
+    wikiLink: catalogLink(raw.wikiLink),
   };
   for (const key of ITEM_STRING_FIELDS) {
     if (typeof raw[key] === 'string') fields[key] = raw[key];
@@ -645,7 +690,7 @@ function adaptTaskRef(value: unknown, context: AdapterContext) {
   return compactObject({
     id,
     name: typeof raw?.name === 'string' ? raw.name : undefined,
-    wikiLink: toTrustedGameLinkUrl(raw?.wikiLink),
+    wikiLink: catalogLink(raw?.wikiLink),
   });
 }
 function adaptTaskRequirement(raw: unknown, context: AdapterContext) {
@@ -723,7 +768,7 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     lightkeeperRequired:
       typeof raw.lightkeeperRequired === 'boolean' ? raw.lightkeeperRequired : undefined,
     experience: typeof raw.experience === 'number' ? raw.experience : undefined,
-    wikiLink: toTrustedGameLinkUrl(raw.wikiLink),
+    wikiLink: catalogLink(raw.wikiLink),
     minPlayerLevel: typeof raw.minPlayerLevel === 'number' ? raw.minPlayerLevel : undefined,
     availableDelaySecondsMin: positiveSeconds(raw.availableDelaySecondsMin),
     availableDelaySecondsMax: positiveSeconds(raw.availableDelaySecondsMax),
@@ -1102,7 +1147,7 @@ const OMITTED_LITE_ITEM_TRANSLATIONS = new Set([
 async function fetchItemsLitePayload(options: TarkovJsonOptions): Promise<JsonItemsPayload> {
   const response = await fetchEnvelope<JsonItemsPayload>(buildPath('items', options), options);
   // The upstream envelope may be shared by concurrent full/lite and locale requests.
-  return localizeEnvelope(
+  return translateEnvelope(
     {
       ...response,
       translations: response.translations?.filter(

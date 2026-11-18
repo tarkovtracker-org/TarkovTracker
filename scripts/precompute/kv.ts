@@ -7,7 +7,6 @@
  * all 32 ~4.2MB envelopes in one call, and per-key writes preserve the
  * per-combination failure isolation in runPrecompute.
  */
-import type { KvWriter } from './precompute';
 const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4';
 const KV_WRITE_TIMEOUT_MS = 30_000;
 const KV_WRITE_ATTEMPTS = 3;
@@ -20,13 +19,36 @@ type CloudflareApiResponse = {
   errors?: { code?: number; message?: string }[];
   success?: boolean;
 };
-export function createKvRestWriter(config: KvRestConfig): KvWriter {
+export type CatalogStore = {
+  read: (key: string) => Promise<ArrayBuffer>;
+  put: (
+    key: string,
+    value: string | Uint8Array<ArrayBuffer>,
+    options?: { expirationTtl?: number }
+  ) => Promise<void>;
+};
+export function createKvRestWriter(config: KvRestConfig): CatalogStore {
+  const valueUrl = (key: string) =>
+    new URL(
+      CLOUDFLARE_API_BASE_URL +
+        '/accounts/' +
+        config.accountId +
+        '/storage/kv/namespaces/' +
+        config.namespaceId +
+        '/values/' +
+        encodeURIComponent(key)
+    );
   return {
+    async read(key) {
+      const response = await fetch(valueUrl(key), {
+        headers: { Authorization: 'Bearer ' + config.apiToken },
+        signal: AbortSignal.timeout(KV_WRITE_TIMEOUT_MS),
+      });
+      if (!response.ok) throw new Error('KV read failed for ' + key + ': HTTP ' + response.status);
+      return response.arrayBuffer();
+    },
     async put(key, value, options) {
-      const url = new URL(
-        `${CLOUDFLARE_API_BASE_URL}/accounts/${config.accountId}/storage/kv/namespaces/` +
-          `${config.namespaceId}/values/${encodeURIComponent(key)}`
-      );
+      const url = valueUrl(key);
       if (options?.expirationTtl !== undefined) {
         url.searchParams.set('expiration_ttl', String(options.expirationTtl));
       }
@@ -37,7 +59,7 @@ export function createKvRestWriter(config: KvRestConfig): KvWriter {
 async function writeWithRetries(
   url: URL,
   key: string,
-  value: string,
+  value: string | Uint8Array<ArrayBuffer>,
   apiToken: string
 ): Promise<void> {
   for (let attempt = 0; attempt < KV_WRITE_ATTEMPTS; attempt++) {
@@ -57,7 +79,7 @@ function isSuccessfulWrite(response: Response, body: CloudflareApiResponse | nul
 async function writeAttempt(
   url: URL,
   key: string,
-  value: string,
+  value: string | Uint8Array<ArrayBuffer>,
   apiToken: string
 ): Promise<WriteFailure | null> {
   let response: Response;
@@ -67,7 +89,7 @@ async function writeAttempt(
       body: value,
       headers: {
         Authorization: `Bearer ${apiToken}`,
-        'Content-Type': 'text/plain',
+        'Content-Type': typeof value === 'string' ? 'text/plain' : 'application/octet-stream',
       },
       method: 'PUT',
       signal: AbortSignal.timeout(KV_WRITE_TIMEOUT_MS),

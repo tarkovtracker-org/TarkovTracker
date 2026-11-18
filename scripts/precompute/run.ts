@@ -13,6 +13,8 @@
  */
 import { writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
+import * as catalogBuilders from '@/server/utils/neutralCatalog';
+import { publishCatalogRelease } from './catalog-release';
 import { runImportPrecompute } from './import-snapshots';
 import { createKvRestWriter } from './kv';
 import { runPrecompute, validatePrecomputeFilter } from './precompute';
@@ -49,11 +51,28 @@ try {
     filter,
     process.env.EXPECTED_OVERLAY_SHA || result.manifest[0]?.overlay.sha256
   );
+  const sha = process.env.EXPECTED_OVERLAY_SHA || result.manifest[0]?.overlay.sha256;
+  let catalogRelease;
+  if (
+    sha &&
+    !filter.lang &&
+    !filter.gameMode &&
+    !result.failures.length &&
+    !imports.failures.length
+  ) {
+    catalogRelease = await publishCatalogRelease(kv, catalogBuilders, sha);
+  }
   try {
     await writeFile(
       'precompute-manifest.json',
       JSON.stringify(
-        { completedAt: Date.now(), entries: result.manifest, failures: result.failures, imports },
+        {
+          completedAt: Date.now(),
+          entries: result.manifest,
+          failures: result.failures,
+          imports,
+          catalogRelease,
+        },
         null,
         2
       )
