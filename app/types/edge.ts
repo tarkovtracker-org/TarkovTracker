@@ -4,4 +4,5 @@ export interface PurgeCacheResponse {
   purgeType: 'all' | 'tarkov-data';
   cloudflareResultId?: string;
   timestamp: string;
+  auditWriteFailed?: true;
 }
