@@ -32,6 +32,7 @@ beforeEach(() => {
     cpSync(fileURLToPath(new URL(name, import.meta.url)), join(root, 'scripts/ci', name));
   }
   write('.gitignore', 'node_modules/\n.nuxt/\n');
+  write('.gitattributes', '* -text\n');
   write('.fallowrc.json', '{}\n');
   write('app/a.ts', 'one\n');
   write(
@@ -46,6 +47,7 @@ beforeEach(() => {
   `
   );
   git('init', '--quiet');
+  git('config', 'core.autocrlf', 'false');
   git('config', 'user.name', 'Metrics test');
   git('config', 'user.email', 'metrics@example.invalid');
   git('config', 'commit.gpgsign', 'false');
@@ -54,6 +56,66 @@ beforeEach(() => {
   git('commit', '--quiet', '-m', 'fixture');
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
+describe('metrics CLI measured snapshots', () => {
+  it('requires paired coverage reports for comparisons', () => {
+    for (const args of [
+      ['--base-coverage', 'base.json'],
+      ['--base', 'HEAD', '--base-coverage', 'base.json'],
+      ['--coverage', 'head.json', '--base-coverage', 'base.json'],
+      ['--base', 'HEAD', '--coverage', 'head.json'],
+    ]) {
+      const result = run(...args);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('requires');
+      expect(result.stdout).toBe('');
+    }
+  });
+  it('maps both Istanbul reports to the exact analyzed checkout', () => {
+    write(
+      'node_modules/fallow/bin/fallow/index.cjs',
+      `
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const args = process.argv;
+      const root = args[args.indexOf('--root') + 1];
+      const report = JSON.parse(fs.readFileSync(args[args.indexOf('--coverage') + 1], 'utf8'));
+      const expected = path.join(root, 'app/a.ts');
+      if (Object.keys(report)[0] !== expected || report[expected].path !== expected) {
+        throw new Error('coverage paths do not match checkout');
+      }
+      process.stdout.write(JSON.stringify({ summary: {
+        coverage_model: report[expected].model ?? 'istanbul'
+      } }));
+      `
+    );
+    const path = join(root, 'app/a.ts');
+    write('head.json', JSON.stringify({ [path]: { path } }));
+    write('base.json', JSON.stringify({ [path]: { path } }));
+    const args = ['--base', 'HEAD', '--coverage', 'head.json', '--base-coverage', 'base.json'];
+    const result = run(...args);
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('CRAP model: istanbul');
+    mkdirSync(join(root, 'coverage-input'));
+    write('coverage-input/coverage-final.json', JSON.stringify({ [path]: { path } }));
+    expect(run('--coverage', 'coverage-input').status).toBe(0);
+    for (const report of ['head.json', 'base.json']) {
+      write(report, JSON.stringify({ [path]: { path, model: 'static_estimated' } }));
+      const fallback = run(...args);
+      expect(fallback.status).toBe(1);
+      expect(fallback.stderr).toContain('Expected Istanbul coverage');
+      expect(fallback.stdout).toBe('');
+      write(report, JSON.stringify({ [path]: { path } }));
+    }
+  });
+  it('rejects coverage paths outside the source checkout', () => {
+    const path = join(root, '..', 'other', 'app/a.ts');
+    write('head.json', JSON.stringify({ [path]: { path } }));
+    const result = run('--coverage', 'head.json');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('outside the source checkout');
+  });
+});
 describe('metrics CLI working-tree snapshots', () => {
   it('identifies clean and dirty snapshots and labels a dirty comparison', () => {
     expect(JSON.parse(run().stdout).dirty).toBe(false);

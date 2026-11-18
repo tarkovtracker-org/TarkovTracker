@@ -121,12 +121,6 @@ jobs:
         env:
           FALLOW_BASE: ${{ steps.fallow-base.outputs.base }}
         run: pnpm run lint:fallow --base "$FALLOW_BASE"
-      # Advisory: reports base-to-head size and Fallow health deltas in the job summary.
-      - name: Codebase metrics
-        continue-on-error: true
-        env:
-          FALLOW_BASE: ${{ steps.fallow-base.outputs.base }}
-        run: pnpm run metrics --base "$FALLOW_BASE" --summary "$GITHUB_STEP_SUMMARY"
   lint-format:
     needs: changes
     name: Lint & Format
@@ -293,6 +287,49 @@ jobs:
           path: coverage/coverage-final.json
           if-no-files-found: error
           retention-days: 30
+  metrics:
+    name: Codebase metrics
+    needs: coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    continue-on-error: true
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-project
+      - name: Download merged head coverage
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-final
+          path: coverage
+      - name: Download coverage for the exact comparison base
+        id: base-coverage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'HEAD^' }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base=$(git merge-base HEAD "$BASE_REF")
+          run=$(gh run list --workflow ci.yml --branch "$DEFAULT_BRANCH" --event push --commit "$base" \
+            --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          test -n "$run" || { echo "No successful default-branch CI run for $base"; exit 1; }
+          gh run download "$run" --name coverage-final --dir "$RUNNER_TEMP/base-coverage"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+      - name: Compare measured codebase metrics
+        timeout-minutes: 4
+        env:
+          METRICS_BASE: ${{ steps.base-coverage.outputs.base }}
+        run: |
+          pnpm run metrics --base "$METRICS_BASE" --base-coverage "$RUNNER_TEMP/base-coverage/coverage-final.json" \
+            --coverage coverage/coverage-final.json --summary "$GITHUB_STEP_SUMMARY"
+      - name: Report unavailable comparison
+        if: failure()
+        run: echo 'Measured codebase comparison unavailable. See the base coverage and metrics steps.' >> "$GITHUB_STEP_SUMMARY"
   validate:
     needs: changes
     # Translation-only pull requests keep the reduced test selection but still build a preview.
