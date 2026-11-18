@@ -7,6 +7,7 @@ import { GAME_MODE_VALUES, getGameModeSeasonNumber } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 import type { WithRemoteSnapshot } from '@/utils/pendingState';
+import type { SupabaseRealtimeChannel } from '@/utils/realtimeChannel';
 const showProgressMerged = vi.fn();
 type FakeChannel = {
   topic: string;
@@ -72,7 +73,7 @@ const {
       realtime: {
         connect: vi.fn(),
         disconnect: vi.fn().mockResolvedValue(undefined),
-        getChannels: vi.fn(() => []),
+        getChannels: vi.fn(() => [] as SupabaseRealtimeChannel[]),
         setAuth: vi.fn(async () => {}),
       },
       from: vi.fn(),
@@ -701,6 +702,46 @@ describe('seasonal progress realtime synchronization', () => {
       expect(state.pvp.level).toBe(defaultState.pvp.level);
     } finally {
       disposeVisibility();
+      vi.useRealTimers();
+    }
+  });
+  it('merges a foreground REST snapshot after both socket open attempts fail', async () => {
+    vi.useFakeTimers();
+    const transport = supabaseContext.client.realtime;
+    const connect = transport.connect;
+    const page = Object.assign(new EventTarget(), {
+      visibilityState: 'visible' as DocumentVisibilityState,
+    });
+    const disposeVisibility = installRealtimeVisibility(
+      transport,
+      async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+      page
+    );
+    try {
+      const { setupRealtimeListener, reconcileRemoteSnapshot } =
+        await import('@/stores/tarkov/realtimeListener');
+      await setupRealtimeListener(store);
+      transport.getChannels.mockReturnValue([
+        createdChannels[0] as unknown as SupabaseRealtimeChannel,
+      ]);
+      page.visibilityState = 'hidden';
+      page.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(60_000);
+      connect.mockImplementation(() => {
+        throw new Error('Socket unavailable');
+      });
+      page.visibilityState = 'visible';
+      page.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(connect).toHaveBeenCalledTimes(2);
+      supabaseContext.client.from.mockClear();
+      await expect(reconcileRemoteSnapshot()).resolves.toBeUndefined();
+      expect(supabaseContext.client.from).toHaveBeenCalledWith('user_progress');
+      expect(supabaseContext.client.from).toHaveBeenCalledWith('user_game_mode_progress');
+    } finally {
+      disposeVisibility();
+      connect.mockReset();
+      transport.getChannels.mockReturnValue([]);
       vi.useRealTimers();
     }
   });

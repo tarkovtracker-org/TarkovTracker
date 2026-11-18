@@ -187,6 +187,51 @@ describe('useSupporter', () => {
     expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
     supporter.unsubscribe();
   });
+  it('loads supporter status while a join is deferred and refreshes once it subscribes', async () => {
+    vi.useFakeTimers();
+    const { installRealtimeVisibility } = await import('@/utils/realtimeVisibility');
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const channel = { on: vi.fn(), subscribe: vi.fn() };
+    channel.on.mockReturnValue(channel);
+    mockChannel.mockReturnValue(channel);
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+    const transport = {
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      getChannels: () => [channel],
+      setAuth: vi.fn(),
+    } as unknown as Parameters<typeof installRealtimeVisibility>[0];
+    Object.assign(mockSupabase.client, { realtime: transport });
+    const page = Object.assign(new EventTarget(), {
+      visibilityState: 'hidden' as DocumentVisibilityState,
+    });
+    const dispose = installRealtimeVisibility(
+      transport,
+      async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+      page
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(60_000);
+      const completed = vi.fn();
+      void supporter.subscribe('user-1').then(completed);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(completed).toHaveBeenCalledWith(true);
+      expect(mockMaybeSingle).toHaveBeenCalledOnce();
+      expect(channel.subscribe).not.toHaveBeenCalled();
+      page.visibilityState = 'visible';
+      page.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(channel.subscribe).toHaveBeenCalledOnce();
+      channel.subscribe.mock.calls[0]![0]('SUBSCRIBED');
+      expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
+    } finally {
+      dispose();
+      supporter.unsubscribe();
+      Reflect.deleteProperty(mockSupabase.client, 'realtime');
+      vi.useRealTimers();
+    }
+  });
   it.each([true, false])(
     'settles initialization from a superseding refresh (success: %s)',
     async (success) => {

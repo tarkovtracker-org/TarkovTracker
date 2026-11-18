@@ -312,8 +312,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     dispatchHydration(teamId);
   };
   /**
-   * A closed or failed channel is no longer joined, so drop the binding and let
-   * the next membership event rebuild it.
+   * Drop the joined binding on failure and rebuild a terminally closed channel.
    *
    * Recovery can replace the owned channel before it rejoins, so the
    * missed-progress refresh is carried across that replacement.
@@ -327,7 +326,8 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     if (previouslyJoined.has(owned)) hydrationTeam = teamId;
     joinedTeamId = null;
     joinedFilter = undefined;
-    recordStatusFailure(status, error);
+    if (status === 'CLOSED') scheduleRecovery();
+    else recordStatusFailure(status, error);
   };
   /**
    * Reacts to every subscribe status rather than only `SUBSCRIBED`.

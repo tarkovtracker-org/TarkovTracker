@@ -8,7 +8,7 @@ import {
 } from '@/utils/realtimeVisibility';
 import type { SupabaseRealtimeChannel } from '@/utils/realtimeChannel';
 const session = (accessToken: string) => ({ accessToken, isCurrent: () => true });
-const setup = () => {
+const setup = (proxyTransport = false) => {
   const page = new EventTarget() as EventTarget & { visibilityState: DocumentVisibilityState };
   page.visibilityState = 'visible';
   const transport = {
@@ -21,8 +21,9 @@ const setup = () => {
     .fn<Parameters<typeof installRealtimeVisibility>[1]>()
     .mockResolvedValue(session('user-token'));
   const connect = transport.connect;
+  const input = transport as unknown as Parameters<typeof installRealtimeVisibility>[0];
   const dispose = installRealtimeVisibility(
-    transport as unknown as Parameters<typeof installRealtimeVisibility>[0],
+    proxyTransport ? (reactive(input) as typeof input) : input,
     readSession,
     page
   );
@@ -86,6 +87,31 @@ describe('Realtime background transport', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(connect).not.toHaveBeenCalled();
     dispose();
+  });
+  it('keeps new joins behind auth after waking an empty reactive transport', async () => {
+    vi.useFakeTimers();
+    const { transport, connect, dispose, readSession, visibility } = setup(true);
+    const asTransport = transport as unknown as Parameters<typeof installRealtimeVisibility>[0];
+    const channel = { subscribe: vi.fn() };
+    const lookup = Promise.withResolvers<ReturnType<typeof session>>();
+    readSession.mockReturnValue(lookup.promise);
+    transport.getChannels.mockReturnValue([]);
+    try {
+      visibility('hidden');
+      await vi.advanceTimersByTimeAsync(60_000);
+      visibility('visible');
+      await vi.advanceTimersByTimeAsync(0);
+      transport.getChannels.mockReturnValue([channel]);
+      subscribeRealtimeChannel(asTransport, channel as unknown as SupabaseRealtimeChannel);
+      expect(channel.subscribe).not.toHaveBeenCalled();
+      lookup.resolve(session('user-token'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(transport.setAuth).toHaveBeenCalledWith('user-token');
+      expect(connect).toHaveBeenCalledOnce();
+      expect(channel.subscribe).toHaveBeenCalledOnce();
+    } finally {
+      dispose();
+    }
   });
   it('waits for an outstanding disconnect and honors a second hide', async () => {
     vi.useFakeTimers();
@@ -215,7 +241,9 @@ describe('Realtime background transport', () => {
       }),
     };
     const healthy = { subscribe: vi.fn() };
-    const onFailure = vi.fn();
+    const onFailure = vi.fn(() => {
+      throw new Error('failure callback threw');
+    });
     transport.getChannels.mockReturnValue([failed, healthy]);
     try {
       visibility('hidden');

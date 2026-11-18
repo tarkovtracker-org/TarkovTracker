@@ -6,12 +6,15 @@ const REALTIME_RESUME_RETRY_MS = 1_000;
 type RealtimeTransport = Pick<SupabaseClient['realtime'], 'connect' | 'disconnect' | 'getChannels'>;
 type RealtimeSession = { accessToken: string; isCurrent: () => boolean };
 type SubscribeCallback = (status: `${REALTIME_SUBSCRIBE_STATES}`, error?: Error) => void;
-const suspendedTransports = new WeakMap<
-  RealtimeTransport,
-  WeakMap<SupabaseRealtimeChannel, SubscribeCallback | undefined>
->();
+type SuspendedTransport = {
+  isHidden: () => boolean;
+  joins: WeakMap<SupabaseRealtimeChannel, SubscribeCallback | undefined>;
+};
+const suspendedTransports = new WeakMap<RealtimeTransport, SuspendedTransport>();
 export const isRealtimeSuspended = (transport: RealtimeTransport): boolean =>
   suspendedTransports.has(toRaw(transport));
+export const isRealtimeBackgroundSuspended = (transport: RealtimeTransport): boolean =>
+  suspendedTransports.get(toRaw(transport))?.isHidden() ?? false;
 /** Delay new joins until resume can give Phoenix an authenticated join payload. */
 export const subscribeRealtimeChannel = (
   transport: RealtimeTransport,
@@ -19,7 +22,7 @@ export const subscribeRealtimeChannel = (
   callback?: SubscribeCallback
 ): boolean => {
   // Consumers can get the SDK client through Nuxt's reactive injection.
-  const pending = suspendedTransports.get(toRaw(transport));
+  const pending = suspendedTransports.get(toRaw(transport))?.joins;
   if (pending) {
     pending.set(toRaw(channel), callback);
     transport.connect();
@@ -37,15 +40,20 @@ const subscribeDeferredChannel = (
   } catch (cause) {
     const error = cause instanceof Error ? cause : new Error(String(cause));
     logger.warn('[Realtime] Deferred channel could not subscribe', error);
-    callback?.('CLOSED', error);
+    try {
+      callback?.('CLOSED', error);
+    } catch (callbackError) {
+      logger.warn('[Realtime] Deferred channel failure callback threw', callbackError);
+    }
   }
 };
 /** Keep channel ownership intact while closing the shared socket in background tabs. */
 export const installRealtimeVisibility = (
-  transport: RealtimeTransport & Pick<SupabaseClient['realtime'], 'setAuth'>,
+  inputTransport: RealtimeTransport & Pick<SupabaseClient['realtime'], 'setAuth'>,
   readSession: () => Promise<RealtimeSession | null>,
   page: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'> = document
 ): (() => void) => {
+  const transport = toRaw(inputTransport);
   const originalConnect = transport.connect;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -58,7 +66,7 @@ export const installRealtimeVisibility = (
   const resumeIsStale = (version: number): boolean =>
     disposed || version !== generation || page.visibilityState === 'hidden';
   const reconnect = () => {
-    const pending = suspendedTransports.get(transport);
+    const pending = suspendedTransports.get(transport)?.joins;
     const channels = transport.getChannels();
     if (channels.length) originalConnect.call(transport);
     suspendedTransports.delete(transport);
@@ -77,8 +85,7 @@ export const installRealtimeVisibility = (
     if (resumeIsStale(version)) return;
     // The SDK opens the socket while its own token lookup runs. A channel can
     // rejoin with the project key before that lookup returns a user token.
-    if (transport.getChannels().length > 0) await authenticateAndReconnect(version);
-    else reconnect();
+    await authenticateAndReconnect(version);
   };
   const requestResume = (allowRetry = true) => {
     if (resumeIsStale(generation)) return;
@@ -114,7 +121,10 @@ export const installRealtimeVisibility = (
     timer = undefined;
     if (disposed || page.visibilityState !== 'hidden') return;
     generation += 1;
-    suspendedTransports.set(transport, new WeakMap());
+    suspendedTransports.set(transport, {
+      isHidden: () => page.visibilityState === 'hidden',
+      joins: new WeakMap(),
+    });
     const pending = Promise.resolve().then(() => transport.disconnect());
     leaving = pending;
     void pending

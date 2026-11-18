@@ -342,6 +342,19 @@ describe('createTeamChannelController', () => {
     expect(harness.removeChannel).toHaveBeenCalledTimes(1);
     expect(harness.channels).toHaveLength(2);
   });
+  it('recovers from a terminal close before a first join without a membership event', async () => {
+    const harness = createHarness();
+    const controller = createTeamChannelController(harness.deps);
+    try {
+      await controller.refresh();
+      harness.channels[0]!.status!('CLOSED', new Error('Deferred join failed'));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(harness.removeChannel).toHaveBeenCalledWith(harness.channels[0]);
+      expect(harness.channels).toHaveLength(2);
+    } finally {
+      await controller.dispose();
+    }
+  });
   it('drops the binding and rebuilds after the channel closes', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);
