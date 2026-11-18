@@ -1310,6 +1310,7 @@
         "other_hint": "In-game group not known yet."
       },
       "questcard": {
+        "objectives_load_error": "Could not load objectives.",
         "pin_task": "Pin task",
         "unpin_task": "Unpin task",
         "hide_task": "Hide task",

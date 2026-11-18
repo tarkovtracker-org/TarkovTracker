@@ -146,6 +146,29 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     expect(store.tasks[0]?.objectives?.[0]?.id).toBe('bunker');
     expect(store.tasksObjectivesHydrated).toBe(true);
   });
+  it('exposes a cold load failure and hydrates objectives on a manual retry', async () => {
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const store = useMetadataStore();
+    store.tasks = [{ id: 'task-1', objectives: [] }] as Task[];
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({
+        data: { tasks: [{ id: 'task-1', objectives: [{ id: 'recovered' }] }] },
+      });
+    vi.stubGlobal('$fetch', fetchMock);
+    await store.fetchTaskObjectivesData();
+    expect(store.tasksObjectivesPending).toBe(false);
+    expect(store.tasksObjectivesHydrated).toBe(false);
+    expect(store.tasksObjectivesError).toBeInstanceOf(Error);
+    await store.fetchTaskObjectivesData();
+    expect(store.tasksObjectivesError).toBeNull();
+    expect(store.tasksObjectivesHydrated).toBe(true);
+    expect(store.tasks[0]?.objectives?.[0]?.id).toBe('recovered');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
   it('reports handled count failures without marking them stale', async () => {
     const store = useMetadataStore();
     store.tasks = [{ id: 'task-1', objectives: [] }] as Task[];

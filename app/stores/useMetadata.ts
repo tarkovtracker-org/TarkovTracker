@@ -303,6 +303,7 @@ interface MetadataState {
   tasksCoreRefreshing: boolean;
   // Indicates objectives still need to be fetched (set when tasks exist but objectives not yet loaded)
   tasksObjectivesPending: boolean;
+  tasksObjectivesError: Error | null;
   tasksObjectivesHydrated: boolean;
   tasksRewardsHydrated: boolean;
   hideoutLoading: boolean;
@@ -606,6 +607,7 @@ export const useMetadataStore = defineStore('metadata', {
     tasksCoreRevision: 0,
     tasksCoreRefreshing: false,
     tasksObjectivesPending: false,
+    tasksObjectivesError: null,
     tasksObjectivesHydrated: false,
     tasksRewardsHydrated: false,
     hideoutLoading: false,
@@ -967,6 +969,7 @@ export const useMetadataStore = defineStore('metadata', {
         | 'error'
         | 'hideoutError'
         | 'itemsError'
+        | 'tasksObjectivesError'
         | 'mapSpawnsError'
         | 'prestigeError'
         | 'editionsError';
@@ -1030,6 +1033,7 @@ export const useMetadataStore = defineStore('metadata', {
         | 'error'
         | 'hideoutError'
         | 'itemsError'
+        | 'tasksObjectivesError'
         | 'mapSpawnsError'
         | 'prestigeError'
         | 'editionsError';
@@ -1548,6 +1552,7 @@ export const useMetadataStore = defineStore('metadata', {
         },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'tasksObjectivesPending',
+        errorKey: 'tasksObjectivesError',
         processData: (data, response) => {
           const currentKey = objectiveCatalogCacheKey(this, requestGameMode);
           if (!response && cacheKey !== currentKey) return;
@@ -2152,6 +2157,7 @@ export const useMetadataStore = defineStore('metadata', {
       });
       this.tasksObjectivesPending = (data.tasks?.length ?? 0) > 0;
       this.tasksObjectivesHydrated = false;
+      this.tasksObjectivesError = null;
       this.tasksRewardsHydrated = false;
       this.objectiveModeCountDifferences = markRaw({});
       this.objectiveModeCountDifferencesHydrated = false;
@@ -2694,6 +2700,7 @@ export const useMetadataStore = defineStore('metadata', {
       getPromiseStore(this).taskCatalogEpoch += 1;
       this.tasksObjectivesPending = false;
       this.tasksObjectivesHydrated = false;
+      this.tasksObjectivesError = null;
       this.tasksRewardsHydrated = false;
       this.mapSpawnsLoaded = false;
       this.mapSpawnsLoading = false;

@@ -47,11 +47,13 @@ const tarkovStoreMock = {
 const metadataStoreMock = {
   alternativeTaskSources: {} as Record<string, string[]>,
   editions: [],
+  fetchTaskObjectivesData: vi.fn(),
   getTaskById: vi.fn(),
   mapsWithSvg: [],
   storyChapters: [] as StoryChapter[],
   storyChaptersGameMode: null as string | null,
   tasks: [] as Task[],
+  tasksObjectivesError: null as Error | null,
   tasksObjectivesHydrated: true,
   tasksObjectivesPending: false,
   traders: [],
@@ -193,7 +195,7 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
         ContextMenuItem: ContextMenuItemStub,
         NuxtImg: true,
         QuestObjectives: QuestObjectivesStub,
-        QuestObjectivesSkeleton: QuestObjectivesStub,
+        QuestObjectivesSkeleton: { template: '<div data-testid="objectives-skeleton" />' },
         TaskCardActions: TaskCardActionsStub,
         TaskCardBackground: TaskCardBackgroundStub,
         TaskCardBadges: TaskCardBadgesStub,
@@ -221,10 +223,29 @@ describe('TaskCard appearance and expansion controls', () => {
     progressStoreMock.tasksFailed = {};
     progressStoreMock.unlockedTasks = { 'task-1': { self: true } };
     vi.clearAllMocks();
+    metadataStoreMock.tasksObjectivesError = null;
+    metadataStoreMock.tasksObjectivesHydrated = true;
     metadataStoreMock.getTaskById.mockReset();
     metadataStoreMock.storyChapters = [];
     metadataStoreMock.storyChaptersGameMode = null;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+  });
+  it('offers a retry on a cold card and shows recovered objectives in place', async () => {
+    metadataStoreMock.tasksObjectivesError = new Error('offline');
+    metadataStoreMock.tasksObjectivesHydrated = false;
+    const wrapper = await mountTaskCard();
+    const objectives = wrapper.get('#objectives-content-task-1');
+    expect(objectives.find('[data-testid="objectives-skeleton"]').exists()).toBe(false);
+    const retry = objectives.get('button');
+    expect(retry.text()).toBe(en.common.retry);
+    await retry.trigger('click');
+    expect(metadataStoreMock.fetchTaskObjectivesData).toHaveBeenCalledExactlyOnceWith();
+    await wrapper.setProps({
+      task: { ...wrapper.props('task'), objectives: [{ id: 'restored' }] },
+    });
+    expect(objectives.find('button').exists()).toBe(false);
+    expect(objectives.find('[data-testid="task-objectives"]').exists()).toBe(true);
+    wrapper.unmount();
   });
   it('discloses completed objectives manually and responds to preference and completion changes', async () => {
     taskState.complete = true;

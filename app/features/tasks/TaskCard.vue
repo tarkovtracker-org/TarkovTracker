@@ -235,8 +235,21 @@
               :id="`objectives-content-${task.id}`"
               :class="compactClasses.objectivesBody"
             >
+              <div
+                v-if="showObjectivesSkeleton && metadataStore.tasksObjectivesError"
+                class="flex items-center gap-2"
+              >
+                <span role="status">{{ t('page.tasks.questcard.objectives_load_error') }}</span>
+                <UButton
+                  size="xs"
+                  variant="soft"
+                  @click.stop="metadataStore.fetchTaskObjectivesData()"
+                >
+                  {{ t('common.retry') }}
+                </UButton>
+              </div>
               <QuestObjectivesSkeleton
-                v-if="showObjectivesSkeleton"
+                v-else-if="showObjectivesSkeleton"
                 :objectives="relevantViewObjectives"
                 :irrelevant-count="irrelevantObjectives.length"
                 :uncompleted-irrelevant="uncompletedIrrelevantObjectives.length"

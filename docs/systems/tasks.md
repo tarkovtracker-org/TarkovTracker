@@ -776,6 +776,10 @@ network requests cannot overwrite current eligibility, cache payloads, or loadin
 Normalize edition and chapter network payloads before applying either, preserving existing
 data if normalization fails. Empty cached editions do not replace loaded eligibility.
 
+After an objectives request fails, a task card waiting for objectives shows a retry action.
+Retry uses the current catalog and the same overlay freshness checks as the initial request.
+Cards with available objectives keep displaying them.
+
 Task readiness uses `ensureEditionsData` to join or reuse the current mode/language edition request,
 including a request settled during bootstrap/core loading. Settled failures are also reused to avoid
 repeated readiness requests; they retain the error, and explicit fetch/refresh calls retry. Scope
