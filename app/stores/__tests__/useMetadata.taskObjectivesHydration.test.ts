@@ -65,6 +65,39 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     });
     expect(store.tasksObjectivesHydrated).toBe(true);
   });
+  it('exposes a load error and shares a retry for the current objective catalog', async () => {
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const store = useMetadataStore();
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
+    store.tasks = [{ id: 'task-1', objectives: [] }] as Task[];
+    const tasks = [{ id: 'task-1', objectives: [{ id: 'obj-1', count: 2 }] }];
+    const response = Promise.withResolvers<{ data: { tasks: typeof tasks } }>();
+    const failure = new Error('Objectives unavailable');
+    const fetchMock = vi.fn().mockRejectedValueOnce(failure).mockReturnValueOnce(response.promise);
+    vi.stubGlobal('$fetch', fetchMock);
+    await store.fetchTaskObjectivesData();
+    expect(store.tasksObjectivesError).toBe(failure);
+    expect(store.tasksObjectivesPending).toBe(false);
+    expect(store.tasksObjectivesHydrated).toBe(false);
+    const first = store.fetchTaskObjectivesData();
+    const second = store.fetchTaskObjectivesData();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(store.tasksObjectivesError).toBeNull();
+    expect(store.tasksObjectivesPending).toBe(true);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/tarkov/tasks-objectives',
+      expect.objectContaining({
+        query: expect.objectContaining({ gameMode: 'regular', lang: 'en' }),
+      })
+    );
+    response.resolve({ data: { tasks } });
+    await Promise.all([first, second]);
+    expect(store.tasksObjectivesError).toBeNull();
+    expect(store.tasksObjectivesPending).toBe(false);
+    expect(store.tasksObjectivesHydrated).toBe(true);
+    expect(store.getTaskById('task-1')?.objectives?.[0]?.count).toBe(2);
+  });
   it('does not persist objective data that predates an observed cache purge', async () => {
     const retry = Promise.withResolvers<undefined>();
     const wait = vi.spyOn(asyncUtils, 'delay').mockReturnValue(retry.promise);
