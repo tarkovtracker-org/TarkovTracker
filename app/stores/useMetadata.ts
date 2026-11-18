@@ -602,7 +602,9 @@ const cachedProgressionView = (
   cached: CachedEditions
 ): ProgressionCatalog => {
   const fallback = cachedProgressionCatalog(cached);
-  const neutral = freshNeutralEditionCatalogs(state).get(mode)?.data ?? fallback;
+  const neutral = hasFreshNeutralEditions(state, mode)
+    ? freshNeutralEditionCatalogs(state).get(mode)!.data
+    : fallback;
   return localizeCachedMetadata(state, neutral, state.languageCode) ?? fallback;
 };
 const cacheProgressionCatalog = (

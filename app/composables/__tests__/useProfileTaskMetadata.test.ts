@@ -34,6 +34,35 @@ afterEach(() => {
   vi.useRealTimers();
 });
 describe('profile mode metadata', () => {
+  it.each([
+    ['tasks-core', null],
+    ['tasks-core', {}],
+    ['tasks-core', { id: 123 }],
+    ['tasks-objectives', null],
+    ['tasks-objectives', {}],
+    ['tasks-objectives', { id: 123 }],
+  ])('refetches cached %s with an incompatible task entry %j', async (type, entry) => {
+    vi.mocked(cache.getCachedData).mockImplementation(async (candidate) =>
+      candidate === type ? ({ tasks: [entry], maps: [], traders: [] } as never) : null
+    );
+    const fetch = vi.fn(async (url: string) => {
+      if (url.endsWith('/tasks-core'))
+        return { data: { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } };
+      if (url.endsWith('/tasks-objectives'))
+        return { data: { tasks: [{ id: 'task', objectives: [{ id: 'objective' }] }] } };
+      if (url.endsWith('/prestige')) return { data: { prestige: [] } };
+      return { data: { editions: [], storyChapters: [] } };
+    });
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await flushPromises();
+    expect(fetch.mock.calls.filter(([url]) => url.endsWith('/' + type))).toHaveLength(1);
+    expect(result.tasks.value[0]?.id).toBe('task');
+    expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('objective');
+    expect(result.error.value).toBeNull();
+    scope.stop();
+  });
   it('refetches malformed cached prestige and stores valid editions with a one-hour TTL', async () => {
     vi.mocked(cache.getCachedData).mockImplementation(async (type) =>
       type === 'prestige' ? ({ prestige: [{ id: 'bad', level: 'invalid' }] } as never) : null

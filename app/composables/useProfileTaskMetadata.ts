@@ -111,11 +111,19 @@ const validCachedProfileChapter = (chapter: StoryChapter): boolean =>
   ].every(Boolean);
 const validCachedProfileChapters = (value: unknown): boolean =>
   validChapterCatalog(value) && value.every(validCachedProfileChapter);
+const validCachedProfileTask = (value: unknown): boolean => {
+  if (!isProfileConditionRecord(value)) return false;
+  const id = (value as Record<string, unknown>).id;
+  return typeof id === 'string' && id.length > 0;
+};
+const validCachedProfileTasks = (value: unknown): boolean =>
+  Array.isArray(value) && value.every(validCachedProfileTask);
 const profileCatalogValidators: Partial<
   Record<CacheType, (value: Record<string, unknown>) => boolean>
 > = {
-  'tasks-core': (value) => [value.tasks, value.maps, value.traders].every(Array.isArray),
-  'tasks-objectives': (value) => Array.isArray(value.tasks),
+  'tasks-core': (value) =>
+    validCachedProfileTasks(value.tasks) && [value.maps, value.traders].every(Array.isArray),
+  'tasks-objectives': (value) => validCachedProfileTasks(value.tasks),
   prestige: (value) => Array.isArray(value.prestige) && value.prestige.every(validProfilePrestige),
   editions: (value) =>
     validEditionCatalog(value.editions) && validCachedProfileChapters(value.storyChapters),

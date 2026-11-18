@@ -20,6 +20,26 @@ describe('metadata string cache', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it('fences a persistent string write that finishes after the owner is invalidated', async () => {
+    const owner = {};
+    const key = '@tt:regular:items:name';
+    const commit = createDeferred<undefined>();
+    const finished = createDeferred<undefined>();
+    const persisted: unknown[] = [];
+    vi.mocked(cache.setCachedData).mockImplementation(
+      async (_type, _key, _language, data, _ttl, isCurrent) => {
+        await commit.promise;
+        if (isCurrent?.() ?? true) persisted.push(data);
+        finished.resolve(undefined);
+      }
+    );
+    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ data: { strings: { [key]: 'Old' } } }));
+    expect(await localizeMetadata(owner, { name: key }, 'en')).toEqual({ name: 'Old' });
+    invalidateGameDataStrings(owner);
+    commit.resolve(undefined);
+    await finished.promise;
+    expect(persisted).toEqual([]);
+  });
   it('refreshes an older cached table once when a new neutral catalog references a new key', async () => {
     const owner = {};
     const first = '@tt:regular:items:first';
@@ -98,8 +118,15 @@ describe('metadata string cache', () => {
     await old;
     expect(await localizeMetadata(owner, { name: key }, 'en')).toEqual({ name: 'New' });
     expect(cache.setCachedData).toHaveBeenCalledTimes(1);
-    expect(cache.setCachedData).toHaveBeenCalledWith('strings', 'strings-v1', 'en', {
-      [key]: 'New',
-    });
+    expect(cache.setCachedData).toHaveBeenCalledWith(
+      'strings',
+      'strings-v1',
+      'en',
+      {
+        [key]: 'New',
+      },
+      undefined,
+      expect.any(Function)
+    );
   });
 });

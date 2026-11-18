@@ -101,9 +101,15 @@ const publishStringTable = (
   });
   invalidatedOwners.delete(toRaw(owner));
   if (result.fetched) {
-    void setCachedData('strings', STRINGS_CACHE_VERSION, language, result.strings).catch((error) =>
-      logger.warn('[MetadataStore] Failed to cache game strings:', error)
-    );
+    const canWrite = claimMetadataCacheWrite(owner, `strings/${language}`);
+    void setCachedData(
+      'strings',
+      STRINGS_CACHE_VERSION,
+      language,
+      result.strings,
+      undefined,
+      canWrite
+    ).catch((error) => logger.warn('[MetadataStore] Failed to cache game strings:', error));
   }
 };
 const createStringRequest = (

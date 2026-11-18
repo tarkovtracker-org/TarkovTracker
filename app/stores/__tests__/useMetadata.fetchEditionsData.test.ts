@@ -50,6 +50,40 @@ describe('useMetadataStore fetchEditionsData', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
+  it('keeps newer IndexedDB editions when the previous language catalog expired in memory', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    const old = {
+      editions: [createEdition('old', 1, 'Old edition')],
+      storyChapters: [createStoryChapter('old', 1, 'Old chapter')],
+    };
+    const current = {
+      editions: [createEdition('current', 1, 'Current edition')],
+      storyChapters: [createStoryChapter('current', 1, 'Current chapter')],
+    };
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const read = vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ data: old }));
+    const store = useMetadataStore();
+    await store.fetchEditionsData(true);
+    expect(store.editions[0]?.id).toBe('old');
+    vi.mocked(Date.now).mockReturnValue(3_602_000);
+    store.languageCode = 'de';
+    read.mockImplementation(
+      async (type) =>
+        ({
+          'tasks-core': { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] },
+          hideout: { hideoutStations: [{ id: 'station', name: 'Station', levels: [] }] },
+          prestige: { prestige: [] },
+          editions: current,
+        })[type as 'editions'] as never
+    );
+    const cached = await store.loadCriticalCacheData();
+    expect(cached?.editions.editions?.[0]?.id).toBe('current');
+    expect(cached).not.toBeNull();
+    store.applyCriticalCachedData(cached!);
+    expect(store.editions[0]?.id).toBe('current');
+    expect(store.storyChapters[0]?.id).toBe('current');
+  });
   it('clears stale Seasonal perks when an edition response omits them', async () => {
     const store = useMetadataStore();
     store.currentGameMode = 'seasonal';
