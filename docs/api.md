@@ -109,15 +109,40 @@ unchanged. See [handler](../app/server/api/security/tarkov-verify.post.ts).
 > [`architecture.md#api-protection`](./architecture.md#api-protection) for access-control configuration and
 > [`rate-limiting.md`](./rate-limiting.md) for rate-limit ownership.
 
+### Neutral catalog responses
+
+The ten hot datasets are language-neutral snapshots scoped by `gameMode`. Their
+names, descriptions, and localized links can be `@tt:` references. Load
+`/api/tarkov/strings?lang=<code>` and resolve those references before rendering,
+searching, or sorting by text. Entity IDs and object keys retain their identities.
+
+Catalog and strings responses use `Cache-Control: no-store`,
+`X-Cache-Status: PRECOMPUTE`, and `X-Catalog-Release: <completedAt>`. Overlay-bearing
+scopes also expose overlay headers and `dataOverlay`. Bootstrap and map-spawns
+have no overlay body identity. A KV failure can serve an eligible last-good
+compressed Cache API snapshot with `X-Cache-Status: STALE`; without one the route
+returns `503`. Release verification requires the active precomputed release.
+
+### GET /api/tarkov/strings
+
+Returns `{ data: { strings: { "<reference>": "<resolved text>" } }, dataOverlay }`.
+The table contains referenced keys for every mode and endpoint, with English
+fallback resolved on the server. Its scope is API language and its release follows
+the shared snapshot policy. `gameMode` does not select a separate table.
+
+| Parameter | Type   | Default | Description                                                              |
+| --------- | ------ | ------- | ------------------------------------------------------------------------ |
+| `lang`    | string | `en`    | Selectable API language, with unsupported values falling back to English |
+
 ### GET /api/tarkov/bootstrap
 
 Fetches minimal player level data for early UI rendering.
 
-**Query Parameters:**
+**Query Parameters**
 
-| Parameter | Type   | Default | Description                                     |
-| --------- | ------ | ------- | ----------------------------------------------- |
-| `lang`    | string | `en`    | Language code (see Supported Languages section) |
+| Parameter  | Type   | Default   | Description                       |
+| ---------- | ------ | --------- | --------------------------------- |
+| `gameMode` | string | `regular` | `regular`, `pve`, or `pvp-season` |
 
 **Response:**
 
@@ -132,8 +157,6 @@ Fetches minimal player level data for early UI rendering.
 }
 ```
 
-**Cache TTL:** 12 hours
-
 ---
 
 ### GET /api/tarkov/tasks-core
@@ -144,7 +167,6 @@ Fetches core task data (tasks, maps, traders) without objectives or rewards.
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
 **Response:**
@@ -155,20 +177,18 @@ Fetches core task data (tasks, maps, traders) without objectives or rewards.
     "tasks": [
       {
         "id": "5936d90786f7742b1420ba5b",
-        "name": "Debut",
-        "trader": { "id": "...", "name": "Prapor" },
-        "map": { "id": "...", "name": "Customs" },
+        "name": "@tt:regular:tasks:5936d90786f7742b1420ba5b name",
+        "trader": { "id": "...", "name": "@tt:regular:traders:..." },
+        "map": { "id": "...", "name": "@tt:regular:maps:..." },
         "experience": 1500,
         "minPlayerLevel": 1
       }
     ],
-    "maps": [...],
-    "traders": [...]
+    "maps": [],
+    "traders": []
   }
 }
 ```
-
-**Cache TTL:** 12 hours
 
 ---
 
@@ -180,13 +200,10 @@ Fetches task objectives and fail conditions.
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
-**Cache TTL:** 12 hours
-
-Requires overlay provenance. A cache miss that cannot apply a valid overlay returns `503` instead
-of caching uncorrected objectives; a good stale entry keeps serving during background refresh.
+The published snapshot includes overlay provenance. A missing snapshot without an
+eligible last-good copy returns `503`. A KV-failure fallback is marked `STALE`.
 
 ---
 
@@ -210,17 +227,14 @@ Whole English task catalog used by EFT log import, read only from the precompute
 
 Fetches task rewards (start, finish, failure).
 
-The admin `tarkov-data` purge includes the current `tasks-rewards-json-v2-<lang>-<gameMode>`
-edge-cache family for both apex and www origins, alongside its legacy retirement targets.
+A new precompute manifest publishes corrected rewards. The admin Tarkov data purge
+invalidates the browser's neutral metadata and strings after publication.
 
 **Query Parameters:**
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
-
-**Cache TTL:** 12 hours
 
 ---
 
@@ -232,10 +246,7 @@ Fetches hideout stations with levels, requirements, and crafts.
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
-
-**Cache TTL:** 12 hours
 
 ---
 
@@ -247,10 +258,7 @@ Fetches lightweight item data (id, name, shortName, image).
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
-
-**Cache TTL:** 24 hours
 
 ---
 
@@ -262,10 +270,7 @@ Fetches full item data including properties.
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
-
-**Cache TTL:** 24 hours
 
 ---
 
@@ -277,13 +282,10 @@ Fetches prestige level requirements.
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
-Prestige requirements come from the upstream task payload with overlay corrections applied, so the
-response is cached per language **and** game mode.
-
-**Cache TTL:** 24 hours
+Prestige requirements come from the upstream mode's task payload with overlay
+corrections applied. Display fields resolve through the selected strings bundle.
 
 ---
 
@@ -301,7 +303,7 @@ is available; successful responses use `Cache-Control: no-cache`. Shapes:
 ### GET /api/tarkov/editions
 
 Fetches mode-scoped game editions and story chapters from the overlay. In `pvp-season`, seasonal
-perk metadata comes from the localized `json.tarkov.dev/pvp-season/season` catalog, augmented by
+perk metadata comes from the neutral `json.tarkov.dev/pvp-season/season` catalog, augmented by
 overlay effects matched by perk ID. All upstream perks are retained, including perks without an
 effect patch. Other modes return an empty seasonal perk list.
 
@@ -309,33 +311,25 @@ effect patch. Other modes return an empty seasonal perk list.
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
 
-Seasonal metadata uses `edgeCache` under `seasonal-perks-json-v1-<lang>-pvp-season-<overlay-sha>`; the overlay is
-applied after that cache read. Seasonal responses expose `X-Cache-Status`, including `STALE` when
-last-good metadata is served during refresh. Other modes still read only the overlay. An unavailable
-or malformed upstream catalog fails with `502` on a cold read; unknown overlay IDs or an unavailable
-overlay fail with `503`. Metadata is checked against the current overlay before cache admission;
-incompatible refreshes retain last-good metadata. The overlay is also checked after cache reads,
-so an overlay introducing unknown IDs still returns `503` rather than silently dropping effects.
-Error responses explicitly use `Cache-Control: no-store`, replacing any policy set by the metadata
-cache before a projection failure.
-Successful responses use `Cache-Control: no-cache` so the internal metadata TTL cannot hide newer
-overlay effects or story corrections. A changed overlay SHA selects a fresh metadata entry.
+Seasonal membership and metadata are validated during precompute, and effect
+patches augment existing perk IDs. The neutral snapshot retains mode-scoped text
+references. An incompatible source prevents release activation and retains the
+previous complete manifest. Responses follow the shared neutral snapshot policy.
 
 ---
 
 ### GET /api/tarkov/overlay-status
 
-Returns the precompute fleet manifest with the overlay identity recorded for each entry. Used by the
-`verify:overlay` release gate to confirm that published precompute entries were built from the
-currently published overlay.
+Returns the activated neutral release manifest with `completedAt`, `overlaySha`,
+and exactly 43 entries covering 30 mode catalogs and 13 language bundles. Each
+entry records its immutable object key, uncompressed byte length, and overlay
+response headers. `verify:overlay` compares every served response against this
+manifest and the freshly published overlay, then checks English imports separately.
 
-**Query Parameters:** none
-
-Responses are sent with `Cache-Control: no-store` and carry no `X-Cache-Status` header. The endpoint
-answers `503` when the manifest is missing or the precomputed store cannot be read.
+This endpoint takes no query parameters. Responses use `Cache-Control: no-store`
+and have no `X-Cache-Status` header. Missing or unreadable manifests return `503`.
 
 ---
 
@@ -347,10 +341,7 @@ Fetches map spawn point data.
 
 | Parameter  | Type   | Default   | Description                                   |
 | ---------- | ------ | --------- | --------------------------------------------- |
-| `lang`     | string | `en`      | Language code                                 |
 | `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
-
-**Cache TTL:** 12 hours
 
 ---
 
@@ -621,45 +612,45 @@ problems keep their specific `4xx` messages in the same envelope.
 
 ### Client-Side (IndexedDB)
 
-The client caches API responses in IndexedDB with keys like (the game-data segment embeds the
-payload schema version built by `generateCacheKey`):
+IndexedDB schema 9 stores neutral catalogs in mode scopes and strings in language
+scopes. `generateCacheKey` produces keys such as the following.
 
-- `tarkov-tasks-core-json-v3-regular-en`
-- `tarkov-hideout-json-v5-pve-de`
-- `tarkov-tasks-core-json-v3-pvp-season-en`
-- `tarkov-items-lite-json-v2-regular-en`
+- `tarkov-tasks-core-neutral-v1-regular-en`
+- `tarkov-hideout-neutral-v1-pve-en`
+- `tarkov-items-lite-neutral-v1-pvp-season-en`
+- `tarkov-strings-strings-v1-de`
 
-### Server-Side (Edge)
+The neutral entries share the `en` storage partition across display languages.
+Localized views are produced from the cached neutral value and selected table.
+Bootstrap retains its existing mode-scoped numeric cache.
 
-Cloudflare edge caching with `Cache-Control` headers:
+### Server-Side Snapshots
 
-```http
-Cache-Control: public, max-age=43200, s-maxage=43200
-```
+Catalog and strings routes use `Cache-Control: no-store`. Their objects are
+prepared off the request path, gzip-stored under immutable keys, and selected by
+the complete release manifest. A per-colo compressed Cache API copy is reused
+when its key and timestamp match the active manifest. A KV-failure fallback is
+marked `STALE`. Operational `cache-meta` retains its separately documented edge
+cache behavior.
 
-Note: 43200 seconds = 12 hours (default), 86400 seconds = 24 hours (extended). Only fresh
-cacheable responses (`HIT`, `MISS`, `PRECOMPUTE` in `app/server/utils/edgeCache.ts`) carry
-`s-maxage`; bypass, local `DEV`, and stale-hit responses are `Cache-Control: no-cache`. On stored
-`MISS` entries `s-maxage` equals `ttl + staleTtl` so the Cloudflare CDN keeps the entry past max-age
-while a background refresh runs (stale-while-revalidate).
+### Publishing and Purging
 
-### Cache Busting
-
-The admin `tarkov-data` purge targets current versioned bootstrap, hideout, items, items-lite,
-map-spawns and prestige cache keys alongside retained legacy retirement targets. Bootstrap keys
-are mode-only; the other current catalogs include language and mode for both apex and www origins.
-
-Pass `cacheBust=1` query parameter to bypass cache.
+Publish a complete precompute release to change catalog contents. Then use the
+admin Tarkov data purge to invalidate browser metadata and string tables. The
+purge retains historical edge-cache retirement targets. A browser refresh reads
+the active snapshot release. Request query parameters do not generate a new release.
 
 ---
 
 ## Supported Languages
 
-The `lang` query parameter is validated against `API_SUPPORTED_LANGUAGES` (`app/utils/constants.ts`); codes outside that allowlist fall back to `en` (`getValidatedLanguage` in `app/server/utils/language-helpers.ts`).
-
-`lang` is not forwarded to upstream as a query parameter. `json.tarkov.dev` serves an English base document containing translation keys plus a separate per-language document at `{gameMode}/{endpoint}_{lang}`; the proxy fetches both (plus `_en` as a per-key fallback) and merges them via the base document's `translations` path list (a restricted JSONPath subset). See [Data fetching pipeline](systems/game-data.md#data-fetching-pipeline).
-
-**Language codes accepted by `/api/tarkov/*`:**
+`/api/tarkov/strings?lang=` accepts `CATALOG_LANGUAGES`, derived from
+`SUPPORTED_LOCALES` and `LOCALE_TO_API_MAPPING`. Unsupported codes use `en`. The
+neutral datasets are scoped only by mode. Their upstream base envelopes retain
+translation keys, while the producer resolves dictionaries into one merged,
+referenced-key bundle per selectable API language. Upstream mode and endpoint
+scope are preserved for keys whose values differ. See
+[the fetching pipeline](systems/game-data.md#upstream-fetching-and-translation).
 
 | Code | Language   |
 | ---- | ---------- |
@@ -668,25 +659,20 @@ The `lang` query parameter is validated against `API_SUPPORTED_LANGUAGES` (`app/
 | `en` | English    |
 | `es` | Spanish    |
 | `fr` | French     |
-| `hu` | Hungarian  |
 | `it` | Italian    |
 | `ja` | Japanese   |
 | `ko` | Korean     |
 | `pl` | Polish     |
 | `pt` | Portuguese |
-| `ro` | Romanian   |
 | `ru` | Russian    |
-| `sk` | Slovak     |
 | `tr` | Turkish    |
 | `zh` | Chinese    |
 
-This allowlist is a subset of what upstream serves. `json.tarkov.dev` additionally supports `id`, `th`, and `vn`; add them to `API_SUPPORTED_LANGUAGES` when the API should accept those languages on `/api/tarkov/*` requests. Enabling a UI locale is a separate step (`SUPPORTED_LOCALES` below). The authoritative upstream list is the `languages` array at `https://json.tarkov.dev/endpoints`.
-
-**Enabled UI locales** (`SUPPORTED_LOCALES` in `app/utils/locales.ts`):
-
-`cs` (Czech), `de` (German), `en` (English), `es` (Spanish), `fr` (French), `it` (Italian), `ja` (Japanese), `ko` (Korean), `pl` (Polish), `pt` (Portuguese), `ru` (Russian), `uk` (Ukrainian), `zh` (Chinese)
-
-**UI locale with upstream fallback.** `uk` (Ukrainian) is an enabled UI locale but is **not supported by `json.tarkov.dev`**. It is mapped to `en` via `LOCALE_TO_API_MAPPING` in `app/utils/constants.ts`, so Ukrainian users see English game data while the rest of the UI remains in Ukrainian.
+The enabled UI locales are `cs`, `de`, `en`, `es`, `fr`, `it`, `ja`, `ko`, `pl`,
+`pt`, `ru`, `tr`, `uk`, and `zh`. Ukrainian uses the English game-data bundle through
+`LOCALE_TO_API_MAPPING`, while its interface remains Ukrainian. Expanding the UI
+language list updates the producer's required language scopes and requires a full
+precompute release before consumer promotion.
 
 ---
 

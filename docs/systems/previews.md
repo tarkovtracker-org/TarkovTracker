@@ -235,25 +235,26 @@ still needs current revision evidence.
   analytics, Turnstile, Stripe, and log-forwarding values; the anonymous build sets `APP_URL` to the
   controlled branch alias so host trust covers the unique deployment URL, and the app's offline
   Supabase fallback activates on `pages.dev`. Public game data still flows through `/api/tarkov/*`.
-- Preview `TARKOV_DATA` binds a dedicated namespace shared by all preview branches, separate from
-  production. Seed/refresh its three English core keys and three English import snapshot keys
-  explicitly with a reviewed producer and seven-day TTL; the production precompute workflow does
-  not refresh preview data. A maintainer owns this manual refresh. Until
-  [#1161](https://github.com/tarkovtracker-org/TarkovTracker/pull/1161) merges, select its
-  independently reviewed snapshot-producer revision: this configuration change does not add that
-  producer, and main's existing core-only runner cannot seed import snapshots. The producer is
-  `scripts/precompute/run.ts` (`pnpm run precompute:tarkov`) from that selected revision, with
-  `PRECOMPUTE_LANG=en`, a pinned `EXPECTED_OVERLAY_SHA`, and `TARKOV_DATA_KV_NAMESPACE_ID` set to
-  the preview namespace. An approved broker writer can invoke the same exported `runPrecompute`
-  and `runImportPrecompute` functions without exposing credentials. Refresh before import
-  verification and at least every six days while an import preview remains active.
-  Missing or expired import snapshots return 503 and block import verification until a valid
-  release is reseeded; ordinary preview smoke tests do not establish import-snapshot readiness.
-  Every approved preview runtime has read/write/delete access to this shared, expendable store.
-  Only merged public game catalogs belong there, never raw overlays, credentials, or user progress;
-  revalidate the seeded release before importing because another preview can change these keys.
-  The trusted deployment job reads `wrangler.toml` from the default branch, so binding changes
-  take effect only after that configuration is merged and the preview is redeployed.
+- Preview `TARKOV_DATA` binds a dedicated namespace shared by all preview branches,
+  separate from production. Neutral readers need the complete release of 30 mode
+  catalogs and 13 language bundles, plus the three whole English import snapshots.
+  Seed it explicitly from a reviewed, merged producer with a pinned
+  `EXPECTED_OVERLAY_SHA` and both language/mode filters empty. The production
+  precompute workflow refreshes only production. An approved broker writer or
+  authorized operator can run the existing producer against the preview namespace
+  without exposing credentials to candidate code. A historical English-only core
+  seed cannot satisfy the neutral reader. Validate the complete manifest, immutable
+  object readbacks, and all three import results before testing catalog-dependent
+  UI. Refresh before expiry and at least every six days while an import preview
+  remains active. Missing snapshots without an eligible last-good per-colo copy
+  return 503. `STALE` fallback can keep the UI available but does not establish
+  release readiness. Ordinary preview smoke tests do not certify the complete
+  catalog or import release. Every approved preview runtime has read/write/delete
+  access to this shared expendable store. Only merged public game catalogs belong
+  there. Revalidate the seeded identity before testing because another preview can
+  change the shared release. The trusted deployment job reads `wrangler.toml` from
+  the default branch, so binding changes take effect after that configuration is
+  merged and the preview is redeployed.
 - Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
   `pnpm install`'s `nuxt prepare`; deployable builds still reject a one-sided key configuration.
 - Smoke tests run in a separate credential-free job against the unique deployment URL and require

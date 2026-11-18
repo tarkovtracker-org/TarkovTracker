@@ -31,12 +31,47 @@ function catalogs(stations: unknown[], items: unknown[]) {
   vi.stubGlobal(
     '$fetch',
     vi.fn(async (url: string, options: { query: unknown }) => {
-      expect(options.query).toEqual({ gameMode: 'pvp', lang: 'en' });
+      expect(options.query).toEqual({ gameMode: 'regular' });
       return { data: url.endsWith('/hideout') ? { hideoutStations: stations } : { items } };
     })
   );
 }
 afterEach(() => vi.unstubAllGlobals());
+it('renders neutral station and material names through the shared public loader', async () => {
+  const stationName = '@tt:regular:hideout:station name';
+  const materialName = '@tt:regular:items:roubles name';
+  const payloads: Record<string, unknown> = {
+    hideout: {
+      hideoutStations: [
+        {
+          ...base,
+          name: stationName,
+          levels: [
+            {
+              ...second,
+              stationLevelRequirements: [
+                { id: 'prior', station: { ...base, name: stationName }, level: 1 },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    'items-lite': { items: [{ id: 'rub', name: materialName }] },
+    strings: { strings: { [stationName]: 'Workbench', [materialName]: 'Roubles' } },
+  };
+  const fetch = vi.fn(async (url: string) => ({ data: payloads[url.split('/').at(-1)!] }));
+  vi.stubGlobal('$fetch', fetch);
+  const [station] = await loadHideoutRequirements();
+  expect(station?.name).toBe('Workbench');
+  expect(station?.levels[0]?.items[0]).toMatchObject({
+    id: 'cash',
+    name: 'Roubles',
+    count: 150000,
+  });
+  expect(station?.levels[0]?.stations[0]?.name).toBe('Workbench');
+  expect(fetch.mock.calls.filter(([url]) => url.endsWith('/strings'))).toHaveLength(1);
+});
 it('retains level costs and prerequisite semantics, including empty levels and missing link targets', async () => {
   catalogs([{ ...base, levels: [second, { level: 1 }] }], [{ id: 'rub', name: 'Roubles' }]);
   const [station] = await loadHideoutRequirements();

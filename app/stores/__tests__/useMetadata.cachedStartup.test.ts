@@ -111,7 +111,7 @@ describe('complete cached startup catalog freshness', () => {
     expect(fetch).not.toHaveBeenCalled();
     await startIdle();
     expect(fetch).toHaveBeenCalledExactlyOnceWith('/api/tarkov/editions', {
-      query: { lang: 'en', gameMode: 'regular' },
+      query: { gameMode: 'regular' },
     });
     pending.resolve(response());
     await flushPromises();
@@ -190,11 +190,11 @@ describe('complete cached startup catalog freshness', () => {
         expect(fetch).toHaveBeenCalledTimes(1);
         await store.fetchEditionsData(true);
         expect(fetch).toHaveBeenNthCalledWith(2, '/api/tarkov/editions', {
-          query: { lang: 'en', gameMode: 'regular', cacheBust: '1' },
+          query: { gameMode: 'regular', cacheBust: '1' },
         });
         await store.fetchEditionsData(false, { revalidate: true });
         expect(fetch).toHaveBeenNthCalledWith(3, '/api/tarkov/editions', {
-          query: { lang: 'en', gameMode: 'regular' },
+          query: { gameMode: 'regular' },
         });
       } finally {
         if (kind === 'pending') write.resolve(undefined);
@@ -239,7 +239,7 @@ describe('complete cached startup catalog freshness', () => {
     await flushPromises();
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(fetch).toHaveBeenLastCalledWith('/api/tarkov/editions', {
-      query: { lang: 'en', gameMode: 'regular' },
+      query: { gameMode: 'regular' },
     });
     expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
   });
@@ -303,9 +303,13 @@ describe('complete cached startup catalog freshness', () => {
         await flushPromises();
         await warm(store);
         await startIdle();
-        expect(fetch).toHaveBeenCalledTimes(3);
+        const expectedRequests = scopeKind === 'language' ? (replacement === 'cached' ? 1 : 2) : 3;
+        expect(fetch).toHaveBeenCalledTimes(expectedRequests);
         expect(fetch).toHaveBeenLastCalledWith('/api/tarkov/editions', {
-          query: { lang: 'en', gameMode: 'regular' },
+          query: {
+            gameMode: 'regular',
+            ...(scopeKind === 'language' && replacement === 'network' ? { cacheBust: '1' } : {}),
+          },
         });
         expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);
       } finally {
@@ -364,11 +368,11 @@ describe('complete cached startup catalog freshness', () => {
       await startIdle();
       const latest = store.ensureEditionsData();
       try {
-        expect(fetch).toHaveBeenCalledTimes(initialRequests + 1);
+        expect(fetch).toHaveBeenCalledTimes(initialRequests + (kind === 'language' ? 0 : 1));
         resume.resolve(undefined);
         await superseded;
         await flushPromises();
-        expect(fetch).toHaveBeenCalledTimes(initialRequests + 1);
+        expect(fetch).toHaveBeenCalledTimes(initialRequests + (kind === 'language' ? 0 : 1));
         currentResponse.resolve(response());
         await latest;
         expect(store.storyChapters[0]?.objectives?.[childId]?.parentObjectiveId).toBe(parentId);

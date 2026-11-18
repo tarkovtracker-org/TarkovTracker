@@ -1,8 +1,15 @@
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
+import { useMetadataStore } from '@/stores/useMetadata';
 import { API_GAME_MODES } from '@/utils/constants';
 import { isGameEdition } from '@/utils/editionHelpers';
 import { logger } from '@/utils/logger';
+import {
+  claimMetadataCacheWrite,
+  fetchLocalizedMetadata,
+  localizeMetadata,
+} from '@/utils/metadataLocalization';
 import { ensureTarkovAccess, getTarkovAccessState, tarkovApiFetch } from '@/utils/tarkovApiFetch';
+import { CACHE_CONFIG, getCachedData, setCachedData, type CacheType } from '@/utils/tarkovCache';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   Task,
@@ -94,17 +101,89 @@ const mergeProfileTasks = (
     }))
   );
 };
-const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: AbortSignal) => {
-  const query = { gameMode: API_GAME_MODES[gameMode], lang };
-  const options = { query, signal: signal };
-  const progressionRequest = tarkovApiFetch<ProgressionResponse>('/api/tarkov/editions', options);
+const validCachedProfileChapter = (chapter: StoryChapter): boolean =>
+  [
+    typeof chapter.name === 'string',
+    typeof chapter.normalizedName === 'string',
+    Number.isFinite(chapter.order),
+    typeof chapter.wikiLink === 'string',
+    isProfileConditionRecord(chapter.objectives),
+  ].every(Boolean);
+const validCachedProfileChapters = (value: unknown): boolean =>
+  validChapterCatalog(value) && value.every(validCachedProfileChapter);
+const profileCatalogValidators: Partial<
+  Record<CacheType, (value: Record<string, unknown>) => boolean>
+> = {
+  'tasks-core': (value) => [value.tasks, value.maps, value.traders].every(Array.isArray),
+  'tasks-objectives': (value) => Array.isArray(value.tasks),
+  prestige: (value) => Array.isArray(value.prestige) && value.prestige.every(validProfilePrestige),
+  editions: (value) =>
+    validEditionCatalog(value.editions) && validCachedProfileChapters(value.storyChapters),
+};
+const cacheableProfileCatalog = (type: CacheType, value: unknown): boolean => {
+  if (!isProfileConditionRecord(value)) return false;
+  const validate = profileCatalogValidators[type] ?? (() => false);
+  return validate(value as Record<string, unknown>);
+};
+const profileCatalog = async <T>(
+  owner: object,
+  type: CacheType,
+  mode: string,
+  language: string,
+  signal: AbortSignal
+): Promise<{ data: T }> => {
+  const key = `neutral-v1-${mode}`;
+  const cached = await getCachedData<T>(type, key, 'en');
+  signal.throwIfAborted();
+  if (cached !== null) {
+    try {
+      if (!cacheableProfileCatalog(type, cached))
+        throw new TypeError('Invalid cached profile catalog');
+      return { data: await localizeMetadata(owner, cached, language, signal) };
+    } catch (error) {
+      signal.throwIfAborted();
+      logger.warn('[Profile] Refreshing an incompatible cached catalog:', error);
+    }
+  }
+  const canWrite = claimMetadataCacheWrite(owner, `${type}/${key}/en`);
+  const { neutral: response, localized } = await fetchLocalizedMetadata(owner, {
+    load: () =>
+      tarkovApiFetch<{ data: T }>(`/api/tarkov/${type}`, {
+        query: { gameMode: mode },
+        signal,
+      }),
+    language,
+    signal,
+  });
+  if (cacheableProfileCatalog(type, response.data) && canWrite()) {
+    const ttl = type === 'editions' ? 60 * 60 * 1000 : CACHE_CONFIG.DEFAULT_TTL;
+    void setCachedData(type, key, 'en', response.data, ttl, canWrite).catch((error) =>
+      logger.warn('[Profile] Failed to cache neutral metadata:', error)
+    );
+  }
+  return localized;
+};
+const loadProfileCatalogs = async (
+  owner: object,
+  gameMode: GameMode,
+  lang: string,
+  signal: AbortSignal
+) => {
+  const mode = API_GAME_MODES[gameMode];
+  const progressionRequest = profileCatalog<ProgressionResponse['data']>(
+    owner,
+    'editions',
+    mode,
+    lang,
+    signal
+  );
   const [coreResult, objectivesResult, chaptersResult, editionsResult, prestigeResult] =
     await Promise.allSettled([
-      tarkovApiFetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', options),
-      tarkovApiFetch<{ data: { tasks: Task[] } }>('/api/tarkov/tasks-objectives', options),
+      profileCatalog<TarkovTasksCoreQueryResult>(owner, 'tasks-core', mode, lang, signal),
+      profileCatalog<{ tasks: Task[] }>(owner, 'tasks-objectives', mode, lang, signal),
       progressionRequest.then(optionalChapters),
       progressionRequest.then(optionalEditions),
-      tarkovApiFetch<{ data: { prestige: PrestigeLevel[] } }>('/api/tarkov/prestige', options).then(
+      profileCatalog<{ prestige: PrestigeLevel[] }>(owner, 'prestige', mode, lang, signal).then(
         optionalPrestige
       ),
     ]);
@@ -134,6 +213,7 @@ const loadProfileCatalogs = async (gameMode: GameMode, lang: string, signal: Abo
 const PROFILE_METADATA_TIMEOUT_MS = 60000;
 /** Read another profile mode without changing the application's active metadata. */
 export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string>) {
+  const localizationOwner = useMetadataStore();
   const snapshot = shallowRef<{
     scope: string;
     tasks: Task[];
@@ -166,6 +246,7 @@ export function useProfileTaskMetadata(mode: Ref<GameMode>, language: Ref<string
           PROFILE_METADATA_TIMEOUT_MS
         );
         const { failure, ...catalogs } = await loadProfileCatalogs(
+          localizationOwner,
           gameMode,
           lang,
           controller.signal

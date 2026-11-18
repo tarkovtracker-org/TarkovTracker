@@ -53,6 +53,22 @@ describe('Tarkov browser access', () => {
     expect(await tarkovApiFetch('/api/tarkov/items')).toEqual({ data: [] });
     expect(network).not.toHaveBeenCalled();
   });
+  it('exposes final catalog headers through the response hook on the gated transport', async () => {
+    const onResponse = vi.fn();
+    network.mockResolvedValueOnce(json()).mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: [] }), {
+        headers: { 'X-Cache-Status': 'PRECOMPUTE', 'X-Catalog-Release': '1795000000000' },
+      })
+    );
+    await expect(tarkovApiFetch('/api/tarkov/tasks-objectives', { onResponse })).resolves.toEqual({
+      data: [],
+    });
+    expect(onResponse).toHaveBeenCalledTimes(1);
+    expect(onResponse.mock.calls[0]?.[0].response.headers.get('x-cache-status')).toBe('PRECOMPUTE');
+    expect(onResponse.mock.calls[0]?.[0].response.headers.get('x-catalog-release')).toBe(
+      '1795000000000'
+    );
+  });
   it('shares the initial probe and reuses its release', async () => {
     network.mockResolvedValueOnce(json());
     expect(await Promise.all([ensureTarkovAccess(), ensureTarkovAccess()])).toEqual([1, 1]);

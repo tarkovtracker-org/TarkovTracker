@@ -26,6 +26,9 @@ export type PrecomputedKvReader = {
 export function buildTasksCorePrecomputedKey(lang: string, gameMode: string): string {
   return `tasks-core-${TASKS_CORE_PRECOMPUTED_VERSION}-${lang}-${gameMode}`;
 }
+export type CatalogKvReader = PrecomputedKvReader & {
+  get: (key: string, type: 'stream') => Promise<unknown>;
+};
 const overlayMeta = (payload: unknown) =>
   (payload as { dataOverlay?: { version?: unknown; sha256?: unknown } })?.dataOverlay;
 const nonemptyString = (value: unknown): value is string =>
@@ -66,12 +69,12 @@ export function isPrecomputedEnvelope<T>(value: unknown): value is PrecomputedEn
     candidate.payload !== undefined
   );
 }
-export function getPrecomputedStore(event: unknown): PrecomputedKvReader | null {
+export function getPrecomputedStore(event: unknown): CatalogKvReader | null {
   if (!event || typeof event !== 'object') return null;
   const context = (event as { context?: { cloudflare?: { env?: Record<string, unknown> } } })
     .context;
   const binding = context?.cloudflare?.env?.[PRECOMPUTED_KV_BINDING];
   if (!binding || typeof binding !== 'object') return null;
   if (typeof (binding as { get?: unknown }).get !== 'function') return null;
-  return binding as PrecomputedKvReader;
+  return binding as CatalogKvReader;
 }

@@ -33,6 +33,44 @@ function mockCatalogs(
   );
 }
 afterEach(() => vi.unstubAllGlobals());
+it('renders neutral checklist labels through the shared public loader with one English table', async () => {
+  const taskName = '@tt:regular:tasks:quest name';
+  const description = '@tt:regular:tasks:give description';
+  const materialName = '@tt:regular:items:med name';
+  const stationName = '@tt:regular:hideout:station name';
+  const payloads: Record<string, unknown> = {
+    'tasks-core': { tasks: [{ id: 'quest', name: taskName, factionName: 'USEC' }] },
+    'tasks-objectives': { tasks: [{ id: 'quest', objectives: [{ ...objective, description }] }] },
+    'items-lite': {
+      items: [
+        { ...item, name: materialName },
+        { id: 'other', name: 'Bandage' },
+      ],
+    },
+    hideout: { hideoutStations: [{ ...station, name: stationName }] },
+    strings: {
+      strings: {
+        [taskName]: 'First Aid',
+        [description]: 'Hand over any medicine',
+        [materialName]: 'Medicine',
+        [stationName]: 'Medstation',
+      },
+    },
+  };
+  const fetch = vi.fn(async (url: string) => ({ data: payloads[url.split('/').at(-1)!] }));
+  vi.stubGlobal('$fetch', fetch);
+  const checklist = await loadItemChecklist();
+  expect(checklist.tasks[0]).toMatchObject({
+    id: 'quest',
+    source: 'First Aid',
+    rows: [{ name: 'Hand over any medicine', count: 3, optional: true, fir: true }],
+  });
+  expect(checklist.hideout[0]).toMatchObject({
+    source: 'Medstation',
+    rows: [{ name: 'Medicine', count: 5 }],
+  });
+  expect(fetch.mock.calls.filter(([url]) => url.endsWith('/strings'))).toHaveLength(1);
+});
 it('preserves pooled quantities, optional objectives and station-level costs', async () => {
   mockCatalogs();
   const checklist = await loadItemChecklist();

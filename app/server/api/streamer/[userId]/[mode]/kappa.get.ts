@@ -12,6 +12,7 @@ import { overlayAuthHeaders } from '@/server/utils/overlayAuth';
 import { getSharedCache, resolveSharedCacheOrigin } from '@/server/utils/sharedEdgeStore';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
+import { localizeGameData, type GameDataStrings } from '@/utils/gameDataStrings';
 import type {
   GameEdition,
   TarkovTaskObjectivesQueryResult,
@@ -270,19 +271,23 @@ export default defineEventHandler(async (event) => {
   const profileData = normalizeSharedProgressData(sharedProfile.data);
   const gameMode = API_GAME_MODES[mode];
   try {
-    const [tasksCoreResponse, tasksObjectivesResponse, editions] = await Promise.all([
+    const [tasksCoreResponse, tasksObjectivesResponse, editions, table] = await Promise.all([
       $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', {
         headers: forwardedHeaders,
-        query: { gameMode, lang: 'en' },
+        query: { gameMode },
       }),
       $fetch<{ data: TarkovTaskObjectivesQueryResult }>('/api/tarkov/tasks-objectives', {
         headers: forwardedHeaders,
-        query: { gameMode, lang: 'en' },
+        query: { gameMode },
       }),
       getEditions(),
+      $fetch<{ data: { strings: GameDataStrings } }>('/api/tarkov/strings', {
+        headers: forwardedHeaders,
+        query: { lang: 'en' },
+      }),
     ]);
-    const tasksCore = tasksCoreResponse.data;
-    const tasksObjectives = tasksObjectivesResponse.data;
+    const tasksCore = localizeGameData(tasksCoreResponse.data, table.data.strings);
+    const tasksObjectives = localizeGameData(tasksObjectivesResponse.data, table.data.strings);
     const objectivesByTaskId = new Map(
       (tasksObjectives.tasks ?? []).map((task) => [task.id, task] as const)
     );

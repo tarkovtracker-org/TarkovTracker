@@ -5,7 +5,7 @@ import type {
   TarkovHideoutQueryResult,
   TarkovItemsQueryResult,
 } from '@/types/tarkov';
-import { fetchPublicPvpCatalog } from '~/server/utils/publicPvpCatalog';
+import { fetchPublicPvpCatalogs } from '~/server/utils/publicPvpCatalog';
 function material(req: ItemRequirement, names: Map<string, string | undefined>) {
   const name = names.get(req.item.id) ?? req.item.name;
   if (!name) throw new Error(`Missing hideout material name for ${req.item.id}`);
@@ -52,10 +52,9 @@ function projectLevel(
   };
 }
 export async function loadHideoutRequirements() {
-  const [hideout, items] = await Promise.all([
-    fetchPublicPvpCatalog<TarkovHideoutQueryResult>('hideout'),
-    fetchPublicPvpCatalog<TarkovItemsQueryResult>('items-lite'),
-  ]);
+  const [hideout, items] = await fetchPublicPvpCatalogs<
+    [TarkovHideoutQueryResult, TarkovItemsQueryResult]
+  >(['hideout', 'items-lite']);
   const names = new Map(items.items.map((item) => [item.id, item.name]));
   const stations = hideout.hideoutStations.filter((station) => station.levels?.length);
   if (!stations.length) throw new Error('Empty public hideout requirements');

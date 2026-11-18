@@ -23,6 +23,7 @@ import {
   getPromiseStore,
 } from '@/stores/tarkov/promiseStore';
 import { delay } from '@/utils/async';
+import { catalogSnapshotAfterPurge, fetchTarkovCatalog } from '@/utils/catalogResponse';
 import {
   API_GAME_MODES,
   API_SUPPORTED_LANGUAGES,
@@ -38,9 +39,18 @@ import {
   isGameEdition,
   getExcludedTaskIdsForEdition as getExcludedTaskIds,
 } from '@/utils/editionHelpers';
+import { MissingGameDataStringError } from '@/utils/gameDataStrings';
 import { createGraph, type TaskGraph } from '@/utils/graphHelpers';
 import { queueIdleTask } from '@/utils/idleScheduler';
 import { logger } from '@/utils/logger';
+import {
+  claimMetadataCacheWrite,
+  fetchLocalizedMetadata,
+  hasCachedGameDataStrings,
+  invalidateGameDataStrings,
+  localizeCachedMetadata,
+  localizeMetadata,
+} from '@/utils/metadataLocalization';
 import { perfEnd, perfStart } from '@/utils/perf';
 import { buildPrestigeTaskMap } from '@/utils/prestige';
 import { resolveSeasonalPerks } from '@/utils/seasonalPerks';
@@ -95,6 +105,20 @@ const requestSignals = new WeakMap<Promise<unknown>, AbortSignal>();
 // A replacement startup must not join a request fenced to its previous owner.
 const editionRequestOwners = new WeakMap<Promise<unknown>, () => boolean>();
 const liveEditionRequests = new WeakSet<Promise<void>>();
+const neutralEditionCatalogs = new WeakMap<
+  object,
+  Map<string, { data: ProgressionCatalog; expires: number }>
+>();
+const freshNeutralEditionCatalogs = (owner: object) => {
+  let catalogs = neutralEditionCatalogs.get(toRaw(owner));
+  if (!catalogs) {
+    catalogs = new Map();
+    neutralEditionCatalogs.set(toRaw(owner), catalogs);
+  }
+  return catalogs;
+};
+const hasFreshNeutralEditions = (owner: object, mode: string): boolean =>
+  (freshNeutralEditionCatalogs(owner).get(mode)?.expires ?? 0) > Date.now();
 type EditionRequestOptions = {
   revalidate?: boolean;
   signal?: AbortSignal;
@@ -145,14 +169,14 @@ const ownsMetadataRequest = (
 const BOOTSTRAP_CACHE_VERSION = 'json-v2';
 /** Requests for language-independent data always use English to share one cache entry. */
 const ENGLISH_LANGUAGE_CODE = 'en';
-const TASKS_CORE_CACHE_VERSION = 'json-v3';
-const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
-const ITEMS_CACHE_VERSION = 'json-v2';
-const TASK_REWARDS_CACHE_VERSION = 'json-v2';
-const HIDEOUT_CACHE_VERSION = 'json-v5';
+const TASKS_CORE_CACHE_VERSION = 'neutral-v1';
+const MAP_SPAWNS_CACHE_VERSION = 'neutral-v1';
+const ITEMS_CACHE_VERSION = 'neutral-v1';
+const TASK_REWARDS_CACHE_VERSION = 'neutral-v1';
+const HIDEOUT_CACHE_VERSION = 'neutral-v1';
 const HIDEOUT_CACHE_TTL_MS = 60 * 60 * 1000;
-const PRESTIGE_CACHE_VERSION = 'json-v3';
-const EDITIONS_CACHE_VERSION = 'overlay-v3';
+const PRESTIGE_CACHE_VERSION = 'neutral-v1';
+const EDITIONS_CACHE_VERSION = 'neutral-v1';
 const settledEditionScope = (requested: string, current: string) =>
   requested === current ? requested : '';
 /**
@@ -194,10 +218,16 @@ const buildObjectiveCatalogCacheKey = (scope: string, purgeTime: number) => {
 };
 const objectiveCatalogCacheKey = (store: object, scope: string) =>
   buildObjectiveCatalogCacheKey(scope, observedObjectivePurgeTime(store));
-const hasObjectiveOverlaySince = (response: FetchSuccess<unknown>, purgeTime: number) =>
-  !purgeTime || Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime;
+// An operator purge changes browser generations while immutable seeds retain their build timestamps.
+const hasObjectiveCatalogSince = (response: FetchSuccess<unknown>, purgeTime: number) => {
+  if (!purgeTime) return true;
+  return (
+    catalogSnapshotAfterPurge(response, purgeTime) ??
+    Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime
+  );
+};
 const hasCurrentObjectiveOverlay = (store: object, response: FetchSuccess<unknown>) =>
-  hasObjectiveOverlaySince(response, observedObjectivePurgeTime(store));
+  hasObjectiveCatalogSince(response, observedObjectivePurgeTime(store));
 const assertCurrentObjectiveCounts = (store: object, response: FetchSuccess<unknown>) => {
   if (!hasCurrentObjectiveOverlay(store, response)) {
     throw new Error('Objective catalog predates the latest cache purge');
@@ -210,7 +240,7 @@ type MetadataCacheScope = {
   mode: string;
 };
 async function readMetadataCache<T>(store: object, scope: MetadataCacheScope) {
-  const cached = await getCachedData<T>(scope.cacheType, scope.cacheKey, scope.language);
+  const cached = await getCachedData<T>(scope.cacheType, scope.cacheKey, ENGLISH_LANGUAGE_CODE);
   if (
     scope.cacheType === 'tasks-objectives' &&
     scope.cacheKey !== objectiveCatalogCacheKey(store, scope.mode)
@@ -227,7 +257,7 @@ const metadataWriteKey = (
   if (typeof window === 'undefined') return null;
   if (scope.cacheType !== 'tasks-objectives') return scope.cacheKey;
   const purgeTime = observedObjectivePurgeTime(store);
-  return hasObjectiveOverlaySince(response, purgeTime)
+  return hasObjectiveCatalogSince(response, purgeTime)
     ? buildObjectiveCatalogCacheKey(scope.mode, purgeTime)
     : null;
 };
@@ -242,7 +272,8 @@ async function fetchMetadataForCache<T>(
   options: { signal?: AbortSignal; query: Record<string, string> },
   isCurrent: () => boolean
 ): Promise<FetchResponse<T>> {
-  const fetchCatalog = () => tarkovApiFetch<FetchResponse<T>>(endpoint, options);
+  const fetchCatalog = () =>
+    fetchTarkovCatalog<FetchResponse<T>>(endpoint, options, observedObjectivePurgeTime(store));
   const response = await fetchCatalog();
   if (!isStaleObjectiveCatalog(store, cacheType, response)) return response;
   // Give a warm Worker one marker-check interval before sharing a single retry.
@@ -253,6 +284,24 @@ async function fetchMetadataForCache<T>(
     ? { error: 'Objective catalog still predates the latest cache purge after retry' }
     : retry;
 }
+const unserializableMetadataError = (error: Record<string, unknown>): string => {
+  const parts = Object.entries(error)
+    .filter(([key, value]) => ['name', 'message', 'code', 'stack'].includes(key) && value)
+    .map(([key, value]) => `${key}=${String(value).slice(0, key === 'stack' ? 100 : undefined)}`);
+  return parts.length > 0 ? parts.join('; ') : `[Unserializable: ${typeof error}]`;
+};
+const serializedMetadataError = (error: Record<string, unknown>): string => {
+  try {
+    return JSON.stringify(error).slice(0, 200);
+  } catch {
+    return unserializableMetadataError(error);
+  }
+};
+const metadataErrorMessage = (error: string | Record<string, unknown>): string => {
+  if (typeof error === 'string') return error;
+  if (typeof error.message === 'string') return error.message;
+  return serializedMetadataError(error);
+};
 const lastPurgeCheckTime = (sessionCheckAt: number) => {
   const storedCheckAt = Number(readPurgeStorage(CACHE_PURGE_CHECK_STORAGE_KEY));
   return Number.isFinite(storedCheckAt) ? Math.max(sessionCheckAt, storedCheckAt) : sessionCheckAt;
@@ -273,6 +322,8 @@ async function updateObservedPurge(
   }
   try {
     await clearAllCache();
+    invalidateGameDataStrings(state);
+    neutralEditionCatalogs.delete(toRaw(state));
   } catch (error) {
     logger.error('[MetadataStore] Failed to clear local cache after server purge:', error);
     return;
@@ -412,14 +463,16 @@ type CachedEditions = {
   storyChapters?: StoryChapter[];
   seasonalPerks?: SeasonalPerk[];
 };
-const readCachedEditions = async (mode: string, language: string): Promise<CachedEditions> => {
+const readCachedEditions = async (owner: object, mode: string): Promise<CachedEditions> => {
+  if (hasFreshNeutralEditions(owner, mode))
+    return freshNeutralEditionCatalogs(owner).get(mode)!.data;
   if (typeof window === 'undefined') return {};
   try {
     return (
       (await getCachedData<CachedEditions>(
         'editions' as CacheType,
         `${EDITIONS_CACHE_VERSION}-${mode}`,
-        language
+        ENGLISH_LANGUAGE_CODE
       )) ?? {}
     );
   } catch (error) {
@@ -445,6 +498,9 @@ const prepareEditionScope = (
   scope: string
 ) => {
   if (store.editionsScope && store.editionsScope !== scope) {
+    const previousMode = store.editionsScope.slice(0, store.editionsScope.lastIndexOf('-'));
+    const nextMode = scope.slice(0, scope.lastIndexOf('-'));
+    if (previousMode !== nextMode) freshNeutralEditionCatalogs(state).delete(previousMode);
     // Freshness belongs to the live catalog, which this scope change discards.
     store.editionsRevalidatedScopes.delete(store.editionsScope);
     store.editionsSettledScope = '';
@@ -469,8 +525,9 @@ const applyCachedEditions = async (
     editions = [],
     storyChapters = [],
     seasonalPerks = [],
-  } = await readCachedEditions(mode, language);
-  if (!isCurrent() || !hasValidCachedEditions(editions)) return false;
+  } = await localizeMetadata(state, await readCachedEditions(state, mode), language);
+  if (!isCurrent()) return false;
+  if (!hasFreshNeutralEditions(state, mode) && !hasValidCachedEditions(editions)) return false;
   state.editions = markRaw(editions);
   state.seasonalPerks = perksForMode(seasonalPerks, mode);
   if (!storyChapters.length) return false;
@@ -505,14 +562,12 @@ const isProgressionCatalog = (
 };
 const fetchProgressionCatalog = async (
   mode: string,
-  language: string,
   forceRefresh: boolean,
   signal?: AbortSignal
 ): Promise<ProgressionCatalog> => {
   const response = await tarkovApiFetch<{ data: CachedEditions }>('/api/tarkov/editions', {
     signal,
     query: {
-      lang: language,
       gameMode: mode,
       ...(forceRefresh ? { cacheBust: '1' } : {}),
     },
@@ -541,22 +596,29 @@ const cachedProgressionCatalog = (cached: CriticalCacheData['editions']): Progre
   storyChapters: cached.storyChapters ?? [],
   seasonalPerks: cached.seasonalPerks ?? [],
 });
-const cacheProgressionCatalog = (
-  state: ProgressionCatalogState,
+const cachedProgressionView = (
+  state: Pick<MetadataState, 'languageCode'>,
   mode: string,
-  language: string
+  cached: CachedEditions
+): ProgressionCatalog => {
+  const fallback = cachedProgressionCatalog(cached);
+  const neutral = freshNeutralEditionCatalogs(state).get(mode)?.data ?? fallback;
+  return localizeCachedMetadata(state, neutral, state.languageCode) ?? fallback;
+};
+const cacheProgressionCatalog = (
+  overlay: ProgressionCatalog,
+  mode: string,
+  isCurrent: () => boolean
 ) => {
+  if (!isCurrent()) return;
   if (typeof window === 'undefined') return;
   setCachedData(
     'editions' as CacheType,
     `${EDITIONS_CACHE_VERSION}-${mode}`,
-    language,
-    {
-      editions: state.editions,
-      storyChapters: state.storyChapters,
-      seasonalPerks: state.seasonalPerks,
-    },
-    CACHE_CONFIG.MAX_TTL
+    ENGLISH_LANGUAGE_CODE,
+    overlay,
+    HIDEOUT_CACHE_TTL_MS,
+    isCurrent
   ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
 };
 /**
@@ -577,20 +639,23 @@ const loadProgressionCatalog = async (
     mode: string;
     scope: string;
   }
-): Promise<boolean> => {
+): Promise<ProgressionCatalog | false> => {
   try {
-    const overlay = await fetchProgressionCatalog(
-      context.mode,
-      context.language,
-      context.forceRefresh,
-      context.signal
+    const canWrite = claimMetadataCacheWrite(
+      state,
+      `editions/${EDITIONS_CACHE_VERSION}-${context.mode}/en`
     );
+    const { neutral: overlay, localized } = await fetchLocalizedMetadata(state, {
+      load: () => fetchProgressionCatalog(context.mode, context.forceRefresh, context.signal),
+      language: context.language,
+      signal: context.signal,
+    });
     throwIfAborted(context.signal);
     if (!context.isCurrent()) return false;
-    applyProgressionCatalog(state, overlay, context.mode);
+    applyProgressionCatalog(state, localized, context.mode);
     promiseStore.editionsSettledScope = context.scope;
-    cacheProgressionCatalog(state, context.mode, context.language);
-    return true;
+    cacheProgressionCatalog(overlay, context.mode, canWrite);
+    return overlay;
   } catch (err) {
     throwIfAborted(context.signal);
     if (!context.isCurrent()) return false;
@@ -873,7 +938,7 @@ export const useMetadataStore = defineStore('metadata', {
         extractLanguageCode(locale, [...API_SUPPORTED_LANGUAGES]);
       const mode = this.getApiGameMode();
       const cached = await Promise.all([
-        this.loadCriticalCacheData(language),
+        this.loadCriticalCacheData(language, false),
         getCachedData<TarkovBootstrapQueryResult>(
           'bootstrap',
           `${BOOTSTRAP_CACHE_VERSION}-${mode}`,
@@ -882,50 +947,48 @@ export const useMetadataStore = defineStore('metadata', {
         getCachedData<TarkovItemsQueryResult>(
           'items-lite',
           `${ITEMS_CACHE_VERSION}-${mode}`,
-          language
+          ENGLISH_LANGUAGE_CODE
         ),
         getCachedData<TarkovTaskObjectivesQueryResult>(
           'tasks-objectives',
           objectiveCatalogCacheKey(this, mode),
-          language
+          ENGLISH_LANGUAGE_CODE
         ),
         getCachedData<TarkovTaskRewardsQueryResult>(
           'tasks-rewards',
           `${TASK_REWARDS_CACHE_VERSION}-${mode}`,
-          language
+          ENGLISH_LANGUAGE_CODE
         ),
       ]).catch(() => null);
-      return cached?.every(Boolean) ?? false;
+      if (!cached?.every(Boolean)) return false;
+      return hasCachedGameDataStrings(this, language, cached).catch(() => false);
     },
-    async loadCriticalCacheData(language?: string): Promise<CriticalCacheData | null> {
+    async loadCriticalCacheData(
+      language?: string,
+      translate = true
+    ): Promise<CriticalCacheData | null> {
       language ??= this.languageCode;
       try {
-        const apiGameMode =
-          API_GAME_MODES[this.currentGameMode as keyof typeof API_GAME_MODES] ||
-          API_GAME_MODES[GAME_MODES.PVP];
+        const apiGameMode = this.getApiGameMode();
         const scope = `${apiGameMode}-${language}`;
         // Load all critical cache entries in parallel
         const [tasksCore, hideout, prestige, editions] = await Promise.all([
           getCachedData<TarkovTasksCoreQueryResult>(
             'tasks-core' as CacheType,
             `${TASKS_CORE_CACHE_VERSION}-${apiGameMode}`,
-            language
+            ENGLISH_LANGUAGE_CODE
           ),
           getCachedData<TarkovHideoutQueryResult>(
             'hideout' as CacheType,
             `${HIDEOUT_CACHE_VERSION}-${apiGameMode}`,
-            language
+            ENGLISH_LANGUAGE_CODE
           ),
           getCachedData<TarkovPrestigeQueryResult>(
             'prestige' as CacheType,
             `${PRESTIGE_CACHE_VERSION}-${apiGameMode}`,
-            language
+            ENGLISH_LANGUAGE_CODE
           ),
-          getCachedData<CachedEditions>(
-            'editions' as CacheType,
-            `${EDITIONS_CACHE_VERSION}-${apiGameMode}`,
-            language
-          ),
+          readCachedEditions(this, apiGameMode),
         ]);
         if (
           tasksCore &&
@@ -937,7 +1000,8 @@ export const useMetadataStore = defineStore('metadata', {
           Array.isArray(editions.storyChapters)
         ) {
           logger.debug('[MetadataStore] Critical cache: ALL PRESENT');
-          return { scope, tasksCore, hideout, prestige, editions };
+          const bundle = { scope, tasksCore, hideout, prestige, editions };
+          return translate ? await localizeMetadata(this, bundle, language) : bundle;
         }
         logger.debug('[MetadataStore] Critical cache: MISSING some entries');
         return null;
@@ -1081,7 +1145,8 @@ export const useMetadataStore = defineStore('metadata', {
       } = config;
       const mode = this.getApiGameMode();
       const cacheScope = { cacheType, cacheKey, language: cacheLanguage, mode };
-      const requestScope = `${mode}-${this.languageCode}`;
+      const requestLanguage = this.languageCode;
+      const requestScope = `${mode}-${requestLanguage}`;
       const isCurrentRequestContext = (ignoreAbort = false): boolean =>
         canApplyRequestSignal(config.signal, ignoreAbort) &&
         `${this.getApiGameMode()}-${this.languageCode}` === requestScope &&
@@ -1104,7 +1169,9 @@ export const useMetadataStore = defineStore('metadata', {
               endPerf({ cached: true, stale: true });
               return;
             }
-            processData(cached);
+            const localized = await localizeMetadata(this, cached, requestLanguage, config.signal);
+            if (!isCurrentRequestContext()) return;
+            processData(localized);
             if (loadingKey) this.$patch({ [loadingKey]: false });
             perfSource = 'cache';
             endPerf({ cached: true });
@@ -1131,44 +1198,29 @@ export const useMetadataStore = defineStore('metadata', {
         const effectiveQueryParams = forceRefresh
           ? { ...queryParams, cacheBust: '1' }
           : queryParams;
-        const response = await fetchMetadataForCache<T>(
+        const canWrite = claimMetadataCacheWrite(this, `${cacheType}/${cacheKey}/${cacheLanguage}`);
+        const { neutral: response, localized: localizedResponse } = await fetchLocalizedMetadata(
           this,
-          cacheType,
-          endpoint,
-          { signal: config.signal, query: effectiveQueryParams },
-          isCurrentRequestContext
+          {
+            load: () =>
+              fetchMetadataForCache<T>(
+                this,
+                cacheType,
+                endpoint,
+                { signal: config.signal, query: effectiveQueryParams },
+                isCurrentRequestContext
+              ),
+            language: requestLanguage,
+            signal: config.signal,
+          }
         );
         throwIfAborted(config.signal);
         if (isFetchError(response)) {
           // Log full response for debugging
           logger.debug(`[MetadataStore] ${logName} error response:`, response);
-          // Construct user-friendly error message
-          let errorMessage: string;
-          if (typeof response.error === 'string') {
-            errorMessage = response.error;
-          } else {
-            const errorObj = response.error as { message?: unknown };
-            if (typeof errorObj.message === 'string') {
-              errorMessage = errorObj.message;
-            } else {
-              try {
-                errorMessage = JSON.stringify(response.error).slice(0, 200);
-              } catch {
-                // Safely extract error details when JSON.stringify fails (e.g., circular refs)
-                const err = response.error as Record<string, unknown>;
-                const parts: string[] = [];
-                if (err.name) parts.push(`name=${String(err.name)}`);
-                if (err.message) parts.push(`message=${String(err.message)}`);
-                if (err.code) parts.push(`code=${String(err.code)}`);
-                if (err.stack) parts.push(`stack=${String(err.stack).slice(0, 100)}`);
-                errorMessage =
-                  parts.length > 0 ? parts.join('; ') : `[Unserializable: ${typeof err}]`;
-              }
-            }
-          }
-          throw new Error(`API error: ${errorMessage}`);
+          throw new Error(`API error: ${metadataErrorMessage(response.error)}`);
         }
-        if (!isFetchSuccess<T>(response)) {
+        if (!isFetchSuccess<T>(response) || !isFetchSuccess<T>(localizedResponse)) {
           // Log full response for debugging
           logger.debug(`[MetadataStore] ${logName} unexpected response shape:`, response);
           const keys = response && typeof response === 'object' ? Object.keys(response) : [];
@@ -1179,13 +1231,18 @@ export const useMetadataStore = defineStore('metadata', {
           endPerf({ stale: true });
           return;
         }
-        processData(response.data, response);
+        processData(localizedResponse.data, response);
         // Step 4: Store in IndexedDB for future visits
         const writeKey = metadataWriteKey(this, cacheScope, response);
-        if (writeKey !== null) {
-          setCachedData(cacheType, writeKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
-            logger.error(`[MetadataStore] Error caching ${logName} data:`, err)
-          );
+        if (writeKey !== null && canWrite()) {
+          setCachedData(
+            cacheType,
+            writeKey,
+            cacheLanguage,
+            response.data,
+            cacheTTL,
+            canWrite
+          ).catch((err) => logger.error(`[MetadataStore] Error caching ${logName} data:`, err));
         }
       } catch (err) {
         throwIfAborted(config.signal);
@@ -1194,7 +1251,7 @@ export const useMetadataStore = defineStore('metadata', {
           this.$patch({ [errorKey]: err as Error });
         }
         const isCurrent = isCurrentRequestContext();
-        if (onEmpty && isCurrent) {
+        if (onEmpty && isCurrent && !(err instanceof MissingGameDataStringError)) {
           onEmpty();
         }
         hadError = true;
@@ -1260,15 +1317,14 @@ export const useMetadataStore = defineStore('metadata', {
     /** Keep cached first paint while checking the catalog once per owned session scope. */
     scheduleCachedEditionsRevalidation(isOwner: () => boolean, signal?: AbortSignal) {
       const promises = getPromiseStore(this);
-      const scope = `${this.getApiGameMode()}-${this.languageCode}`;
-      if (promises.editionsRevalidatedScopes.has(scope)) return;
+      if (hasFreshNeutralEditions(this, this.getApiGameMode())) return;
       const requestVersion = promises.editionsRequestVersion;
       void queueIdleTask(
         () => {
           if (
             !isOwner() ||
             promises.editionsRequestVersion !== requestVersion ||
-            promises.editionsRevalidatedScopes.has(scope)
+            hasFreshNeutralEditions(this, this.getApiGameMode())
           )
             return;
           return this.fetchEditionsData(false, { revalidate: true, signal, isOwner });
@@ -1295,6 +1351,7 @@ export const useMetadataStore = defineStore('metadata', {
       } = {}
     ) {
       throwIfAborted(options.signal);
+      invalidateGameDataStrings(this, forceRefresh);
       const requestScope = `${this.getApiGameMode()}-${this.languageCode}`;
       const isCurrent = () =>
         !options.signal?.aborted &&
@@ -1474,9 +1531,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovTasksCoreQueryResult>({
         cacheType: 'tasks-core' as CacheType,
         cacheKey: `${TASKS_CORE_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/tasks-core',
-        queryParams: { lang: requestLanguage, gameMode: requestGameMode },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'loading',
         errorKey: 'error',
@@ -1499,9 +1556,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovMapSpawnsQueryResult>({
         cacheType: 'map-spawns' as CacheType,
         cacheKey: `${MAP_SPAWNS_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/map-spawns',
-        queryParams: { lang: requestLanguage, gameMode: requestGameMode },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'mapSpawnsLoading',
         errorKey: 'mapSpawnsError',
@@ -1543,11 +1600,10 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovTaskObjectivesQueryResult>({
         cacheType: 'tasks-objectives' as CacheType,
         cacheKey,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/tasks-objectives',
         queryParams: {
           gameMode: requestGameMode,
-          lang: requestLanguage,
           version: TASK_OBJECTIVES_CACHE_VERSION,
         },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
@@ -1691,16 +1747,16 @@ export const useMetadataStore = defineStore('metadata', {
           throwIfAborted(signal);
           if (cached) return cached;
         }
-        const response = await tarkovApiFetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
+        const response = await fetchTarkovCatalog<FetchResponse<TarkovTaskObjectivesQueryResult>>(
           '/api/tarkov/tasks-objectives',
           {
             signal,
             query: {
               gameMode: apiGameMode,
-              lang: ENGLISH_LANGUAGE_CODE,
               version: TASK_OBJECTIVES_CACHE_VERSION,
             },
-          }
+          },
+          observedObjectivePurgeTime(this)
         );
         if (isFetchError(response)) {
           const errorMessage =
@@ -1750,9 +1806,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovTaskRewardsQueryResult>({
         cacheType: 'tasks-rewards' as CacheType,
         cacheKey: `${TASK_REWARDS_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/tasks-rewards',
-        queryParams: { lang: requestLanguage, gameMode: requestGameMode },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         processData: (data) => {
           this.mergeTaskRewards(data.tasks, { rebuildDerivedData: false });
@@ -1776,9 +1832,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovHideoutQueryResult>({
         cacheType: 'hideout' as CacheType,
         cacheKey: `${HIDEOUT_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/hideout',
-        queryParams: { lang: requestLanguage, gameMode: requestGameMode },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: HIDEOUT_CACHE_TTL_MS,
         loadingKey: 'hideoutLoading',
         errorKey: 'hideoutError',
@@ -1820,9 +1876,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovItemsQueryResult>({
         cacheType: 'items-lite' as CacheType,
         cacheKey: `${ITEMS_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/items-lite',
-        queryParams: { gameMode: requestGameMode, lang: requestLanguage },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.MAX_TTL,
         loadingKey: 'itemsLoading',
         errorKey: 'itemsError',
@@ -1874,9 +1930,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovItemsQueryResult>({
         cacheType: 'items' as CacheType,
         cacheKey: `${ITEMS_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/items',
-        queryParams: { gameMode: requestGameMode, lang: requestLanguage },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.MAX_TTL,
         loadingKey: 'itemsLoading',
         errorKey: 'itemsError',
@@ -1941,9 +1997,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovPrestigeQueryResult>({
         cacheType: 'prestige' as CacheType,
         cacheKey: `${PRESTIGE_CACHE_VERSION}-${this.getApiGameMode()}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/prestige',
-        queryParams: { lang: requestLanguage, gameMode: requestMode },
+        queryParams: { gameMode: requestMode },
         cacheTTL: CACHE_CONFIG.MAX_TTL,
         loadingKey: 'prestigeLoading',
         errorKey: 'prestigeError',
@@ -2012,7 +2068,7 @@ export const useMetadataStore = defineStore('metadata', {
           if (!isCurrent()) return;
           this.editionsError = null;
           // Revalidate once while the successfully checked catalog remains live in this scope.
-          if (!promiseStore.editionsRevalidatedScopes.has(scope)) {
+          if (!hasFreshNeutralEditions(this, requestMode)) {
             void this.fetchEditionsData(false, { revalidate: true, signal: options.signal }).catch(
               (error) =>
                 options.signal?.aborted
@@ -2037,12 +2093,19 @@ export const useMetadataStore = defineStore('metadata', {
         });
         // A successful live load is as fresh as a revalidation.
         if (loaded && isCurrent()) {
+          freshNeutralEditionCatalogs(this).set(requestMode, {
+            data: loaded,
+            expires: Date.now() + HIDEOUT_CACHE_TTL_MS,
+          });
           promiseStore.editionsRevalidatedScopes.add(scope);
         }
       });
       if (options.signal) requestSignals.set(promise, options.signal);
       if (options.isOwner) editionRequestOwners.set(promise, options.isOwner);
-      if (skipBrowserCache) liveEditionRequests.add(promise);
+      if (skipBrowserCache) {
+        freshNeutralEditionCatalogs(this).delete(requestMode);
+        liveEditionRequests.add(promise);
+      }
       promiseStore.editionsPromise = promise;
       try {
         await promise;
@@ -2111,7 +2174,7 @@ export const useMetadataStore = defineStore('metadata', {
       if (!preserveLiveCatalog) {
         applyProgressionCatalog(
           this,
-          cachedProgressionCatalog(cachedData.editions),
+          cachedProgressionView(this, this.getApiGameMode(), cachedData.editions),
           this.getApiGameMode()
         );
       } else {

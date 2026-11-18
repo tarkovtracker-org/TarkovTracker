@@ -102,6 +102,7 @@ describe('Streamer Kappa API', () => {
             visibility: 'public',
           };
         }
+        if (input === '/api/tarkov/strings') return { data: { strings: {} } };
         if (input === '/api/tarkov/tasks-core') {
           return { data: { tasks: [{ id: 'task-1' }] } };
         }
@@ -138,14 +139,14 @@ describe('Streamer Kappa API', () => {
           host: 'tarkovtracker.org',
           'x-forwarded-for': '203.0.113.5',
         },
-        query: { gameMode: 'regular', lang: 'en' },
+        query: { gameMode: 'regular' },
       });
       expect(mockDollarFetch).toHaveBeenCalledWith('/api/tarkov/tasks-objectives', {
         headers: {
           host: 'tarkovtracker.org',
           'x-forwarded-for': '203.0.113.5',
         },
-        query: { gameMode: 'regular', lang: 'en' },
+        query: { gameMode: 'regular' },
       });
       expect(mockSetResponseHeader).toHaveBeenCalledWith(
         mockEvent,

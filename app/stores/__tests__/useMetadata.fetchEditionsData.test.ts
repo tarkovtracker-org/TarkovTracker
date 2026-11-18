@@ -143,7 +143,6 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(payload).toEqual({
       editions: [createEdition('standard', 1, 'Standard')],
       storyChapters: [],
-      seasonalPerks: [],
     });
     // IndexedDB stores values with the structured clone algorithm, which throws
     // DataCloneError on a Vue reactive proxy. Reaching the cache with reactive
@@ -397,7 +396,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([refreshedEdition]);
     expect(store.storyChapters).toEqual([refreshedChapter]);
   });
-  it('revalidates a retired cached scope without a cache bust', async () => {
+  it('shares a fresh neutral catalog across language scopes', async () => {
     const store = useMetadataStore();
     store.currentGameMode = 'pve';
     store.languageCode = 'de';
@@ -417,20 +416,20 @@ describe('useMetadataStore fetchEditionsData', () => {
     await flushPromises();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/tarkov/editions', {
-      query: { lang: 'de', gameMode: 'pve' },
+      query: { gameMode: 'pve' },
     });
     await store.ensureEditionsData();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    // Returning after retiring the live catalog must check the cached copy again.
+    // A language change reuses the already verified neutral mode catalog.
     store.languageCode = 'en';
     await store.fetchEditionsData();
     await flushPromises();
     store.languageCode = 'de';
     await store.fetchEditionsData();
     await flushPromises();
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenLastCalledWith('/api/tarkov/editions', {
-      query: { lang: 'de', gameMode: 'pve' },
+      query: { gameMode: 'pve' },
     });
     expect(store.editions[0]?.id).toBe('fresh-edition');
     expect(store.storyChapters[0]?.id).toBe('fresh-chapter');
@@ -446,14 +445,15 @@ describe('useMetadataStore fetchEditionsData', () => {
     await store.fetchEditionsData(true);
     expect(store.storyChapters).toEqual([chapter]);
     expect(fetch).toHaveBeenCalledWith('/api/tarkov/editions', {
-      query: { lang: 'de', gameMode: 'pve', cacheBust: '1' },
+      query: { gameMode: 'pve', cacheBust: '1' },
     });
     expect(cacheWrite).toHaveBeenCalledWith(
       'editions',
-      'overlay-v3-pve',
-      'de',
+      'neutral-v1-pve',
+      'en',
       expect.any(Object),
-      expect.any(Number)
+      expect.any(Number),
+      expect.any(Function)
     );
   });
   it('retries a mode whose obsolete request settled after switching away', async () => {

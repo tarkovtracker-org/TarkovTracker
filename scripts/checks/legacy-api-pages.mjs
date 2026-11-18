@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
@@ -218,6 +219,102 @@ test('compiled known Tarkov route takes precedence over the fallback', async () 
   }
   assert.deepEqual(outbound, []);
 });
+async function assertCatalogUnavailable(response, method, label) {
+  assert.equal(response.status, 503, label);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.match(response.headers.get('Content-Type'), /^application\/json/);
+  assert.equal(response.headers.has('X-Cache-Status'), false);
+  assert.equal(response.headers.get('X-Test-Upstream-Reads'), '0');
+  if (method === 'HEAD') assert.equal(await response.text(), '');
+  else assert.equal((await response.json()).statusCode, 503);
+}
+test('compiled catalog GET and HEAD fail closed on cold missing or unavailable KV', async () => {
+  for (const fault of ['absent', 'unavailable', 'missing-manifest', 'missing-body']) {
+    for (const route of ['tasks-core?gameMode=pve', 'strings?lang=de']) {
+      for (const method of ['GET', 'HEAD']) {
+        const response = await harness.fetch(`https://tarkovtracker.org/api/tarkov/${route}`, {
+          method,
+          headers: { 'X-Test-Catalog-Fault': fault, 'X-Test-Clear-Catalog-Cache': '1' },
+        });
+        await assertCatalogUnavailable(response, method, `${fault} ${method} ${route}`);
+      }
+    }
+  }
+  assert.deepEqual(outbound, []);
+});
+async function assertCatalogObject(scope, entry, manifest) {
+  const [dataset, value] = scope.split('/');
+  const query = dataset === 'strings' ? `lang=${value}` : `gameMode=${value}`;
+  const url = `https://tarkovtracker.org/api/tarkov/${dataset}?${query}`;
+  const response = await harness.fetch(url);
+  assert.equal(response.status, 200, scope);
+  assert.equal(response.headers.get('X-Cache-Status'), 'PRECOMPUTE', scope);
+  assert.equal(response.headers.get('X-Catalog-Release'), String(manifest.completedAt), scope);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store', scope);
+  assert.equal(response.headers.get('Cloudflare-CDN-Cache-Control'), 'no-store', scope);
+  assert.equal(response.headers.has('X-Catalog-Key'), false, scope);
+  assert.equal(response.headers.get('X-Test-Upstream-Reads'), '0', scope);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  assert.equal(bytes.byteLength, entry.bytes, scope);
+  assert.equal(
+    createHash('sha256').update(bytes).digest('hex'),
+    entry.key.split('/').at(-1),
+    scope
+  );
+  for (const [name, value] of Object.entries(entry.headers))
+    assert.equal(response.headers.get(name), value, `${scope}: ${name}`);
+  assert.ok(JSON.parse(bytes.toString('utf8')).data, scope);
+}
+test('compiled production readers serve all 43 immutable catalog objects with exact bytes and provenance', async () => {
+  const response = await harness.fetch('https://tarkovtracker.org/api/tarkov/overlay-status');
+  assert.equal(response.status, 200);
+  const manifest = await response.json();
+  assert.equal(Object.keys(manifest.entries).length, 43);
+  assert.equal(manifest.overlaySha, 'a'.repeat(64));
+  for (const [scope, entry] of Object.entries(manifest.entries))
+    await assertCatalogObject(scope, entry, manifest);
+  assert.deepEqual(outbound, []);
+});
+test('compiled language bundle retains mode-specific objective values and stable objective IDs', async () => {
+  const strings = await (
+    await harness.fetch('https://tarkovtracker.org/api/tarkov/strings?lang=de')
+  ).json();
+  const descriptions = [];
+  for (const mode of ['regular', 'pve']) {
+    const payload = await (
+      await harness.fetch(
+        `https://tarkovtracker.org/api/tarkov/tasks-objectives?gameMode=${mode}&lang=de`
+      )
+    ).json();
+    const objective = payload.data.tasks[0].objectives[0];
+    assert.equal(objective.id, 'head-objective');
+    assert.ok(objective.description.startsWith(`@tt:${mode}:tasks:`));
+    descriptions.push(strings.data.strings[objective.description]);
+  }
+  assert.deepEqual(descriptions, ['Prestige 1 dogtag', 'Level 20 dogtag']);
+  const fallback = await (
+    await harness.fetch('https://tarkovtracker.org/api/tarkov/strings?lang=unsupported')
+  ).json();
+  assert.equal(fallback.data.strings['@tt:pve:tasks:head-objective'], 'pve objective in English');
+});
+test('compiled warm catalog GET and HEAD retain last-good bytes during a KV outage', async () => {
+  const url = 'https://tarkovtracker.org/api/tarkov/tasks-objectives?gameMode=pve';
+  const fresh = await harness.fetch(url, { headers: { 'X-Test-Clear-Catalog-Cache': '1' } });
+  assert.equal(fresh.headers.get('X-Cache-Status'), 'PRECOMPUTE');
+  const body = await fresh.text();
+  for (const method of ['GET', 'HEAD']) {
+    const stale = await harness.fetch(url, {
+      method,
+      headers: { 'X-Test-Catalog-Fault': 'unavailable' },
+    });
+    assert.equal(stale.status, 200);
+    assert.equal(stale.headers.get('X-Cache-Status'), 'STALE');
+    assert.equal(stale.headers.get('X-Catalog-Release'), fresh.headers.get('X-Catalog-Release'));
+    assert.equal(stale.headers.get('Cache-Control'), 'no-store');
+    assert.equal(stale.headers.get('X-Test-Upstream-Reads'), '0');
+    assert.equal(await stale.text(), method === 'HEAD' ? '' : body);
+  }
+});
 for (const route of tarkovRoutes) {
   test(`compiled ${route} HEAD preserves GET metadata without a body`, async () => {
     for (const suffix of ['', '/?gameMode=pve&lang=en']) {
@@ -238,6 +335,8 @@ for (const route of tarkovRoutes) {
           'Vary',
           'X-Overlay-Version',
           'X-Overlay-Sha256',
+          'X-Cache-Status',
+          'X-Catalog-Release',
         ]) {
           assert.equal(head.headers.get(header), get.headers.get(header), `${url}: ${header}`);
         }
