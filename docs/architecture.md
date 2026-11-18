@@ -19,10 +19,11 @@ opts into prerendering; link crawling is disabled and missing required documents
 Payload extraction is off: prerendered documents inline their Nuxt payload because
 `_payload.json` URLs match the client-rendered catch-all and would return HTML; a required public
 or client document that references one fails the build.
-Public route entrypoints in `app/features/seo-pages/` pass the shared `PageHeader` into each
-client-only tracker module's `header` slot and render the same header in a matching container as the
-prerendered fallback, so each page keeps one `h1` in one position. The `pages:extend` hook maps those
-routes to wrappers while preserving the existing modules in `app/pages/`.
+The `pages:extend` hook maps public routes to wrappers in `app/features/seo-pages/` and keeps the
+tracker modules in `app/pages/`. Most tracker wrappers pass their header through the module's
+`header` slot and render the same header in the prerendered fallback. The hideout wrapper renders
+its header and English PvP station requirements above the client-only tracker. Each station and
+level has a fragment target in the initial HTML, so links can open the reference before hydration.
 Resource guides render their full article. Navigation, personal state, supporter checkout,
 changelog requests, and application initialization run only in the browser. English HTML hydrates
 before saved/browser locale selection; initialization mounts once per application.
