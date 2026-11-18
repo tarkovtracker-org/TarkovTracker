@@ -36,7 +36,7 @@ one place and is grouped by purpose.
 | ------------------ | ------------------------------------------------------------------------ |
 | `*.mjs`            | Node.js script using ES modules (`import`). Runs with `node`, no build.  |
 | `*.sh`             | Bash script. Run with `bash`.                                            |
-| `*.ts`             | TypeScript loaded by Nuxt, Vitest or the precompute pipeline.            |
+| `*.ts`             | TypeScript loaded by Nuxt, Vitest or a script runner such as `tsx`.      |
 | `ops/prod-db`      | Extensionless Bash wrapper so the command reads `scripts/ops/prod-db …`. |
 | `*.test.mjs`       | Vitest tests, run by `pnpm run test`.                                    |
 | `*-tests.mjs`      | `node --test` tests in `codex-review/`, run by `pnpm run test:workflow`. |
