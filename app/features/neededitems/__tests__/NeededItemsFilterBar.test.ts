@@ -156,6 +156,12 @@ describe('NeededItemsFilterBar', () => {
       global: createDefaultGlobal(),
     });
     const toggle = wrapper.get('[data-testid="needed-items-show"] [role="switch"]');
+    const grouping = wrapper.get('[data-testid="needed-items-show"]');
+    expect(grouping.text()).toContain('page.needed_items.view.show_once');
+    expect(grouping.text()).not.toContain('page.needed_items.view.show_once_hint');
+    expect(
+      wrapper.find('button[aria-label="page.needed_items.view.show_once_hint"]').exists()
+    ).toBe(true);
     expect(toggle.attributes('aria-checked')).toBe('false');
     await toggle.trigger('click');
     expect(wrapper.emitted('update:groupByItem')).toEqual([[true]]);
