@@ -355,6 +355,24 @@ describe('createTeamChannelController', () => {
       await controller.dispose();
     }
   });
+  it('retries a failed leave and member refresh after a terminal close', async () => {
+    const harness = createHarness();
+    const controller = createTeamChannelController(harness.deps);
+    try {
+      await controller.refresh();
+      harness.removeChannel.mockRejectedValueOnce(new Error('Disconnect failed'));
+      harness.refreshMembers.mockResolvedValueOnce(false);
+      harness.channels[0]!.status!('CLOSED', new Error('Deferred join failed'));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(harness.removeChannel).toHaveBeenCalledTimes(2);
+      expect(harness.channels).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(harness.refreshMembers).toHaveBeenCalledTimes(3);
+      expect(harness.channels).toHaveLength(2);
+    } finally {
+      await controller.dispose();
+    }
+  });
   it('drops the binding and rebuilds after the channel closes', async () => {
     const harness = createHarness();
     const controller = createTeamChannelController(harness.deps);
