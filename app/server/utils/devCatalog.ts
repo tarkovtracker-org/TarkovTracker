@@ -17,9 +17,8 @@ export async function devCatalog(
   lang: string
 ) {
   if (dataset !== 'strings') return buildNeutralCatalog(dataset, mode);
-  referenceInventory ??= collectPublishedReferences().catch((error) => {
+  referenceInventory ??= collectPublishedReferences().finally(() => {
     referenceInventory = undefined;
-    throw error;
   });
   return buildCatalogStrings(lang, await referenceInventory);
 }

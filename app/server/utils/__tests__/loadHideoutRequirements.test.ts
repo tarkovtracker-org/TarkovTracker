@@ -47,6 +47,7 @@ it('renders neutral station and material names through the shared public loader'
           ...base,
           name: stationName,
           levels: [
+            { level: 1 },
             {
               ...second,
               stationLevelRequirements: [
@@ -60,16 +61,29 @@ it('renders neutral station and material names through the shared public loader'
     'items-lite': { items: [{ id: 'rub', name: materialName }] },
     strings: { strings: { [stationName]: 'Workbench', [materialName]: 'Roubles' } },
   };
-  const fetch = vi.fn(async (url: string) => ({ data: payloads[url.split('/').at(-1)!] }));
+  const fetch = vi.fn(
+    async (
+      url: string,
+      options: { onResponse: (context: { response: { headers: Headers } }) => void }
+    ) => {
+      options.onResponse({ response: { headers: new Headers({ 'X-Catalog-Release': '1' }) } });
+      return { data: payloads[url.split('/').at(-1)!] };
+    }
+  );
   vi.stubGlobal('$fetch', fetch);
   const [station] = await loadHideoutRequirements();
   expect(station?.name).toBe('Workbench');
-  expect(station?.levels[0]?.items[0]).toMatchObject({
+  expect(station?.levels[0]?.anchor).toBe('requirements-workbench-level-1');
+  expect(station?.levels[1]?.items[0]).toMatchObject({
     id: 'cash',
     name: 'Roubles',
     count: 150000,
   });
-  expect(station?.levels[0]?.stations[0]?.name).toBe('Workbench');
+  expect(station?.levels[1]?.stations[0]).toMatchObject({
+    name: 'Workbench',
+    level: 1,
+    anchor: station?.levels[0]?.anchor,
+  });
   expect(fetch.mock.calls.filter(([url]) => url.endsWith('/strings'))).toHaveLength(1);
 });
 it('retains level costs and prerequisite semantics, including empty levels and missing link targets', async () => {

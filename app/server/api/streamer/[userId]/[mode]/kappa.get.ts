@@ -7,12 +7,12 @@ import {
   type H3Event,
 } from 'h3';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
+import { fetchLocalizedCatalogs } from '@/server/utils/localizedCatalogs';
 import { createLogger } from '@/server/utils/logger';
 import { overlayAuthHeaders } from '@/server/utils/overlayAuth';
 import { getSharedCache, resolveSharedCacheOrigin } from '@/server/utils/sharedEdgeStore';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
-import { localizeGameData, type GameDataStrings } from '@/utils/gameDataStrings';
 import type {
   GameEdition,
   TarkovTaskObjectivesQueryResult,
@@ -21,6 +21,26 @@ import type {
 } from '@/types/tarkov';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const logger = createLogger('StreamerKappaApi');
+function throwMetricsError(error: unknown, mode: string, userId: string): never {
+  if (resolveStatusCode(error) === 503) throw error;
+  logger.error('Failed to compute streamer metrics', { error, mode, userId });
+  throw createError({ statusCode: 500, statusMessage: 'Failed to compute streamer metrics' });
+}
+async function fetchStreamerCatalog(
+  path: string,
+  gameMode: string,
+  headers: Record<string, string> | undefined
+) {
+  let release: string | null = null;
+  const response = await $fetch<{ data: unknown }>(`/api/tarkov/${path}`, {
+    headers,
+    query: path === 'strings' ? { lang: 'en' } : { gameMode },
+    onResponse: ({ response }) => {
+      release = response.headers.get('x-catalog-release');
+    },
+  });
+  return { data: response.data, release };
+}
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EDITIONS_CACHE_TTL_MS = 60 * 60 * 1000;
 const EDITIONS_SHARED_CACHE_PREFIX = 'streamer-kappa-editions';
@@ -271,23 +291,13 @@ export default defineEventHandler(async (event) => {
   const profileData = normalizeSharedProgressData(sharedProfile.data);
   const gameMode = API_GAME_MODES[mode];
   try {
-    const [tasksCoreResponse, tasksObjectivesResponse, editions, table] = await Promise.all([
-      $fetch<{ data: TarkovTasksCoreQueryResult }>('/api/tarkov/tasks-core', {
-        headers: forwardedHeaders,
-        query: { gameMode },
-      }),
-      $fetch<{ data: TarkovTaskObjectivesQueryResult }>('/api/tarkov/tasks-objectives', {
-        headers: forwardedHeaders,
-        query: { gameMode },
-      }),
+    const [[tasksCore, tasksObjectives], editions] = await Promise.all([
+      fetchLocalizedCatalogs<[TarkovTasksCoreQueryResult, TarkovTaskObjectivesQueryResult]>(
+        ['tasks-core', 'tasks-objectives'],
+        (path) => fetchStreamerCatalog(path, gameMode, forwardedHeaders)
+      ),
       getEditions(),
-      $fetch<{ data: { strings: GameDataStrings } }>('/api/tarkov/strings', {
-        headers: forwardedHeaders,
-        query: { lang: 'en' },
-      }),
     ]);
-    const tasksCore = localizeGameData(tasksCoreResponse.data, table.data.strings);
-    const tasksObjectives = localizeGameData(tasksObjectivesResponse.data, table.data.strings);
     const objectivesByTaskId = new Map(
       (tasksObjectives.tasks ?? []).map((task) => [task.id, task] as const)
     );
@@ -320,11 +330,6 @@ export default defineEventHandler(async (event) => {
       visibility: sharedProfile.visibility,
     };
   } catch (error) {
-    logger.error('Failed to compute streamer metrics', {
-      error,
-      mode,
-      userId,
-    });
-    throw createError({ statusCode: 500, statusMessage: 'Failed to compute streamer metrics' });
+    throwMetricsError(error, mode, userId);
   }
 });

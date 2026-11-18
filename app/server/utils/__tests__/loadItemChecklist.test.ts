@@ -57,7 +57,15 @@ it('renders neutral checklist labels through the shared public loader with one E
       },
     },
   };
-  const fetch = vi.fn(async (url: string) => ({ data: payloads[url.split('/').at(-1)!] }));
+  const fetch = vi.fn(
+    async (
+      url: string,
+      options: { onResponse: (context: { response: { headers: Headers } }) => void }
+    ) => {
+      options.onResponse({ response: { headers: new Headers({ 'X-Catalog-Release': '1' }) } });
+      return { data: payloads[url.split('/').at(-1)!] };
+    }
+  );
   vi.stubGlobal('$fetch', fetch);
   const checklist = await loadItemChecklist();
   expect(checklist.tasks[0]).toMatchObject({

@@ -162,7 +162,11 @@ server-rendered consumers during the migration.
 
 The public item checklist and hideout requirements pages use one English table
 per prerendered projection to resolve all referenced item, task, and station names.
-Profile and streamer consumers also resolve their catalogs before rendering.
+The public projections and streamer Kappa response verify that catalogs and
+strings come from the same release, then retry the whole bundle once on a mismatch.
+A persistent mismatch produces an unavailable response. During the first deployment,
+prerender can also consume the preceding release's fully localized plaintext data.
+Profile consumers resolve their catalogs before rendering.
 After an admin purge, objective hydration accepts a response from the active
 precomputed release when the request started in the current purge generation.
 An older in-flight request or a stale fallback cannot repopulate that generation.
