@@ -2,7 +2,7 @@ import { isPlainObject } from '@/server/utils/deepMerge';
 import { overlayAuthHeaders } from '@/server/utils/overlayAuth';
 import { validateOverlayData, unknownOverlaySections } from '@/server/utils/overlayValidation';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
-import { isGameDataString, overlayOverrideKey } from '@/utils/gameDataStrings';
+import { overlayOverrideKey } from '@/utils/gameDataStrings';
 import type { OverlayMeta } from '@/server/utils/overlay';
 import type { OverlayData } from '@/server/utils/overlayTypes';
 type Identity = { version: string; generated: string; sha256: string };
@@ -28,18 +28,34 @@ const validStrings = (value: unknown): value is NeutralOverlaySnapshot['strings'
     (table) =>
       isPlainObject(table) && Object.values(table).every((text) => typeof text === 'string')
   );
+// Match the overlay producer's locale-override schema, including ID-keyed objective text.
+const LOCALE_FIELDS = new Map<string, ReadonlySet<string>>([
+  ['items', new Set(['description', 'name', 'shortName', 'wikiLink'])],
+  ['maps', new Set(['description', 'name'])],
+  ['prestige', new Set(['name'])],
+  ['storyChapters', new Set(['description', 'name'])],
+  ['tasks', new Set(['name', 'wikiLink'])],
+  ['traders', new Set(['description', 'name'])],
+]);
+const safeTargetPart = (part: unknown): part is string =>
+  typeof part === 'string' && !['__proto__', 'constructor', 'prototype'].includes(part);
+const safeTargetPath = (path: unknown): path is string[] =>
+  Array.isArray(path) && path.length >= 3 && path.every(safeTargetPart);
+const flatLocaleTarget = (path: string[]): boolean =>
+  path.length === 3 && (LOCALE_FIELDS.get(path[0]!)?.has(path[2]!) ?? false);
+const objectiveLocaleTarget = (path: string[]): boolean =>
+  path.length === 5 &&
+  ['tasks', 'storyChapters'].includes(path[0]!) &&
+  path[2] === 'objectives' &&
+  path[4] === 'description';
+const targetKey = (path: string[]): string =>
+  `@tt:overlay:/${path.map((part) => part.replaceAll('~', '~0').replaceAll('/', '~1')).join('/')}`;
+const validTarget = (key: string, path: unknown): boolean =>
+  safeTargetPath(path) &&
+  (flatLocaleTarget(path) || objectiveLocaleTarget(path)) &&
+  key === targetKey(path);
 const validTargets = (value: unknown): value is NeutralOverlaySnapshot['localeTargets'] =>
-  isPlainObject(value) &&
-  Object.entries(value).every(
-    ([key, path]) =>
-      isGameDataString(key) &&
-      Array.isArray(path) &&
-      path.length > 1 &&
-      path.every(
-        (part) =>
-          typeof part === 'string' && !['__proto__', 'constructor', 'prototype'].includes(part)
-      )
-  );
+  isPlainObject(value) && Object.entries(value).every(([key, path]) => validTarget(key, path));
 export async function parseNeutralOverlay(
   value: unknown,
   sourceUrl = DEFAULT_URL

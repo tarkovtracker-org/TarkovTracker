@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 import { buildCatalogStrings, buildNeutralCatalog } from '@/server/utils/neutralCatalog';
@@ -31,6 +32,77 @@ const upstream = (responses: Record<string, unknown>): TarkovJsonOptions => ({
   },
 });
 describe('neutral catalogs', () => {
+  it('accepts signed name and objective-description targets while preserving both entity IDs', async () => {
+    const name = '@tt:overlay:/tasks/task/name';
+    const description = '@tt:overlay:/tasks/task/objectives/objective/description';
+    const value = {
+      schemaVersion: 1,
+      editions: testOverlayEditions,
+      $meta: { version: 'v1', generated: 'today' },
+      $source: { version: 'v1', generated: 'today', sha256: 'source' },
+      $strings: { en: { [name]: 'Corrected task', [description]: 'Corrected objective' } },
+      $localeTargets: {
+        [name]: ['tasks', 'task', 'name'],
+        [description]: ['tasks', 'task', 'objectives', 'objective', 'description'],
+      },
+    };
+    const sha256 = createHash('sha256')
+      .update(JSON.stringify(value, null, 2))
+      .digest('hex');
+    const parsed = await parseNeutralOverlay({ ...value, $meta: { ...value.$meta, sha256 } });
+    const original = {
+      data: {
+        tasks: [
+          {
+            id: 'task',
+            name: 'Original task',
+            objectives: [{ id: 'objective', description: 'Original objective' }],
+          },
+        ],
+      },
+    };
+    const bound = bindOverlayLocaleTargets(original, parsed, 'regular');
+    const table = await buildCatalogStrings('en', collectGameDataStrings(bound), {
+      snapshot: parsed,
+    });
+    expect(localizeGameData(bound, table.data.strings)).toEqual({
+      data: {
+        tasks: [
+          {
+            id: 'task',
+            name: 'Corrected task',
+            objectives: [{ id: 'objective', description: 'Corrected objective' }],
+          },
+        ],
+      },
+    });
+  });
+  it.each([
+    ['tasks', 'task', 'id'],
+    ['tasks', 'task', 'type'],
+    ['tasks', 'task', 'objectives', 'objective', 'count'],
+    ['maps', 'map', 'extractsAdd', 'exit', 'name'],
+    ['unknown', 'task', 'name'],
+  ])(
+    'rejects a signed locale target that rewrites identity or structural fields %j',
+    async (...path) => {
+      const key = `@tt:overlay:/${path.join('/')}`;
+      const value = {
+        schemaVersion: 1,
+        editions: testOverlayEditions,
+        $meta: { version: 'v1', generated: 'today' },
+        $source: { version: 'v1', generated: 'today', sha256: 'source' },
+        $strings: { en: { [key]: 'Changed' } },
+        $localeTargets: { [key]: path },
+      };
+      const sha256 = createHash('sha256')
+        .update(JSON.stringify(value, null, 2))
+        .digest('hex');
+      await expect(
+        parseNeutralOverlay({ ...value, $meta: { ...value.$meta, sha256 } })
+      ).rejects.toThrow('Invalid neutral overlay strings');
+    }
+  );
   it.each([
     ['de', 'Im Raid gefunden abgeben: Item'],
     ['fr', "Remise trouvée lors d'un raid: Item"],

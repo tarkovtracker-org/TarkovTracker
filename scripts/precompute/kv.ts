@@ -49,6 +49,7 @@ export function createKvRestWriter(config: KvRestConfig): CatalogStore {
     },
   };
 }
+export class KvReadNotFound extends Error {}
 type KvFailure = { error: Error; retryable: boolean };
 type Attempt<T> = { value: T } | KvFailure;
 async function retryKvOperation<T>(operation: () => Promise<Attempt<T>>): Promise<T> {
@@ -68,7 +69,9 @@ async function readAttempt(url: URL, key: string, apiToken: string): Promise<Att
     if (response.ok) return { value: await response.arrayBuffer() };
     const body = await readApiResponse(response);
     return {
-      error: new Error(`KV read failed for "${key}": ${errorDetail(response, body)}`),
+      error: new (response.status === 404 ? KvReadNotFound : Error)(
+        `KV read failed for "${key}": ${errorDetail(response, body)}`
+      ),
       retryable: isTransientFailure(response, body) || response.status === 404,
     };
   } catch (error) {

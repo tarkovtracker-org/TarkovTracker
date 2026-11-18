@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 import { buildOverlayResponseHeaders } from '@/server/utils/overlayResponseHeaders';
 import { precomputedOverlayIdentity } from '@/server/utils/precomputedTarkov';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { CATALOG_DATASETS, CATALOG_LANGUAGES, CATALOG_MANIFEST_KEY } from '@/utils/catalogDatasets';
 import { collectGameDataStrings } from '@/utils/gameDataStrings';
+import { KvReadNotFound } from './kv';
 import { PRECOMPUTED_TTL_SECONDS } from './precompute';
 import type { CatalogStore } from './kv';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
@@ -19,6 +21,18 @@ function checkCatalog(dataset: CatalogDataset, payload: Payload, sha: string) {
   if (precomputedOverlayIdentity(payload)?.sha256 !== sha)
     throw new Error(`Unexpected overlay in ${dataset}`);
 }
+async function readbackMatches(kv: CatalogStore, key: string, expected: Buffer) {
+  // A previously cached value or miss can outlive a successful KV write by 60 seconds.
+  for (const waitMs of [0, 5000, 15000, 45000]) {
+    if (waitMs) await delay(waitMs);
+    try {
+      if (expected.equals(Buffer.from(await kv.read(key)))) return true;
+    } catch (error) {
+      if (!(error instanceof KvReadNotFound)) throw error;
+    }
+  }
+  return false;
+}
 async function stage(kv: CatalogStore, scope: string, payload: Payload) {
   const body = JSON.stringify(payload);
   const bytes = Buffer.byteLength(body);
@@ -28,7 +42,7 @@ async function stage(kv: CatalogStore, scope: string, payload: Payload) {
   if (compressed.byteLength > 25 * 1024 * 1024)
     throw new Error(`Compressed catalog exceeds KV limit for ${scope}`);
   await kv.put(key, compressed, { expirationTtl: PRECOMPUTED_TTL_SECONDS });
-  if (!compressed.equals(Buffer.from(await kv.read(key))))
+  if (!(await readbackMatches(kv, key, compressed)))
     throw new Error(`KV readback differs for ${scope}`);
   return { key, bytes, headers: buildOverlayResponseHeaders(payload.dataOverlay) };
 }
@@ -69,8 +83,15 @@ export async function publishCatalogRelease(
   const remainingTtl = PRECOMPUTED_TTL_SECONDS - Math.ceil((Date.now() - startedAt) / 1000) - 60;
   if (remainingTtl < 60) throw new Error('Catalog objects expired during publication');
   await kv.put(CATALOG_MANIFEST_KEY, pointer, { expirationTtl: remainingTtl });
-  if (new TextDecoder().decode(await kv.read(CATALOG_MANIFEST_KEY)) !== pointer)
-    throw new Error('Active catalog manifest did not match the completed release on readback');
+  try {
+    if (!(await readbackMatches(kv, CATALOG_MANIFEST_KEY, Buffer.from(pointer))))
+      throw new Error('active manifest bytes differ');
+  } catch (error) {
+    throw new Error(
+      `Catalog pointer was already written but could not be confirmed: ${String(error)}`,
+      { cause: error }
+    );
+  }
   return manifest;
 }
 /** Include failed neutral publication alongside legacy/import diagnostics in the workflow artifact. */

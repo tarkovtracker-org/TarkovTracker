@@ -2,6 +2,10 @@ import { gunzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import { CATALOG_DATASETS, CATALOG_LANGUAGES, CATALOG_MANIFEST_KEY } from '@/utils/catalogDatasets';
 import { catalogReleaseReport, publishCatalogRelease } from '../catalog-release';
+vi.mock('node:timers/promises', () => {
+  const setTimeout = vi.fn(async () => {});
+  return { default: { setTimeout }, setTimeout };
+});
 const ref = '@tt:pve:tasks:objective';
 const data = Object.fromEntries(
   [
@@ -91,6 +95,26 @@ describe('neutral catalog publication', () => {
       CATALOG_MANIFEST_KEY,
       expect.anything(),
       expect.anything()
+    );
+  });
+  it('waits for stale objects and the prior active pointer to converge without writing twice', async () => {
+    const kv = memoryStore();
+    const seen = new Set<string>();
+    const read = async (key: string) => {
+      if (seen.has(key)) return kv.read(key);
+      seen.add(key);
+      return new ArrayBuffer(0);
+    };
+    const manifest = await publishCatalogRelease({ ...kv, read }, builders(), 'sha');
+    expect(seen.size).toBe(Object.keys(manifest.entries).length + 1);
+    expect(kv.put).toHaveBeenCalledTimes(seen.size);
+  });
+  it('reports that the pointer was written if it cannot be confirmed', async () => {
+    const kv = memoryStore();
+    const read = (key: string) =>
+      key === CATALOG_MANIFEST_KEY ? Promise.resolve(new ArrayBuffer(0)) : kv.read(key);
+    await expect(publishCatalogRelease({ ...kv, read }, builders(), 'sha')).rejects.toThrow(
+      'pointer was already written'
     );
   });
   it('leaves the active release alone when staged data fails readback', async () => {
