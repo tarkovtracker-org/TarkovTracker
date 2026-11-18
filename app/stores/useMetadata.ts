@@ -182,6 +182,7 @@ interface MetadataState {
   // Indicates objectives still need to be fetched (set when tasks exist but objectives not yet loaded)
   tasksObjectivesPending: boolean;
   tasksObjectivesHydrated: boolean;
+  tasksRewardsHydrated: boolean;
   hideoutLoading: boolean;
   itemsLoading: boolean;
   mapSpawnsLoading: boolean;
@@ -484,6 +485,7 @@ export const useMetadataStore = defineStore('metadata', {
     tasksCoreRefreshing: false,
     tasksObjectivesPending: false,
     tasksObjectivesHydrated: false,
+    tasksRewardsHydrated: false,
     hideoutLoading: false,
     itemsLoading: false,
     mapSpawnsLoading: false,
@@ -1620,6 +1622,7 @@ export const useMetadataStore = defineStore('metadata', {
         processData: (data) => {
           this.mergeTaskRewards(data.tasks, { rebuildDerivedData: false });
           this.hydrateTaskItems();
+          this.tasksRewardsHydrated = true;
         },
         logName: 'Task rewards',
         forceRefresh,
@@ -2019,6 +2022,7 @@ export const useMetadataStore = defineStore('metadata', {
       });
       this.tasksObjectivesPending = (data.tasks?.length ?? 0) > 0;
       this.tasksObjectivesHydrated = false;
+      this.tasksRewardsHydrated = false;
       this.objectiveModeCountDifferences = markRaw({});
       this.objectiveModeCountDifferencesHydrated = false;
       getPromiseStore(this).taskCatalogEpoch += 1;
@@ -2560,6 +2564,7 @@ export const useMetadataStore = defineStore('metadata', {
       getPromiseStore(this).taskCatalogEpoch += 1;
       this.tasksObjectivesPending = false;
       this.tasksObjectivesHydrated = false;
+      this.tasksRewardsHydrated = false;
       this.mapSpawnsLoaded = false;
       this.mapSpawnsLoading = false;
       this.mapSpawnsError = null;

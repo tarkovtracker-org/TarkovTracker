@@ -26,7 +26,7 @@ const tasks = [
 ] as Task[];
 const mountPanel = (hidden: string[], props: Record<string, unknown> = {}) =>
   mount(MapTaskVisibilityPanel, {
-    props: { tasks, hiddenTaskIds: new Set(hidden), ...props },
+    props: { tasks, hiddenTaskIds: new Set(hidden), reputationOptions: [], ...props },
     global: {
       stubs: {
         UIcon: true,
@@ -80,23 +80,23 @@ describe('MapTaskVisibilityPanel', () => {
     expect(wrapper.find('[data-testid="map-raid-plan-all-hidden"]').exists()).toBe(true);
   });
   it('changes the reputation minimum and allows clearing it with no matching quests', async () => {
-    const wrapper = mountPanel([]);
+    const wrapper = mountPanel([], { reputationOptions: [0.1, 0.2, 0.25, 0.75, 1.5] });
     const filter = wrapper.get('select');
     expect(
       filter
         .findAll('option')
         .slice(2)
         .map((option) => Number(option.element.value))
-    ).toEqual([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]);
-    await filter.setValue('0.05');
-    expect(wrapper.emitted('update:minimumReputation')).toEqual([[0.05]]);
-    await wrapper.setProps({ tasks: [], minimumReputation: 0.05 });
+    ).toEqual([0.1, 0.2, 0.25, 0.75, 1.5]);
+    await filter.setValue('0.25');
+    expect(wrapper.emitted('update:minimumReputation')).toEqual([[0.25]]);
+    await wrapper.setProps({ tasks: [], minimumReputation: 0.25 });
     expect(wrapper.get('[data-testid="map-raid-plan-summary"]').text()).toBe(
       'page.tasks.map.raid_plan.no_reputation_matches'
     );
     filter.element.selectedIndex = 0;
     await filter.trigger('change');
-    expect(wrapper.emitted('update:minimumReputation')).toEqual([[0.05], [null]]);
+    expect(wrapper.emitted('update:minimumReputation')).toEqual([[0.25], [null]]);
   });
   describe('quest colors (#920)', () => {
     const taskColors = new Map([

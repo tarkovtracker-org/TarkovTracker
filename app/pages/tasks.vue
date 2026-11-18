@@ -122,6 +122,7 @@
                     <template v-if="selectedMapData">
                       <MapTaskVisibilityPanel
                         v-model:minimum-reputation="minimumMapReputation"
+                        :reputation-options="mapReputationOptions"
                         :tasks="mapPlanTasks"
                         :hidden-task-ids="hiddenTaskIds"
                         :task-colors="mapTaskColors"
@@ -526,6 +527,7 @@
           <div v-if="selectedMapData" class="bg-surface-900 px-4 pt-3">
             <MapTaskVisibilityPanel
               v-model:minimum-reputation="minimumMapReputation"
+              :reputation-options="mapReputationOptions"
               :tasks="mapPlanTasks"
               :hidden-task-ids="hiddenTaskIds"
               :task-colors="mapTaskColors"
@@ -583,6 +585,7 @@
   import MapTaskVisibilityPanel from '@/features/maps/MapTaskVisibilityPanel.vue';
   import {
     getHiddenMapTaskIds,
+    getMapReputationOptions,
     meetsMapReputationMinimum,
     type MapTaskVisibilityActions,
   } from '@/features/maps/utils/mapTaskVisibility';
@@ -793,6 +796,18 @@
   // Set from the deep-link pin below; the map shows exactly the tasks the list shows.
   const mapFocusTaskId = ref<string | null>(null);
   const minimumMapReputation = ref<number | null>(null);
+  const mapReputationOptions = computed(() => getMapReputationOptions(tasks.value));
+  watchEffect(() => {
+    const minimum = minimumMapReputation.value;
+    if (
+      minimum &&
+      taskDetailsReady.value &&
+      metadataStore.tasksRewardsHydrated &&
+      !mapReputationOptions.value.includes(minimum)
+    ) {
+      minimumMapReputation.value = null;
+    }
+  });
   const matchesMapReputation = (task: Task) =>
     task.id === mapFocusTaskId.value || meetsMapReputationMinimum(task, minimumMapReputation.value);
   const userHiddenMapTaskIds = computed(() =>
