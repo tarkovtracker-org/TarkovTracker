@@ -2134,6 +2134,7 @@ export const useMetadataStore = defineStore('metadata', {
       return applyCachedEditionsOrIgnore(this, isCurrent, mode, language);
     },
     hasRevalidatedCatalog(scope: string): boolean {
+      if (!hasFreshNeutralEditions(this, this.getApiGameMode())) return false;
       const promises = getPromiseStore(this);
       return (
         promises.editionsScope === scope &&
