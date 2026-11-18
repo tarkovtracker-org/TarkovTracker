@@ -7,6 +7,7 @@ import {
   type H3Event,
 } from 'h3';
 import { scheduleBackgroundTask } from '@/server/utils/backgroundTask';
+import { shouldBypassCache } from '@/server/utils/edgeCache';
 import { createLogger } from '@/server/utils/logger';
 import { getPrecomputedStore, type CatalogKvReader } from '@/server/utils/precomputedTarkov';
 import { validateGameMode } from '@/server/utils/tarkov-cache-config';
@@ -60,7 +61,9 @@ async function serveSnapshot(event: H3Event, store: CatalogKvReader | null, scop
   const cache = (globalThis.caches as (CacheStorage & { default?: EdgeStorage }) | undefined)
     ?.default;
   const key = new URL('/__neutral-catalog-v1/' + scope, getRequestURL(event).origin).href;
-  const cached = await cache?.match(key).catch(() => undefined);
+  const cached = shouldBypassCache(event)
+    ? undefined
+    : await cache?.match(key).catch(() => undefined);
   try {
     if (!store) throw new Error('Missing catalog store');
     const value = await readCatalogSnapshot(store, scope, cached);
@@ -81,6 +84,7 @@ export function catalogHandler(dataset: CatalogDataset | 'strings') {
     setHeader(event, 'Cache-Control', 'no-store');
     const store = getPrecomputedStore(event);
     if (import.meta.dev && !store) {
+      setHeader(event, 'X-Catalog-Release', 'development');
       const { devCatalog } = await import('@/server/utils/devCatalog');
       return devCatalog(dataset, mode, lang);
     }

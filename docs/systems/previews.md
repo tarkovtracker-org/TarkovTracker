@@ -246,9 +246,10 @@ still needs current revision evidence.
   seed cannot satisfy the neutral reader. Validate the complete manifest, immutable
   object readbacks, and all three import results before testing catalog-dependent
   UI. Refresh before expiry and at least every six days while an import preview
-  remains active. Missing snapshots without an eligible last-good per-colo copy
-  return 503. `STALE` fallback can keep the UI available but does not establish
-  release readiness. Ordinary preview smoke tests do not certify the complete
+  remains active. Unavailable or expired English imports always return 503.
+  Neutral catalog readers can return a last-good per-colo copy marked `STALE`
+  when KV is unavailable, or 503 when no copy exists. Only a current release
+  passes verification. Ordinary preview smoke tests do not certify the complete
   catalog or import release. Every approved preview runtime has read/write/delete
   access to this shared expendable store. Only merged public game catalogs belong
   there. Revalidate the seeded identity before testing because another preview can

@@ -78,6 +78,29 @@ Deno.test('retains historical objective catalogs for every language and mode', (
       }
     }
 });
+Deno.test('preserves every retired versioned non-task purge target and its old scope', () => {
+  const all = buildTarkovCacheUrls(origins);
+  const keys = [
+    'bootstrap-json-v2',
+    'hideout-json-v5',
+    'items-json-v2',
+    'items-lite-json-v2',
+    'map-spawns-json-v1',
+    'prestige-json-v3',
+  ];
+  for (const key of keys) {
+    const prefixes = origins.map((origin) => `${origin}/__edge-cache/tarkov/${key}-`);
+    const expected = prefixes.flatMap((prefix) =>
+      modes.flatMap((mode) =>
+        key === 'bootstrap-json-v2'
+          ? [prefix + mode]
+          : languages.map((lang) => `${prefix}${lang}-${mode}`)
+      )
+    );
+    const found = all.filter((url) => prefixes.some((prefix) => url.startsWith(prefix)));
+    assertEquals(found.sort(), expected.sort(), key);
+  }
+});
 Deno.test('retains existing non-task targets and covers both authorized cache origins', () => {
   const targets = buildTarkovCacheUrls([
     'https://tarkovtracker.org',

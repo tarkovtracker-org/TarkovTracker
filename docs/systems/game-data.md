@@ -45,8 +45,13 @@ The ten neutral datasets accept `gameMode`; their release keys have no language
 component. `strings?lang=` covers all modes in one response. Fresh production catalog and strings responses carry
 `Cache-Control: no-store`, `X-Cache-Status: PRECOMPUTE`, and `X-Catalog-Release`.
 A last-good response carries `X-Cache-Status: STALE`. The development builder
-returns its result directly without the production snapshot headers. Overlay-bearing scopes also include overlay identity
+returns `X-Catalog-Release: development` without a production timestamp or cache status. Overlay-bearing scopes also include overlay identity
 headers. Bootstrap and map-spawns are upstream-only and have no `dataOverlay`.
+
+With `NUXT_CACHE_BYPASS_ENABLED`, a request using `cacheBust=1` reads the active
+manifest and its object directly from KV, skipping the per-colo last-good copy.
+This also suppresses stale fallback if KV is unavailable. The scheduled producer
+is responsible for refreshing the authoritative release.
 
 Every GET endpoint has an explicit HEAD counterpart. Unknown `/api/tarkov/*`
 paths return HTTP 404 JSON with `Cache-Control: no-store` and stay within the API

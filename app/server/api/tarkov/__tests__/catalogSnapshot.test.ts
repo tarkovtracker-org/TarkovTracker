@@ -1,7 +1,7 @@
 import { createApp, defineEventHandler, toWebHandler } from 'h3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { catalogHandler } from '@/server/utils/serveCatalog';
-import { CATALOG_DATASETS, CATALOG_MANIFEST_KEY } from '@/utils/catalogDatasets';
+import { CATALOG_DATASETS, CATALOG_LANGUAGES, CATALOG_MANIFEST_KEY } from '@/utils/catalogDatasets';
 const body = JSON.stringify({
   data: { tasks: [{ id: 'unchanged-id', description: '@tt:pve:tasks:key' }] },
 });
@@ -52,9 +52,35 @@ describe('catalog snapshot routes', () => {
     const other = await request(new Request('https://example.test/?gameMode=regular'));
     expect(other.status).toBe(503);
   });
+  it('forces a KV read and rejects stale fallback only for an enabled bypass request', async () => {
+    vi.stubEnv('NUXT_CACHE_BYPASS_ENABLED', 'true');
+    const kept = new Map<string, Response>();
+    const cache = {
+      match: vi.fn(async (key: string) => kept.get(key)?.clone()),
+      put: async (key: string, value: Response) => {
+        kept.set(key, value);
+      },
+    };
+    vi.stubGlobal('caches', { default: cache });
+    try {
+      const { request, get, key } = serve('tasks-core', 'tasks-core/regular');
+      const url = 'https://example.test/?gameMode=regular';
+      expect(await (await request(new Request(url))).text()).toBe(body);
+      expect(await (await request(new Request(url + '&cacheBust=1'))).text()).toBe(body);
+      expect(get.mock.calls.filter(([k]) => k === key)).toHaveLength(2);
+      get.mockRejectedValue(new Error('KV unavailable'));
+      expect((await request(new Request(url + '&cacheBust=1'))).status).toBe(503);
+      vi.stubEnv('NUXT_CACHE_BYPASS_ENABLED', 'false');
+      expect((await request(new Request(url + '&cacheBust=1'))).headers.get('X-Cache-Status')).toBe(
+        'STALE'
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it.each(CATALOG_DATASETS)('reads the same %s snapshot in every language', async (dataset) => {
     const { get, request, key } = serve(dataset, dataset + '/pve');
-    for (const lang of ['en', 'de']) {
+    for (const lang of CATALOG_LANGUAGES) {
       const res = await request(
         new Request(`https://example.test/api/tarkov/${dataset}?gameMode=pve&lang=${lang}`)
       );
@@ -63,12 +89,9 @@ describe('catalog snapshot routes', () => {
       expect(res.headers.get('X-Cache-Status')).toBe('PRECOMPUTE');
       expect(await res.text()).toBe(body);
     }
-    expect(get.mock.calls.map(([k]) => k)).toEqual([
-      CATALOG_MANIFEST_KEY,
-      key,
-      CATALOG_MANIFEST_KEY,
-      key,
-    ]);
+    expect(get.mock.calls.map(([k]) => k)).toEqual(
+      CATALOG_LANGUAGES.flatMap(() => [CATALOG_MANIFEST_KEY, key])
+    );
   });
   it('uses the first language when the strings query repeats it', async () => {
     const { request } = serve('strings', 'strings/de');

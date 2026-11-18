@@ -1455,7 +1455,8 @@ plus three independently validated whole English import snapshots. Follow the
    A filtered run, preview namespace, or older localized manifest cannot satisfy
    this gate.
 5. Promote the consumer after the complete production manifest is available.
-   `pnpm run verify:overlay` must report all 43 scopes current and three current
+   Supply the private overlay read token through the `OVERLAY_TOKEN` process
+   environment or a secret store. `pnpm run verify:overlay` must report all 43 scopes current and three current
    imports. It checks raw response digest/length, release timestamp, precompute
    source, cache policy, and overlay identity, retrying one concurrent release
    change. A `STALE` fallback does not certify the active release.
