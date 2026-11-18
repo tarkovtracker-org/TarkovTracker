@@ -73,6 +73,7 @@ const {
         connect: vi.fn(),
         disconnect: vi.fn().mockResolvedValue(undefined),
         getChannels: vi.fn(() => []),
+        setAuth: vi.fn(async () => {}),
       },
       from: vi.fn(),
       // Mirrors `RealtimeClient.channel()`: an open topic returns the live channel.
@@ -679,7 +680,11 @@ describe('seasonal progress realtime synchronization', () => {
   it('ignores late progress events while the shared transport is suspended', async () => {
     vi.useFakeTimers();
     const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });
-    const disposeVisibility = installRealtimeVisibility(supabaseContext.client.realtime, page);
+    const disposeVisibility = installRealtimeVisibility(
+      supabaseContext.client.realtime,
+      async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+      page
+    );
     try {
       const { setupRealtimeListener } = await import('@/stores/tarkov/realtimeListener');
       await setupRealtimeListener(store);

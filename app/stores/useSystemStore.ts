@@ -7,6 +7,7 @@ import {
   removeOwnedChannel,
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
+import { subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
 import { collectTeamMembershipIds } from '@/utils/teamMemberships';
 import type { SystemGetters, SystemState } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
@@ -275,26 +276,24 @@ export function useSystemStoreWithSupabase(): SystemStoreInstance {
     // leave keeps it occupied and `subscribe()` would never rejoin, so decline
     // this attempt and let the next auth change retry.
     if (!(await canJoinMembershipTopic(topic, sessionId, userId))) return;
-    const channel = client
-      .channel(topic)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'team_memberships',
-          filter: `user_id=eq.${userId}`,
-        },
-        () => void refreshTeamMemberships(userId, sessionId)
-      )
-      .subscribe((status, error) => {
-        if (status === 'SUBSCRIBED' && isCurrentMembershipSession(sessionId, userId)) {
-          void refreshTeamMemberships(userId, sessionId);
-        }
-        logChannelSubscribeFailure('SystemStore', status, error, {
-          table: 'team_memberships',
-        });
+    const channel = client.channel(topic).on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'team_memberships',
+        filter: `user_id=eq.${userId}`,
+      },
+      () => void refreshTeamMemberships(userId, sessionId)
+    );
+    subscribeRealtimeChannel(client.realtime, channel, (status, error) => {
+      if (status === 'SUBSCRIBED' && isCurrentMembershipSession(sessionId, userId)) {
+        void refreshTeamMemberships(userId, sessionId);
+      }
+      logChannelSubscribeFailure('SystemStore', status, error, {
+        table: 'team_memberships',
       });
+    });
     membershipChannel.value = { channel, client, topic };
   };
   listenerScope.run(() => {

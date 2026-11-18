@@ -79,6 +79,7 @@ const createHarness = (options: { removeStatus?: string | Promise<string> } = {}
     channels,
     client,
     deps,
+    getChannels: () => [...open.values()] as unknown as ReturnType<SupabaseClient['getChannels']>,
     isTopicOpen: (topic: string) => open.has(topic),
     refreshMembers,
     removeChannel,
@@ -130,12 +131,21 @@ describe('createTeamChannelController', () => {
     'reconciles a suspended first join (suspended at creation: %s)',
     async (suspendedAtCreation) => {
       const harness = createHarness();
-      const transport = { connect: vi.fn(), disconnect: vi.fn(), getChannels: () => [] };
+      const transport = {
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        getChannels: harness.getChannels,
+        setAuth: vi.fn(async () => {}),
+      };
       Object.assign(harness.client, { realtime: transport });
       const page = Object.assign(new EventTarget(), {
         visibilityState: 'hidden' as DocumentVisibilityState,
       });
-      const releaseVisibility = installRealtimeVisibility(transport, page);
+      const releaseVisibility = installRealtimeVisibility(
+        transport,
+        async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+        page
+      );
       const controller = createTeamChannelController(harness.deps);
       const hydrated = vi.fn();
       window.addEventListener('teammate-progress-reconnected', hydrated);
@@ -173,10 +183,19 @@ describe('createTeamChannelController', () => {
     async (ownerSuspended) => {
       const owner = createHarness();
       const replacement = createHarness();
-      const transport = { connect: vi.fn(), disconnect: vi.fn(), getChannels: () => [] };
+      const transport = {
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        getChannels: () => [],
+        setAuth: vi.fn(async () => {}),
+      };
       Object.assign(ownerSuspended ? owner.client : replacement.client, { realtime: transport });
       const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' as const });
-      const releaseVisibility = installRealtimeVisibility(transport, page);
+      const releaseVisibility = installRealtimeVisibility(
+        transport,
+        async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+        page
+      );
       const controller = createTeamChannelController(owner.deps);
       try {
         await controller.refresh();

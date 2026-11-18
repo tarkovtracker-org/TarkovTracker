@@ -49,7 +49,7 @@ import {
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
 import { startRealtimeRecovery } from '@/utils/realtimeRecovery';
-import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
+import { isRealtimeSuspended, subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
 import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
@@ -710,7 +710,7 @@ async function runSetupRealtimeListener(
   const subscribeOwnedChannel = () => {
     const subscribing = owned;
     try {
-      subscribing.channel.subscribe((status, error) => {
+      subscribeRealtimeChannel(client.realtime, subscribing.channel, (status, error) => {
         if (replacing || !setupStillOwnsChannel(subscribing, currentUserId, generation)) return;
         recovery.onStatus(status, error);
       });

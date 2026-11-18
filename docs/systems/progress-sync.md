@@ -374,8 +374,11 @@ shown by `app/shell/ProgressSaveStatusIndicator.vue` in the app bar.
 - `user_system` is included in `supabase_realtime`, and sign-out tears down all client channels.
 - The shared browser Realtime transport disconnects after 60 seconds continuously hidden. Channel
   ownership is retained, new connect attempts are gated while suspended, and a visible tab waits for
-  an outstanding disconnect before reconnecting once. Auth, local persistence, and outbound saves
-  remain active. Rejoined consumers refresh authoritative snapshots; owner progress uses existing
+  an outstanding disconnect and a user access token before reconnecting once. New channels wait to
+  subscribe until the transport has that token. The transport retries a failed read or socket open
+  once. An auth event, restored connectivity, or a later connect attempt can also resume it.
+  Auth, local persistence, and outbound saves remain active.
+  Rejoined consumers refresh authoritative snapshots; owner progress uses existing
   merge/epoch rules, and snapshot responses cannot overwrite newer live events or another session.
   Pending snapshots omit non-serializable fields, including functions and symbols, while retaining
   explicit `undefined` fields. Removing transient state must not become a persisted field deletion.

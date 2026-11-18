@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPendingStateTracker } from '@/utils/pendingState';
 import { installRealtimeVisibility } from '@/utils/realtimeVisibility';
 import type { WithRemoteSnapshot } from '@/utils/pendingState';
+import type { SupabaseRealtimeChannel } from '@/utils/realtimeChannel';
 import type { Store } from 'pinia';
 const { channel, client, loggerMock, removeChannel } = vi.hoisted(() => {
   const realtimeChannel = {
@@ -83,10 +84,15 @@ describe('useSupabaseListener cleanup', () => {
       const transport = {
         connect: vi.fn(),
         disconnect: vi.fn(async () => 'ok' as const),
-        getChannels: vi.fn(() => []),
+        getChannels: vi.fn(() => [channel as unknown as SupabaseRealtimeChannel]),
+        setAuth: vi.fn(async () => {}),
       };
       client.realtime = transport;
-      const disposeVisibility = installRealtimeVisibility(transport, page);
+      const disposeVisibility = installRealtimeVisibility(
+        transport,
+        async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+        page
+      );
       channel.subscribe.mockImplementationOnce(() => channel);
       let listener: ReturnType<typeof useSupabaseListener> | undefined;
       try {
@@ -99,17 +105,23 @@ describe('useSupabaseListener cleanup', () => {
         });
         await vi.advanceTimersByTimeAsync(0);
         expect(client.from).toHaveBeenCalledOnce();
-        const status = channel.subscribe.mock.calls[0]![0];
+        expect(channel.subscribe).toHaveBeenCalledTimes(suspendedBeforeCreation ? 0 : 1);
         if (!suspendedBeforeCreation) {
           await vi.advanceTimersByTimeAsync(60_000);
-          status('CHANNEL_ERROR');
+          channel.subscribe.mock.calls[0]![0]('CHANNEL_ERROR');
         }
         expect(transport.disconnect).toHaveBeenCalledOnce();
-        if (disposed) listener.cleanup();
+        if (disposed) {
+          listener.cleanup();
+          transport.getChannels.mockReturnValue([]);
+        }
         page.visibilityState = 'visible';
         page.dispatchEvent(new Event('visibilitychange'));
         await vi.advanceTimersByTimeAsync(0);
-        status('SUBSCRIBED');
+        expect(channel.subscribe).toHaveBeenCalledTimes(
+          suspendedBeforeCreation && disposed ? 0 : 1
+        );
+        channel.subscribe.mock.calls[0]?.[0]('SUBSCRIBED');
         await vi.advanceTimersByTimeAsync(0);
         expect(client.from).toHaveBeenCalledTimes(disposed ? 1 : 2);
         expect(listener.isSubscribed.value).toBe(!disposed);

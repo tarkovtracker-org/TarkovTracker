@@ -22,7 +22,7 @@ import {
   type OwnedRealtimeChannel,
   type SupabaseRealtimeChannel,
 } from '@/utils/realtimeChannel';
-import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
+import { isRealtimeSuspended, subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
@@ -379,7 +379,9 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     const owned: OwnedTeamChannel = { channel: next, client, topic };
     channel.value = owned;
     if (client.realtime && isRealtimeSuspended(client.realtime)) previouslyJoined.add(owned);
-    next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));
+    subscribeRealtimeChannel(client.realtime, next, (status, error) =>
+      handleStatus(owned, teamId, progressFilter, status, error)
+    );
   };
   const canBuild = (setupVersion: number): boolean => !disposed && setupVersion === version;
   const setup = async (setupVersion: number): Promise<void> => {
