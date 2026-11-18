@@ -657,10 +657,12 @@ const loadProgressionCatalog = async (
   }
 ): Promise<ProgressionCatalog | false> => {
   try {
-    const canWrite = claimMetadataCacheWrite(
+    const generation = observedObjectivePurgeTime(state);
+    const claim = claimMetadataCacheWrite(
       state,
       `editions/${EDITIONS_CACHE_VERSION}-${context.mode}/en`
     );
+    const canWrite = () => claim() && generation === observedObjectivePurgeTime(state);
     const { neutral: overlay, localized } = await fetchLocalizedMetadata(state, {
       load: (fresh) =>
         fetchProgressionCatalog(context.mode, context.forceRefresh || fresh, context.signal),
@@ -680,6 +682,28 @@ const loadProgressionCatalog = async (
     state.editionsError = err as Error;
     return false;
   }
+};
+/** Purges invalidate in-flight catalogs without replacing the request's scope owner. */
+const loadCurrentProgressionCatalog = async (
+  state: Parameters<typeof loadProgressionCatalog>[0],
+  promiseStore: ReturnType<typeof getPromiseStore>,
+  context: Parameters<typeof loadProgressionCatalog>[2]
+): Promise<{ overlay: ProgressionCatalog; isCurrent: () => boolean } | false> => {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await promiseStore.cachePurgePromise;
+    if (!context.isCurrent()) return false;
+    const generation = observedObjectivePurgeTime(state);
+    const isCurrent = () => context.isCurrent() && generation === observedObjectivePurgeTime(state);
+    const overlay = await loadProgressionCatalog(state, promiseStore, {
+      ...context,
+      isCurrent,
+    });
+    if (!context.isCurrent()) return false;
+    if (generation !== observedObjectivePurgeTime(state)) continue;
+    return overlay ? { overlay, isCurrent } : false;
+  }
+  state.editionsError = new Error('Progression catalog changed during cache purge');
+  return false;
 };
 export const useMetadataStore = defineStore('metadata', {
   state: (): MetadataState => ({
@@ -2100,9 +2124,13 @@ export const useMetadataStore = defineStore('metadata', {
           promiseStore.editionsPromise === promise &&
           this.getApiGameMode() === requestMode &&
           this.languageCode === requestLanguage;
+        const cacheGeneration = observedObjectivePurgeTime(this);
+        const isCacheCurrent = () =>
+          isCurrent() && cacheGeneration === observedObjectivePurgeTime(this);
         if (
           !skipBrowserCache &&
-          (await this.reuseOrApplyCachedEditions(isCurrent, requestMode, requestLanguage))
+          (await this.reuseOrApplyCachedEditions(isCacheCurrent, requestMode, requestLanguage)) &&
+          isCacheCurrent()
         ) {
           if (!isCurrent()) return;
           this.editionsError = null;
@@ -2122,7 +2150,7 @@ export const useMetadataStore = defineStore('metadata', {
         this.editionsError = null;
         this.editionsLoading = true;
         liveEditionRequests.add(promise);
-        const loaded = await loadProgressionCatalog(this, promiseStore, {
+        const loaded = await loadCurrentProgressionCatalog(this, promiseStore, {
           forceRefresh,
           signal: options.signal,
           isCurrent,
@@ -2131,9 +2159,9 @@ export const useMetadataStore = defineStore('metadata', {
           scope,
         });
         // A successful live load is as fresh as a revalidation.
-        if (loaded && isCurrent()) {
+        if (loaded && loaded.isCurrent()) {
           freshNeutralEditionCatalogs(this).set(requestMode, {
-            data: loaded,
+            data: loaded.overlay,
             expires: Date.now() + HIDEOUT_CACHE_TTL_MS,
           });
           promiseStore.editionsRevalidatedScopes.add(scope);

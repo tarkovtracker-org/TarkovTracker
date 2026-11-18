@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPromiseStore } from '@/stores/tarkov/promiseStore';
 import { useMetadataStore } from '@/stores/useMetadata';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import * as cacheUtils from '@/utils/tarkovCache';
 import { createDeferred } from '@/utils/test-helpers';
 import type { GameEdition, SeasonalPerk, StoryChapter } from '@/types/tarkov';
@@ -45,10 +46,134 @@ describe('useMetadataStore fetchEditionsData', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    localStorage.clear();
   });
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+  it.each(['success', 'failure'] as const)(
+    'retries an editions response crossing an observed purge and preserves last-good on %s',
+    async (outcome) => {
+      const store = useMetadataStore();
+      const kept = createEdition('kept', 1, 'Last good');
+      const current = createEdition('current', 2, 'Current');
+      store.editions = [kept];
+      const old = createDeferred<object>();
+      const retry = createDeferred<object>();
+      const write = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+      vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+      vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+      const editions = vi.fn().mockReturnValueOnce(old.promise).mockReturnValue(retry.promise);
+      vi.stubGlobal(
+        '$fetch',
+        vi.fn((endpoint) =>
+          endpoint === '/api/tarkov/cache-meta'
+            ? Promise.resolve({ data: { lastPurgeAt: '2026-11-18T13:00:00Z' } })
+            : editions()
+        )
+      );
+      const request = store.fetchEditionsData();
+      await vi.waitFor(() => expect(editions).toHaveBeenCalledOnce());
+      await store.checkCachePurge();
+      old.resolve({
+        data: { editions: [createEdition('obsolete', 3, 'Obsolete')], storyChapters: [] },
+      });
+      await vi.waitFor(() => expect(editions).toHaveBeenCalledTimes(2));
+      expect(store.editions).toEqual([kept]);
+      expect(write).not.toHaveBeenCalled();
+      if (outcome === 'success')
+        retry.resolve({ data: { editions: [current], storyChapters: [] } });
+      else retry.reject(new Error('Fresh generation unavailable'));
+      await request;
+      expect(store.editions).toEqual([outcome === 'success' ? current : kept]);
+      expect(write).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 0);
+      expect(store.hasRevalidatedCatalog('regular-en')).toBe(outcome === 'success');
+      expect(store.editionsLoading).toBe(false);
+    }
+  );
+  it('does not retry a purged editions request after a newer request takes ownership', async () => {
+    const store = useMetadataStore();
+    const old = createDeferred<object>();
+    const current = createEdition('current', 2, 'Current');
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    const write = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+    const editions = vi
+      .fn()
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValue({ data: { editions: [current], storyChapters: [] } });
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn((endpoint) =>
+        endpoint === '/api/tarkov/cache-meta'
+          ? Promise.resolve({ data: { lastPurgeAt: '2026-11-18T13:00:00Z' } })
+          : editions()
+      )
+    );
+    const first = store.fetchEditionsData();
+    await vi.waitFor(() => expect(editions).toHaveBeenCalledOnce());
+    await store.checkCachePurge();
+    await store.fetchEditionsData(true);
+    old.resolve({ data: { editions: [], storyChapters: [] } });
+    await first;
+    expect(editions).toHaveBeenCalledTimes(2);
+    expect(store.editions).toEqual([current]);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(store.editionsError).toBeNull();
+  });
+  it('bounds editions retries when both responses cross a purge generation', async () => {
+    const store = useMetadataStore();
+    const kept = createEdition('kept', 1, 'Last good');
+    store.editions = [kept];
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    const write = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const editions = vi.fn(async () => {
+      localStorage.setItem(
+        STORAGE_KEYS.cachePurgeAt,
+        `2026-11-18T13:00:0${editions.mock.calls.length}Z`
+      );
+      return { data: { editions: [], storyChapters: [] } };
+    });
+    vi.stubGlobal('$fetch', editions);
+    await store.fetchEditionsData();
+    expect(editions).toHaveBeenCalledTimes(2);
+    expect(store.editions).toEqual([kept]);
+    expect(write).not.toHaveBeenCalled();
+    expect(store.hasRevalidatedCatalog('regular-en')).toBe(false);
+    expect(store.editionsLoading).toBe(false);
+  });
+  it('rejects an editions cache read completed after a newer purge', async () => {
+    const store = useMetadataStore();
+    const cached = createDeferred<object>();
+    const current = createEdition('current', 2, 'Current');
+    vi.spyOn(cacheUtils, 'getCachedData').mockReturnValue(cached.promise);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+    const network = createDeferred<object>();
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn((endpoint) =>
+        endpoint === '/api/tarkov/cache-meta'
+          ? Promise.resolve({ data: { lastPurgeAt: '2026-11-18T13:00:00Z' } })
+          : network.promise
+      )
+    );
+    const request = store.fetchEditionsData();
+    await vi.waitFor(() => expect(cacheUtils.getCachedData).toHaveBeenCalledOnce());
+    await store.checkCachePurge();
+    cached.resolve({
+      editions: [createEdition('obsolete', 1, 'Obsolete')],
+      storyChapters: [createStoryChapter('obsolete', 1, 'Obsolete')],
+    });
+    await flushPromises();
+    expect(store.editions).toEqual([]);
+    expect(store.storyChapters).toEqual([]);
+    network.resolve({ data: { editions: [current], storyChapters: [] } });
+    await request;
+    expect(store.editions).toEqual([current]);
+    expect(store.hasRevalidatedCatalog('regular-en')).toBe(true);
   });
   it.each(['en', 'de'])(
     'keeps newer IndexedDB editions when the %s language catalog expired in memory',
