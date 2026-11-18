@@ -5,7 +5,7 @@ set -euo pipefail
 candidate_dir="$1"
 app_url="$2"
 trusted_dir="$3"
-if [[ "$(cat "$trusted_dir/.nvmrc")" != '24.21.0' ]]; then
+if [[ "$(cat "$trusted_dir/.nvmrc")" != '24.22.3' ]]; then
   echo 'Shadow image Node version must match trusted .nvmrc.' >&2
   exit 1
 fi
@@ -28,7 +28,7 @@ docker run --rm -i \
   --env STRIPE_PRICE_TIMMY_6MONTH= --env STRIPE_PRICE_TIMMY_YEARLY= \
   --env STRIPE_PRICE_CHAD_MONTHLY= --env STRIPE_PRICE_CHAD_6MONTH= \
   --env STRIPE_PRICE_CHAD_YEARLY= \
-  node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 \
+  node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 \
   sh -eu <<'IN_CONTAINER'
 node --input-type=module -e '
   import { readFileSync } from "node:fs";
