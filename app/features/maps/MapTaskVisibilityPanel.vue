@@ -47,7 +47,7 @@
             {{
               t(
                 'page.tasks.map.raid_plan.minimum_reputation',
-                { amount: n(amount, { minimumFractionDigits: 2 }) },
+                { amount: n(amount, { minimumFractionDigits: 2, maximumFractionDigits: 20 }) },
                 '+{amount} or more'
               )
             }}
@@ -173,6 +173,7 @@
     defineProps<{
       tasks: Task[];
       hiddenTaskIds: ReadonlySet<string>;
+      reputationOptions: readonly number[];
       /** Quest colors while chips are colored by quest (#920); empty in the other modes. */
       taskColors?: ReadonlyMap<string, string>;
       /** Quest whose markers the map highlights, from the legend or a hovered marker. */
@@ -188,7 +189,6 @@
   }>();
   const minimumReputation = defineModel<number | null>('minimumReputation', { default: null });
   const reputationFilterId = useId();
-  const reputationOptions = Array.from({ length: 10 }, (_, index) => (index + 1) / 100);
   const { n, t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
   const taskColorOverrides = computed(() => preferencesStore.getMapTaskColors);

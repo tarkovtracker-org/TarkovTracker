@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getHiddenMapTaskIds,
+  getMapReputationOptions,
   meetsMapReputationMinimum,
   normalizeTaskIdList,
 } from '@/features/maps/utils/mapTaskVisibility';
@@ -19,6 +20,24 @@ describe('mapTaskVisibility', () => {
     expect(normalizeTaskIdList(['a', 'a', '', 3, null, 'b'])).toEqual(['a', 'b']);
     expect(normalizeTaskIdList('a')).toEqual([]);
     expect(normalizeTaskIdList(undefined)).toEqual([]);
+  });
+  it('offers sorted, distinct positive rewards from every trader in the catalog', () => {
+    const quests = [
+      {},
+      ...[
+        [0.25, 0.2, -0.1, 0],
+        [0.75, 0.25, 1.5, 0.005, Infinity, NaN],
+      ].map((rewards) => ({
+        finishRewards: {
+          traderStanding: rewards.map((standing, index) => ({
+            standing,
+            trader: { id: String(index), name: `Trader ${index}` },
+          })),
+        },
+      })),
+    ];
+    expect(getMapReputationOptions(quests)).toEqual([0.005, 0.2, 0.25, 0.75, 1.5]);
+    expect(getMapReputationOptions([{}])).toEqual([]);
   });
   it.each([
     { amounts: undefined, minimum: null, matches: true },

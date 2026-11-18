@@ -344,7 +344,7 @@ const defaultGlobalStubs = {
     props: ['reputationFiltered'],
     emits: ['clear-reputation'],
     template:
-      '<task-empty-state-stub><button v-if="reputationFiltered" data-testid="clear-map-reputation" @click="$emit(\'clear-reputation\')" /></task-empty-state-stub>',
+      '<div data-testid="task-empty-state"><button v-if="reputationFiltered" data-testid="clear-map-reputation" @click="$emit(\'clear-reputation\')" /></div>',
   },
   TaskLoadingState: true,
   Teleport: true,
@@ -429,6 +429,7 @@ describe('tasks page', () => {
     selfCompletedObjectiveIds.clear();
     selfCompletedTaskIds.clear();
     selfFailedTaskIds.clear();
+    metadataStoreMock.tasks = [defaultTask];
     metadataStoreMock.mapsWithSvg = [];
     metadataStoreMock.fetchMapSpawnsData.mockClear();
     mapTaskCountsMock.withHide = 0;
@@ -513,12 +514,12 @@ describe('tasks page', () => {
       });
       await vi.waitFor(() => expect(updateVisibleTasksMock).toHaveBeenCalled());
       expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
-      expect(wrapper.find('task-empty-state-stub').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="task-empty-state"]').exists()).toBe(false);
       visibleTasksRef.value = hasTasks ? [defaultTask] : [];
       finishRefresh();
       await vi.waitFor(() => expect(wrapper.find('task-loading-state-stub').exists()).toBe(false));
       expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(hasTasks);
-      expect(wrapper.find('task-empty-state-stub').exists()).toBe(!hasTasks);
+      expect(wrapper.find('[data-testid="task-empty-state"]').exists()).toBe(!hasTasks);
     }
   );
   it('refreshes after initialization changes even when the task array is unchanged', async () => {
@@ -576,7 +577,7 @@ describe('tasks page', () => {
     metadataStoreMock.loading = false;
     await vi.waitFor(() => expect(updateVisibleTasksMock).toHaveBeenCalled());
     expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
-    expect(wrapper.find('task-empty-state-stub').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-empty-state"]').exists()).toBe(false);
     visibleTasksRef.value = [defaultTask];
     finishRefresh();
     await vi.waitFor(() => expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true));
@@ -1132,7 +1133,7 @@ describe('tasks page', () => {
       createDefaultTask({
         id: 'task-gain',
         objectives: [createMapObjective({ id: 'obj-gain', taskId: 'task-gain' })],
-        finishRewards: { traderStanding: [{ trader, standing: 0.05 }] },
+        finishRewards: { traderStanding: [{ trader, standing: 0.2 }] },
       }),
       createDefaultTask({
         id: 'task-no-gain',
@@ -1144,6 +1145,11 @@ describe('tasks page', () => {
       }),
     ];
     visibleTasksRef.value = quests;
+    const offMapQuest = createDefaultTask({
+      id: 'other-map',
+      finishRewards: { traderStanding: [{ trader, standing: 0.25 }] },
+    });
+    metadataStoreMock.tasks = [...quests, offMapQuest];
     preferencesStoreMock.getTaskPrimaryView = 'maps';
     preferencesStoreMock.getTaskMapView = 'map-1';
     preferencesStoreMock.getMapHiddenTaskIds = ['task-hidden'];
@@ -1154,11 +1160,14 @@ describe('tasks page', () => {
     await mountPage();
     const filter = wrapper.get('[data-testid="map-raid-plan"] select');
     expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
-    await filter.setValue('0.05');
+    await filter.setValue('0.2');
     expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain']);
     expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(1);
     expect(wrapper.get('[data-testid="task-card"]').text()).toBe('task-gain');
-    await filter.setValue('0.1');
+    metadataStoreMock.tasks = [offMapQuest];
+    await nextTick();
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
+    await filter.setValue('0.25');
     expect(getLeafletMarks()).toHaveLength(0);
     await wrapper.get('[data-testid="map-collapse-toggle"]').trigger('click');
     await wrapper.get('[data-testid="clear-map-reputation"]').trigger('click');
