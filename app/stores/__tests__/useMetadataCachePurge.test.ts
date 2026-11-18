@@ -56,6 +56,29 @@ describe('useMetadataStore checkCachePurge', () => {
       expect.objectContaining({ cacheKey: `json-v5-regular-${Date.parse(lastPurgeAt)}` })
     );
   });
+  it('invalidates hydrated objectives even if writing the purge marker fails', async () => {
+    const store = useMetadataStore();
+    store.tasksObjectivesHydrated = true;
+    store.objectiveModeCountDifferencesHydrated = true;
+    const clear = vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+    const storage = localStorage;
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.getItem(key),
+      setItem: (key: string, value: string) => {
+        if (key === STORAGE_KEYS.cachePurgeAt)
+          throw new DOMException('Quota exceeded', 'QuotaExceededError');
+        storage.setItem(key, value);
+      },
+    });
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn().mockResolvedValue({ data: { lastPurgeAt: '2025-01-03T00:00:00Z' } })
+    );
+    await store.checkCachePurge();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(store.tasksObjectivesHydrated).toBe(false);
+    expect(store.objectiveModeCountDifferencesHydrated).toBe(false);
+  });
   it('does not clear cache when server purge is older than local', async () => {
     const store = useMetadataStore();
     const clearSpy = vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();

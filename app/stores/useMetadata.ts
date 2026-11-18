@@ -204,13 +204,19 @@ async function updateObservedPurge(
   if (!Number.isFinite(purgeTime) || purgeTime <= observedObjectivePurgeTime()) return;
   try {
     await clearAllCache();
-    if (purgeTime <= observedObjectivePurgeTime()) return;
-    localStorage.setItem(CACHE_PURGE_STORAGE_KEY, lastPurgeAt);
-    state.tasksObjectivesHydrated = false;
-    state.objectiveModeCountDifferencesHydrated = false;
-    logger.info('[MetadataStore] Cleared local cache after server purge.');
   } catch (error) {
     logger.error('[MetadataStore] Failed to clear local cache after server purge:', error);
+    return;
+  }
+  if (purgeTime <= observedObjectivePurgeTime()) return;
+  state.tasksObjectivesHydrated = false;
+  state.objectiveModeCountDifferencesHydrated = false;
+  getPromiseStore(state).modeObjectiveCounts.clear();
+  logger.info('[MetadataStore] Cleared local cache after server purge.');
+  try {
+    localStorage.setItem(CACHE_PURGE_STORAGE_KEY, lastPurgeAt);
+  } catch (error) {
+    logger.warn('[MetadataStore] Failed to persist the cache purge marker:', error);
   }
 }
 // Exported type for craft sources used by components
