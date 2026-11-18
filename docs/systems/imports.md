@@ -141,10 +141,11 @@ Catalog files are content-addressed and loaded by detected slot size. This first
 English and regular-mode based; mode-exclusive items absent from it cannot be identified.
 Accuracy across languages, game updates, compression, UI scaling, and tooltips must be
 measured with representative labeled screenshots. Synthetic parity does not prove it.
-`scripts/stash-scan/screenshot.test.ts` runs the unmodified demo PNG through real shards and
-checks the five document counts, current meds matching, the old-reference skip regression,
-flash-drive ambiguity, and scaled/JPEG copies. It is a calibration fixture, not held-out
-accuracy evidence. The checked-in original is never recompressed by the test.
+`scripts/stash-scan/screenshot.test.ts` detects the full grid in the unmodified demo PNG, then
+uses the real catalog shards to match and count the five documents at their detected cells.
+It also checks current meds matching, the old-reference skip regression, flash-drive ambiguity,
+and scaled/JPEG copies. The PNG is a calibration fixture, not held-out accuracy evidence. The
+checked-in original is never recompressed by the test.
 
 ### Rollout and rollback
 
