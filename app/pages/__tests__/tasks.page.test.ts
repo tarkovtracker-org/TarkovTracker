@@ -2,6 +2,7 @@ import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
+import { TASK_DETAIL_WAIT_MS } from '@/composables/useTaskDetailReadiness';
 import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { Task, TaskObjective } from '@/types/tarkov';
@@ -85,6 +86,7 @@ const metadataStoreMock = reactive({
   languageCode: 'en',
   tasksCoreRevision: 0,
   tasksCoreRefreshing: false,
+  tasksRewardsHydrated: true,
   editionsLoading: false,
   objectiveModeCountDifferencesHydrated: true,
   getApiGameMode: () => 'regular',
@@ -430,6 +432,7 @@ describe('tasks page', () => {
     selfCompletedTaskIds.clear();
     selfFailedTaskIds.clear();
     metadataStoreMock.tasks = [defaultTask];
+    metadataStoreMock.tasksRewardsHydrated = true;
     metadataStoreMock.mapsWithSvg = [];
     metadataStoreMock.fetchMapSpawnsData.mockClear();
     mapTaskCountsMock.withHide = 0;
@@ -1158,16 +1161,39 @@ describe('tasks page', () => {
       quests.map(({ id }) => [id, { self: true }])
     );
     await mountPage();
-    const filter = wrapper.get('[data-testid="map-raid-plan"] select');
+    const filter = () => wrapper.get('[data-testid="map-raid-plan"] select');
     expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
-    await filter.setValue('0.2');
+    await filter().setValue('0.2');
     expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain']);
     expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(1);
     expect(wrapper.get('[data-testid="task-card"]').text()).toBe('task-gain');
+    let finishRewards!: () => void;
+    metadataStoreMock.fetchTaskRewardsData.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRewards = resolve;
+        })
+    );
+    vi.useFakeTimers();
+    try {
+      metadataStoreMock.tasksCoreRevision += 1;
+      metadataStoreMock.tasksRewardsHydrated = false;
+      metadataStoreMock.tasks = quests.map((quest) => ({ ...quest, finishRewards: undefined }));
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(TASK_DETAIL_WAIT_MS);
+      metadataStoreMock.tasks = [...quests, offMapQuest];
+      metadataStoreMock.tasksRewardsHydrated = true;
+      finishRewards();
+      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      expect((filter().element as HTMLSelectElement).value).toBe('0.2');
+      expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain']);
+    } finally {
+      vi.useRealTimers();
+    }
     metadataStoreMock.tasks = [offMapQuest];
     await nextTick();
     expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
-    await filter.setValue('0.25');
+    await filter().setValue('0.25');
     expect(getLeafletMarks()).toHaveLength(0);
     await wrapper.get('[data-testid="map-collapse-toggle"]').trigger('click');
     await wrapper.get('[data-testid="clear-map-reputation"]').trigger('click');

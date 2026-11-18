@@ -799,7 +799,12 @@
   const mapReputationOptions = computed(() => getMapReputationOptions(tasks.value));
   watchEffect(() => {
     const minimum = minimumMapReputation.value;
-    if (minimum && taskDetailsReady.value && !mapReputationOptions.value.includes(minimum)) {
+    if (
+      minimum &&
+      taskDetailsReady.value &&
+      metadataStore.tasksRewardsHydrated &&
+      !mapReputationOptions.value.includes(minimum)
+    ) {
       minimumMapReputation.value = null;
     }
   });
