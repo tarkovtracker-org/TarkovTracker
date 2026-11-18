@@ -25,7 +25,13 @@ const datasetData = {
     hideoutStations: [{ id: 'head-station', name: reference(mode, 'hideout', 'name'), levels: [] }],
   }),
   'items-lite': (mode) => ({ items: [item(mode)] }),
-  items: (mode) => ({ items: [item(mode)] }),
+  // An ordinary multi-chunk item catalog proves HEAD validation is not only first-chunk work.
+  items: (mode) => ({
+    items: Array.from({ length: 1200 }, (_, index) => ({
+      ...item(mode),
+      id: `head-item-${index}`,
+    })),
+  }),
   prestige: (mode) => ({
     prestige: [{ id: 'head-prestige', name: reference(mode, 'tasks', 'prestige') }],
   }),

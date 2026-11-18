@@ -25,19 +25,6 @@ async function clearCatalogCache(request) {
     )
   );
 }
-function trackedContext(context, tasks) {
-  return new Proxy(context, {
-    get(target, key) {
-      if (key === 'waitUntil')
-        return (task) => {
-          tasks.push(task);
-          target.waitUntil(task);
-        };
-      const value = Reflect.get(target, key);
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
-}
 export default {
   async fetch(request, env, context) {
     tarkovHeadOutbound.reads = 0;
@@ -64,13 +51,9 @@ export default {
         },
       }
     );
-    const backgroundTasks = [];
-    const response = await pagesWorker.fetch(
-      request,
-      testEnv,
-      trackedContext(context, backgroundTasks)
-    );
-    await Promise.all(backgroundTasks);
+    // Preserve native waitUntil concurrency: catalog cache publication completes after delivery
+    // validates the public body. Awaiting those tasks here deadlocks the response itself.
+    const response = await pagesWorker.fetch(request, testEnv, context);
     const result = new Response(response.body, response);
     result.headers.set('X-Test-Body-Reads', String(bodyReads));
     result.headers.set('X-Test-Upstream-Reads', String(tarkovHeadOutbound.reads));

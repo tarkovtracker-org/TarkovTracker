@@ -315,6 +315,19 @@ test('compiled language bundle retains mode-specific objective values and stable
   ).json();
   assert.equal(fallback.data.strings['@tt:pve:tasks:head-objective'], 'pve objective in English');
 });
+test('compiled cold catalog HEAD prepares last-good bytes for a later outage GET', async () => {
+  const url = 'https://tarkovtracker.org/api/tarkov/items?gameMode=pve';
+  const head = await harness.fetch(url, {
+    method: 'HEAD',
+    headers: { 'X-Test-Clear-Catalog-Cache': '1' },
+  });
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), '');
+  const stale = await harness.fetch(url, { headers: { 'X-Test-Catalog-Fault': 'unavailable' } });
+  assert.equal(stale.status, 200);
+  assert.equal(stale.headers.get('X-Cache-Status'), 'STALE');
+  assert.equal((await stale.json()).data.items.length, 1200);
+});
 test('compiled warm catalog GET and HEAD retain last-good bytes during a KV outage', async () => {
   const url = 'https://tarkovtracker.org/api/tarkov/tasks-objectives?gameMode=pve';
   const fresh = await harness.fetch(url, { headers: { 'X-Test-Clear-Catalog-Cache': '1' } });
