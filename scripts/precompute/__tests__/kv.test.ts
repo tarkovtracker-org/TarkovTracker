@@ -47,6 +47,18 @@ describe('createKvRestWriter', () => {
     expect(new TextDecoder().decode(await pending)).toBe('ready');
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+  it('keeps the transport reason in the diagnostic after read retries are exhausted', async () => {
+    const cause = new TypeError('terminated');
+    fetchMock.mockRejectedValue(cause);
+    const assertion = expect(writer().read('scope')).rejects.toMatchObject({
+      message: 'KV read failed for "scope": terminated',
+      cause,
+    });
+    void assertion.catch(() => {});
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
   it('fails immediately on a forbidden KV readback', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({}, 403));
     await expect(writer().read('key')).rejects.toThrow('HTTP 403');

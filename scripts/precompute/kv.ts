@@ -52,6 +52,13 @@ export function createKvRestWriter(config: KvRestConfig): CatalogStore {
 export class KvReadNotFound extends Error {}
 type KvFailure = { error: Error; retryable: boolean };
 type Attempt<T> = { value: T } | KvFailure;
+function transportFailure(operation: 'read' | 'write', key: string, cause: unknown): KvFailure {
+  const reason = cause instanceof Error ? cause.message : String(cause);
+  return {
+    error: new Error(`KV ${operation} failed for "${key}": ${reason}`, { cause }),
+    retryable: true,
+  };
+}
 async function retryKvOperation<T>(operation: () => Promise<Attempt<T>>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     const result = await operation();
@@ -75,7 +82,7 @@ async function readAttempt(url: URL, key: string, apiToken: string): Promise<Att
       retryable: isTransientFailure(response, body) || response.status === 404,
     };
   } catch (error) {
-    return { error: new Error(`KV read failed for "${key}"`, { cause: error }), retryable: true };
+    return transportFailure('read', key, error);
   }
 }
 function isTerminalFailure(failure: KvFailure, attempt: number): boolean {
@@ -104,11 +111,7 @@ async function writeAttempt(
     });
     body = await readApiResponse(response);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    return {
-      error: new Error(`KV write failed for "${key}": ${reason}`, { cause: error }),
-      retryable: true,
-    };
+    return transportFailure('write', key, error);
   }
   if (isSuccessfulWrite(response, body)) return { value: undefined };
   return {
