@@ -4,7 +4,12 @@ import { gzipSync } from 'node:zlib';
 import { buildOverlayResponseHeaders } from '@/server/utils/overlayResponseHeaders';
 import { precomputedOverlayIdentity } from '@/server/utils/precomputedTarkov';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
-import { CATALOG_DATASETS, CATALOG_LANGUAGES, CATALOG_MANIFEST_KEY } from '@/utils/catalogDatasets';
+import {
+  catalogByteLimit,
+  CATALOG_DATASETS,
+  CATALOG_LANGUAGES,
+  CATALOG_MANIFEST_KEY,
+} from '@/utils/catalogDatasets';
 import { collectGameDataStrings } from '@/utils/gameDataStrings';
 import { KvReadNotFound } from './kv';
 import { PRECOMPUTED_TTL_SECONDS } from './precompute';
@@ -36,6 +41,8 @@ async function readbackMatches(kv: CatalogStore, key: string, expected: Buffer) 
 async function stage(kv: CatalogStore, scope: string, payload: Payload) {
   const body = JSON.stringify(payload);
   const bytes = Buffer.byteLength(body);
+  if (bytes > catalogByteLimit(scope))
+    throw new Error(`Uncompressed catalog exceeds limit for ${scope}`);
   const digest = createHash('sha256').update(body).digest('hex');
   const key = `neutral-catalog-v1/${scope}/${digest}`;
   const compressed = gzipSync(body);

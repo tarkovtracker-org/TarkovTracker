@@ -342,6 +342,12 @@ failure may serve that last-good copy with `X-Cache-Status: STALE`. Without an
 eligible copy, a missing entry or body returns 503. A stale fallback keeps the UI
 available and cannot pass release verification.
 
+The producer and reader share per-dataset uncompressed size limits from
+`catalogDatasets.ts`. The reader checks the declared length, opens the
+decompressed stream before sending headers, and counts bytes as it streams.
+A first-read error can use a last-good copy. An interruption after response
+bytes have been sent terminates the stream; callers can retry the request.
+
 Bootstrap and map-spawns have no overlay body identity. Every other neutral scope
 and every strings bundle carries the release's source-overlay identity. The
 public API gateway in TarkovTracker-API retains its independently owned upstream
