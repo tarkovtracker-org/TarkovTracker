@@ -16,6 +16,54 @@ describe('createKvRestWriter', () => {
   });
   const writer = () =>
     createKvRestWriter({ accountId: 'acc-1', apiToken: 'token-1', namespaceId: 'ns-1' });
+  it('writes binary objects unchanged and reads the bytes with scoped authorization', async () => {
+    const bytes = Uint8Array.from([31, 139, 8, 255]);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ success: true }))
+      .mockResolvedValueOnce(new Response(bytes));
+    await writer().put('scope/object', bytes, { expirationTtl: 600 });
+    expect(new Uint8Array(await writer().read('scope/object'))).toEqual(bytes);
+    const [putUrl, put] = fetchMock.mock.calls[0]!;
+    const [readUrl, read] = fetchMock.mock.calls[1]!;
+    expect(String(putUrl)).toContain('scope%2Fobject?expiration_ttl=600');
+    expect(put).toMatchObject({
+      method: 'PUT',
+      body: bytes,
+      headers: { 'Content-Type': 'application/octet-stream' },
+    });
+    expect(String(readUrl)).toBe(
+      'https://api.cloudflare.com/client/v4/accounts/acc-1/storage/kv/namespaces/ns-1/values/scope%2Fobject'
+    );
+    expect(read.headers.Authorization).toBe('Bearer token-1');
+  });
+  it('retries transient KV readback failures and transport interruptions', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, 429))
+      .mockRejectedValueOnce(new Error('interrupted'))
+      .mockResolvedValueOnce(new Response('ready'));
+    const pending = writer().read('key');
+    void pending.catch(() => {});
+    await vi.runAllTimersAsync();
+    expect(new TextDecoder().decode(await pending)).toBe('ready');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  it('keeps the transport reason in the diagnostic after read retries are exhausted', async () => {
+    const cause = new TypeError('terminated');
+    fetchMock.mockRejectedValue(cause);
+    const assertion = expect(writer().read('scope')).rejects.toMatchObject({
+      message: 'KV read failed for "scope": terminated',
+      cause,
+    });
+    void assertion.catch(() => {});
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+  it('fails immediately on a forbidden KV readback', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 403));
+    await expect(writer().read('key')).rejects.toThrow('HTTP 403');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it('PUTs the value to the namespaced key with TTL and bearer auth', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ success: true }));
     await writer().put('tasks-core-json-v2-en-regular', '{"payload":1}', {

@@ -368,6 +368,12 @@ describe('getObjectiveItemIds', () => {
   });
 });
 describe('expandObjectiveAdditions', () => {
+  it.each([undefined, null, 8])(
+    'skips objectives that cannot infer a type from their own description %j',
+    (description) => {
+      expect(expandObjectiveAdditions([{ id: 'untyped', description }])).toEqual([]);
+    }
+  );
   it('expands multi-item entry into individual objectives', () => {
     const additions = [
       {

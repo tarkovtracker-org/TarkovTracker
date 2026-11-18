@@ -100,9 +100,12 @@ export function inferObjectiveType(entry: Record<string, unknown>): string | und
 /**
  * Normalize an objective entry with inferred type and foundInRaid.
  */
-function normalizeObjectiveEntry(entry: Record<string, unknown>): Record<string, unknown> {
-  const description = typeof entry.description === 'string' ? entry.description : '';
-  const inferred = inferObjectiveType(entry);
+function normalizeObjectiveEntry(
+  entry: Record<string, unknown>,
+  resolveText: (value: string) => string
+): Record<string, unknown> {
+  const description = resolveText(typeof entry.description === 'string' ? entry.description : '');
+  const inferred = inferObjectiveType({ ...entry, description });
   const trimmed = typeof inferred === 'string' ? inferred.trim() : '';
   const type = trimmed.length > 0 ? trimmed : undefined;
   const foundInRaid = inferFoundInRaid(description, entry);
@@ -111,7 +114,12 @@ function normalizeObjectiveEntry(entry: Record<string, unknown>): Record<string,
 /**
  * Normalize a list of objectives.
  */
-export function normalizeObjectiveList(list: unknown): unknown {
+export function normalizeObjectiveList(
+  list: unknown,
+  resolveText = (value: string): string => value
+): unknown {
   if (!Array.isArray(list)) return list;
-  return list.map((entry) => (isPlainObject(entry) ? normalizeObjectiveEntry(entry) : entry));
+  return list.map((entry) =>
+    isPlainObject(entry) ? normalizeObjectiveEntry(entry, resolveText) : entry
+  );
 }

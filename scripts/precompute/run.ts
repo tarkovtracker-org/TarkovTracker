@@ -13,6 +13,8 @@
  */
 import { writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
+import * as catalogBuilders from '@/server/utils/neutralCatalog';
+import { catalogReleaseReport } from './catalog-release';
 import { runImportPrecompute } from './import-snapshots';
 import { createKvRestWriter } from './kv';
 import { runPrecompute, validatePrecomputeFilter } from './precompute';
@@ -49,11 +51,21 @@ try {
     filter,
     process.env.EXPECTED_OVERLAY_SHA || result.manifest[0]?.overlay.sha256
   );
+  const sha = process.env.EXPECTED_OVERLAY_SHA || result.manifest[0]?.overlay.sha256;
+  const shouldPublish =
+    sha && !filter.lang && !filter.gameMode && !result.failures.length && !imports.failures.length;
+  const report = shouldPublish ? await catalogReleaseReport(kv, catalogBuilders, sha) : undefined;
   try {
     await writeFile(
       'precompute-manifest.json',
       JSON.stringify(
-        { completedAt: Date.now(), entries: result.manifest, failures: result.failures, imports },
+        {
+          completedAt: Date.now(),
+          entries: result.manifest,
+          failures: result.failures,
+          imports,
+          ...report,
+        },
         null,
         2
       )
@@ -69,6 +81,7 @@ try {
         failures: result.failures,
         succeeded: result.successes.length,
         importSnapshots: imports,
+        catalogReleaseError: report?.catalogReleaseError,
       },
       null,
       2
@@ -76,7 +89,8 @@ try {
   );
   // Non-zero exit surfaces partial failures in the Actions UI; existing KV
   // entries (7-day TTL) keep serving until the next successful run.
-  if (result.failures.length > 0 || imports.failures.length > 0) process.exit(1);
+  if (report?.catalogReleaseError || result.failures.length > 0 || imports.failures.length > 0)
+    process.exit(1);
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
 }

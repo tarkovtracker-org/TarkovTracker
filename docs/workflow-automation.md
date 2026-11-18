@@ -361,8 +361,10 @@ compare refs. Comparisons also reject different `.fallowrc.json` fingerprints so
 analyzer rules cannot masquerade as a code-health improvement. CRAP maxima and threshold counts
 come from all scored files, including functions below the reporting thresholds.
 
-CI runs `--base <event-base-sha>` as an advisory step after the Fallow gate and writes the table
-to the job summary. The step cannot fail the build. Model and CLI tests live in `scripts/ci/metrics*.test.mjs`.
+After enforcing coverage thresholds, CI compares the merged head map with the retained map from
+a successful main push at the exact comparison base. Use `--base-coverage` with `--coverage`
+and `--base` to reproduce a measured comparison. If the base run or its artifact is unavailable,
+the advisory job summary records the missing comparison. Model and CLI tests live in `scripts/ci/metrics*.test.mjs`.
 
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
