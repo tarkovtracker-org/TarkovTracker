@@ -1,5 +1,5 @@
 <template>
-  <details v-if="checklist" class="max-w-3xl text-sm">
+  <details v-if="checklist" class="mb-2 max-w-3xl text-sm">
     <summary
       class="text-surface-300 hover:text-surface-100 cursor-pointer py-2 underline underline-offset-2"
     >

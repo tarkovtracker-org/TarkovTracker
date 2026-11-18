@@ -1,7 +1,8 @@
+import { neededCountOf } from '@/features/neededitems/neededItemFilters';
 import { useTarkovStore } from '@/stores/useTarkov';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
 type Need = NeededItemTaskObjective | NeededItemHideoutModule;
-export const neededCountOf = (need: Need) => need.count || 1;
+export { neededCountOf };
 export const useNeededItemProgress = () => {
   const tarkovStore = useTarkovStore();
   const storedCountOf = (need: Need) =>

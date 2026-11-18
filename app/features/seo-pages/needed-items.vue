@@ -3,7 +3,7 @@
     <NeededItemsPage>
       <template #header>
         <PageHeader v-bind="header" />
-        <PublicItemChecklist class="mb-2" />
+        <PublicItemChecklist />
       </template>
     </NeededItemsPage>
     <template #fallback>

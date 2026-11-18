@@ -1,4 +1,5 @@
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
+import { neededCountOf } from '@/features/neededitems/neededItemFilters';
 import { isCurrencyItemId } from '@/utils/constants';
 import { inferNewBeginningPrestigeLevel } from '@/utils/prestige';
 import { SEO_ORIGIN } from '@/utils/routeSeo';
@@ -40,6 +41,19 @@ async function catalog<T>(path: string) {
 const bySource = (a: Group, b: Group) =>
   a.source.localeCompare(b.source, 'en') || (a.level ?? 0) - (b.level ?? 0);
 type ItemName = (item: TarkovItem) => string | undefined;
+function poolLabel(items: TarkovItem[], itemName: ItemName) {
+  const names = items.map(itemName).filter(Boolean);
+  const examples = names.slice(0, 3).join(' / ');
+  return names.length > 3 ? `${examples} / …` : examples;
+}
+function questItemLabel(
+  need: NeededItemTaskObjective,
+  description: string | undefined,
+  itemName: ItemName
+) {
+  if (!need.acceptedItems) return itemName(need.item);
+  return description?.trim() || poolLabel(need.acceptedItems, itemName) || itemName(need.item);
+}
 function questRow(
   need: NeededItemTaskObjective,
   objective: TaskObjective | undefined,
@@ -48,8 +62,8 @@ function questRow(
   // An objective can accept thousands of alternatives. Its description gives
   // the shared condition without listing every eligible item.
   const { description, optional } = objective ?? {};
-  const name = need.acceptedItems ? description : itemName(need.item);
-  return name ? [{ name, count: need.count, fir: need.foundInRaid, optional }] : [];
+  const name = questItemLabel(need, description, itemName);
+  return name ? [{ name, count: neededCountOf(need), fir: need.foundInRaid, optional }] : [];
 }
 function questGroup(task: Task, rows: Row[]): Group[] {
   if (!task.name || !rows.length) return [];
@@ -105,7 +119,7 @@ function hideoutChecklist(hideout: TarkovHideoutQueryResult, itemName: ItemName)
       const rows = requirements.flatMap((need) => {
         const name = itemName(need.item);
         return name && !isCurrencyItemId(need.item.id)
-          ? [{ name, count: need.count, fir: need.foundInRaid }]
+          ? [{ name, count: neededCountOf(need), fir: need.foundInRaid }]
           : [];
       });
       return source && rows.length ? [{ id, source, level, rows }] : [];
