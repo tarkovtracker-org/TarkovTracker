@@ -1,7 +1,18 @@
+import { gzipSync } from 'node:zlib';
 import { createApp, defineEventHandler, toWebHandler } from 'h3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  openCatalogBody,
+  CATALOG_BYTES_HEADER,
+  limitCompressedCatalog,
+} from '@/server/utils/catalogStream';
 import { catalogHandler } from '@/server/utils/serveCatalog';
-import { CATALOG_DATASETS, CATALOG_LANGUAGES, CATALOG_MANIFEST_KEY } from '@/utils/catalogDatasets';
+import {
+  catalogByteLimit,
+  CATALOG_DATASETS,
+  CATALOG_LANGUAGES,
+  CATALOG_MANIFEST_KEY,
+} from '@/utils/catalogDatasets';
 const body = JSON.stringify({
   data: { tasks: [{ id: 'unchanged-id', description: '@tt:pve:tasks:key' }] },
 });
@@ -13,7 +24,13 @@ function serve(
   const key = `neutral-catalog-v1/${scope}/immutable-digest`;
   const manifest = {
     completedAt: 123,
-    entries: { [scope]: { key, headers: { 'X-Overlay-Sha256': 'active-sha' } } },
+    entries: {
+      [scope]: {
+        key,
+        bytes: new TextEncoder().encode(stored ?? body).byteLength,
+        headers: { 'X-Overlay-Sha256': 'active-sha' },
+      },
+    },
   };
   const get = vi.fn(async (requested: string) => {
     if (requested === CATALOG_MANIFEST_KEY) return manifest;
@@ -28,10 +45,164 @@ function serve(
       })
     )
     .use(catalogHandler(dataset));
-  return { request: toWebHandler(app), get, key };
+  return { request: toWebHandler(app), get, key, manifest };
 }
 describe('catalog snapshot routes', () => {
   afterEach(() => vi.unstubAllGlobals());
+  it('bounds retained compressed bytes with ordinary chunks', async () => {
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(3));
+        controller.enqueue(new Uint8Array(3));
+        controller.close();
+      },
+    });
+    const reader = limitCompressedCatalog(source, 4).getReader();
+    expect((await reader.read()).value?.byteLength).toBe(3);
+    await expect(reader.read()).rejects.toThrow('Compressed catalog byte limit exceeded');
+  });
+  it.each(['wrong-length', 'cancel'])(
+    'keeps the healthy atomic cache slot after a late validation failure: %s',
+    async (failure) => {
+      const kept = new Map<string, Response>();
+      const writes: Promise<void>[] = [];
+      vi.stubGlobal('caches', {
+        default: {
+          match: async (key: string) => kept.get(key)?.clone(),
+          put(key: string, value: Response) {
+            const write = value.arrayBuffer().then((bytes) => {
+              kept.set(key, new Response(bytes, { headers: value.headers }));
+            });
+            writes.push(write);
+            return write;
+          },
+        },
+      });
+      const { request, get, manifest } = serve('tasks-core', 'tasks-core/regular');
+      const url = new Request('https://example.test/');
+      expect(await (await request(url)).text()).toBe(body);
+      await Promise.all(writes);
+      expect(kept.size).toBe(1);
+      manifest.completedAt++;
+      const entry = manifest.entries['tasks-core/regular']!;
+      entry.key += '-new';
+      entry.bytes++;
+      get.mockImplementation(async (key) =>
+        key === CATALOG_MANIFEST_KEY
+          ? manifest
+          : new Response(body).body!.pipeThrough(new CompressionStream('gzip'))
+      );
+      const response = await request(url);
+      expect(response.status).toBe(200);
+      if (failure === 'cancel') await response.body!.cancel('Consumer left');
+      else await expect(response.text()).rejects.toThrow('Catalog byte length mismatch');
+      await Promise.allSettled(writes);
+      expect(writes).toHaveLength(2);
+      expect([...kept.values()][0]?.headers.get('X-Catalog-Release')).toBe('123');
+      get.mockRejectedValue(new Error('KV unavailable'));
+      const stale = await request(url);
+      expect(stale.headers.get('X-Cache-Status')).toBe('STALE');
+      expect(await stale.text()).toBe(body);
+    }
+  );
+  it.each([
+    0,
+    -1,
+    1.5,
+    catalogByteLimit('tasks-core/regular') + 1,
+    Number.MAX_SAFE_INTEGER,
+    undefined,
+    '123',
+  ])('rejects invalid expanded manifest bytes: %s', async (bytes) => {
+    const { request, manifest } = serve('tasks-core', 'tasks-core/regular');
+    Object.assign(manifest.entries['tasks-core/regular']!, { bytes });
+    expect((await request(new Request('https://example.test/'))).status).toBe(503);
+  });
+  it('propagates consumer cancellation to the compressed source', async () => {
+    const cancel = vi.fn();
+    const source = new ReadableStream({
+      start(controller) {
+        controller.enqueue(gzipSync(body));
+      },
+      cancel,
+    });
+    const response = new Response(source, {
+      headers: { [CATALOG_BYTES_HEADER]: String(new TextEncoder().encode(body).byteLength) },
+    });
+    const { body: output } = await openCatalogBody(response, 'tasks-core/regular');
+    await output.cancel('Consumer left');
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledWith('Consumer left'));
+  });
+  it('retains streaming and surfaces later source failure without replacing the payload', async () => {
+    let sourceController: ReadableStreamDefaultController<Uint8Array>;
+    const source = new ReadableStream<Uint8Array>({
+      start(controller) {
+        sourceController = controller;
+        controller.enqueue(gzipSync(body).subarray(0, -8));
+      },
+    });
+    const response = new Response(source, {
+      headers: { [CATALOG_BYTES_HEADER]: String(new TextEncoder().encode(body).byteLength) },
+    });
+    const { body: output } = await openCatalogBody(response, 'tasks-core/regular');
+    const reader = output.getReader();
+    const first = await reader.read();
+    expect(new TextDecoder().decode(first.value)).toBe(body);
+    sourceController!.error(new Error('Later source failure'));
+    await expect(reader.read()).rejects.toThrow('Later source failure');
+  });
+  it.each([-1, 1])(
+    'rejects an expanded body whose length differs from the manifest by %s',
+    async (difference) => {
+      const { request, manifest } = serve('tasks-core', 'tasks-core/regular');
+      manifest.entries['tasks-core/regular']!.bytes += difference;
+      const response = await request(new Request('https://example.test/'));
+      if (response.status === 200) await expect(response.text()).rejects.toThrow();
+      else expect(response.status).toBe(503);
+    }
+  );
+  it('uses the warm scope when a newer compressed stream fails on its first read', async () => {
+    const kept = new Map<string, Response>();
+    vi.stubGlobal('caches', {
+      default: {
+        match: async (key: string) => kept.get(key)?.clone(),
+        put: async (key: string, value: Response) => {
+          kept.set(key, value);
+        },
+      },
+    });
+    const { request, get, manifest } = serve('tasks-core', 'tasks-core/regular');
+    const url = new Request('https://example.test/');
+    expect(await (await request(url)).text()).toBe(body);
+    manifest.completedAt++;
+    manifest.entries['tasks-core/regular']!.key += '-new';
+    get.mockImplementation(async (key) => {
+      if (key === CATALOG_MANIFEST_KEY) return manifest;
+      return new ReadableStream({
+        start(controller) {
+          controller.error(new Error('First chunk unavailable'));
+        },
+      });
+    });
+    const response = await request(url);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Cache-Status')).toBe('STALE');
+    expect(response.headers.get('X-Catalog-Bytes')).toBeNull();
+    expect(await response.text()).toBe(body);
+  });
+  it('fails closed on a corrupt cached body instead of returning successful headers', async () => {
+    vi.stubGlobal('caches', {
+      default: {
+        match: async () =>
+          new Response('invalid gzip', {
+            headers: { 'X-Catalog-Bytes': String(body.length), 'X-Catalog-Release': '122' },
+          }),
+      },
+    });
+    const { request, get } = serve('tasks-core', 'tasks-core/regular');
+    get.mockRejectedValue(new Error('KV unavailable'));
+    expect((await request(new Request('https://example.test/'))).status).toBe(503);
+  });
   it('keeps the last verified scope available during a KV read failure', async () => {
     const kept = new Map<string, Response>();
     const cache = {
@@ -87,6 +258,7 @@ describe('catalog snapshot routes', () => {
       expect(res.status).toBe(200);
       expect(res.headers.get('X-Overlay-Sha256')).toBe('active-sha');
       expect(res.headers.get('X-Cache-Status')).toBe('PRECOMPUTE');
+      expect(res.headers.get(CATALOG_BYTES_HEADER)).toBeNull();
       expect(await res.text()).toBe(body);
     }
     expect(get.mock.calls.map(([k]) => k)).toEqual(
