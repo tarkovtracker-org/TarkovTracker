@@ -84,19 +84,36 @@ async function checkImport(gameMode: string, published: unknown) {
     return { ...compareImportCatalog(gameMode, published, undefined), problems: [problem(error)] };
   }
 }
-async function inspectRelease(published: unknown) {
+const hasUnconsumedSections = (sections?: string[]): boolean => Boolean(sections?.length);
+async function readPublishedOverlay() {
+  const result = await fetchOverlay(true);
+  if (result.meta.status !== 'fresh') throw new Error('Published overlay refresh is unverified');
+  if (hasUnconsumedSections(result.meta.unconsumedSections))
+    throw new Error('Published overlay has unconsumed sections');
+  return structuredClone(result.overlay?.$meta);
+}
+async function readObservation() {
   let manifest: unknown;
-  let manifestProblems: string[];
+  let published: unknown;
+  const manifestProblems: string[] = [];
   try {
     manifest = await readManifest();
-    manifestProblems = catalogManifestProblems(
-      published,
-      manifest,
-      process.env.EXPECTED_OVERLAY_SHA
-    );
   } catch (error) {
-    manifestProblems = [problem(error)];
+    manifestProblems.push(problem(error));
   }
+  try {
+    published = await readPublishedOverlay();
+  } catch (error) {
+    manifestProblems.push(problem(error));
+  }
+  manifestProblems.push(
+    ...catalogManifestProblems(published, manifest, process.env.EXPECTED_OVERLAY_SHA)
+  );
+  return { manifest, published, manifestProblems };
+}
+async function inspectRelease() {
+  const observation = await readObservation();
+  const { published, manifest, manifestProblems } = observation;
   const rows: CatalogVerificationRow[] = [];
   for (const scope of CATALOG_SCOPES) {
     rows.push(
@@ -106,29 +123,30 @@ async function inspectRelease(published: unknown) {
     );
   }
   const imports = await Promise.all(VALID_GAME_MODES.map((mode) => checkImport(mode, published)));
-  return { manifest, manifestProblems, rows, imports };
+  return { ...observation, rows, imports };
 }
-let published: unknown;
-try {
-  const result = await fetchOverlay(true);
-  if (result.meta.status !== 'fresh') throw new Error('Published overlay refresh is unverified');
-  if (result.meta.unconsumedSections?.length)
-    throw new Error('Published overlay has unconsumed sections');
-  published = result.overlay?.$meta;
-} catch (error) {
-  console.error(problem(error));
+function publishedIdentity(value: unknown): string {
+  const meta = (value ?? {}) as { version?: string; sha256?: string };
+  return JSON.stringify([meta.version, meta.sha256]);
 }
-let result = await inspectRelease(published);
+async function observeRelease() {
+  const result = await inspectRelease();
+  const conclusion = await readObservation();
+  const changed =
+    JSON.stringify(conclusion.manifest) !== JSON.stringify(result.manifest) ||
+    publishedIdentity(conclusion.published) !== publishedIdentity(result.published);
+  result.manifestProblems.push(...conclusion.manifestProblems);
+  return { ...result, changed };
+}
+let result = await observeRelease();
 let attempts = 1;
-try {
-  if (JSON.stringify(await readManifest()) !== JSON.stringify(result.manifest)) {
-    result = await inspectRelease(published);
-    attempts = 2;
-    if (JSON.stringify(await readManifest()) !== JSON.stringify(result.manifest))
-      result.manifestProblems.push('Catalog release changed again during verification');
-  }
-} catch (error) {
-  result.manifestProblems.push(problem(error));
+if (result.changed) {
+  result = await observeRelease();
+  attempts = 2;
+  if (result.changed)
+    result.manifestProblems.push(
+      'Catalog release or published overlay changed again during verification'
+    );
 }
 const { rows, imports, manifestProblems } = result;
 const manifest = result.manifest as CatalogRelease | undefined;

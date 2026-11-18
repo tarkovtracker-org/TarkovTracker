@@ -8,7 +8,7 @@ import {
 } from '../verify-catalog-release';
 import type { CatalogRelease } from '@/utils/catalogDatasets';
 const { report, published, source } = vi.hoisted(() => ({
-  source: { status: 'fresh' },
+  source: { status: 'fresh', reads: 0, onRead: undefined as (() => void) | undefined },
   report: {
     value: null as {
       rows: Array<{ status: string }>;
@@ -25,10 +25,14 @@ const { report, published, source } = vi.hoisted(() => ({
   },
 }));
 vi.mock('@/server/utils/overlay', () => ({
-  fetchOverlay: async () => ({
-    overlay: { $meta: published },
-    meta: { status: source.status, unconsumedSections: [] },
-  }),
+  fetchOverlay: async () => {
+    source.reads++;
+    source.onRead?.();
+    return {
+      overlay: { $meta: published },
+      meta: { status: source.status, unconsumedSections: [] },
+    };
+  },
 }));
 vi.mock('node:fs/promises', async (original) => {
   const actual = await original<typeof import('node:fs/promises')>();
@@ -53,6 +57,10 @@ beforeEach(() => {
   vi.resetModules();
   report.value = null;
   source.status = 'fresh';
+  source.reads = 0;
+  source.onRead = undefined;
+  published.version = 'catalog-test';
+  published.sha256 = 'a'.repeat(64);
   process.exitCode = undefined;
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.stubEnv('TARKOV_OPERATIONS_ORIGIN', 'https://catalog-test.example');
@@ -256,7 +264,72 @@ it('fails if a second release change prevents a consistent observation', async (
   await import('../check-overlay');
   expect(report.value?.attempts).toBe(2);
   expect(report.value?.manifestProblems).toContain(
-    'Catalog release changed again during verification'
+    'Catalog release or published overlay changed again during verification'
+  );
+  expect(process.exitCode).toBe(1);
+});
+it('rereads the published identity at conclusion and rejects an obsolete unchanged manifest', async () => {
+  stubRelease(release());
+  source.onRead = () => {
+    if (source.reads === 2) published.sha256 = 'b'.repeat(64);
+  };
+  await import('../check-overlay');
+  expect(source.reads).toBe(4);
+  expect(report.value?.attempts).toBe(2);
+  expect(report.value?.manifestProblems).toContain(
+    'Manifest overlay differs from published overlay'
+  );
+  expect(process.exitCode).toBe(1);
+});
+it('uses a fresh published identity for a coherent replacement release on the retry', async () => {
+  const fleet = release();
+  stubRelease(fleet);
+  source.onRead = () => {
+    if (source.reads !== 2) return;
+    published.sha256 = 'b'.repeat(64);
+    published.version = 'catalog-test-2';
+    Object.assign(fleet, release());
+  };
+  await import('../check-overlay');
+  expect(source.reads).toBe(4);
+  expect(report.value?.attempts).toBe(2);
+  expect(report.value?.manifestProblems).toEqual([]);
+  expect(report.value?.rows.every((row) => row.status === 'current')).toBe(true);
+  expect(report.value?.imports.every((row) => row.status === 'current')).toBe(true);
+  expect(process.exitCode).toBeUndefined();
+});
+it('fails after another published identity change at the conclusion of the second attempt', async () => {
+  const fleet = release();
+  stubRelease(fleet);
+  source.onRead = () => {
+    if (![2, 4].includes(source.reads)) return;
+    published.sha256 = (source.reads === 2 ? 'b' : 'c').repeat(64);
+    Object.assign(fleet, release());
+  };
+  await import('../check-overlay');
+  expect(source.reads).toBe(4);
+  expect(report.value?.manifestProblems).toContain(
+    'Catalog release or published overlay changed again during verification'
+  );
+  expect(process.exitCode).toBe(1);
+});
+it('rejects an unchanged release that crosses the freshness boundary during response checks', async () => {
+  const started = Date.now();
+  let now = started;
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const fleet = release(started - 14 * 60 * 60 * 1000 + 1);
+  const fetcher = stubRelease(fleet);
+  const original = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (input) => {
+    const response = await original(input);
+    if (input.endsWith('/bootstrap?gameMode=regular')) now = started + 2;
+    return response;
+  });
+  await import('../check-overlay');
+  expect(report.value?.rows.every((row) => row.status === 'current')).toBe(true);
+  expect(report.value?.attempts).toBe(1);
+  expect(report.value?.manifestProblems).toContain(
+    'Manifest timestamp is stale, future, or invalid'
   );
   expect(process.exitCode).toBe(1);
 });
