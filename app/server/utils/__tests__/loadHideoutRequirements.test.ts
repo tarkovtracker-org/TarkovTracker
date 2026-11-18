@@ -30,9 +30,10 @@ const second = {
 function catalogs(stations: unknown[], items: unknown[]) {
   vi.stubGlobal(
     '$fetch',
-    vi.fn(async (url: string) => ({
-      data: url.endsWith('/hideout') ? { hideoutStations: stations } : { items },
-    }))
+    vi.fn(async (url: string, options: { query: unknown }) => {
+      expect(options.query).toEqual({ gameMode: 'pvp', lang: 'en' });
+      return { data: url.endsWith('/hideout') ? { hideoutStations: stations } : { items } };
+    })
   );
 }
 afterEach(() => vi.unstubAllGlobals());

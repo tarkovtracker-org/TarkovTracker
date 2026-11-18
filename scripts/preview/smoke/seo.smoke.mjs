@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { RESOURCES } from '@/features/resources/resourceData';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { previewGet, protectPreviewBrowser } from './access.mjs';
 import { previewOrigin } from './readiness.mjs';
 const origin = previewOrigin();
@@ -225,7 +226,10 @@ test('hideout initial HTML contains every catalog level and its requirements', a
       const document = new DOMParser().parseFromString(html, 'text/html');
       return [...document.querySelectorAll('main section[id^="requirements-"]')].map((section) => ({
         anchor: section.id,
-        rows: section.querySelectorAll('li').length,
+        rows: [...section.querySelectorAll('li')].map((row) => ({
+          label: row.textContent.trim(),
+          href: row.querySelector('a')?.getAttribute('href') ?? null,
+        })),
         href: section.querySelector('h3 a')?.getAttribute('href'),
       }));
     },
@@ -234,7 +238,32 @@ test('hideout initial HTML contains every catalog level and its requirements', a
   expect(rendered).toEqual(
     levels.map((level) => ({
       anchor: level.anchor,
-      rows: level.items.length + level.stations.length + level.skills.length + level.traders.length,
+      rows: [
+        ...level.items.map(({ count, name, fir }) => ({
+          label:
+            count.toLocaleString('en') +
+            ' × ' +
+            name +
+            (fir ? ' · ' + english.common.found_in_raid_required : ''),
+          href: null,
+        })),
+        ...level.stations.map(({ name, level, anchor }) => ({
+          label: name + ' level ' + level,
+          href: anchor ? '#' + anchor : null,
+        })),
+        ...level.skills.map(({ name, level }) => ({ label: name + ' level ' + level, href: null })),
+        ...level.traders.map(({ name, type, comparison, value }) => ({
+          label:
+            name +
+            ' · ' +
+            english.page.dashboard.traders[type === 'reputation' ? 'reputation' : 'loyalty_level'] +
+            ' ' +
+            comparison +
+            ' ' +
+            value,
+          href: null,
+        })),
+      ],
       href: '#' + level.anchor,
     }))
   );
@@ -242,7 +271,11 @@ test('hideout initial HTML contains every catalog level and its requirements', a
 test('a shared hideout level opens after the tracker hydrates on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   const target = '#requirements-workbench-level-2';
+  await page.addInitScript((key) => {
+    localStorage.setItem(key, JSON.stringify({ hideoutPrimaryView: 'locked' }));
+  }, STORAGE_KEYS.preferences);
   await page.goto(origin + '/hideout' + target);
+  await expect(page).toHaveURL(origin + '/hideout?view=locked' + target);
   await expect(page.getByTestId('hideout-view-switcher')).toBeAttached();
   await expect(page.locator(target)).toBeInViewport();
 });
