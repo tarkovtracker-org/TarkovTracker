@@ -230,13 +230,13 @@ describe('settings page', () => {
     const selectedScroll = expected === 'tab' ? scrollTab : scrollPanel;
     const otherScroll = expected === 'tab' ? scrollPanel : scrollTab;
     const options = {
-      behavior: expected === 'tab' ? 'instant' : 'smooth',
+      behavior: 'instant',
       block: 'start',
       inline: 'nearest',
     };
     expect(selectedScroll).toHaveBeenCalledWith(options);
     expect(selectedScroll).toHaveBeenCalledTimes(1);
-    // Only the instant tab scroll is re-asserted after an interrupted smooth scroll's last frame.
+    // Re-assert the mobile tab's position after Nuxt scrolls to the panel.
     vi.spyOn(tab, 'isConnected', 'get').mockReturnValue(true);
     frames.splice(0).forEach((callback) => callback(0));
     expect(selectedScroll).toHaveBeenCalledTimes(expected === 'tab' ? 2 : 1);

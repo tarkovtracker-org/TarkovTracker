@@ -193,6 +193,8 @@
   definePageMeta({
     alias: ['/progression', '/prestige', '/preferences'],
   });
+  // Nuxt's hash scroll uses `auto`, which otherwise inherits the document's smooth scrolling.
+  useHead({ htmlAttrs: { class: 'no-smooth-scroll' } });
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
@@ -366,8 +368,7 @@
   const scrollTarget = (element: Element, hash: string) => {
     const isTab = element.getAttribute('role') === 'tab';
     const options: ScrollIntoViewOptions = {
-      // Settle horizontal tab movement before Nuxt's subsequent panel scroll.
-      behavior: isTab ? 'instant' : 'smooth',
+      behavior: 'instant',
       block: 'start',
       inline: 'nearest',
     };
@@ -375,9 +376,7 @@
     if (!isTab) {
       return;
     }
-    // An instant scroll issued while an earlier smooth panel scroll is still animating does not
-    // fully cancel it in Chromium: the stale animation applies one more frame and leaves the tab
-    // strip under the app bar. Re-assert the position once that frame has run.
+    // Keep the mobile tab visible after Nuxt scrolls to the panel.
     requestAnimationFrame(() => {
       if (hash === route.hash && element.isConnected) {
         element.scrollIntoView(options);
