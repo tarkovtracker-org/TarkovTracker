@@ -18,6 +18,7 @@ type TaskFilterInputs = {
   /** Shares the map's visibility criteria with the completed-objective notice. */
   isIncludedMapTask: (task: Task) => boolean;
   mapTaskVisibilityFilterOptions: ComputedRefLike<TaskFilterAndSortOptions>;
+  matchesMapReputation: (task: Task) => boolean;
   normalizedSearch: ComputedRefLike<string>;
   showMapDisplay: ComputedRefLike<boolean>;
   tasks: RefLike<Task[]>;
@@ -60,6 +61,7 @@ export function useTaskFilters({
   hideCompletedMapObjectives,
   isIncludedMapTask,
   mapTaskVisibilityFilterOptions,
+  matchesMapReputation,
   normalizedSearch,
   showMapDisplay,
   tasks,
@@ -68,6 +70,9 @@ export function useTaskFilters({
   const filteredTasks = computed(() => {
     return applySearchToTaskList(visibleTasks.value, normalizedSearch.value);
   });
+  const mapReputationFilteredTasks = computed(() =>
+    filteredTasks.value.filter(matchesMapReputation)
+  );
   const countIncludedTasks = (taskList: Task[]) => taskList.filter(isIncludedMapTask).length;
   const mapCompleteTasksCountOnMap = computed(() => {
     if (!showMapDisplay.value) return 0;
@@ -101,12 +106,15 @@ export function useTaskFilters({
         { ...options, secondaryView: status },
         hideCompletedMapObjectives.value
       );
-      counts[status] = applySearchToTaskList(statusTasks, normalizedSearch.value).length;
+      counts[status] = applySearchToTaskList(statusTasks, normalizedSearch.value).filter(
+        matchesMapReputation
+      ).length;
     }
     return counts;
   });
   return {
     filteredTasks,
+    mapReputationFilteredTasks,
     mapCompleteTasksCountOnMap,
     searchStatusCounts,
     showMapTaskVisibilityNotice,

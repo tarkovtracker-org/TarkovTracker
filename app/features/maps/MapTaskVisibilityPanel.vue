@@ -188,7 +188,7 @@
   }>();
   const minimumReputation = defineModel<number | null>('minimumReputation', { default: null });
   const reputationFilterId = useId();
-  const reputationOptions = [0.01, 0.02, 0.03, 0.05, 0.1];
+  const reputationOptions = Array.from({ length: 10 }, (_, index) => (index + 1) / 100);
   const { n, t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
   const taskColorOverrides = computed(() => preferencesStore.getMapTaskColors);

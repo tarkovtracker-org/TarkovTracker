@@ -1165,6 +1165,25 @@ describe('tasks page', () => {
     expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
     expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(true);
   });
+  it('offers the completed-objective toggle when all remaining map quests are manually hidden', async () => {
+    const hiddenTask = createDefaultTask({
+      id: 'task-hidden',
+      objectives: [createMapObjective({ id: 'obj-hidden', taskId: 'task-hidden' })],
+    });
+    visibleTasksRef.value = [hiddenTask];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getHideCompletedMapObjectives = true;
+    preferencesStoreMock.getMapHiddenTaskIds = [hiddenTask.id];
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = { [hiddenTask.id]: { self: true } };
+    await mountPage();
+    expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(0);
+    expect(
+      wrapper.find('button[aria-label="page.tasks.map.map_complete_tasks_toggle_show"]').exists()
+    ).toBe(true);
+  });
   it('drops a marker hover when the full screen map opens or closes over it (#920)', async () => {
     visibleTasksRef.value = [
       createDefaultTask({

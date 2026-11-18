@@ -672,8 +672,9 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    required-item summary using quest completion rewards. **Any gain** requires a positive reward.
    A minimum matches when any single trader's reward meets it. The selection carries across
    maps and fullscreen and resets on leaving Tasks → Maps. Quests opened from a direct link
-   stay in focus. Clear the filter from the empty quest list even when the map is collapsed.
-   Filtering preserves manually hidden quests.
+   stay in focus. The reputation no-match alert offers a reset even when the map is collapsed.
+   Manually hidden quests retain their hidden status. The list of hidden quests shows entries
+   that meet the active reputation filter.
 
 ### Files
 

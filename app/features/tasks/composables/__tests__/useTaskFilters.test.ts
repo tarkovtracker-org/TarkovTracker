@@ -82,6 +82,7 @@ describe('useTaskFilters', () => {
       hideCompletedMapObjectives: ref(false),
       isIncludedMapTask: () => true,
       mapTaskVisibilityFilterOptions: createOptions(),
+      matchesMapReputation: () => true,
       normalizedSearch,
       showMapDisplay: computed(() => false),
       tasks: ref([...visibleTasks.value]),
@@ -110,11 +111,13 @@ describe('useTaskFilters', () => {
         return inputTasks.filter((task) => statusById[task.id] === options.secondaryView);
       }
     );
+    const reputationFilterActive = ref(false);
     const { searchStatusCounts } = useTaskFilters({
       calculateFilteredTasksForOptions,
       getTaskMapView: ref('all'),
       hideCompletedMapObjectives: ref(true),
       isIncludedMapTask: () => true,
+      matchesMapReputation: (task) => !reputationFilterActive.value || task.id === 'mole',
       mapTaskVisibilityFilterOptions: createOptions(),
       normalizedSearch: ref('saving'),
       showMapDisplay: computed(() => false),
@@ -125,6 +128,14 @@ describe('useTaskFilters', () => {
       all: 2,
       available: 0,
       completed: 1,
+      failed: 0,
+      locked: 1,
+    });
+    reputationFilterActive.value = true;
+    expect(searchStatusCounts.value).toEqual({
+      all: 1,
+      available: 0,
+      completed: 0,
       failed: 0,
       locked: 1,
     });
@@ -146,6 +157,7 @@ describe('useTaskFilters', () => {
         mergedMaps: [{ id: 'woods', mergedIds: ['woods'] }],
         primaryView: 'maps',
       }),
+      matchesMapReputation: () => true,
       normalizedSearch: ref('task'),
       showMapDisplay: computed(() => true),
       tasks,

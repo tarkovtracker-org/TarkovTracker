@@ -82,6 +82,12 @@ describe('MapTaskVisibilityPanel', () => {
   it('changes the reputation minimum and allows clearing it with no matching quests', async () => {
     const wrapper = mountPanel([]);
     const filter = wrapper.get('select');
+    expect(
+      filter
+        .findAll('option')
+        .slice(2)
+        .map((option) => Number(option.element.value))
+    ).toEqual([0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1]);
     await filter.setValue('0.05');
     expect(wrapper.emitted('update:minimumReputation')).toEqual([[0.05]]);
     await wrapper.setProps({ tasks: [], minimumReputation: 0.05 });

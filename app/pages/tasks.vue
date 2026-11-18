@@ -303,11 +303,7 @@
               <MapTaskVisibilityNotice
                 v-if="
                   showMapTaskVisibilityNotice &&
-                  (mapSpecificTasksInSlice.length > 0 ||
-                    ((focusedTaskInSlice.length > 0 || pinnedTasksInSlice.length > 0) &&
-                      globalTasksInSlice.length === 0 &&
-                      mapSpecificTasksInSlice.length === 0 &&
-                      mapCompleteTasksCountOnMap > 0))
+                  (mapSpecificTasksInSlice.length > 0 || globalTasksInSlice.length === 0)
                 "
                 class="mb-6"
                 :count="mapCompleteTasksCountOnMap"
@@ -1169,6 +1165,7 @@
   const {
     filteredTasks,
     mapCompleteTasksCountOnMap,
+    mapReputationFilteredTasks,
     searchStatusCounts,
     showMapTaskVisibilityNotice,
   } = useTaskFilters({
@@ -1183,6 +1180,7 @@
     hideCompletedMapObjectives: getHideCompletedMapObjectives,
     isIncludedMapTask,
     mapTaskVisibilityFilterOptions,
+    matchesMapReputation,
     normalizedSearch,
     showMapDisplay,
     tasks,
@@ -1233,11 +1231,6 @@
       secondaryView: effectiveTaskSecondaryView.value,
       focusTaskId: pinnedTask.value?.id ?? null,
     })
-  );
-  const mapReputationFilteredTasks = computed(() =>
-    minimumMapReputation.value === null
-      ? filteredTasks.value
-      : filteredTasks.value.filter(matchesMapReputation)
   );
   const unorderedListedTasks = computed(() =>
     mapReputationFilteredTasks.value.filter(

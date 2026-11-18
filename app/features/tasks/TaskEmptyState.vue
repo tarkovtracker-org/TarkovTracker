@@ -57,25 +57,24 @@
   // Offer the way out right where the list came up empty, instead of sending people hunting for it.
   // Filters still apply while searching, so they can be what empties a search too.
   const actions = computed(() => {
+    const resets = [];
     if (props.reputationFiltered) {
-      return [
-        {
-          label: t('page.tasks.map.raid_plan.clear_reputation_filter', 'Clear reputation filter'),
-          color: 'primary' as const,
-          variant: 'soft' as const,
-          onClick: () => emit('clear-reputation'),
-        },
-      ];
+      resets.push({
+        label: t('page.tasks.map.raid_plan.clear_reputation_filter', 'Clear reputation filter'),
+        color: 'primary' as const,
+        variant: 'soft' as const,
+        onClick: () => emit('clear-reputation'),
+      });
     }
-    if (activeCount.value === 0) return undefined;
-    return [
-      {
+    if (activeCount.value > 0) {
+      resets.push({
         label: t('filter_menu.clear_filters', { count: activeCount.value }),
         icon: 'i-mdi-filter-remove-outline',
         color: 'primary' as const,
         variant: 'soft' as const,
         onClick: clearAll,
-      },
-    ];
+      });
+    }
+    return resets;
   });
 </script>
