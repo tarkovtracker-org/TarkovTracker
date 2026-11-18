@@ -8,8 +8,8 @@
  * per-combination failure isolation in runPrecompute.
  */
 const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4';
-const KV_WRITE_TIMEOUT_MS = 30_000;
-const KV_WRITE_ATTEMPTS = 3;
+const KV_TIMEOUT_MS = 30_000;
+const KV_ATTEMPTS = 3;
 export type KvRestConfig = {
   accountId: string;
   apiToken: string;
@@ -39,39 +39,44 @@ export function createKvRestWriter(config: KvRestConfig): CatalogStore {
         encodeURIComponent(key)
     );
   return {
-    async read(key) {
-      const response = await fetch(valueUrl(key), {
-        headers: { Authorization: 'Bearer ' + config.apiToken },
-        signal: AbortSignal.timeout(KV_WRITE_TIMEOUT_MS),
-      });
-      if (!response.ok) throw new Error('KV read failed for ' + key + ': HTTP ' + response.status);
-      return response.arrayBuffer();
-    },
+    read: (key) => retryKvOperation(() => readAttempt(valueUrl(key), key, config.apiToken)),
     async put(key, value, options) {
       const url = valueUrl(key);
       if (options?.expirationTtl !== undefined) {
         url.searchParams.set('expiration_ttl', String(options.expirationTtl));
       }
-      await writeWithRetries(url, key, value, config.apiToken);
+      await retryKvOperation(() => writeAttempt(url, key, value, config.apiToken));
     },
   };
 }
-async function writeWithRetries(
-  url: URL,
-  key: string,
-  value: string | Uint8Array<ArrayBuffer>,
-  apiToken: string
-): Promise<void> {
-  for (let attempt = 0; attempt < KV_WRITE_ATTEMPTS; attempt++) {
-    const failure = await writeAttempt(url, key, value, apiToken);
-    if (!failure) return;
-    if (isTerminalFailure(failure, attempt)) throw failure.error;
+type KvFailure = { error: Error; retryable: boolean };
+type Attempt<T> = { value: T } | KvFailure;
+async function retryKvOperation<T>(operation: () => Promise<Attempt<T>>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    const result = await operation();
+    if ('value' in result) return result.value;
+    if (isTerminalFailure(result, attempt)) throw result.error;
     await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** attempt));
   }
 }
-type WriteFailure = { error: Error; retryable: boolean };
-function isTerminalFailure(failure: WriteFailure, attempt: number): boolean {
-  return !failure.retryable || attempt === KV_WRITE_ATTEMPTS - 1;
+async function readAttempt(url: URL, key: string, apiToken: string): Promise<Attempt<ArrayBuffer>> {
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: 'Bearer ' + apiToken },
+      signal: AbortSignal.timeout(KV_TIMEOUT_MS),
+    });
+    if (response.ok) return { value: await response.arrayBuffer() };
+    const body = await readApiResponse(response);
+    return {
+      error: new Error(`KV read failed for "${key}": ${errorDetail(response, body)}`),
+      retryable: isTransientFailure(response, body) || response.status === 404,
+    };
+  } catch (error) {
+    return { error: new Error(`KV read failed for "${key}"`, { cause: error }), retryable: true };
+  }
+}
+function isTerminalFailure(failure: KvFailure, attempt: number): boolean {
+  return !failure.retryable || attempt === KV_ATTEMPTS - 1;
 }
 function isSuccessfulWrite(response: Response, body: CloudflareApiResponse | null): boolean {
   return response.ok && body?.success === true;
@@ -81,7 +86,7 @@ async function writeAttempt(
   key: string,
   value: string | Uint8Array<ArrayBuffer>,
   apiToken: string
-): Promise<WriteFailure | null> {
+): Promise<Attempt<void>> {
   let response: Response;
   let body: CloudflareApiResponse | null;
   try {
@@ -92,7 +97,7 @@ async function writeAttempt(
         'Content-Type': typeof value === 'string' ? 'text/plain' : 'application/octet-stream',
       },
       method: 'PUT',
-      signal: AbortSignal.timeout(KV_WRITE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(KV_TIMEOUT_MS),
     });
     body = await readApiResponse(response);
   } catch (error) {
@@ -102,7 +107,7 @@ async function writeAttempt(
       retryable: true,
     };
   }
-  if (isSuccessfulWrite(response, body)) return null;
+  if (isSuccessfulWrite(response, body)) return { value: undefined };
   return {
     error: new Error(`KV write failed for "${key}": ${errorDetail(response, body)}`),
     retryable: isTransientFailure(response, body),

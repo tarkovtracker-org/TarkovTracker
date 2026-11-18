@@ -366,6 +366,14 @@ const DEFAULT_OBJECTIVE_TEXT: ObjectiveText = {
 };
 const DEFAULT_OVERLAY_OBJECTIVE_TYPE = 'giveItem';
 const DEFAULT_OVERLAY_OBJECTIVE_COUNT = 1;
+function inferAdditionType(
+  entry: ObjectiveAddEntry,
+  resolvedDescription: string
+): string | undefined {
+  // Default display text cannot supply type evidence absent from the source entry.
+  const description = typeof entry.description === 'string' ? resolvedDescription : undefined;
+  return inferObjectiveType({ ...entry, description });
+}
 export function expandObjectiveAdditions(
   additions: unknown[],
   text: ObjectiveText = DEFAULT_OBJECTIVE_TEXT
@@ -382,7 +390,7 @@ export function expandObjectiveAdditions(
     const resolvedDescription = text.resolve(description);
     const foundInRaid = inferFoundInRaid(resolvedDescription, entry);
     const count = typeof entry.count === 'number' ? entry.count : DEFAULT_OVERLAY_OBJECTIVE_COUNT;
-    const inferredType = inferObjectiveType({ ...entry, description: resolvedDescription });
+    const inferredType = inferAdditionType(entry, resolvedDescription);
     const normalizedType =
       typeof inferredType === 'string' && inferredType.trim().length > 0
         ? inferredType.trim()

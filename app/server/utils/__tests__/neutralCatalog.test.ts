@@ -31,6 +31,32 @@ const upstream = (responses: Record<string, unknown>): TarkovJsonOptions => ({
   },
 });
 describe('neutral catalogs', () => {
+  it.each([
+    ['de', 'Im Raid gefunden abgeben: Item'],
+    ['fr', "Remise trouvée lors d'un raid: Item"],
+    ['en', 'Hand over the found in raid item: Item'],
+    ['tr', 'Hand over the found in raid item: Item'],
+    ['hu', 'Hand over the found in raid item: Item'],
+    ['__proto__', 'Hand over the found in raid item: Item'],
+  ])(
+    'localizes generated hand-over descriptions for %s with English fallback',
+    async (language, expected) => {
+      const token = '@tt:template:hand-over:Item';
+      const result = await buildCatalogStrings(language!, new Set([token]), { snapshot });
+      expect(result.data.strings[token]).toBe(expected);
+    }
+  );
+  it('reports unsupported neutral translation paths without naming an unrelated endpoint', async () => {
+    const options = upstream({
+      'https://json.tarkov.dev/pve/tasks': {
+        data: { tasks: [] },
+        translations: ['$.data.tasks[0].name'],
+      },
+    });
+    await expect(
+      fetchTarkovJsonEndpoint('tasks', { ...options, gameMode: 'pve', neutral: true })
+    ).rejects.toThrow('Unsupported json.tarkov.dev translation path');
+  });
   it('uses English overlay corrections before the previous field when a locale has no override', async () => {
     const key = '@tt:overlay:/tasks/task/name';
     const token = overlayOverrideKey('pve', key, 'Previous upstream text');
@@ -128,13 +154,13 @@ describe('neutral catalogs', () => {
             id: 'synthetic:a',
             type: 'giveItem',
             foundInRaid: true,
-            description: 'Hand over the found in raid item: Erster Gegenstand',
+            description: 'Im Raid gefunden abgeben: Erster Gegenstand',
           }),
           expect.objectContaining({
             id: 'synthetic:b',
             type: 'giveItem',
             foundInRaid: true,
-            description: 'Hand over the found in raid item: Zweiter Gegenstand',
+            description: 'Im Raid gefunden abgeben: Zweiter Gegenstand',
           }),
         ],
       }),

@@ -1,3 +1,4 @@
+import { handOverDescription } from '@/server/utils/catalogTemplates';
 import { isPlainObject } from '@/server/utils/deepMerge';
 import { bindOverlayLocaleTargets, fetchNeutralOverlay } from '@/server/utils/neutralOverlay';
 import { applyOverlay } from '@/server/utils/overlay';
@@ -219,7 +220,7 @@ export async function buildCatalogStrings(
     const templatePrefix = '@tt:template:hand-over:';
     if (!token.startsWith(templatePrefix)) throw new Error('Unknown game data string template');
     const name = decodeURIComponent(token.slice(templatePrefix.length));
-    return `Hand over the found in raid item: ${await resolveValue(name)}`;
+    return handOverDescription(lang, await resolveValue(name));
   };
   const resolveOverride = async (token: string): Promise<string> => {
     const override = overrideReference(token);

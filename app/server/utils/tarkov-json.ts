@@ -385,7 +385,7 @@ function applyTranslationPath(
 ): unknown {
   const segments = parseTranslationPath(path);
   if (segments) return translateAtPath(current, segments, 0, translate);
-  if (requireTranslations) throw new Error('Unsupported json.tarkov.dev season translation path');
+  if (requireTranslations) throw new Error('Unsupported json.tarkov.dev translation path');
   log.warn('[TarkovJson] Skipped unsupported translation path', { path });
   return current;
 }

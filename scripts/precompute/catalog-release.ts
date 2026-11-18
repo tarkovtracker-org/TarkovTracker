@@ -37,6 +37,7 @@ export async function publishCatalogRelease(
   builders: Builders,
   overlaySha: string
 ) {
+  const startedAt = Date.now();
   const references = new Set<string>();
   const entries: CatalogRelease['entries'] = {};
   for (const mode of VALID_GAME_MODES) {
@@ -64,10 +65,29 @@ export async function publishCatalogRelease(
   const manifest: CatalogRelease = { completedAt: Date.now(), overlaySha, entries };
   // Readers discover this release only after every referenced immutable object is stored.
   const pointer = JSON.stringify(manifest);
-  await kv.put(CATALOG_MANIFEST_KEY, pointer, {
-    expirationTtl: PRECOMPUTED_TTL_SECONDS,
-  });
+  // Expire the pointer before the earliest object even when staging takes several minutes.
+  const remainingTtl = PRECOMPUTED_TTL_SECONDS - Math.ceil((Date.now() - startedAt) / 1000) - 60;
+  if (remainingTtl < 60) throw new Error('Catalog objects expired during publication');
+  await kv.put(CATALOG_MANIFEST_KEY, pointer, { expirationTtl: remainingTtl });
   if (new TextDecoder().decode(await kv.read(CATALOG_MANIFEST_KEY)) !== pointer)
     throw new Error('Active catalog manifest did not match the completed release on readback');
   return manifest;
+}
+/** Include failed neutral publication alongside legacy/import diagnostics in the workflow artifact. */
+export async function catalogReleaseReport(
+  kv: CatalogStore,
+  builders: Builders,
+  overlaySha: string
+) {
+  try {
+    return {
+      catalogRelease: await publishCatalogRelease(kv, builders, overlaySha),
+      catalogReleaseError: undefined,
+    };
+  } catch (error) {
+    return {
+      catalogRelease: undefined,
+      catalogReleaseError: error instanceof Error ? error.message : String(error),
+    };
+  }
 }

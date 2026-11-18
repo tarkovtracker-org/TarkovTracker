@@ -1,7 +1,7 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it, vi } from 'vitest';
 import { CATALOG_DATASETS, CATALOG_LANGUAGES, CATALOG_MANIFEST_KEY } from '@/utils/catalogDatasets';
-import { publishCatalogRelease } from '../catalog-release';
+import { catalogReleaseReport, publishCatalogRelease } from '../catalog-release';
 const ref = '@tt:pve:tasks:objective';
 const data = Object.fromEntries(
   [
@@ -17,7 +17,7 @@ const data = Object.fromEntries(
 );
 function builders() {
   return {
-    buildNeutralCatalog: vi.fn(async () => ({
+    buildNeutralCatalog: vi.fn(async (_dataset: string, _mode: string) => ({
       data,
       dataOverlay: { sha256: 'sha', version: 'v1' },
     })),
@@ -30,9 +30,15 @@ function builders() {
 function memoryStore() {
   const writes = new Map<string, string | Uint8Array<ArrayBuffer>>();
   return {
-    put: vi.fn(async (key: string, body: string | Uint8Array<ArrayBuffer>) => {
-      writes.set(key, body);
-    }),
+    put: vi.fn(
+      async (
+        key: string,
+        body: string | Uint8Array<ArrayBuffer>,
+        _options?: { expirationTtl?: number }
+      ) => {
+        writes.set(key, body);
+      }
+    ),
     read: async (key: string) => new Response(writes.get(key)).arrayBuffer(),
   };
 }
@@ -45,13 +51,21 @@ describe('neutral catalog publication', () => {
     expect(Object.keys(manifest.entries)).toHaveLength(
       3 * CATALOG_DATASETS.length + CATALOG_LANGUAGES.length
     );
+    expect(build.buildNeutralCatalog.mock.calls).toEqual(
+      ['regular', 'pve', 'pvp-season'].flatMap((mode) =>
+        CATALOG_DATASETS.map((dataset) => [dataset, mode])
+      )
+    );
     expect(build.buildCatalogStrings).toHaveBeenCalledWith('tr', new Set([ref]));
     expect(put.mock.calls.at(-1)).toEqual([
       CATALOG_MANIFEST_KEY,
       JSON.stringify(manifest),
       expect.anything(),
     ]);
-    const staged = new Map(put.mock.calls);
+    expect(put.mock.calls.at(-1)?.[2]?.expirationTtl).toBeLessThan(
+      put.mock.calls[0]?.[2]?.expirationTtl ?? 0
+    );
+    const staged = new Map(put.mock.calls.map(([key, value]) => [key, value]));
     for (const { key, bytes } of Object.values(manifest.entries)) {
       expect(gunzipSync(staged.get(key)!).byteLength).toBe(bytes);
     }
@@ -89,6 +103,15 @@ describe('neutral catalog publication', () => {
       expect.anything(),
       expect.anything()
     );
+  });
+  it('reports a staging failure to the workflow without activating a partial manifest', async () => {
+    const kv = { ...memoryStore(), read: async () => new ArrayBuffer(0) };
+    const report = await catalogReleaseReport(kv, builders(), 'sha');
+    expect(report).toEqual({
+      catalogRelease: undefined,
+      catalogReleaseError: 'KV readback differs for bootstrap/regular',
+    });
+    expect(kv.put).toHaveBeenCalledTimes(1);
   });
   it('rejects data from another overlay release before writing it', async () => {
     const kv = memoryStore();

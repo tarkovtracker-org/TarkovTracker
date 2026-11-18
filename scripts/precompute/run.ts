@@ -14,7 +14,7 @@
 import { writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import * as catalogBuilders from '@/server/utils/neutralCatalog';
-import { publishCatalogRelease } from './catalog-release';
+import { catalogReleaseReport } from './catalog-release';
 import { runImportPrecompute } from './import-snapshots';
 import { createKvRestWriter } from './kv';
 import { runPrecompute, validatePrecomputeFilter } from './precompute';
@@ -52,16 +52,9 @@ try {
     process.env.EXPECTED_OVERLAY_SHA || result.manifest[0]?.overlay.sha256
   );
   const sha = process.env.EXPECTED_OVERLAY_SHA || result.manifest[0]?.overlay.sha256;
-  let catalogRelease;
-  if (
-    sha &&
-    !filter.lang &&
-    !filter.gameMode &&
-    !result.failures.length &&
-    !imports.failures.length
-  ) {
-    catalogRelease = await publishCatalogRelease(kv, catalogBuilders, sha);
-  }
+  const shouldPublish =
+    sha && !filter.lang && !filter.gameMode && !result.failures.length && !imports.failures.length;
+  const report = shouldPublish ? await catalogReleaseReport(kv, catalogBuilders, sha) : undefined;
   try {
     await writeFile(
       'precompute-manifest.json',
@@ -71,7 +64,7 @@ try {
           entries: result.manifest,
           failures: result.failures,
           imports,
-          catalogRelease,
+          ...report,
         },
         null,
         2
@@ -88,6 +81,7 @@ try {
         failures: result.failures,
         succeeded: result.successes.length,
         importSnapshots: imports,
+        catalogReleaseError: report?.catalogReleaseError,
       },
       null,
       2
@@ -95,7 +89,8 @@ try {
   );
   // Non-zero exit surfaces partial failures in the Actions UI; existing KV
   // entries (7-day TTL) keep serving until the next successful run.
-  if (result.failures.length > 0 || imports.failures.length > 0) process.exit(1);
+  if (report?.catalogReleaseError || result.failures.length > 0 || imports.failures.length > 0)
+    process.exit(1);
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
 }
