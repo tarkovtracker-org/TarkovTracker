@@ -225,6 +225,7 @@ vi.mock('@/stores/useTarkov', () => ({
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
+    n: (value: number) => value.toFixed(2),
     t: (_key: string, fallback?: string) => fallback ?? _key,
   }),
 }));
@@ -339,7 +340,12 @@ const defaultGlobalStubs = {
     template:
       '<div data-testid="task-filter" :data-active-status="activeStatusView"><button data-testid="pin-status" @click="$emit(\'pin-status\', \'locked\')" /></div>',
   },
-  TaskEmptyState: true,
+  TaskEmptyState: {
+    props: ['reputationFiltered'],
+    emits: ['clear-reputation'],
+    template:
+      '<task-empty-state-stub><button v-if="reputationFiltered" data-testid="clear-map-reputation" @click="$emit(\'clear-reputation\')" /></task-empty-state-stub>',
+  },
   TaskLoadingState: true,
   Teleport: true,
   Transition: false,
@@ -1119,6 +1125,64 @@ describe('tasks page', () => {
     expect(section.findAll('[data-testid="task-card"]')).toHaveLength(1);
     await section.find('[data-testid="map-hidden-tasks-show-all"]').trigger('click');
     expect(preferencesStoreMock.clearMapTaskVisibility).toHaveBeenCalledWith(['task-hidden']);
+  });
+  it('filters map markers and cards by reputation, preserving manually hidden quests', async () => {
+    const trader = { id: 'trader-1', name: 'Test Trader' };
+    const quests = [
+      createDefaultTask({
+        id: 'task-gain',
+        objectives: [createMapObjective({ id: 'obj-gain', taskId: 'task-gain' })],
+        finishRewards: { traderStanding: [{ trader, standing: 0.05 }] },
+      }),
+      createDefaultTask({
+        id: 'task-no-gain',
+        objectives: [createMapObjective({ id: 'obj-no-gain', taskId: 'task-no-gain' })],
+      }),
+      createDefaultTask({
+        id: 'task-hidden',
+        objectives: [createMapObjective({ id: 'obj-hidden', taskId: 'task-hidden' })],
+      }),
+    ];
+    visibleTasksRef.value = quests;
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getMapHiddenTaskIds = ['task-hidden'];
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = Object.fromEntries(
+      quests.map(({ id }) => [id, { self: true }])
+    );
+    await mountPage();
+    const filter = wrapper.get('[data-testid="map-raid-plan"] select');
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
+    await filter.setValue('0.05');
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain']);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="task-card"]').text()).toBe('task-gain');
+    await filter.setValue('0.1');
+    expect(getLeafletMarks()).toHaveLength(0);
+    await wrapper.get('[data-testid="map-collapse-toggle"]').trigger('click');
+    await wrapper.get('[data-testid="clear-map-reputation"]').trigger('click');
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
+    expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(true);
+  });
+  it('offers the completed-objective toggle when all remaining map quests are manually hidden', async () => {
+    const hiddenTask = createDefaultTask({
+      id: 'task-hidden',
+      objectives: [createMapObjective({ id: 'obj-hidden', taskId: 'task-hidden' })],
+    });
+    visibleTasksRef.value = [hiddenTask];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getHideCompletedMapObjectives = true;
+    preferencesStoreMock.getMapHiddenTaskIds = [hiddenTask.id];
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = { [hiddenTask.id]: { self: true } };
+    await mountPage();
+    expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(0);
+    expect(
+      wrapper.find('button[aria-label="page.tasks.map.map_complete_tasks_toggle_show"]').exists()
+    ).toBe(true);
   });
   it('drops a marker hover when the full screen map opens or closes over it (#920)', async () => {
     visibleTasksRef.value = [

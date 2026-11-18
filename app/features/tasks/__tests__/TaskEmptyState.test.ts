@@ -15,7 +15,7 @@ vi.mock('@/features/tasks/composables/useTaskContentFilters', () => ({
   useTaskContentFilters: () => ({ activeCount, clearAll }),
 }));
 const UAlertStub = {
-  props: ['title', 'actions'],
+  props: ['title', 'description', 'actions'],
   template: `<div><p data-testid="title">{{ title }}</p><button
     v-for="action in actions ?? []"
     :key="action.label"
@@ -85,6 +85,27 @@ describe('TaskEmptyState', () => {
     activeCount.value = 0;
     const wrapper = await mountEmptyState(false);
     expect(wrapper.find('[data-testid="action"]').exists()).toBe(false);
+  });
+  it('offers both resets for a reputation no-match alert', async () => {
+    activeCount.value = 0;
+    clearAll.mockClear();
+    const wrapper = await mountEmptyState(false, true);
+    await wrapper.setProps({ reputationFiltered: true });
+    expect(wrapper.find('[data-testid="progress-guidance"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="title"]').text()).toBe('No mapped quests match this filter.');
+    expect(wrapper.findComponent(UAlertStub).props('description')).toBeUndefined();
+    await wrapper.get('[data-testid="action"]').trigger('click');
+    expect(wrapper.emitted('clear-reputation')).toEqual([[]]);
+    activeCount.value = 1;
+    await nextTick();
+    const actions = wrapper.findAll('[data-testid="action"]');
+    expect(actions.map((action) => action.text())).toEqual([
+      'Clear reputation filter',
+      'Clear filters (1)',
+    ]);
+    await actions[1]!.trigger('click');
+    expect(clearAll).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('clear-reputation')).toEqual([[]]);
   });
   it.each([false, true])(
     'offers to clear active filters with their count (searching: %s)',

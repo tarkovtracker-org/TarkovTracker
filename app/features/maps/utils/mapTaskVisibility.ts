@@ -1,3 +1,11 @@
+import type { Task } from '@/types/tarkov';
+/** A quest matches when at least one individual trader reward meets the minimum. */
+export const meetsMapReputationMinimum = (task: Task, minimum: number | null): boolean => {
+  if (minimum === null) return true;
+  return (task.finishRewards?.traderStanding ?? []).some(
+    ({ standing }) => Number.isFinite(standing) && standing > 0 && standing >= minimum
+  );
+};
 /**
  * Quests the user hid from the Tasks map (#918).
  *

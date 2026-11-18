@@ -20,13 +20,40 @@
       </span>
       <span
         data-testid="map-raid-plan-summary"
-        class="truncate text-xs"
+        class="text-xs"
         :class="hiddenCount > 0 ? 'text-warning-200' : 'text-surface-400'"
+        role="status"
       >
         {{ summaryText }}
       </span>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="text-surface-300 flex flex-wrap items-center gap-2 text-xs">
+        <label :for="reputationFilterId">
+          {{ t('page.tasks.map.raid_plan.trader_reputation', 'Trader reputation') }}
+        </label>
+        <select
+          :id="reputationFilterId"
+          v-model="minimumReputation"
+          class="bg-surface-800 border-surface-700 text-surface-100 focus-visible:ring-primary-500 min-h-7 rounded-md border px-2 text-xs focus-visible:ring-2"
+        >
+          <option :value="null">
+            {{ t('page.tasks.map.raid_plan.any_reward', 'Any reward') }}
+          </option>
+          <option :value="0">
+            {{ t('page.tasks.map.raid_plan.any_reputation_gain', 'Any gain') }}
+          </option>
+          <option v-for="amount in reputationOptions" :key="amount" :value="amount">
+            {{
+              t(
+                'page.tasks.map.raid_plan.minimum_reputation',
+                { amount: n(amount, { minimumFractionDigits: 2 }) },
+                '+{amount} or more'
+              )
+            }}
+          </option>
+        </select>
+      </div>
       <UButton
         v-if="hiddenCount > 0"
         data-testid="map-raid-plan-show-all"
@@ -159,7 +186,10 @@
     highlight: [taskId: string | null];
     'toggle-highlight-lock': [taskId: string];
   }>();
-  const { t } = useI18n({ useScope: 'global' });
+  const minimumReputation = defineModel<number | null>('minimumReputation', { default: null });
+  const reputationFilterId = useId();
+  const reputationOptions = Array.from({ length: 10 }, (_, index) => (index + 1) / 100);
+  const { n, t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
   const taskColorOverrides = computed(() => preferencesStore.getMapTaskColors);
   const rows = computed(() =>
@@ -184,8 +214,15 @@
   );
   const summaryText = computed(() => {
     const params = { hidden: hiddenCount.value, total: rows.value.length };
-    if (hiddenCount.value === 0) return t('page.tasks.map.raid_plan.summary_all', params);
-    return t('page.tasks.map.raid_plan.summary_hidden', params);
+    if (params.hidden > 0) return t('page.tasks.map.raid_plan.summary_hidden', params);
+    if (minimumReputation.value === null) return t('page.tasks.map.raid_plan.summary_all', params);
+    if (params.total === 0) {
+      return t(
+        'page.tasks.map.raid_plan.no_reputation_matches',
+        'No mapped quests match this filter.'
+      );
+    }
+    return t('page.tasks.map.raid_plan.reputation_quests_shown', params.total);
   });
   const showOnly = (taskId: string) => {
     preferencesStore.showOnlyMapTask(taskId, taskIds.value);

@@ -121,6 +121,7 @@
                   <div v-show="isMapPanelExpanded" id="tasks-map-panel-content">
                     <template v-if="selectedMapData">
                       <MapTaskVisibilityPanel
+                        v-model:minimum-reputation="minimumMapReputation"
                         :tasks="mapPlanTasks"
                         :hidden-task-ids="hiddenTaskIds"
                         :task-colors="mapTaskColors"
@@ -187,8 +188,12 @@
                 </Transition>
               </div>
             </div>
-            <div v-if="filteredTasks.length === 0" class="py-6">
-              <TaskEmptyState :is-searching="isSearchActive" />
+            <div v-if="mapReputationFilteredTasks.length === 0" class="py-6">
+              <TaskEmptyState
+                :is-searching="isSearchActive"
+                :reputation-filtered="filteredTasks.length > 0"
+                @clear-reputation="minimumMapReputation = null"
+              />
               <MapTaskVisibilityNotice
                 v-if="showMapTaskVisibilityNotice"
                 class="mt-4"
@@ -298,11 +303,7 @@
               <MapTaskVisibilityNotice
                 v-if="
                   showMapTaskVisibilityNotice &&
-                  (mapSpecificTasksInSlice.length > 0 ||
-                    ((focusedTaskInSlice.length > 0 || pinnedTasksInSlice.length > 0) &&
-                      globalTasksInSlice.length === 0 &&
-                      mapSpecificTasksInSlice.length === 0 &&
-                      mapCompleteTasksCountOnMap > 0))
+                  (mapSpecificTasksInSlice.length > 0 || globalTasksInSlice.length === 0)
                 "
                 class="mb-6"
                 :count="mapCompleteTasksCountOnMap"
@@ -524,6 +525,7 @@
           </div>
           <div v-if="selectedMapData" class="bg-surface-900 px-4 pt-3">
             <MapTaskVisibilityPanel
+              v-model:minimum-reputation="minimumMapReputation"
               :tasks="mapPlanTasks"
               :hidden-task-ids="hiddenTaskIds"
               :task-colors="mapTaskColors"
@@ -581,6 +583,7 @@
   import MapTaskVisibilityPanel from '@/features/maps/MapTaskVisibilityPanel.vue';
   import {
     getHiddenMapTaskIds,
+    meetsMapReputationMinimum,
     type MapTaskVisibilityActions,
   } from '@/features/maps/utils/mapTaskVisibility';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
@@ -789,6 +792,9 @@
   };
   // Set from the deep-link pin below; the map shows exactly the tasks the list shows.
   const mapFocusTaskId = ref<string | null>(null);
+  const minimumMapReputation = ref<number | null>(null);
+  const matchesMapReputation = (task: Task) =>
+    task.id === mapFocusTaskId.value || meetsMapReputationMinimum(task, minimumMapReputation.value);
   const userHiddenMapTaskIds = computed(() =>
     getListHiddenTaskIds(getHiddenTaskIds.value, {
       searchActive: isSearchActive.value,
@@ -796,10 +802,10 @@
       focusTaskId: mapFocusTaskId.value,
     })
   );
+  const isIncludedMapTask = (task: Task) =>
+    !userHiddenMapTaskIds.value.has(task.id) && matchesMapReputation(task);
   const sourceMapTasks = computed(() =>
-    (isSearchActive.value ? filteredTasks.value : visibleTasks.value).filter(
-      (task) => !userHiddenMapTaskIds.value.has(task.id)
-    )
+    (isSearchActive.value ? filteredTasks.value : visibleTasks.value).filter(isIncludedMapTask)
   );
   const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, hiddenTaskIds, mapTaskColors } =
     useMapObjectiveMarks({
@@ -1005,8 +1011,9 @@
     }
   });
   watch(showMapDisplay, (isMapView) => {
-    if (isMapView || !isMapFullscreen.value) return;
-    closeMapFullscreen();
+    if (isMapView) return;
+    minimumMapReputation.value = null;
+    if (isMapFullscreen.value) closeMapFullscreen();
   });
   // Jumping to an objective of a hidden quest shows that quest again so its marker can open.
   const revealObjectiveTask = (objectiveId: string) => {
@@ -1158,10 +1165,10 @@
   const {
     filteredTasks,
     mapCompleteTasksCountOnMap,
+    mapReputationFilteredTasks,
     searchStatusCounts,
     showMapTaskVisibilityNotice,
   } = useTaskFilters({
-    excludedTaskIds: userHiddenMapTaskIds,
     calculateFilteredTasksForOptions: (taskList, options, hideCompletedMapObjectives, overrides) =>
       calculateFilteredTasksForOptions(
         taskList,
@@ -1171,7 +1178,9 @@
       ),
     getTaskMapView,
     hideCompletedMapObjectives: getHideCompletedMapObjectives,
+    isIncludedMapTask,
     mapTaskVisibilityFilterOptions,
+    matchesMapReputation,
     normalizedSearch,
     showMapDisplay,
     tasks,
@@ -1224,7 +1233,7 @@
     })
   );
   const unorderedListedTasks = computed(() =>
-    filteredTasks.value.filter(
+    mapReputationFilteredTasks.value.filter(
       (task) => !hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
     )
   );
@@ -1242,12 +1251,12 @@
       : unorderedListedTasks.value
   );
   const hiddenListTasks = computed(() =>
-    filteredTasks.value.filter(
+    mapReputationFilteredTasks.value.filter(
       (task) => hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
     )
   );
   const userHiddenListTasks = computed(() =>
-    filteredTasks.value.filter((task) => userHiddenListTaskIds.value.has(task.id))
+    mapReputationFilteredTasks.value.filter((task) => userHiddenListTaskIds.value.has(task.id))
   );
   const unhideListedTasks = () => {
     preferencesStore.unhideTasks(userHiddenListTasks.value.map((task) => task.id));

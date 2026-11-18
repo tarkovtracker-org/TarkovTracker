@@ -668,6 +668,13 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    closes over it, and the legend forgets an entry that leaves it, since none of these fires
    mouseout. `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
    and fullscreen maps; `LeafletMap` toggles chip classes for it without redrawing markers.
+7. **Trader reputation** beside **Choose quests** filters the map, its quest list, and the
+   required-item summary using quest completion rewards. **Any gain** requires a positive reward.
+   A minimum matches when any single trader's reward meets it. The selection carries across
+   maps and fullscreen and resets on leaving Tasks → Maps. Quests opened from a direct link
+   stay in focus. The reputation no-match alert offers a reset even when the map is collapsed.
+   Manually hidden quests retain their hidden status. The list of hidden quests shows entries
+   that meet the active reputation filter.
 
 ### Files
 

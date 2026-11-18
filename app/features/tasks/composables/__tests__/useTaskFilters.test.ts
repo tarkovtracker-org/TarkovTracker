@@ -78,10 +78,11 @@ describe('useTaskFilters', () => {
     const normalizedSearch = ref('');
     const { filteredTasks, searchStatusCounts } = useTaskFilters({
       calculateFilteredTasksForOptions: (inputTasks) => inputTasks,
-      excludedTaskIds: computed(() => new Set<string>()),
       getTaskMapView: ref('all'),
       hideCompletedMapObjectives: ref(false),
+      isIncludedMapTask: () => true,
       mapTaskVisibilityFilterOptions: createOptions(),
+      matchesMapReputation: () => true,
       normalizedSearch,
       showMapDisplay: computed(() => false),
       tasks: ref([...visibleTasks.value]),
@@ -110,11 +111,13 @@ describe('useTaskFilters', () => {
         return inputTasks.filter((task) => statusById[task.id] === options.secondaryView);
       }
     );
+    const reputationFilterActive = ref(false);
     const { searchStatusCounts } = useTaskFilters({
       calculateFilteredTasksForOptions,
-      excludedTaskIds: computed(() => new Set<string>()),
       getTaskMapView: ref('all'),
       hideCompletedMapObjectives: ref(true),
+      isIncludedMapTask: () => true,
+      matchesMapReputation: (task) => !reputationFilterActive.value || task.id === 'mole',
       mapTaskVisibilityFilterOptions: createOptions(),
       normalizedSearch: ref('saving'),
       showMapDisplay: computed(() => false),
@@ -128,6 +131,14 @@ describe('useTaskFilters', () => {
       failed: 0,
       locked: 1,
     });
+    reputationFilterActive.value = true;
+    expect(searchStatusCounts.value).toEqual({
+      all: 1,
+      available: 0,
+      completed: 0,
+      failed: 0,
+      locked: 1,
+    });
   });
   it('calculates hidden map objective task count with search applied', () => {
     const tasks = ref([createTask('1', 'Alpha Task'), createTask('2', 'Bravo Task')]);
@@ -138,14 +149,15 @@ describe('useTaskFilters', () => {
     const excludedTaskIds = ref<ReadonlySet<string>>(new Set());
     const { mapCompleteTasksCountOnMap, showMapTaskVisibilityNotice } = useTaskFilters({
       calculateFilteredTasksForOptions,
-      excludedTaskIds,
       getTaskMapView: ref('woods'),
       hideCompletedMapObjectives: ref(true),
+      isIncludedMapTask: (task) => !excludedTaskIds.value.has(task.id),
       mapTaskVisibilityFilterOptions: createOptions({
         mapView: 'woods',
         mergedMaps: [{ id: 'woods', mergedIds: ['woods'] }],
         primaryView: 'maps',
       }),
+      matchesMapReputation: () => true,
       normalizedSearch: ref('task'),
       showMapDisplay: computed(() => true),
       tasks,
