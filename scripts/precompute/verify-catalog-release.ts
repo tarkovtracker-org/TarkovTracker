@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
 import { CATALOG_DATASETS, CATALOG_LANGUAGES } from '@/utils/catalogDatasets';
+import { collectGameDataStrings } from '@/utils/gameDataStrings';
 import { OVERLAY_PROPAGATION_WINDOW_MS } from './verify-overlay';
 import type { CatalogRelease } from '@/utils/catalogDatasets';
 export const CATALOG_SCOPES = [
@@ -33,8 +34,10 @@ const timestampCurrent = (value: unknown, now: number): boolean =>
   Number(value) > 0 &&
   Number(value) <= now &&
   now - Number(value) <= OVERLAY_PROPAGATION_WINDOW_MS;
+const parseableTimestamp = (value: unknown): boolean =>
+  typeof value === 'string' && Number.isFinite(Date.parse(value));
 const validPublishedIdentity = (meta: Record<string, unknown>): boolean =>
-  sha(meta.sha256) && nonempty(meta.version);
+  sha(meta.sha256) && nonempty(meta.version) && parseableTimestamp(meta.generated);
 const validByteLength = (value: unknown): boolean =>
   Number.isSafeInteger(value) && Number(value) > 0;
 const validHeaders = (value: unknown): boolean =>
@@ -146,7 +149,25 @@ function responseOverlayProblems(scope: string, published: unknown, payload: unk
     [overlay.status !== 'missing', 'Response overlay is missing'],
   ]);
 }
-/** Hash the bytes received from the route, before parsing or reserializing the JSON. */
+const hasTaskRows = (payload: unknown): boolean => {
+  const tasks = record(record(payload).data).tasks;
+  return Array.isArray(tasks) && tasks.length > 0;
+};
+function responseTaskScopeProblems(scope: string, payload: unknown): string[] {
+  const [dataset, mode] = scope.split('/');
+  if (!['tasks-core', 'tasks-objectives'].includes(dataset!)) return [];
+  if (!hasTaskRows(payload)) return [];
+  const wrongMode = [...collectGameDataStrings(record(payload).data)].some((reference) => {
+    const sourceMode = /^@tt:(regular|pve|pvp-season):/.exec(reference)?.[1];
+    return sourceMode !== undefined && sourceMode !== mode;
+  });
+  return failed([[!wrongMode, 'Direct upstream task reference belongs to another mode']]);
+}
+/**
+ * Certify served bytes/provenance and the direct task-reference mode invariant.
+ * Game-rule and progression-pool semantics remain covered by producer tests and deployment probes.
+ * Hash route bytes before parsing or reserializing their JSON.
+ */
 export function verifyCatalogResponse(
   scope: string,
   published: unknown,
@@ -166,6 +187,7 @@ export function verifyCatalogResponse(
     ]),
     ...responseHeaderProblems(evidence, entry, manifest.completedAt),
     ...responseOverlayProblems(scope, published, payload),
+    ...responseTaskScopeProblems(scope, payload),
   ];
   return {
     scope,

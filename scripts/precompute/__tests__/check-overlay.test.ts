@@ -160,6 +160,9 @@ it('requires the exact scope set, fresh timestamp, overlay SHA, and content-addr
   const now = Date.now();
   const good = release(now).manifest;
   expect(catalogManifestProblems(published, good, published.sha256, now)).toEqual([]);
+  expect(catalogManifestProblems(published, good, 'b'.repeat(64), now)).toContain(
+    'Published overlay differs from requested SHA'
+  );
   const missing = structuredClone(good);
   delete missing.entries['strings/tr'];
   const unexpected = structuredClone(good);
@@ -202,6 +205,7 @@ it('checks original response bytes, length, source, cache policy, release timest
     ['Cache-Control', 'max-age=5'],
     ['X-Catalog-Release', '1'],
     ['X-Overlay-Sha256', 'wrong'],
+    ['X-Overlay-Version', 'wrong'],
     ['Content-Type', 'text/html'],
   ]) {
     const headers = new Headers(evidence.headers);
@@ -210,6 +214,69 @@ it('checks original response bytes, length, source, cache policy, release timest
       'unverified'
     );
   }
+});
+it.each([undefined, null, '', 'invalid-date', 123])(
+  'rejects published overlay identity with an unparseable generated timestamp %j',
+  (generated) => {
+    const { manifest } = release();
+    expect(catalogManifestProblems({ ...published, generated }, manifest)).toContain(
+      'Published overlay identity unavailable'
+    );
+  }
+);
+it('fails certification when the requested operator overlay SHA differs', async () => {
+  vi.stubEnv('EXPECTED_OVERLAY_SHA', 'b'.repeat(64));
+  stubRelease(release());
+  await import('../check-overlay');
+  expect(report.value?.manifestProblems).toContain('Published overlay differs from requested SHA');
+  expect(process.exitCode).toBe(1);
+});
+function taskScopeEvidence(scope: string, data: unknown) {
+  const { manifest } = release();
+  const body = JSON.stringify({ data, dataOverlay: published });
+  manifest.entries[scope] = {
+    ...manifest.entries[scope]!,
+    key: `neutral-catalog-v1/${scope}/${createHash('sha256').update(body).digest('hex')}`,
+    bytes: Buffer.byteLength(body),
+  };
+  return {
+    manifest,
+    evidence: { body: Buffer.from(body), headers: response(body, manifest, scope).headers },
+  };
+}
+it.each([
+  ['tasks-core/pve', '@tt:regular:tasks:quest-name'],
+  ['tasks-objectives/regular', '@tt:pvp-season:tasks:objective-description'],
+])(
+  'rejects a self-consistent %s payload containing a direct upstream reference from another mode',
+  (scope, description) => {
+    const { manifest, evidence } = taskScopeEvidence(scope!, {
+      tasks: [{ id: 'quest', objectives: [{ id: 'step', description }] }],
+    });
+    const checked = verifyCatalogResponse(scope!, published, manifest, evidence);
+    expect(checked.status).toBe('unverified');
+    expect(checked.problems).toContain('Direct upstream task reference belongs to another mode');
+  }
+);
+it.each([
+  '@tt:pve:tasks:objective-description',
+  '@tt:overlay:/tasks/quest/name',
+  '@tt:override:pve:field:original',
+  'English description',
+])('preserves supported direct and independent task text %s', (description) => {
+  const scope = 'tasks-objectives/pve';
+  const { manifest, evidence } = taskScopeEvidence(scope, {
+    tasks: [{ id: 'quest', objectives: [{ id: 'step', description }] }],
+  });
+  expect(verifyCatalogResponse(scope, published, manifest, evidence).status).toBe('current');
+});
+it('keeps empty synthetic task fixtures outside the direct-reference mode invariant', () => {
+  const scope = 'tasks-core/pve';
+  const { manifest, evidence } = taskScopeEvidence(scope, {
+    tasks: [],
+    label: '@tt:regular:tasks:unused',
+  });
+  expect(verifyCatalogResponse(scope, published, manifest, evidence).status).toBe('current');
 });
 it('fails a complete catalog check when any response is corrupt', async () => {
   const fleet = release();
