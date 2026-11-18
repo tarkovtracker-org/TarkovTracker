@@ -2,7 +2,10 @@
   <header class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
     <div class="min-w-0 wrap-break-word">
       <h1 class="text-surface-50 text-xl leading-tight font-bold sm:text-2xl">{{ title }}</h1>
-      <p v-if="description" class="text-surface-400 mt-1 max-w-3xl text-sm">{{ description }}</p>
+      <p v-if="description" class="text-surface-400 mt-1 max-w-3xl text-sm">
+        {{ description }}
+        <slot name="description-link" />
+      </p>
     </div>
     <div v-if="$slots.actions" class="flex flex-wrap items-center gap-3">
       <slot name="actions" />

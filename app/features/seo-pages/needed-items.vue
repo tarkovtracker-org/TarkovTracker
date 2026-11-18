@@ -2,13 +2,15 @@
   <ClientOnly>
     <NeededItemsPage>
       <template #header>
-        <PageHeader v-bind="header" class="mb-4" />
+        <PageHeader v-bind="header" />
+        <PublicItemChecklist />
       </template>
     </NeededItemsPage>
     <template #fallback>
       <div class="px-3 py-6 sm:px-6">
         <div class="mx-auto max-w-350">
-          <PageHeader v-bind="header" class="mb-4" />
+          <PageHeader v-bind="header" />
+          <PublicItemChecklist />
         </div>
       </div>
     </template>
@@ -16,6 +18,7 @@
 </template>
 <script setup lang="ts">
   import PageHeader from '@/components/ui/PageHeader.vue';
+  import PublicItemChecklist from '@/features/neededitems/PublicItemChecklist.vue';
   import NeededItemsPage from '@/pages/needed-items.vue';
   const { t } = useI18n({ useScope: 'global' });
   const header = computed(() => ({

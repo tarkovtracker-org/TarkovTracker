@@ -1114,6 +1114,7 @@
     },
     "tasks": {
       "status_tabs_label": "Task status",
+      "auto_tracking_guide": "Automatic quest tracking with TarkovMonitor",
       "primary_views": {
         "aria_label": "Task views",
         "graph": "Graph",
@@ -1529,6 +1530,7 @@
       }
     },
     "needed_items": {
+      "pvp_checklist": "PvP quest and hideout item checklist",
       "filter_tabs_label": "Needed item filters",
       "loading": "Loading task and hideout data",
       "items_count": "{count} item | {count} items",

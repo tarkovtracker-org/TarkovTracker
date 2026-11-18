@@ -69,6 +69,12 @@ async function readMetadata(page, html) {
         tag.getAttribute('href')
       ),
       hasHeading: Boolean(document.querySelector('h1')),
+      hasMonitorGuide: Boolean(
+        document.querySelector('main header a[href="/resources/tarkovmonitor"]')
+      ),
+      checklistRowCounts: [...document.querySelectorAll('main details > details')].map(
+        (section) => section.querySelectorAll('li').length
+      ),
     };
   }, html);
   const meta = {};
@@ -123,6 +129,11 @@ for (const [route, key] of Object.entries({ ...publicPages, ...privatePages })) 
     const document = await readMetadata(page, await response.text());
     const copy = english.seo.routes[key];
     expect(document.titles).toEqual([copy.title]);
+    if (route === '/tasks') expect(document.hasMonitorGuide).toBe(true);
+    if (route === '/needed-items') {
+      expect(document.checklistRowCounts).toHaveLength(2);
+      for (const count of document.checklistRowCounts) expect(count).toBeGreaterThan(0);
+    }
     assertSocialMetadata(document.meta, copy, route);
     assertIndexing(document, route);
     assertCanonical(document, route);

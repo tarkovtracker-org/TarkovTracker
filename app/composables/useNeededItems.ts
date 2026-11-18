@@ -5,6 +5,7 @@ import {
   getNeededItemId,
   isNonFirSpecialEquipment,
   itemMatchesQuery,
+  neededCountOf,
 } from '@/features/neededitems/neededItemFilters';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
@@ -463,7 +464,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     // A teammate-only need is listed because a teammate still lacks it, so the
     // user's own count does not make it owned.
     if (!countsForSelf(item)) return true;
-    const count = item.count ?? 1;
+    const count = neededCountOf(item);
     const currentCount =
       item.needType === 'taskObjective'
         ? tarkovStore.getObjectiveCount(item.id)
@@ -696,7 +697,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         });
       }
       const group = groups.get(itemId)!;
-      const count = need.count || 1;
+      const count = neededCountOf(need);
       let needCurrentCount: number;
       if (need.needType === 'taskObjective') {
         const objectiveCount = tarkovStore.getObjectiveCount(need.id);
