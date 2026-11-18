@@ -20,3 +20,13 @@ CI job planning, result gates, and GitHub automation helpers used by the workflo
 | `workflow-metrics.mjs`        | Collects read-only CI and review timing baselines from GitHub as JSON.       | by hand; see `workflow-automation.md`             |
 | `workflow-metrics-timing.mjs` | Timing calculations for `workflow-metrics.mjs`.                              | `workflow-metrics.mjs`                            |
 | `*.test.mjs`                  | Vitest tests for the scripts above.                                          | `pnpm run test`                                   |
+
+Measured comparisons require coverage from both revisions:
+`pnpm metrics --base <ref> --coverage <head-report.json> --base-coverage <base-report.json>`.
+The base report must cover the merge base of `HEAD` and `<ref>`. Generate both Istanbul
+reports at the source checkout path; metrics remaps their file keys and embedded paths to
+the checkout analyzed by Fallow. Paths outside the source checkout are rejected. Both
+Fallow results must report the `istanbul` model; estimated fallback fails the comparison.
+Use `--coverage <report.json>` alone for a measured current snapshot, or omit both coverage
+options for the existing automatic coverage behavior.
+Each coverage argument accepts a JSON file or a directory containing `coverage-final.json`.
