@@ -31,6 +31,18 @@ const upstream = (responses: Record<string, unknown>): TarkovJsonOptions => ({
   },
 });
 describe('neutral catalogs', () => {
+  it('uses English overlay corrections before the previous field when a locale has no override', async () => {
+    const key = '@tt:overlay:/tasks/task/name';
+    const token = overlayOverrideKey('pve', key, 'Previous upstream text');
+    const local = {
+      ...snapshot,
+      strings: { en: { [key]: 'English correction' }, de: { [key]: 'Deutsche Korrektur' } },
+    };
+    const englishFallback = await buildCatalogStrings('fr', new Set([token]), { snapshot: local });
+    const requested = await buildCatalogStrings('de', new Set([token]), { snapshot: local });
+    expect(englishFallback.data.strings[token]).toBe('English correction');
+    expect(requested.data.strings[token]).toBe('Deutsche Korrektur');
+  });
   it('sanitizes adapted null skill rewards before applying overlay corrections', async () => {
     const factory = vi.spyOn(tarkovJson, 'createTarkovJsonTaskRewardsFetcher').mockReturnValue(
       async () =>

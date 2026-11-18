@@ -224,7 +224,8 @@ export async function buildCatalogStrings(
   const resolveOverride = async (token: string): Promise<string> => {
     const override = overrideReference(token);
     if (!override) throw new Error('Invalid overlay override reference');
-    const corrected = readText(snapshot.strings[lang], override.key);
+    const corrected =
+      readText(snapshot.strings[lang], override.key) ?? readText(snapshot.strings.en, override.key);
     return corrected === undefined
       ? resolveValue(override.fallback)
       : overlayText(override.key, corrected);
