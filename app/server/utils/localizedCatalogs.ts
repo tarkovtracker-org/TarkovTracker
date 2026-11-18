@@ -8,6 +8,16 @@ import {
 type CatalogResponse = { data: unknown; release: string | null };
 export type CatalogFetcher = (path: string) => Promise<CatalogResponse>;
 class IncompatibleCatalogRelease extends Error {}
+function readStringTable(value: unknown): GameDataStrings {
+  const strings = (value as { strings?: unknown } | null)?.strings;
+  const record = [strings !== null, typeof strings === 'object', !Array.isArray(strings)].every(
+    Boolean
+  );
+  if (!record) throw new IncompatibleCatalogRelease();
+  if (!Object.values(strings as object).every((text) => typeof text === 'string'))
+    throw new IncompatibleCatalogRelease();
+  return strings as GameDataStrings;
+}
 function assertSameRelease(responses: CatalogResponse[], requireRelease: boolean) {
   const releases = responses.map((response) => response.release);
   const legacy = !requireRelease && releases.every((release) => release === null);
@@ -24,7 +34,7 @@ async function localizedAttempt<T extends unknown[]>(paths: string[], fetch: Cat
   if (!needsStrings) return catalogs;
   const table = await fetch('strings');
   assertSameRelease([...responses, table], true);
-  return localizeGameData(catalogs, (table.data as { strings: GameDataStrings }).strings);
+  return localizeGameData(catalogs, readStringTable(table.data));
 }
 function retryableSnapshotError(error: unknown) {
   const known = [IncompatibleCatalogRelease, MissingGameDataStringError];

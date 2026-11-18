@@ -81,6 +81,37 @@ it('rejects a table missing a referenced public label', async () => {
     statusCode: 503,
   });
 });
+it.each([
+  undefined,
+  null,
+  {},
+  { strings: null },
+  { strings: [] },
+  { strings: 'invalid' },
+  { strings: { '@tt:key': 12 } },
+])('returns a bounded 503 for a malformed strings snapshot: %j', async (table) => {
+  const fetch = vi.fn(async (url: string, options: ResponseOptions) => {
+    released(options, '1');
+    return { data: url.endsWith('/strings') ? table : { name: '@tt:key' } };
+  });
+  vi.stubGlobal('$fetch', fetch);
+  await expect(fetchPublicPvpCatalogs(['tasks-core'])).rejects.toMatchObject({
+    statusCode: 503,
+    statusMessage: 'Catalog snapshot unavailable',
+  });
+  expect(fetch).toHaveBeenCalledTimes(4);
+});
+it('refetches the whole snapshot when a malformed table recovers', async () => {
+  let catalogs = 0;
+  const fetch = vi.fn(async (url: string, options: ResponseOptions) => {
+    released(options, '1');
+    if (!url.endsWith('/strings')) return { data: { name: '@tt:key', version: ++catalogs } };
+    return { data: catalogs === 1 ? { strings: null } : { strings: { '@tt:key': 'Recovered' } } };
+  });
+  vi.stubGlobal('$fetch', fetch);
+  expect(await fetchPublicPvpCatalogs(['tasks-core'])).toEqual([{ name: 'Recovered', version: 2 }]);
+  expect(fetch).toHaveBeenCalledTimes(4);
+});
 type ResponseOptions = { onResponse?: (context: { response: { headers: Headers } }) => void };
 function released(options: ResponseOptions, release: string) {
   options.onResponse?.({ response: { headers: new Headers({ 'X-Catalog-Release': release }) } });
