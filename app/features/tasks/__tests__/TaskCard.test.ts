@@ -44,18 +44,20 @@ const tarkovStoreMock = {
   playerLevel: vi.fn(() => 1),
   setObjectiveCount: vi.fn(),
 };
-const metadataStoreMock = {
+const metadataStoreMock = reactive({
   alternativeTaskSources: {} as Record<string, string[]>,
   editions: [],
+  fetchTaskObjectivesData: vi.fn<() => Promise<void>>(),
   getTaskById: vi.fn(),
   mapsWithSvg: [],
   storyChapters: [] as StoryChapter[],
   storyChaptersGameMode: null as string | null,
   tasks: [] as Task[],
+  tasksObjectivesError: null as Error | null,
   tasksObjectivesHydrated: true,
   tasksObjectivesPending: false,
   traders: [],
-};
+});
 const taskFilteringMock = {
   isGlobalTask: vi.fn(() => false),
 };
@@ -172,7 +174,9 @@ const AppTooltipStub = {
   template: '<span><slot /></span>',
 };
 const QuestObjectivesStub = {
-  template: '<div data-testid="task-objectives" />',
+  props: ['objectives'],
+  template:
+    '<div data-testid="task-objectives">{{ objectives.map((objective) => objective.id).join(",") }}</div>',
 };
 const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
   mountSuspended(TaskCard, {
@@ -193,7 +197,6 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
         ContextMenuItem: ContextMenuItemStub,
         NuxtImg: true,
         QuestObjectives: QuestObjectivesStub,
-        QuestObjectivesSkeleton: QuestObjectivesStub,
         TaskCardActions: TaskCardActionsStub,
         TaskCardBackground: TaskCardBackgroundStub,
         TaskCardBadges: TaskCardBadgesStub,
@@ -222,9 +225,59 @@ describe('TaskCard appearance and expansion controls', () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: true } };
     vi.clearAllMocks();
     metadataStoreMock.getTaskById.mockReset();
+    metadataStoreMock.fetchTaskObjectivesData.mockReset().mockResolvedValue();
     metadataStoreMock.storyChapters = [];
     metadataStoreMock.storyChaptersGameMode = null;
+    metadataStoreMock.tasks = [];
+    metadataStoreMock.tasksObjectivesError = null;
+    metadataStoreMock.tasksObjectivesHydrated = true;
+    metadataStoreMock.tasksObjectivesPending = false;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+  });
+  it('offers a retry when objectives fail and shows the hydrated objectives afterward', async () => {
+    metadataStoreMock.tasksObjectivesHydrated = false;
+    metadataStoreMock.tasksObjectivesPending = true;
+    metadataStoreMock.getTaskById.mockImplementation((id) =>
+      metadataStoreMock.tasks.find((task) => task.id === id)
+    );
+    const wrapper = await mountTaskCard();
+    const skeleton = () => wrapper.find('#objectives-content-task-1 > [aria-hidden="true"]');
+    expect(skeleton().exists()).toBe(true);
+    metadataStoreMock.tasksObjectivesPending = false;
+    metadataStoreMock.tasksObjectivesError = new Error('offline');
+    await nextTick();
+    expect(skeleton().exists()).toBe(false);
+    expect(wrapper.get('[role="status"]').text()).toBe('Could not load objectives.');
+    const retry = Promise.withResolvers<undefined>();
+    metadataStoreMock.fetchTaskObjectivesData.mockImplementationOnce(() => {
+      metadataStoreMock.tasksObjectivesError = null;
+      metadataStoreMock.tasksObjectivesPending = true;
+      return retry.promise;
+    });
+    await wrapper.get('[data-testid="retry-task-objectives"]').trigger('click');
+    expect(metadataStoreMock.fetchTaskObjectivesData).toHaveBeenCalledExactlyOnceWith();
+    expect(skeleton().exists()).toBe(true);
+    expect(wrapper.find('[data-testid="retry-task-objectives"]').exists()).toBe(false);
+    metadataStoreMock.tasks = [
+      { id: 'task-1', objectives: [{ id: 'objective-1', type: 'visit', count: 1 }] } as Task,
+    ];
+    metadataStoreMock.tasksObjectivesHydrated = true;
+    metadataStoreMock.tasksObjectivesPending = false;
+    retry.resolve(undefined);
+    await nextTick();
+    expect(wrapper.get('[data-testid="task-objectives"]').text()).toBe('objective-1');
+    expect(skeleton().exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('keeps loaded objectives visible after a refresh failure', async () => {
+    metadataStoreMock.tasksObjectivesHydrated = false;
+    metadataStoreMock.tasksObjectivesError = new Error('offline');
+    const wrapper = await mountTaskCard({
+      objectives: [{ id: 'objective-1', type: 'visit', count: 1 }],
+    });
+    expect(wrapper.find('[data-testid="task-objectives"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="retry-task-objectives"]').exists()).toBe(false);
+    wrapper.unmount();
   });
   it('discloses completed objectives manually and responds to preference and completion changes', async () => {
     taskState.complete = true;

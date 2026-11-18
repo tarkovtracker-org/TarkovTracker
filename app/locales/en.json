@@ -1366,6 +1366,7 @@
         "requires_currently": "currently {status}",
         "requires_tooltip_conflict": "\"{name}\" is {current} but needs {expected} — this task may be permanently locked",
         "objectives_hidden": "{count} objectives not on this map ({uncompleted} uncompleted)",
+        "objectives_load_error": "Could not load objectives.",
         "needed_by": "Needed by: {names}",
         "time_gate": "Unlocks {duration} after prerequisites are complete",
         "time_gate_range": "Unlocks {min}–{max} after prerequisites are complete",
