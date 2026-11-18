@@ -97,11 +97,18 @@ function coveragePath(path, source, root) {
   }
   return join(root, local);
 }
+function readCoverage(coverage) {
+  const input = resolve(coverage);
+  try {
+    return readFileSync(input, 'utf8');
+  } catch (error) {
+    if (error.code !== 'EISDIR') throw error;
+    return readFileSync(join(input, 'coverage-final.json'), 'utf8');
+  }
+}
 function measuredHealth(root, coverage, source) {
   if (!coverage) return collectHealth(root);
-  const input = resolve(coverage);
-  const file = lstatSync(input).isDirectory() ? join(input, 'coverage-final.json') : input;
-  const report = JSON.parse(readFileSync(file, 'utf8'));
+  const report = JSON.parse(readCoverage(coverage));
   const entries = Object.entries(report).map(([path, data]) => {
     const target = coveragePath(path, source, root);
     return [target, { ...data, path: coveragePath(data.path ?? path, source, root) }];
