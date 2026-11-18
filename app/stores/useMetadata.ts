@@ -2,7 +2,12 @@ import { defineStore } from 'pinia';
 import { extractLanguageCode, useSafeLocale } from '@/composables/i18nHelpers';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import mapsData from '@/data/maps.json';
-import { type FetchResponse, isFetchError, isFetchSuccess } from '@/stores/tarkov/fetchResponse';
+import {
+  type FetchResponse,
+  type FetchSuccess,
+  isFetchError,
+  isFetchSuccess,
+} from '@/stores/tarkov/fetchResponse';
 import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemPicker';
 import {
   getMetadataGameMode,
@@ -17,6 +22,7 @@ import {
   getPromiseRequestKeyStore,
   getPromiseStore,
 } from '@/stores/tarkov/promiseStore';
+import { delay } from '@/utils/async';
 import {
   API_GAME_MODES,
   API_SUPPORTED_LANGUAGES,
@@ -49,7 +55,10 @@ import {
   getCachedData,
   setCachedData,
 } from '@/utils/tarkovCache';
-import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
+import {
+  TASK_OBJECTIVES_CACHE_VERSION,
+  TASK_OBJECTIVES_PURGE_CHECK_TTL_MS,
+} from '@/utils/taskCatalogCache';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   FinishRewards,
@@ -160,6 +169,119 @@ const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
 const CACHE_PURGE_CHECK_TTL_MS = 5 * 60 * 1000;
 const CACHE_PURGE_CHECK_TIMEOUT_MS = 2500;
 const CACHE_PURGE_CHECK_STORAGE_KEY = STORAGE_KEYS.cachePurgeCheckAt;
+const readPurgeStorage = (key: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const writePurgeStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    logger.warn('[MetadataStore] Failed to persist cache purge metadata:', error);
+  }
+};
+const storedObjectivePurgeTime = () =>
+  Date.parse(readPurgeStorage(CACHE_PURGE_STORAGE_KEY) ?? '') || 0;
+const observedObjectivePurgeTime = (store: object) =>
+  Math.max(getPromiseStore(store).observedCachePurgeTime, storedObjectivePurgeTime());
+const buildObjectiveCatalogCacheKey = (scope: string, purgeTime: number) => {
+  const key = `${TASK_OBJECTIVES_CACHE_VERSION}-${scope}`;
+  return purgeTime ? `${key}-${purgeTime}` : key;
+};
+const objectiveCatalogCacheKey = (store: object, scope: string) =>
+  buildObjectiveCatalogCacheKey(scope, observedObjectivePurgeTime(store));
+const hasObjectiveOverlaySince = (response: FetchSuccess<unknown>, purgeTime: number) =>
+  !purgeTime || Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime;
+const hasCurrentObjectiveOverlay = (store: object, response: FetchSuccess<unknown>) =>
+  hasObjectiveOverlaySince(response, observedObjectivePurgeTime(store));
+const assertCurrentObjectiveCounts = (store: object, response: FetchSuccess<unknown>) => {
+  if (!hasCurrentObjectiveOverlay(store, response)) {
+    throw new Error('Objective catalog predates the latest cache purge');
+  }
+};
+type MetadataCacheScope = {
+  cacheType: CacheType;
+  cacheKey: string;
+  language: string;
+  mode: string;
+};
+async function readMetadataCache<T>(store: object, scope: MetadataCacheScope) {
+  const cached = await getCachedData<T>(scope.cacheType, scope.cacheKey, scope.language);
+  if (
+    scope.cacheType === 'tasks-objectives' &&
+    scope.cacheKey !== objectiveCatalogCacheKey(store, scope.mode)
+  ) {
+    return null;
+  }
+  return cached;
+}
+const metadataWriteKey = (
+  store: object,
+  scope: MetadataCacheScope,
+  response: FetchSuccess<unknown>
+): string | null => {
+  if (typeof window === 'undefined') return null;
+  if (scope.cacheType !== 'tasks-objectives') return scope.cacheKey;
+  const purgeTime = observedObjectivePurgeTime(store);
+  return hasObjectiveOverlaySince(response, purgeTime)
+    ? buildObjectiveCatalogCacheKey(scope.mode, purgeTime)
+    : null;
+};
+const isStaleObjectiveCatalog = (store: object, cacheType: CacheType, response: unknown) =>
+  cacheType === 'tasks-objectives' &&
+  isFetchSuccess(response) &&
+  !hasCurrentObjectiveOverlay(store, response);
+async function fetchMetadataForCache<T>(
+  store: object,
+  cacheType: CacheType,
+  endpoint: string,
+  options: { signal?: AbortSignal; query: Record<string, string> },
+  isCurrent: () => boolean
+): Promise<FetchResponse<T>> {
+  const fetchCatalog = () => tarkovApiFetch<FetchResponse<T>>(endpoint, options);
+  const response = await fetchCatalog();
+  if (!isStaleObjectiveCatalog(store, cacheType, response)) return response;
+  // Give a warm Worker one marker-check interval before sharing a single retry.
+  await delay(TASK_OBJECTIVES_PURGE_CHECK_TTL_MS + 5000, options.signal);
+  if (!isCurrent()) return response;
+  const retry = await fetchCatalog();
+  return isStaleObjectiveCatalog(store, cacheType, retry)
+    ? { error: 'Objective catalog still predates the latest cache purge after retry' }
+    : retry;
+}
+const lastPurgeCheckTime = (sessionCheckAt: number) => {
+  const storedCheckAt = Number(readPurgeStorage(CACHE_PURGE_CHECK_STORAGE_KEY));
+  return Number.isFinite(storedCheckAt) ? Math.max(sessionCheckAt, storedCheckAt) : sessionCheckAt;
+};
+async function updateObservedPurge(
+  lastPurgeAt: string,
+  state: Pick<MetadataState, 'tasksObjectivesHydrated' | 'objectiveModeCountDifferencesHydrated'>
+) {
+  const purgeTime = Date.parse(lastPurgeAt);
+  if (!Number.isFinite(purgeTime) || purgeTime <= storedObjectivePurgeTime()) return;
+  const promises = getPromiseStore(state);
+  if (purgeTime < promises.observedCachePurgeTime) return;
+  if (purgeTime > promises.observedCachePurgeTime) {
+    promises.observedCachePurgeTime = purgeTime;
+    state.tasksObjectivesHydrated = false;
+    state.objectiveModeCountDifferencesHydrated = false;
+    promises.modeObjectiveCounts.clear();
+  }
+  try {
+    await clearAllCache();
+  } catch (error) {
+    logger.error('[MetadataStore] Failed to clear local cache after server purge:', error);
+    return;
+  }
+  logger.info('[MetadataStore] Cleared local cache after server purge.');
+  if (purgeTime >= observedObjectivePurgeTime(state)) {
+    writePurgeStorage(CACHE_PURGE_STORAGE_KEY, lastPurgeAt);
+  }
+}
 // Exported type for craft sources used by components
 export type CraftSource = { stationId: string; stationName: string; stationLevel: number };
 export interface MetadataStoreTaskLookup {
@@ -743,6 +865,7 @@ export const useMetadataStore = defineStore('metadata', {
      * Returns the cached data to avoid redundant fetches, or null if cache is incomplete.
      */
     async hasCriticalLocaleCache(locale: string): Promise<boolean> {
+      await getPromiseStore(this).cachePurgePromise;
       const language =
         LOCALE_TO_API_MAPPING[locale as keyof typeof LOCALE_TO_API_MAPPING] ??
         extractLanguageCode(locale, [...API_SUPPORTED_LANGUAGES]);
@@ -761,7 +884,7 @@ export const useMetadataStore = defineStore('metadata', {
         ),
         getCachedData<TarkovTaskObjectivesQueryResult>(
           'tasks-objectives',
-          `${TASK_OBJECTIVES_CACHE_VERSION}-${mode}`,
+          objectiveCatalogCacheKey(this, mode),
           language
         ),
         getCachedData<TarkovTaskRewardsQueryResult>(
@@ -847,7 +970,7 @@ export const useMetadataStore = defineStore('metadata', {
         | 'mapSpawnsError'
         | 'prestigeError'
         | 'editionsError';
-      processData: (data: T) => void;
+      processData: (data: T, response?: FetchSuccess<T>) => void;
       onEmpty?: () => void;
       logName: string;
       forceRefresh?: boolean;
@@ -910,7 +1033,7 @@ export const useMetadataStore = defineStore('metadata', {
         | 'mapSpawnsError'
         | 'prestigeError'
         | 'editionsError';
-      processData: (data: T) => void;
+      processData: (data: T, response?: FetchSuccess<T>) => void;
       onEmpty?: () => void;
       logName: string;
       forceRefresh?: boolean;
@@ -952,7 +1075,9 @@ export const useMetadataStore = defineStore('metadata', {
         promiseRequestId,
         throwOnError = false,
       } = config;
-      const requestScope = `${this.getApiGameMode()}-${this.languageCode}`;
+      const mode = this.getApiGameMode();
+      const cacheScope = { cacheType, cacheKey, language: cacheLanguage, mode };
+      const requestScope = `${mode}-${this.languageCode}`;
       const isCurrentRequestContext = (ignoreAbort = false): boolean =>
         canApplyRequestSignal(config.signal, ignoreAbort) &&
         `${this.getApiGameMode()}-${this.languageCode}` === requestScope &&
@@ -964,7 +1089,7 @@ export const useMetadataStore = defineStore('metadata', {
       // Step 1: Check IndexedDB cache (unless forcing refresh)
       if (!forceRefresh && typeof window !== 'undefined') {
         try {
-          const cached = await getCachedData<T>(cacheType, cacheKey, cacheLanguage);
+          const cached = await readMetadataCache<T>(this, cacheScope);
           throwIfAborted(config.signal);
           if (cached) {
             logger.debug(
@@ -1002,10 +1127,13 @@ export const useMetadataStore = defineStore('metadata', {
         const effectiveQueryParams = forceRefresh
           ? { ...queryParams, cacheBust: '1' }
           : queryParams;
-        const response = await tarkovApiFetch<FetchResponse<T>>(endpoint, {
-          signal: config.signal,
-          query: effectiveQueryParams,
-        });
+        const response = await fetchMetadataForCache<T>(
+          this,
+          cacheType,
+          endpoint,
+          { signal: config.signal, query: effectiveQueryParams },
+          isCurrentRequestContext
+        );
         throwIfAborted(config.signal);
         if (isFetchError(response)) {
           // Log full response for debugging
@@ -1047,10 +1175,11 @@ export const useMetadataStore = defineStore('metadata', {
           endPerf({ stale: true });
           return;
         }
-        processData(response.data);
+        processData(response.data, response);
         // Step 4: Store in IndexedDB for future visits
-        if (typeof window !== 'undefined') {
-          setCachedData(cacheType, cacheKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
+        const writeKey = metadataWriteKey(this, cacheScope, response);
+        if (writeKey !== null) {
+          setCachedData(cacheType, writeKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
             logger.error(`[MetadataStore] Error caching ${logName} data:`, err)
           );
         }
@@ -1087,15 +1216,17 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * Check if the server has purged cache and clear local cache if needed.
      */
-    async checkCachePurge(): Promise<void> {
+    checkCachePurge(): Promise<void> {
+      const promises = getPromiseStore(this);
+      promises.cachePurgePromise ??= this._checkCachePurge().finally(() => {
+        promises.cachePurgePromise = null;
+      });
+      return promises.cachePurgePromise;
+    },
+    async _checkCachePurge(): Promise<void> {
       if (typeof window === 'undefined') return;
       const now = Date.now();
-      const storedCheckRaw = localStorage.getItem(CACHE_PURGE_CHECK_STORAGE_KEY);
-      const storedCheckAt = storedCheckRaw ? Number(storedCheckRaw) : 0;
-      const lastCheckAt = Number.isFinite(storedCheckAt)
-        ? Math.max(this.lastCachePurgeCheckAt, storedCheckAt)
-        : this.lastCachePurgeCheckAt;
-      if (now - lastCheckAt < CACHE_PURGE_CHECK_TTL_MS) return;
+      if (now - lastPurgeCheckTime(this.lastCachePurgeCheckAt) < CACHE_PURGE_CHECK_TTL_MS) return;
       this.lastCachePurgeCheckAt = now;
       const timeoutMs = CACHE_PURGE_CHECK_TIMEOUT_MS;
       const controller = new AbortController();
@@ -1109,25 +1240,9 @@ export const useMetadataStore = defineStore('metadata', {
           { signal: controller.signal }
         );
         if (!isFetchSuccess(response)) return;
-        localStorage.setItem(CACHE_PURGE_CHECK_STORAGE_KEY, String(now));
+        writePurgeStorage(CACHE_PURGE_CHECK_STORAGE_KEY, String(now));
         const lastPurgeAt = response.data?.lastPurgeAt;
-        if (!lastPurgeAt) return;
-        const serverTime = Date.parse(lastPurgeAt);
-        if (!Number.isFinite(serverTime)) return;
-        const localValue = localStorage.getItem(CACHE_PURGE_STORAGE_KEY);
-        const localTime = localValue ? Date.parse(localValue) : 0;
-        if (!Number.isFinite(localTime) || serverTime > localTime) {
-          try {
-            await clearAllCache();
-            localStorage.setItem(CACHE_PURGE_STORAGE_KEY, lastPurgeAt);
-            logger.info('[MetadataStore] Cleared local cache after server purge.');
-          } catch (clearError) {
-            logger.error(
-              '[MetadataStore] Failed to clear local cache after server purge:',
-              clearError
-            );
-          }
-        }
+        if (lastPurgeAt) await updateObservedPurge(lastPurgeAt, this);
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           logger.warn(`[MetadataStore] Cache purge check timed out after ${timeoutMs}ms.`, error);
@@ -1397,9 +1512,20 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * Fetch task objectives and fail conditions data
      */
-    async fetchTaskObjectivesData(forceRefresh = false, signal?: AbortSignal) {
+    async fetchTaskObjectivesData(forceRefresh = false, signal?: AbortSignal): Promise<void> {
       throwIfAborted(signal);
-      if (this.tasksObjectivesHydrated && !forceRefresh) {
+      const promises = getPromiseStore(this);
+      if (promises.cachePurgePromise) {
+        await promises.cachePurgePromise;
+        throwIfAborted(signal);
+      }
+      const requestLanguage = this.languageCode;
+      const requestGameMode = this.getApiGameMode();
+      const cacheKey = objectiveCatalogCacheKey(this, requestGameMode);
+      const requestKey = `${requestLanguage}-${cacheKey}`;
+      const isHydrated =
+        this.tasksObjectivesHydrated && promises.taskObjectiveHydrationScope === requestKey;
+      if (isHydrated && !forceRefresh) {
         this.fetchObjectiveModeCountDifferences(false, signal).catch((err) =>
           signal?.aborted
             ? undefined
@@ -1410,12 +1536,9 @@ export const useMetadataStore = defineStore('metadata', {
         );
         return;
       }
-      const requestLanguage = this.languageCode;
-      const requestGameMode = this.getApiGameMode();
-      const requestKey = `${requestLanguage}-${requestGameMode}`;
       await this.fetchWithCache<TarkovTaskObjectivesQueryResult>({
         cacheType: 'tasks-objectives' as CacheType,
-        cacheKey: `${TASK_OBJECTIVES_CACHE_VERSION}-${requestGameMode}`,
+        cacheKey,
         cacheLanguage: requestLanguage,
         endpoint: '/api/tarkov/tasks-objectives',
         queryParams: {
@@ -1425,7 +1548,11 @@ export const useMetadataStore = defineStore('metadata', {
         },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'tasksObjectivesPending',
-        processData: (data) => {
+        processData: (data, response) => {
+          const currentKey = objectiveCatalogCacheKey(this, requestGameMode);
+          if (!response && cacheKey !== currentKey) return;
+          if (response && !hasCurrentObjectiveOverlay(this, response)) return;
+          promises.taskObjectiveHydrationScope = `${requestLanguage}-${currentKey}`;
           this.mergeTaskObjectives(data.tasks, {
             rebuildDerivedData: false,
             repairFailedTaskStates: false,
@@ -1482,15 +1609,17 @@ export const useMetadataStore = defineStore('metadata', {
         }
         const requestApiMode = this.getApiGameMode();
         const requestEpoch = promiseStore.taskCatalogEpoch;
+        const requestPurgeTime = observedObjectivePurgeTime(this);
         const otherApiMode =
           requestApiMode === API_GAME_MODES[GAME_MODES.PVE]
             ? API_GAME_MODES[GAME_MODES.PVP]
             : API_GAME_MODES[GAME_MODES.PVE];
-        // Only the task catalog itself (mode switch or tasks-core reload) invalidates the
-        // comparison. Reward/item hydration replaces the array reference but not the counts.
+        // A catalog or purge generation change invalidates counts. Rewards and item
+        // hydration can replace the task array without changing its counts.
         const isStale = () =>
           this.getApiGameMode() !== requestApiMode ||
-          promiseStore.taskCatalogEpoch !== requestEpoch;
+          promiseStore.taskCatalogEpoch !== requestEpoch ||
+          observedObjectivePurgeTime(this) !== requestPurgeTime;
         try {
           const otherCounts = await this.loadModeObjectiveCounts(
             otherApiMode,
@@ -1543,10 +1672,10 @@ export const useMetadataStore = defineStore('metadata', {
       signal?: AbortSignal
     ): Promise<Record<string, number>> {
       const memo = getPromiseStore(this).modeObjectiveCounts;
-      const existing = memo.get(apiGameMode);
+      const cacheKey = objectiveCatalogCacheKey(this, `counts-${apiGameMode}`);
+      const existing = memo.get(cacheKey);
       if (existing && !forceRefresh && requestSignals.get(existing) === signal && !signal?.aborted)
         return existing;
-      const cacheKey = `${TASK_OBJECTIVES_CACHE_VERSION}-counts-${apiGameMode}`;
       const promise = (async () => {
         if (!forceRefresh && typeof window !== 'undefined') {
           const cached = await getCachedData<Record<string, number>>(
@@ -1577,6 +1706,7 @@ export const useMetadataStore = defineStore('metadata', {
           throw new Error('Invalid response: expected { data }');
         }
         throwIfAborted(signal);
+        assertCurrentObjectiveCounts(this, response);
         const modeTasks = (response.data.tasks || []).map((task) => ({
           id: task.id,
           objectives: this.normalizeObjectiveItems(
@@ -1597,10 +1727,10 @@ export const useMetadataStore = defineStore('metadata', {
         return counts;
       })();
       if (signal) requestSignals.set(promise, signal);
-      memo.set(apiGameMode, promise);
+      memo.set(cacheKey, promise);
       // A failed load must not pin the rejection for the rest of the session.
       promise.catch(() => {
-        if (memo.get(apiGameMode) === promise) memo.delete(apiGameMode);
+        if (memo.get(cacheKey) === promise) memo.delete(cacheKey);
       });
       return promise;
     },

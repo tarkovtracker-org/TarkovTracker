@@ -518,13 +518,14 @@ describe('Tarkov API handlers', () => {
       bypassCache: false,
       gameMode: 'regular',
       locale: 'en',
+      purgedAt: 0,
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-objectives-json-v4-en-regular',
+      'tasks-objectives-json-v5-en-regular-0',
       expect.any(Function),
       111,
-      { cacheKeyPrefix: 'tarkov', response: true }
+      { cacheKeyPrefix: 'tarkov', response: true, noStoreResponse: true }
     );
   });
   it('rejects missing objective overlay provenance before admitting a cache entry', async () => {
@@ -548,7 +549,7 @@ describe('Tarkov API handlers', () => {
     });
     const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
     await handler(event);
-    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe(`tasks-objectives-json-v4-${lang}-${mode}`);
+    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe(`tasks-objectives-json-v5-${lang}-${mode}-0`);
   });
   it('sanitizes and overlays tasks-rewards before caching', async () => {
     const { default: handler } = await import('@/server/api/tarkov/tasks-rewards.get');
@@ -572,7 +573,7 @@ describe('Tarkov API handlers', () => {
     );
   });
   it('returns last successful cache purge timestamp from audit log', async () => {
-    runtimeConfig.supabaseUrl = 'https://test.supabase.co';
+    runtimeConfig.supabaseUrl = 'https://test.supabase.co/?ignored=1#fragment';
     runtimeConfig.supabaseServiceKey = 'service-key';
     mockFetch.mockResolvedValueOnce({
       json: async () => [
@@ -583,6 +584,12 @@ describe('Tarkov API handlers', () => {
     });
     const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
     const result = await handler(event);
+    const auditUrl = new URL(String(mockFetch.mock.calls[0]?.[0]));
+    expect(auditUrl.pathname).toBe('/rest/v1/admin_audit_log');
+    expect(auditUrl.hash).toBe('');
+    const auditQuery = auditUrl.searchParams;
+    expect(auditQuery.get('details')).toBe('cs.{"success":true}');
+    expect(auditQuery.get('limit')).toBe('1');
     expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, CACHE_META_HEADERS);
     expect(result).toEqual({
       data: {

@@ -57,6 +57,8 @@ let cachedOverlay: OverlayData | null = null;
 let cacheTimestamp = 0;
 let overlayRefreshPromise: Promise<OverlayFetchResult> | null = null;
 let nextOverlayRefreshAt = 0;
+let cachedOverlayPurgeTime = 0;
+let lastOverlayRefreshPurgeTime = 0;
 const OVERLAY_CACHE_TTL = 3600000; // 1 hour in milliseconds
 const OVERLAY_REFRESH_RETRY_MS = 60000;
 const FETCH_TIMEOUT_MS = 5000; // 5 seconds
@@ -101,6 +103,7 @@ function buildOverlayMeta(
     generated,
     sha256,
     sourceUrl: OVERLAY_URL_WITH_BUSTER,
+    fetchedAt: overlay ? new Date(cacheTimestamp).toISOString() : undefined,
     unconsumedSections: overlay ? unknownOverlaySections(overlay) : [],
     ...extra,
   };
@@ -128,12 +131,15 @@ function resolveOverlayRedirect(response: Response, currentUrl: string): string 
   }
   return target.toString();
 }
-async function fetchOverlayOverHttps(signal: AbortSignal): Promise<Response> {
-  let currentUrl = OVERLAY_URL_WITH_BUSTER;
+async function fetchOverlayOverHttps(signal: AbortSignal, purgedAt: number): Promise<Response> {
+  const url = new URL(OVERLAY_URL_WITH_BUSTER);
+  if (purgedAt) url.searchParams.set('tarkovPurge', String(purgedAt));
+  let currentUrl = url.toString();
   for (let hop = 0; hop <= MAX_OVERLAY_REDIRECTS; hop += 1) {
     const response = await fetch(currentUrl, {
       signal,
       redirect: 'manual',
+      ...(purgedAt ? { cache: 'no-store' as const } : {}),
       headers: {
         Accept: 'application/json',
         'User-Agent': TARKOVTRACKER_USER_AGENT,
@@ -146,20 +152,25 @@ async function fetchOverlayOverHttps(signal: AbortSignal): Promise<Response> {
   }
   throw new Error(`overlay_redirect_limit_exceeded (${MAX_OVERLAY_REDIRECTS})`);
 }
-function createOverlayRequest(): {
+type OverlayRequestOptions = { purgedAt?: number; timeoutMs?: number };
+function createOverlayRequest({
+  purgedAt = 0,
+  timeoutMs = FETCH_TIMEOUT_MS,
+}: OverlayRequestOptions): {
   clearTimeout: () => void;
   response: Promise<Response>;
 } {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   return {
     clearTimeout: () => clearTimeout(timeoutId),
-    response: Promise.resolve().then(() => fetchOverlayOverHttps(controller.signal)),
+    response: Promise.resolve().then(() => fetchOverlayOverHttps(controller.signal, purgedAt)),
   };
 }
 async function processOverlayResponse(
   response: Response,
-  now: number
+  now: number,
+  purgedAt: number
 ): Promise<OverlayFetchResult> {
   if (!response.ok) {
     logger.warn(`Failed to fetch overlay: ${response.status}`);
@@ -174,38 +185,46 @@ async function processOverlayResponse(
   if (unconsumed.length) logger.warn('Unconsumed overlay sections:', unconsumed);
   cachedOverlay = parsedData;
   cacheTimestamp = now;
+  cachedOverlayPurgeTime = purgedAt;
   logger.info(`Loaded overlay v${cachedOverlay.$meta!.version}`);
   lastOverlayMeta = buildOverlayMeta(cachedOverlay, 'fresh', {
     unconsumedSections: unconsumed,
-    fetchedAt: new Date(now).toISOString(),
     cacheAgeMs: 0,
   });
   return { overlay: cachedOverlay, meta: lastOverlayMeta };
 }
-function logOverlayFetchError(error: unknown): void {
+function logOverlayFetchError(error: unknown, timeoutMs = FETCH_TIMEOUT_MS): void {
   if (error instanceof Error && error.name === 'AbortError') {
-    logger.warn(`Fetch timeout after ${FETCH_TIMEOUT_MS}ms`);
+    logger.warn(`Fetch timeout after ${timeoutMs}ms`);
     return;
   }
   logger.warn('Error fetching overlay:', error);
 }
-async function refreshOverlay(now: number): Promise<OverlayFetchResult> {
-  const request = createOverlayRequest();
+async function refreshOverlay(
+  now: number,
+  options: OverlayRequestOptions
+): Promise<OverlayFetchResult> {
+  const request = createOverlayRequest(options);
   try {
-    return await processOverlayResponse(await request.response, now);
+    return await processOverlayResponse(await request.response, now, options.purgedAt ?? 0);
   } catch (error) {
-    logOverlayFetchError(error);
+    logOverlayFetchError(error, options.timeoutMs);
     return buildOverlayFailure(error instanceof Error ? error.message : String(error));
   } finally {
     request.clearTimeout();
   }
 }
-function startOverlayRefresh(now: number): {
+function startOverlayRefresh(
+  now: number,
+  options: OverlayRequestOptions = {}
+): {
   promise: Promise<OverlayFetchResult>;
   started: boolean;
 } {
   if (overlayRefreshPromise) return { promise: overlayRefreshPromise, started: false };
-  const promise = refreshOverlay(now)
+  const purgedAt = Math.max(options.purgedAt ?? 0, cachedOverlayPurgeTime);
+  lastOverlayRefreshPurgeTime = purgedAt;
+  const promise = refreshOverlay(now, { ...options, purgedAt })
     .then((result) => {
       nextOverlayRefreshAt =
         result.meta.status === 'fresh' ? 0 : Date.now() + OVERLAY_REFRESH_RETRY_MS;
@@ -249,6 +268,26 @@ export async function fetchOverlay(
     return buildCachedOverlayResult(now, 'stale');
   }
   return await startOverlayRefresh(now).promise;
+}
+const isOverlayCurrentForPurge = (purgedAt: number) =>
+  cachedOverlayPurgeTime >= purgedAt && cacheTimestamp >= purgedAt;
+async function fetchOverlayAfterPurge(purgedAt: number): Promise<OverlayFetchResult> {
+  const deadline = Date.now() + FETCH_TIMEOUT_MS;
+  if (overlayRefreshPromise && lastOverlayRefreshPurgeTime < purgedAt) {
+    await overlayRefreshPromise;
+  }
+  const now = Date.now();
+  const canRefresh =
+    overlayRefreshPromise || lastOverlayRefreshPurgeTime < purgedAt || now >= nextOverlayRefreshAt;
+  if (now < deadline && canRefresh) {
+    const { promise } = startOverlayRefresh(now, { purgedAt, timeoutMs: deadline - now });
+    const result = await promise;
+    if (isOverlayCurrentForPurge(purgedAt)) return result;
+  }
+  return {
+    overlay: null,
+    meta: buildOverlayMeta(null, 'missing', { error: 'Overlay refresh pending after cache purge' }),
+  };
 }
 /**
  * Apply overlay corrections to an array of entities
@@ -730,19 +769,24 @@ const collectStoryUnlocks = (chapters: Record<string, Record<string, unknown>> =
   }
   return byTask;
 };
+type ApplyOverlayOptions = {
+  bypassCache?: boolean;
+  gameMode?: string;
+  locale?: string;
+  purgedAt?: number;
+  scheduleRefresh?: OverlayRefreshScheduler;
+};
+function fetchOverlayForApplication(options: ApplyOverlayOptions): Promise<OverlayFetchResult> {
+  const purgedAt = options.purgedAt ?? 0;
+  return isOverlayCurrentForPurge(purgedAt)
+    ? fetchOverlay(Boolean(options.bypassCache), options.scheduleRefresh)
+    : fetchOverlayAfterPurge(purgedAt);
+}
 export async function applyOverlay<T extends { data?: OverlayTargetData }>(
   data: T,
-  options: {
-    bypassCache?: boolean;
-    gameMode?: string;
-    locale?: string;
-    scheduleRefresh?: OverlayRefreshScheduler;
-  } = {}
+  options: ApplyOverlayOptions = {}
 ): Promise<T & { dataOverlay: OverlayMeta }> {
-  const { overlay, meta } = await fetchOverlay(
-    Boolean(options.bypassCache),
-    options.scheduleRefresh
-  );
+  const { overlay, meta } = await fetchOverlayForApplication(options);
   const result = { ...data, dataOverlay: meta } as T & { dataOverlay: OverlayMeta };
   if (!overlay || !data?.data) {
     return result;
