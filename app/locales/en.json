@@ -1487,6 +1487,8 @@
       }
     },
     "hideout": {
+      "public_requirements": "PvP station requirements",
+      "no_listed_requirements": "No requirements listed for this level.",
       "status_tabs_label": "Station status",
       "loading": "Loading hideout data",
       "station_link_label": "Go to {name}",

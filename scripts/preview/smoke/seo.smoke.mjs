@@ -206,3 +206,43 @@ test('public to private to public navigation restores metadata', async ({ page }
     0
   );
 });
+test('hideout initial HTML contains every catalog level and its requirements', async ({
+  page,
+  request,
+}) => {
+  const [doc, data] = await Promise.all(
+    ['/hideout', '/data/hideout-requirements-pvp.json'].map((path) =>
+      previewGet(request, origin + path, origin)
+    )
+  );
+  expect(doc.status()).toBe(200);
+  expect(data.status()).toBe(200);
+  const stations = JSON.parse(await data.text());
+  const levels = stations.flatMap((station) => station.levels);
+  expect(levels.length).toBeGreaterThan(0);
+  const rendered = await page.evaluate(
+    (html) => {
+      const document = new DOMParser().parseFromString(html, 'text/html');
+      return [...document.querySelectorAll('main section[id^="requirements-"]')].map((section) => ({
+        anchor: section.id,
+        rows: section.querySelectorAll('li').length,
+        href: section.querySelector('h3 a')?.getAttribute('href'),
+      }));
+    },
+    await doc.text()
+  );
+  expect(rendered).toEqual(
+    levels.map((level) => ({
+      anchor: level.anchor,
+      rows: level.items.length + level.stations.length + level.skills.length + level.traders.length,
+      href: '#' + level.anchor,
+    }))
+  );
+});
+test('a shared hideout level opens after the tracker hydrates on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const target = '#requirements-workbench-level-2';
+  await page.goto(origin + '/hideout' + target);
+  await expect(page.getByTestId('hideout-view-switcher')).toBeAttached();
+  await expect(page.locator(target)).toBeInViewport();
+});
