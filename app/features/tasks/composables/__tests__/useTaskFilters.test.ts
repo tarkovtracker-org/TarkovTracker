@@ -78,9 +78,9 @@ describe('useTaskFilters', () => {
     const normalizedSearch = ref('');
     const { filteredTasks, searchStatusCounts } = useTaskFilters({
       calculateFilteredTasksForOptions: (inputTasks) => inputTasks,
-      excludedTaskIds: computed(() => new Set<string>()),
       getTaskMapView: ref('all'),
       hideCompletedMapObjectives: ref(false),
+      isIncludedMapTask: () => true,
       mapTaskVisibilityFilterOptions: createOptions(),
       normalizedSearch,
       showMapDisplay: computed(() => false),
@@ -112,9 +112,9 @@ describe('useTaskFilters', () => {
     );
     const { searchStatusCounts } = useTaskFilters({
       calculateFilteredTasksForOptions,
-      excludedTaskIds: computed(() => new Set<string>()),
       getTaskMapView: ref('all'),
       hideCompletedMapObjectives: ref(true),
+      isIncludedMapTask: () => true,
       mapTaskVisibilityFilterOptions: createOptions(),
       normalizedSearch: ref('saving'),
       showMapDisplay: computed(() => false),
@@ -138,9 +138,9 @@ describe('useTaskFilters', () => {
     const excludedTaskIds = ref<ReadonlySet<string>>(new Set());
     const { mapCompleteTasksCountOnMap, showMapTaskVisibilityNotice } = useTaskFilters({
       calculateFilteredTasksForOptions,
-      excludedTaskIds,
       getTaskMapView: ref('woods'),
       hideCompletedMapObjectives: ref(true),
+      isIncludedMapTask: (task) => !excludedTaskIds.value.has(task.id),
       mapTaskVisibilityFilterOptions: createOptions({
         mapView: 'woods',
         mergedMaps: [{ id: 'woods', mergedIds: ['woods'] }],

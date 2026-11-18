@@ -5,6 +5,7 @@ import type { Task } from '@/types/tarkov';
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
+    n: (value: number) => value.toFixed(2),
     t: (key: string) => key,
   }),
 }));
@@ -77,6 +78,19 @@ describe('MapTaskVisibilityPanel', () => {
   it('flags when every quest on the map is hidden', () => {
     const wrapper = mountPanel(['task-a', 'task-b']);
     expect(wrapper.find('[data-testid="map-raid-plan-all-hidden"]').exists()).toBe(true);
+  });
+  it('changes the reputation minimum and allows clearing it with no matching quests', async () => {
+    const wrapper = mountPanel([]);
+    const filter = wrapper.get('select');
+    await filter.setValue('0.05');
+    expect(wrapper.emitted('update:minimumReputation')).toEqual([[0.05]]);
+    await wrapper.setProps({ tasks: [], minimumReputation: 0.05 });
+    expect(wrapper.get('[data-testid="map-raid-plan-summary"]').text()).toBe(
+      'page.tasks.map.raid_plan.no_reputation_matches'
+    );
+    filter.element.selectedIndex = 0;
+    await filter.trigger('change');
+    expect(wrapper.emitted('update:minimumReputation')).toEqual([[0.05], [null]]);
   });
   describe('quest colors (#920)', () => {
     const taskColors = new Map([

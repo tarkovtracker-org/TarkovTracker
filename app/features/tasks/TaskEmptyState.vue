@@ -6,14 +6,8 @@
       icon="i-mdi-clipboard-search"
       color="primary"
       variant="soft"
-      :title="t(isSearching ? 'page.tasks.no_search_matches' : 'page.tasks.no_tasks_found')"
-      :description="
-        t(
-          isSearching
-            ? 'page.tasks.no_search_matches_description'
-            : 'page.tasks.no_tasks_found_description'
-        )
-      "
+      :title="title"
+      :description="description"
       :actions="actions"
     />
   </div>
@@ -24,7 +18,9 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   const props = defineProps<{
     isSearching?: boolean;
+    reputationFiltered?: boolean;
   }>();
+  const emit = defineEmits<{ 'clear-reputation': [] }>();
   const { t } = useI18n({ useScope: 'global' });
   const { activeCount, clearAll } = useTaskContentFilters();
   const preferences = usePreferencesStore();
@@ -35,11 +31,42 @@
       preferences.getTaskUserView === 'self'
   );
   const showGuidance = computed(
-    () => isPersonalAvailableList.value && !props.isSearching && activeCount.value === 0
+    () =>
+      isPersonalAvailableList.value &&
+      !props.isSearching &&
+      !props.reputationFiltered &&
+      activeCount.value === 0
   );
+  const title = computed(() => {
+    if (props.reputationFiltered) {
+      return t(
+        'page.tasks.map.raid_plan.no_reputation_matches',
+        'No mapped quests match this filter.'
+      );
+    }
+    return t(props.isSearching ? 'page.tasks.no_search_matches' : 'page.tasks.no_tasks_found');
+  });
+  const description = computed(() => {
+    if (props.reputationFiltered) return undefined;
+    return t(
+      props.isSearching
+        ? 'page.tasks.no_search_matches_description'
+        : 'page.tasks.no_tasks_found_description'
+    );
+  });
   // Offer the way out right where the list came up empty, instead of sending people hunting for it.
   // Filters still apply while searching, so they can be what empties a search too.
   const actions = computed(() => {
+    if (props.reputationFiltered) {
+      return [
+        {
+          label: t('page.tasks.map.raid_plan.clear_reputation_filter', 'Clear reputation filter'),
+          color: 'primary' as const,
+          variant: 'soft' as const,
+          onClick: () => emit('clear-reputation'),
+        },
+      ];
+    }
     if (activeCount.value === 0) return undefined;
     return [
       {
