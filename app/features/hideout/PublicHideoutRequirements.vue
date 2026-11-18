@@ -24,16 +24,22 @@
   prerenderRoutes('/data/hideout-requirements-pvp.json');
   const { data: stations, error } = await useLazyFetch('/data/hideout-requirements-pvp.json');
   if (import.meta.prerender && error.value) throw createError(error.value);
+  const route = useRoute();
   function revealLinkedRequirement() {
-    const target = document.querySelector('[id^="requirements-"]:target');
+    if (!window.location.hash.startsWith('#requirements-')) return;
+    const target = document.getElementById(window.location.hash.slice(1));
     if (!target) return;
+    expandAncestors(target);
+    target.scrollIntoView({ block: 'start' });
+  }
+  function expandAncestors(target: HTMLElement) {
     let details = target.closest('details');
     while (details) {
       details.open = true;
       details = details.parentElement?.closest('details') ?? null;
     }
-    target.scrollIntoView({ block: 'start' });
   }
+  watch([stations, () => route.hash], revealLinkedRequirement, { flush: 'post' });
   onMounted(() => {
     onNuxtReady(revealLinkedRequirement);
     window.addEventListener('hashchange', revealLinkedRequirement);
