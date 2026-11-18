@@ -635,7 +635,7 @@ describe('useNeededItems', () => {
       const item = createItem('item-shared', 'Shared Item');
       const objectives = [
         createTaskObjective('obj-owned', 'task-1', item, 1),
-        createTaskObjective('obj-needed', 'task-1', item, 1),
+        createTaskObjective('obj-needed', 'task-1', item, 0),
       ];
       const { neededItems } = await setup({
         metadataStore: { neededItemTaskObjectives: objectives, neededItemHideoutModules: [] },
