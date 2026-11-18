@@ -102,11 +102,11 @@ their original values. Unsupported or non-string locale leaves stop publication.
 
 To add a correction, edit the overlay repository's ID-keyed JSON5 override or
 addition. Put a canonical English correction in the shared or mode source and a
-locale-only correction in `src/overrides/locales/<language>.json5`. Include the
+locale-only correction in the [overlay locale source directory](https://github.com/tarkovtracker-org/tarkov-data-overlay/tree/main/src/overrides/locales). Include the
 entity name, previous value, and supporting evidence. Run overlay validation,
 tests, typecheck, and build. Submit sources and let the overlay release workflow
 publish both generated artifacts. The complete producer contract is in the overlay
-repository's `docs/NEUTRAL_OVERLAY.md`. `OVERLAY_URL` and
+repository�s [neutral overlay guide](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/NEUTRAL_OVERLAY.md). `OVERLAY_URL` and
 `NEUTRAL_OVERLAY_URL` can select the matching legacy and neutral artifacts. Pin
 both to the same immutable release or source revision when overriding defaults.
 
@@ -309,7 +309,7 @@ produced and validated separately by the same trusted runner.
 
 ### Key and activation contract
 
-- `TARKOV_DATA` is the KV binding. Every neutral object uses
+- The KV binding name is `TARKOV_DATA`. Every neutral object uses
   `neutral-catalog-v1/<dataset>/<mode>/<digest>` or
   `neutral-catalog-v1/strings/<language>/<digest>`.
 - The digest is SHA256 of the uncompressed UTF-8 JSON. The producer stores gzip
