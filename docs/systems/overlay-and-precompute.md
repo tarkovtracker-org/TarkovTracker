@@ -148,7 +148,8 @@ The per-colo Worker cache also keys final catalogs by language, game mode, and t
 successful Tarkov purge timestamp. Each isolate checks the audit log at most once a minute.
 HTTP responses use `no-store` so the CDN and browser HTTP caches cannot bypass the Worker check.
 Objective hydration waits for any in-flight browser purge check before using local data. The
-client keys its local objective entries and in-memory count memo by the observed purge timestamp.
+client keys its local objective entries and count memo by the observed purge timestamp, which it
+keeps in memory even when persisting the marker fails.
 It only applies or persists a network catalog whose overlay was fetched at or after that timestamp.
 After a scoped Tarkov data purge, the next generation requires an overlay fetched since that purge
 and returns 503 if it cannot refresh. Older generations expire on their existing retention

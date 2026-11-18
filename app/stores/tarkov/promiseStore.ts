@@ -8,6 +8,7 @@ export interface PromiseStore {
   readonly objectiveModeCountDifferencesPromise: Promise<'stale' | undefined> | null;
   readonly taskObjectivesPromise: Promise<void> | null;
   readonly cachePurgePromise: Promise<void> | null;
+  readonly observedCachePurgeTime: number;
   readonly taskObjectiveHydrationScope: string | null;
   readonly taskRewardsPromise: Promise<void> | null;
   readonly prestigePromise: Promise<void> | null;
@@ -65,6 +66,7 @@ export function getPromiseStore(storeInstance: object): MutablePromiseStore {
       objectiveModeCountDifferencesPromise: null,
       taskObjectivesPromise: null,
       cachePurgePromise: null,
+      observedCachePurgeTime: 0,
       taskObjectiveHydrationScope: null,
       taskRewardsPromise: null,
       prestigePromise: null,

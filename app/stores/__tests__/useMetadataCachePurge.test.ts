@@ -61,6 +61,8 @@ describe('useMetadataStore checkCachePurge', () => {
     store.tasksObjectivesHydrated = true;
     store.objectiveModeCountDifferencesHydrated = true;
     const clear = vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+    const catalogFetch = vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
+    const lastPurgeAt = '2025-01-03T00:00:00Z';
     const storage = localStorage;
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => storage.getItem(key),
@@ -70,14 +72,16 @@ describe('useMetadataStore checkCachePurge', () => {
         storage.setItem(key, value);
       },
     });
-    vi.stubGlobal(
-      '$fetch',
-      vi.fn().mockResolvedValue({ data: { lastPurgeAt: '2025-01-03T00:00:00Z' } })
-    );
+    vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ data: { lastPurgeAt } }));
     await store.checkCachePurge();
     expect(clear).toHaveBeenCalledOnce();
     expect(store.tasksObjectivesHydrated).toBe(false);
     expect(store.objectiveModeCountDifferencesHydrated).toBe(false);
+    expect(storage.getItem(STORAGE_KEYS.cachePurgeAt)).toBeNull();
+    await store.fetchTaskObjectivesData();
+    expect(catalogFetch).toHaveBeenCalledWith(
+      expect.objectContaining({ cacheKey: `json-v5-regular-${Date.parse(lastPurgeAt)}` })
+    );
   });
   it('does not clear cache when server purge is older than local', async () => {
     const store = useMetadataStore();

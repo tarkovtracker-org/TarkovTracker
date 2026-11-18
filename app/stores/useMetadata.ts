@@ -173,25 +173,38 @@ const readPurgeStorage = (key: string): string | null => {
     return null;
   }
 };
-const observedObjectivePurgeTime = () =>
+const writePurgeStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    logger.warn('[MetadataStore] Failed to persist cache purge metadata:', error);
+  }
+};
+const storedObjectivePurgeTime = () =>
   Date.parse(readPurgeStorage(CACHE_PURGE_STORAGE_KEY) ?? '') || 0;
-const objectiveCatalogCacheKey = (scope: string) => {
-  const purgeTime = observedObjectivePurgeTime();
+const observedObjectivePurgeTime = (store: object) =>
+  Math.max(getPromiseStore(store).observedCachePurgeTime, storedObjectivePurgeTime());
+const objectiveCatalogCacheKey = (store: object, scope: string) => {
+  const purgeTime = observedObjectivePurgeTime(store);
   const key = `${TASK_OBJECTIVES_CACHE_VERSION}-${scope}`;
   return purgeTime ? `${key}-${purgeTime}` : key;
 };
-const hasCurrentObjectiveOverlay = (response: FetchSuccess<unknown>) => {
-  const purgeTime = observedObjectivePurgeTime();
+const hasCurrentObjectiveOverlay = (store: object, response: FetchSuccess<unknown>) => {
+  const purgeTime = observedObjectivePurgeTime(store);
   return !purgeTime || Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime;
 };
-const assertCurrentObjectiveCounts = (response: FetchSuccess<unknown>) => {
-  if (!hasCurrentObjectiveOverlay(response)) {
+const assertCurrentObjectiveCounts = (store: object, response: FetchSuccess<unknown>) => {
+  if (!hasCurrentObjectiveOverlay(store, response)) {
     throw new Error('Objective catalog predates the latest cache purge');
   }
 };
-const shouldPersistMetadata = (cacheType: CacheType, response: FetchSuccess<unknown>) =>
+const shouldPersistMetadata = (
+  store: object,
+  cacheType: CacheType,
+  response: FetchSuccess<unknown>
+) =>
   typeof window !== 'undefined' &&
-  (cacheType !== 'tasks-objectives' || hasCurrentObjectiveOverlay(response));
+  (cacheType !== 'tasks-objectives' || hasCurrentObjectiveOverlay(store, response));
 const lastPurgeCheckTime = (sessionCheckAt: number) => {
   const storedCheckAt = Number(readPurgeStorage(CACHE_PURGE_CHECK_STORAGE_KEY));
   return Number.isFinite(storedCheckAt) ? Math.max(sessionCheckAt, storedCheckAt) : sessionCheckAt;
@@ -201,22 +214,24 @@ async function updateObservedPurge(
   state: Pick<MetadataState, 'tasksObjectivesHydrated' | 'objectiveModeCountDifferencesHydrated'>
 ) {
   const purgeTime = Date.parse(lastPurgeAt);
-  if (!Number.isFinite(purgeTime) || purgeTime <= observedObjectivePurgeTime()) return;
+  if (!Number.isFinite(purgeTime) || purgeTime <= storedObjectivePurgeTime()) return;
+  const promises = getPromiseStore(state);
+  if (purgeTime < promises.observedCachePurgeTime) return;
+  if (purgeTime > promises.observedCachePurgeTime) {
+    promises.observedCachePurgeTime = purgeTime;
+    state.tasksObjectivesHydrated = false;
+    state.objectiveModeCountDifferencesHydrated = false;
+    promises.modeObjectiveCounts.clear();
+  }
   try {
     await clearAllCache();
   } catch (error) {
     logger.error('[MetadataStore] Failed to clear local cache after server purge:', error);
     return;
   }
-  if (purgeTime <= observedObjectivePurgeTime()) return;
-  state.tasksObjectivesHydrated = false;
-  state.objectiveModeCountDifferencesHydrated = false;
-  getPromiseStore(state).modeObjectiveCounts.clear();
   logger.info('[MetadataStore] Cleared local cache after server purge.');
-  try {
-    localStorage.setItem(CACHE_PURGE_STORAGE_KEY, lastPurgeAt);
-  } catch (error) {
-    logger.warn('[MetadataStore] Failed to persist the cache purge marker:', error);
+  if (purgeTime >= observedObjectivePurgeTime(state)) {
+    writePurgeStorage(CACHE_PURGE_STORAGE_KEY, lastPurgeAt);
   }
 }
 // Exported type for craft sources used by components
@@ -821,7 +836,7 @@ export const useMetadataStore = defineStore('metadata', {
         ),
         getCachedData<TarkovTaskObjectivesQueryResult>(
           'tasks-objectives',
-          objectiveCatalogCacheKey(mode),
+          objectiveCatalogCacheKey(this, mode),
           language
         ),
         getCachedData<TarkovTaskRewardsQueryResult>(
@@ -1109,7 +1124,7 @@ export const useMetadataStore = defineStore('metadata', {
         }
         processData(response.data, response);
         // Step 4: Store in IndexedDB for future visits
-        if (shouldPersistMetadata(cacheType, response)) {
+        if (shouldPersistMetadata(this, cacheType, response)) {
           setCachedData(cacheType, cacheKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
             logger.error(`[MetadataStore] Error caching ${logName} data:`, err)
           );
@@ -1171,7 +1186,7 @@ export const useMetadataStore = defineStore('metadata', {
           { signal: controller.signal }
         );
         if (!isFetchSuccess(response)) return;
-        localStorage.setItem(CACHE_PURGE_CHECK_STORAGE_KEY, String(now));
+        writePurgeStorage(CACHE_PURGE_CHECK_STORAGE_KEY, String(now));
         const lastPurgeAt = response.data?.lastPurgeAt;
         if (lastPurgeAt) await updateObservedPurge(lastPurgeAt, this);
       } catch (error) {
@@ -1452,7 +1467,7 @@ export const useMetadataStore = defineStore('metadata', {
       }
       const requestLanguage = this.languageCode;
       const requestGameMode = this.getApiGameMode();
-      const cacheKey = objectiveCatalogCacheKey(requestGameMode);
+      const cacheKey = objectiveCatalogCacheKey(this, requestGameMode);
       const requestKey = `${requestLanguage}-${cacheKey}`;
       const isHydrated =
         this.tasksObjectivesHydrated && promises.taskObjectiveHydrationScope === requestKey;
@@ -1480,8 +1495,8 @@ export const useMetadataStore = defineStore('metadata', {
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'tasksObjectivesPending',
         processData: (data, response) => {
-          if (cacheKey !== objectiveCatalogCacheKey(requestGameMode)) return;
-          if (response && !hasCurrentObjectiveOverlay(response)) return;
+          if (cacheKey !== objectiveCatalogCacheKey(this, requestGameMode)) return;
+          if (response && !hasCurrentObjectiveOverlay(this, response)) return;
           promises.taskObjectiveHydrationScope = requestKey;
           this.mergeTaskObjectives(data.tasks, {
             rebuildDerivedData: false,
@@ -1539,7 +1554,7 @@ export const useMetadataStore = defineStore('metadata', {
         }
         const requestApiMode = this.getApiGameMode();
         const requestEpoch = promiseStore.taskCatalogEpoch;
-        const requestPurgeTime = observedObjectivePurgeTime();
+        const requestPurgeTime = observedObjectivePurgeTime(this);
         const otherApiMode =
           requestApiMode === API_GAME_MODES[GAME_MODES.PVE]
             ? API_GAME_MODES[GAME_MODES.PVP]
@@ -1549,7 +1564,7 @@ export const useMetadataStore = defineStore('metadata', {
         const isStale = () =>
           this.getApiGameMode() !== requestApiMode ||
           promiseStore.taskCatalogEpoch !== requestEpoch ||
-          observedObjectivePurgeTime() !== requestPurgeTime;
+          observedObjectivePurgeTime(this) !== requestPurgeTime;
         try {
           const otherCounts = await this.loadModeObjectiveCounts(
             otherApiMode,
@@ -1602,7 +1617,7 @@ export const useMetadataStore = defineStore('metadata', {
       signal?: AbortSignal
     ): Promise<Record<string, number>> {
       const memo = getPromiseStore(this).modeObjectiveCounts;
-      const cacheKey = objectiveCatalogCacheKey(`counts-${apiGameMode}`);
+      const cacheKey = objectiveCatalogCacheKey(this, `counts-${apiGameMode}`);
       const existing = memo.get(cacheKey);
       if (existing && !forceRefresh && requestSignals.get(existing) === signal && !signal?.aborted)
         return existing;
@@ -1636,7 +1651,7 @@ export const useMetadataStore = defineStore('metadata', {
           throw new Error('Invalid response: expected { data }');
         }
         throwIfAborted(signal);
-        assertCurrentObjectiveCounts(response);
+        assertCurrentObjectiveCounts(this, response);
         const modeTasks = (response.data.tasks || []).map((task) => ({
           id: task.id,
           objectives: this.normalizeObjectiveItems(
