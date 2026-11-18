@@ -181,6 +181,13 @@ describe('objective catalog cache admission', () => {
     const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
     await expect(handler({ context: {} } as H3Event)).rejects.toMatchObject({ statusCode: 503 });
     expect(puts).not.toHaveBeenCalled();
+    expect(setHeaders).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        'Cache-Control': 'no-store',
+        'Cloudflare-CDN-Cache-Control': 'no-store',
+      })
+    );
   });
   it('retains a good stale objective entry when background overlay refresh fails', async () => {
     matches.mockResolvedValue(

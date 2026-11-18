@@ -7,6 +7,8 @@ export interface PromiseStore {
   readonly mapSpawnsPromise: Promise<void> | null;
   readonly objectiveModeCountDifferencesPromise: Promise<'stale' | undefined> | null;
   readonly taskObjectivesPromise: Promise<void> | null;
+  readonly cachePurgePromise: Promise<void> | null;
+  readonly taskObjectiveHydrationScope: string | null;
   readonly taskRewardsPromise: Promise<void> | null;
   readonly prestigePromise: Promise<void> | null;
   readonly editionsPromise: Promise<void> | null;
@@ -15,7 +17,7 @@ export interface PromiseStore {
   readonly editionsSettledScope: string;
   /** Mode/language scopes whose cached catalog was already revalidated this session. */
   readonly editionsRevalidatedScopes: Set<string>;
-  /** Language-independent objective counts per API game mode, shared across callers. */
+  /** Language-independent objective counts per mode and purge generation, shared across callers. */
   readonly modeObjectiveCounts: Map<string, Promise<Record<string, number>>>;
   /** Bumped whenever the task catalog is replaced, so count diffs can detect a stale base. */
   readonly taskCatalogEpoch: number;
@@ -62,6 +64,8 @@ export function getPromiseStore(storeInstance: object): MutablePromiseStore {
       mapSpawnsPromise: null,
       objectiveModeCountDifferencesPromise: null,
       taskObjectivesPromise: null,
+      cachePurgePromise: null,
+      taskObjectiveHydrationScope: null,
       taskRewardsPromise: null,
       prestigePromise: null,
       editionsPromise: null,

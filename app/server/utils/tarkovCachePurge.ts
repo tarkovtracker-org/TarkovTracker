@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3';
+import { normalizeSupabaseUrl } from '~/server/utils/adminSupabase';
 import { createLogger } from '~/server/utils/logger';
 const logger = createLogger('TarkovCacheMeta');
 const PURGE_CHECK_TTL_MS = 60_000;
@@ -7,35 +8,20 @@ let nextPurgeCheckAt = 0;
 let purgeCheck: Promise<number> | undefined;
 function buildAuditQuery(event: H3Event) {
   const config = useRuntimeConfig(event);
-  const supabaseUrl = config.supabaseUrl;
-  const supabaseServiceKey = config.supabaseServiceKey;
-  if (
-    typeof supabaseUrl !== 'string' ||
-    !supabaseUrl.trim() ||
-    typeof supabaseServiceKey !== 'string' ||
-    !supabaseServiceKey.trim()
-  ) {
+  const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
+  const serviceKey =
+    typeof config.supabaseServiceKey === 'string' ? config.supabaseServiceKey.trim() : '';
+  if (!supabaseUrl || !serviceKey) {
     logger.warn('Supabase not configured - skipping cache meta lookup');
     return null;
   }
-  const supabaseUrlValue = supabaseUrl.trim();
-  const supabaseServiceKeyValue = supabaseServiceKey.trim();
-  let url: URL;
-  try {
-    url = new URL(`${supabaseUrlValue}/rest/v1/admin_audit_log`);
-  } catch (error) {
-    logger.error('Invalid Supabase URL for cache meta lookup.', {
-      supabaseUrl: supabaseUrlValue,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
+  const url = new URL(`${supabaseUrl}/rest/v1/admin_audit_log`);
   url.searchParams.set('select', 'created_at,details');
   url.searchParams.set('action', 'eq.cache_purge');
   url.searchParams.set('order', 'created_at.desc');
   url.searchParams.set('details', 'cs.{"success":true}');
   url.searchParams.set('limit', '1');
-  return { url, serviceKey: supabaseServiceKeyValue };
+  return { url, serviceKey };
 }
 export async function readTarkovCacheMeta(event: H3Event) {
   const query = buildAuditQuery(event);

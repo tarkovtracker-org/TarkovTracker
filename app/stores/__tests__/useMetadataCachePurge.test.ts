@@ -35,6 +35,27 @@ describe('useMetadataStore checkCachePurge', () => {
     expect(clearSpy).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(STORAGE_KEYS.cachePurgeAt)).toBe(lastPurgeAt);
   });
+  it('waits for an observed purge before reusing hydrated objectives', async () => {
+    const store = useMetadataStore();
+    store.tasksObjectivesHydrated = true;
+    vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
+    const catalogFetch = vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
+    const response = Promise.withResolvers<{ data: { lastPurgeAt: string } }>();
+    const fetchMock = vi.fn().mockReturnValueOnce(response.promise);
+    vi.stubGlobal('$fetch', fetchMock);
+    const check = store.checkCachePurge();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    const loadingObjectives = store.fetchTaskObjectivesData();
+    expect(catalogFetch).not.toHaveBeenCalled();
+    const lastPurgeAt = '2025-01-03T00:00:00Z';
+    response.resolve({ data: { lastPurgeAt } });
+    await Promise.all([check, loadingObjectives]);
+    expect(store.tasksObjectivesHydrated).toBe(false);
+    expect(catalogFetch).toHaveBeenCalledWith(
+      expect.objectContaining({ cacheKey: `json-v5-regular-${Date.parse(lastPurgeAt)}` })
+    );
+  });
   it('does not clear cache when server purge is older than local', async () => {
     const store = useMetadataStore();
     const clearSpy = vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();

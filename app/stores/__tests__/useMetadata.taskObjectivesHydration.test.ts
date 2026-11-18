@@ -24,8 +24,8 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     vi.clearAllMocks();
   });
   afterEach(() => {
-    localStorage.removeItem(STORAGE_KEYS.cachePurgeAt);
     vi.unstubAllGlobals();
+    localStorage.removeItem(STORAGE_KEYS.cachePurgeAt);
     vi.restoreAllMocks();
   });
   it('rebuilds derived task data when objectives load before items', async () => {
@@ -67,7 +67,12 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     const setCached = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
     const store = useMetadataStore();
     vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
-    const catalog = { data: { tasks: [] } };
+    store.tasks = [{ id: 'task-1', objectives: [{ id: 'obj-1', count: 1 }] }] as Task[];
+    const catalog = {
+      data: {
+        tasks: [{ id: 'task-1', failConditions: [], objectives: [{ id: 'obj-1', count: 3 }] }],
+      },
+    };
     const oldResponse = Promise.withResolvers<
       typeof catalog & { dataOverlay: { fetchedAt: string } }
     >();
@@ -86,7 +91,9 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     oldResponse.resolve({ ...catalog, dataOverlay: { fetchedAt: '2026-11-18T14:00:00Z' } });
     await pending;
     expect(setCached).not.toHaveBeenCalled();
+    expect(store.tasks[0]?.objectives?.[0]?.count).toBe(1);
     await store.fetchTaskObjectivesData(true);
+    expect(store.tasks[0]?.objectives?.[0]?.count).toBe(3);
     expect(setCached).toHaveBeenCalledWith(
       'tasks-objectives',
       `json-v5-regular-${Date.parse(purge)}`,
@@ -194,6 +201,46 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     await store.fetchObjectiveModeCountDifferences();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 1, pve: 3 } });
+  });
+  it('reloads memoized other-mode counts after the local purge generation changes', async () => {
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const store = useMetadataStore();
+    const catalog = { data: { tasks: [] }, dataOverlay: { fetchedAt: '2025-01-04T00:00:00Z' } };
+    const fetchMock = vi.fn().mockResolvedValue(catalog);
+    vi.stubGlobal('$fetch', fetchMock);
+    await store.loadModeObjectiveCounts('pve');
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, '2025-01-03T00:00:00Z');
+    await store.loadModeObjectiveCounts('pve');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('discards stale other-mode counts and retries in the same purge generation', async () => {
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, '2025-01-03T00:00:00Z');
+    const store = useMetadataStore();
+    const catalog = { data: { tasks: [] } };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ...catalog, dataOverlay: { fetchedAt: '2025-01-02T00:00:00Z' } })
+      .mockResolvedValueOnce({ ...catalog, dataOverlay: { fetchedAt: '2025-01-04T00:00:00Z' } });
+    vi.stubGlobal('$fetch', fetchMock);
+    await expect(store.loadModeObjectiveCounts('pve')).rejects.toThrow(
+      'Objective catalog predates the latest cache purge'
+    );
+    await expect(store.loadModeObjectiveCounts('pve')).resolves.toEqual({});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('can fetch objectives when local storage is blocked', async () => {
+    const store = useMetadataStore();
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new DOMException('Blocked', 'SecurityError');
+      },
+    });
+    const fetch = vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
+    await store.fetchTaskObjectivesData(true);
+    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({ cacheKey: 'json-v5-regular' }));
   });
   it('reads persisted other-mode counts without a request', async () => {
     const getCached = vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({ 'obj-1': 5 });

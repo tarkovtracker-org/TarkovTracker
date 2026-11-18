@@ -573,7 +573,7 @@ describe('Tarkov API handlers', () => {
     );
   });
   it('returns last successful cache purge timestamp from audit log', async () => {
-    runtimeConfig.supabaseUrl = 'https://test.supabase.co';
+    runtimeConfig.supabaseUrl = 'https://test.supabase.co/?ignored=1#fragment';
     runtimeConfig.supabaseServiceKey = 'service-key';
     mockFetch.mockResolvedValueOnce({
       json: async () => [
@@ -584,7 +584,10 @@ describe('Tarkov API handlers', () => {
     });
     const { default: handler } = await import('@/server/api/tarkov/cache-meta.get');
     const result = await handler(event);
-    const auditQuery = new URL(String(mockFetch.mock.calls[0]?.[0])).searchParams;
+    const auditUrl = new URL(String(mockFetch.mock.calls[0]?.[0]));
+    expect(auditUrl.pathname).toBe('/rest/v1/admin_audit_log');
+    expect(auditUrl.hash).toBe('');
+    const auditQuery = auditUrl.searchParams;
     expect(auditQuery.get('details')).toBe('cs.{"success":true}');
     expect(auditQuery.get('limit')).toBe('1');
     expect(mockSetResponseHeaders).toHaveBeenCalledWith(event, CACHE_META_HEADERS);

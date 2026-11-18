@@ -82,6 +82,17 @@ function isTruthyFlag(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   return ['1', 'true', 'yes', 'y', 'on'].includes(value.toLowerCase());
 }
+const NO_STORE_RESPONSE_HEADERS = {
+  'Cache-Control': 'no-store',
+  'Cloudflare-CDN-Cache-Control': 'no-store',
+};
+function setCacheErrorHeaders(
+  event: H3Event,
+  setHeaders: typeof setResponseHeaders,
+  options: CacheOptions
+) {
+  if (options.noStoreResponse) setHeaders(event, NO_STORE_RESPONSE_HEADERS);
+}
 function setCacheResponseHeaders(
   event: H3Event,
   setHeaders: typeof setResponseHeaders,
@@ -98,8 +109,8 @@ function setCacheResponseHeaders(
   const headers = {
     'X-Cache-Status': status,
     'X-Cache-Key': fullCacheKey,
-    'Cache-Control': noStoreResponse ? 'no-store' : cacheControl,
-    ...(noStoreResponse ? { 'Cloudflare-CDN-Cache-Control': 'no-store' } : {}),
+    'Cache-Control': cacheControl,
+    ...(noStoreResponse ? NO_STORE_RESPONSE_HEADERS : {}),
     ...buildOverlayResponseHeaders(overlayMeta),
   };
   setHeaders(event, headers);
@@ -381,6 +392,7 @@ export async function edgeCache<T>(
     logger.error(`Error in edgeCache for ${fullCacheKey}:`, error);
     const statusCode = (error as { statusCode?: unknown } | null)?.statusCode === 503 ? 503 : 502;
     const sanitizedErrorMessage = sanitizeErrorMessage(errorMessage);
+    setCacheErrorHeaders(event, setHeaders, options);
     throw createErrorFn({
       statusCode,
       statusMessage: sanitizedErrorMessage

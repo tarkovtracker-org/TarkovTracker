@@ -147,9 +147,9 @@ Objective cache version `json-v5` starts a new HTTP URL and local metadata-store
 The per-colo Worker cache also keys final catalogs by language, game mode, and the latest
 successful Tarkov purge timestamp. Each isolate checks the audit log at most once a minute.
 HTTP responses use `no-store` so the CDN and browser HTTP caches cannot bypass the Worker check.
-The client keys its local objective entries by the observed purge timestamp and only persists a
-catalog with an overlay fetched at or after that timestamp. A late response cannot refill the
-active IndexedDB generation with the old catalog.
+Objective hydration waits for any in-flight browser purge check before using local data. The
+client keys its local objective entries and in-memory count memo by the observed purge timestamp.
+It only applies or persists a network catalog whose overlay was fetched at or after that timestamp.
 After a scoped Tarkov data purge, the next generation requires an overlay fetched since that purge
 and returns 503 if it cannot refresh. Older generations expire on their existing retention
 schedule. A background refresh failure still retains a good stale entry in the current generation.
