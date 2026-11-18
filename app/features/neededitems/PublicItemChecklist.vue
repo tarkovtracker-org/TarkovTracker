@@ -29,8 +29,8 @@
   type ChecklistGroup = NonNullable<typeof checklist.value>['tasks'][number];
   const groupHeading = (group: ChecklistGroup) => {
     if (group.level != null) return `${group.source} · ${t('common.level')} ${group.level}`;
-    if (group.prestige) return `${group.source} · ${t('common.prestige')} ${group.prestige}`;
-    return [group.source, group.faction].filter(Boolean).join(' · ');
+    const quest = [group.source, group.faction].filter(Boolean).join(' · ');
+    return group.prestige ? `${quest} · ${t('common.prestige')} ${group.prestige}` : quest;
   };
   const rowLabel = (row: ChecklistGroup['rows'][number]) =>
     [
