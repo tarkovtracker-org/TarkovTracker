@@ -119,6 +119,12 @@ sequenceDiagram
   `requirementDiagnostics` entry ([canonical task progression](./tasks.md#canonical-task-progression)).
 - On fetch failure, serves the last good overlay (stale) rather than failing the request.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
+- Objective equipment references retain their source shape: `usingWeapon` lists and the
+  `usingWeaponMods`, `wearing` and `notWearing` groups are adapted without collapsing
+  group boundaries. Legacy scalar and flat overlay references still work. Explicit empty lists
+  remain empty; malformed leaves (including unsupported deeper arrays) remain `{ id: '' }`,
+  and unknown nonempty IDs are retained.
+  Client item hydration preserves those shapes; task/map item presentation alone flattens them.
 - Per-locale corrections under `locales[locale]` patch `tasks`, `items`, `traders` and `maps`
   (locale-sensitive fields such as name, wikiLink, and objective descriptions) and are applied last
   so they take precedence over global and mode-specific corrections. The locale defaults to `en`
@@ -143,7 +149,7 @@ sequenceDiagram
   a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
 
 The objective endpoint requires nonempty overlay version/SHA before caching a generated response.
-Objective cache version `json-v5` starts a new HTTP URL and local metadata-store cache namespace.
+Objective cache version `json-v6` starts a new HTTP URL and local metadata-store cache namespace.
 The per-colo Worker cache also keys final catalogs by language, game mode, and the latest
 successful Tarkov purge timestamp. Each isolate checks the audit log at most once a minute.
 HTTP responses use `no-store` so the CDN and browser HTTP caches cannot bypass the Worker check.

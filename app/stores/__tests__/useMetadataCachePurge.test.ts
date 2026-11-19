@@ -53,7 +53,7 @@ describe('useMetadataStore checkCachePurge', () => {
     await Promise.all([check, loadingObjectives]);
     expect(store.tasksObjectivesHydrated).toBe(false);
     expect(catalogFetch).toHaveBeenCalledWith(
-      expect.objectContaining({ cacheKey: `json-v5-regular-${Date.parse(lastPurgeAt)}` })
+      expect.objectContaining({ cacheKey: `json-v6-regular-${Date.parse(lastPurgeAt)}` })
     );
   });
   it('invalidates hydrated objectives even if writing the purge marker fails', async () => {
@@ -80,7 +80,7 @@ describe('useMetadataStore checkCachePurge', () => {
     expect(storage.getItem(STORAGE_KEYS.cachePurgeAt)).toBeNull();
     await store.fetchTaskObjectivesData();
     expect(catalogFetch).toHaveBeenCalledWith(
-      expect.objectContaining({ cacheKey: `json-v5-regular-${Date.parse(lastPurgeAt)}` })
+      expect.objectContaining({ cacheKey: `json-v6-regular-${Date.parse(lastPurgeAt)}` })
     );
   });
   it('does not clear cache when server purge is older than local', async () => {

@@ -175,7 +175,7 @@ describe('objective catalog cache admission', () => {
       );
       expect(JSON.stringify(payload)).not.toContain(token);
       expect(JSON.stringify(payload)).not.toContain('raw-overlay-only');
-      expect(puts.mock.calls[0]?.[0].url).toContain(`tasks-objectives-json-v5-en-${mode}-0`);
+      expect(puts.mock.calls[0]?.[0].url).toContain(`tasks-objectives-json-v6-en-${mode}-0`);
     }
   );
   it('does not cache an upstream-only payload after a private overlay fetch fails', async () => {

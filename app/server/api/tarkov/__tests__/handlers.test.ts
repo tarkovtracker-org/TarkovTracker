@@ -522,7 +522,7 @@ describe('Tarkov API handlers', () => {
     });
     expect(mockEdgeCache).toHaveBeenCalledWith(
       event,
-      'tasks-objectives-json-v5-en-regular-0',
+      'tasks-objectives-json-v6-en-regular-0',
       expect.any(Function),
       111,
       { cacheKeyPrefix: 'tarkov', response: true, noStoreResponse: true }
@@ -549,7 +549,7 @@ describe('Tarkov API handlers', () => {
     });
     const { default: handler } = await import('@/server/api/tarkov/tasks-objectives.get');
     await handler(event);
-    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe(`tasks-objectives-json-v5-${lang}-${mode}-0`);
+    expect(mockEdgeCache.mock.calls[0]?.[1]).toBe(`tasks-objectives-json-v6-${lang}-${mode}-0`);
   });
   it('sanitizes and overlays tasks-rewards before caching', async () => {
     const { default: handler } = await import('@/server/api/tarkov/tasks-rewards.get');

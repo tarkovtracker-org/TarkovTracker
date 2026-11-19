@@ -1,3 +1,4 @@
+import { objectiveEquipmentItems } from '@/utils/objectiveEquipment';
 import type { TarkovItem, TaskObjective } from '@/types/tarkov';
 export const MAX_RENDERED_OBJECTIVE_ITEMS = 24;
 export const getObjectiveEquipmentItems = (
@@ -24,9 +25,9 @@ export const getObjectiveEquipmentItems = (
     if (objective.useAny?.length) {
       items.push(...objective.useAny.slice(0, MAX_RENDERED_OBJECTIVE_ITEMS));
     }
-    if (objective.usingWeapon?.id) items.push(objective.usingWeapon);
-    if (objective.usingWeaponMods?.length) items.push(...objective.usingWeaponMods);
-    if (objective.wearing?.length) items.push(...objective.wearing);
+    items.push(...objectiveEquipmentItems(objective.usingWeapon));
+    items.push(...objectiveEquipmentItems(objective.usingWeaponMods));
+    items.push(...objectiveEquipmentItems(objective.wearing));
   }
   const seenItemIds = new Set<TarkovItem['id']>();
   const uniqueItems: TarkovItem[] = [];

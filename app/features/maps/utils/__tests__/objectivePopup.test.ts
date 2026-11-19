@@ -8,6 +8,22 @@ import type { TaskObjective } from '@/types/tarkov';
 const marker = { id: 'ms2000', name: 'MS2000 Marker' };
 const folder = { id: 'folder', name: 'Intelligence folder' };
 describe('objective popup details', () => {
+  it('shows weapon alternatives without calling conjunctive wearing leaves alternatives', () => {
+    const weapon = { id: 'weapon' };
+    const other = { id: 'other' };
+    expect(getObjectivePopupItem({ id: 'o', usingWeapon: [weapon, other] })).toEqual({
+      item: weapon,
+      alternatives: 1,
+    });
+    expect(getObjectivePopupItem({ id: 'o', wearing: [[weapon, other], [marker]] })).toEqual({
+      item: weapon,
+      alternatives: 0,
+    });
+    expect(getObjectivePopupItem({ id: 'o', wearing: [weapon, other] })).toEqual({
+      item: weapon,
+      alternatives: 1,
+    });
+  });
   it('shows the marker for marks and the quest item for pickups and stashes', () => {
     const mark = { id: 'o', type: 'mark', markerItem: marker } as TaskObjective;
     expect(getObjectivePopupItem(mark)).toEqual({ item: marker, alternatives: 0 });

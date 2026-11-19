@@ -2437,7 +2437,8 @@ export const useMetadataStore = defineStore('metadata', {
       const itemsById = this.itemsById.size
         ? this.itemsById
         : new Map(this.items.map((item) => [item.id, item]));
-      const { pickItemLite, pickItemArray, pickItemMatrix } = createItemPicker(itemsById);
+      const { pickItemLite, pickItemArray, pickItemMatrix, pickEquipment } =
+        createItemPicker(itemsById);
       const hydrateObjective = (objective: TaskObjective): TaskObjective => {
         const obj = objective as ObjectiveWithItems;
         return {
@@ -2449,10 +2450,10 @@ export const useMetadataStore = defineStore('metadata', {
           requiredKeys: pickItemMatrix(obj.requiredKeys),
           containsAll: pickItemArray(obj.containsAll),
           useAny: pickItemArray(obj.useAny),
-          usingWeapon: pickItemLite(obj.usingWeapon),
-          usingWeaponMods: pickItemArray(obj.usingWeaponMods),
-          wearing: pickItemArray(obj.wearing),
-          notWearing: pickItemArray(obj.notWearing),
+          usingWeapon: pickEquipment(obj.usingWeapon),
+          usingWeaponMods: pickEquipment(obj.usingWeaponMods),
+          wearing: pickEquipment(obj.wearing),
+          notWearing: pickEquipment(obj.notWearing),
         } as TaskObjective;
       };
       const hydrateRewards = (rewards?: FinishRewards): FinishRewards | undefined => {
