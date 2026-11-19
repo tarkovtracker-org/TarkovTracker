@@ -1,5 +1,12 @@
 {
   "stash_import": {
+    "sell_incomplete": "Cannot give a safe sell list: {count} unfinished quests have unmapped item requirements.",
+    "sell_incomplete_tasks": "Examples of incomplete quest data: {tasks}.",
+    "sell_heading": "What can I sell?",
+    "sell_summary": "Can sell: 1 item type with no remaining tracked quest or hideout use. | Can sell: {count} item types with no remaining tracked quest or hideout use.",
+    "sell_empty": "No confirmed sell candidates in this screenshot. Check uncertain matches and amounts; needed items stay protected.",
+    "sell_unavailable": "Sell advice is unavailable while quest or hideout data is missing or changing. Reopen the importer after changing game mode.",
+    "sell_scope": "{mode} only, from this screenshot and the loaded quest/hideout catalog, including later requirements. Check the matches before selling. This does not assess gear usefulness, market eligibility or unseen stash items. No surplus is inferred; viewing changes no progress.",
     "title": "Import items from a screenshot",
     "description": "Scan a stash or container screenshot on your device, check the items, then update your Needed Items counts.",
     "destination": "Updates your {mode} progress",
