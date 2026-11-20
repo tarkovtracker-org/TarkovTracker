@@ -63,6 +63,7 @@
   import {
     ACTIVE_SEASON,
     GAME_MODES,
+    PMC_FACTIONS,
     getActiveSeasonTimeRemaining,
     type PMCFaction,
   } from '@/utils/constants';
@@ -73,7 +74,7 @@
   const seasonCountdownNow = ref(Date.now());
   const choiceButtonClass =
     'border-default bg-default text-muted enabled:hover:bg-elevated aria-pressed:border-primary/70 aria-pressed:bg-primary/10 aria-pressed:text-highlighted focus-visible:outline-primary min-w-0 cursor-pointer rounded-md border text-center text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
-  const factions = ['BEAR', 'USEC'] as const satisfies readonly PMCFaction[];
+  const factions = [...PMC_FACTIONS].reverse();
   const currentFaction = computed<PMCFaction>(() => tarkovStore.getPMCFaction());
   function setFaction(faction: PMCFaction) {
     if (faction !== currentFaction.value) {
