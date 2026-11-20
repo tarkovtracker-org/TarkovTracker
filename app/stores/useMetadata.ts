@@ -1817,6 +1817,7 @@ export const useMetadataStore = defineStore('metadata', {
             query: {
               gameMode: apiGameMode,
               version: TASK_OBJECTIVES_CACHE_VERSION,
+              view: 'counts',
             },
           },
           observedObjectivePurgeTime(this)
@@ -1833,9 +1834,7 @@ export const useMetadataStore = defineStore('metadata', {
         assertCurrentObjectiveCounts(this, response);
         const modeTasks = (response.data.tasks || []).map((task) => ({
           id: task.id,
-          objectives: this.normalizeObjectiveItems(
-            normalizeTaskObjectives<TaskObjective>(task.objectives)
-          ),
+          objectives: normalizeTaskObjectives<TaskObjective>(task.objectives),
         }));
         const deduped = this.dedupeObjectiveIds(modeTasks as Task[]).tasks;
         const counts = Object.fromEntries(this.buildObjectiveCountMap(deduped));
