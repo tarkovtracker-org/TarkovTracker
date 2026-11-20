@@ -1,7 +1,7 @@
 # TarkovTracker Systems Spec
 
 <!-- AGENT QUICK REFERENCE
-Endpoint table with cache TTLs: game-data.md (Tarkov.dev data integration).
+Endpoint scopes and snapshot cache policy: game-data.md (Tarkov.dev data integration).
 Each section ends with code-binding INVARIANTS — check these when modifying a system.
 Game-mode + Seasonal progress storage: progress-storage.md.
 Implementing files are listed within each section body.

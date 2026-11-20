@@ -1,3 +1,3 @@
-// Bump every objective cache layer together when retiring incomplete corrected catalogs.
-export const TASK_OBJECTIVES_CACHE_VERSION = 'json-v6';
+// Browser namespace for objective snapshots. Server snapshots are versioned by the release manifest.
+export const TASK_OBJECTIVES_CACHE_VERSION = 'neutral-v2';
 export const TASK_OBJECTIVES_PURGE_CHECK_TTL_MS = 60_000;
