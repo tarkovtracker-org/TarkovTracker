@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import { createTestHarness } from 'wrangler';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const tarkovRoutes = readdirSync(new URL('../../app/server/api/tarkov/', import.meta.url), {
@@ -315,6 +316,20 @@ test('compiled language bundle retains mode-specific objective values and stable
   ).json();
   assert.equal(fallback.data.strings['@tt:pve:tasks:head-objective'], 'pve objective in English');
 });
+async function waitForLastGoodCatalog(url) {
+  const deadline = performance.now() + 3000;
+  const headers = { 'X-Test-Catalog-Fault': 'unavailable' };
+  let response = await harness.fetch(url, { headers });
+  // Only the earlier successful request can populate this cache while KV is unavailable.
+  while (response.status === 503 && performance.now() < deadline) {
+    await response.body?.cancel();
+    await delay(25);
+    response = await harness.fetch(url, { headers });
+  }
+  assert.equal(response.status, 200, 'Expected the background catalog cache write to finish');
+  assert.equal(response.headers.get('X-Cache-Status'), 'STALE');
+  return response;
+}
 test('compiled cold catalog HEAD prepares last-good bytes for a later outage GET', async () => {
   const url = 'https://tarkovtracker.org/api/tarkov/items?gameMode=pve';
   const head = await harness.fetch(url, {
@@ -323,9 +338,7 @@ test('compiled cold catalog HEAD prepares last-good bytes for a later outage GET
   });
   assert.equal(head.status, 200);
   assert.equal(await head.text(), '');
-  const stale = await harness.fetch(url, { headers: { 'X-Test-Catalog-Fault': 'unavailable' } });
-  assert.equal(stale.status, 200);
-  assert.equal(stale.headers.get('X-Cache-Status'), 'STALE');
+  const stale = await waitForLastGoodCatalog(url);
   assert.equal((await stale.json()).data.items.length, 1200);
 });
 test('compiled warm catalog GET and HEAD retain last-good bytes during a KV outage', async () => {
@@ -333,6 +346,7 @@ test('compiled warm catalog GET and HEAD retain last-good bytes during a KV outa
   const fresh = await harness.fetch(url, { headers: { 'X-Test-Clear-Catalog-Cache': '1' } });
   assert.equal(fresh.headers.get('X-Cache-Status'), 'PRECOMPUTE');
   const body = await fresh.text();
+  assert.equal(await (await waitForLastGoodCatalog(url)).text(), body);
   for (const method of ['GET', 'HEAD']) {
     const stale = await harness.fetch(url, {
       method,
