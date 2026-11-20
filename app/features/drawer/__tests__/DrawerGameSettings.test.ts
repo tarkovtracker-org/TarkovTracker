@@ -4,6 +4,7 @@ import { ref } from 'vue';
 import DrawerGameSettings from '@/features/drawer/DrawerGameSettings.vue';
 import { ACTIVE_SEASON, GAME_MODES, type GameMode } from '@/utils/constants';
 const switchGameModeMock = vi.fn(async () => undefined);
+const setPMCFactionMock = vi.fn();
 const metadataLoading = ref(false);
 const currentGameMode = ref<GameMode>(GAME_MODES.PVP);
 const fetchAllDataMock = vi.fn(async () => undefined);
@@ -22,7 +23,7 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getCurrentGameMode: () => currentGameMode.value,
     getPMCFaction: () => 'USEC',
-    setPMCFaction: vi.fn(),
+    setPMCFaction: setPMCFactionMock,
     switchGameMode: switchGameModeMock,
   }),
 }));
@@ -56,7 +57,7 @@ describe('DrawerGameSettings', () => {
     const wrapper = mount(DrawerGameSettings);
     const group = wrapper.get('[role="group"][aria-label="Select game mode"]');
     const buttons = group.findAll('button');
-    expect(buttons.map((button) => button.text())).toEqual(['PvP', 'PvE', 'Seasonal PvP']);
+    expect(buttons.map((button) => button.text())).toEqual(['PvP', 'PvE', 'Seasonal']);
     expect(buttons.map((button) => button.get('img').attributes('src'))).toEqual([
       '/img/game-modes/pvp.png',
       '/img/game-modes/pve.png',
@@ -69,6 +70,22 @@ describe('DrawerGameSettings', () => {
     currentGameMode.value = GAME_MODES.PVE;
     await wrapper.vm.$nextTick();
     expect(group.get('[aria-pressed="true"]').text()).toBe('PvE');
+    wrapper.unmount();
+  });
+  it('renders BEAR before USEC with their matching emblems', async () => {
+    const wrapper = mount(DrawerGameSettings);
+    const group = wrapper.get('[role="group"][aria-label="game_settings.select_faction_label"]');
+    const buttons = group.findAll('button');
+    expect(buttons.map((button) => button.text())).toEqual(['BEAR', 'USEC']);
+    expect(buttons[0]!.get('[aria-hidden="true"]').attributes('style')).toContain(
+      '/img/factions/BEAR.webp'
+    );
+    expect(buttons[1]!.get('[aria-hidden="true"]').attributes('style')).toContain(
+      '/img/factions/USEC.webp'
+    );
+    expect(buttons[1]!.attributes('aria-pressed')).toBe('true');
+    await buttons[0]!.trigger('click');
+    expect(setPMCFactionMock).toHaveBeenCalledWith('BEAR');
     wrapper.unmount();
   });
   it('marks PvP selected for an unrecognized saved mode', () => {
