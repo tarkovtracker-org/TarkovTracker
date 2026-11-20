@@ -163,30 +163,37 @@ describe('metrics CLI measured snapshots', () => {
     expect(result.stderr).toContain(path);
     expect(result.stdout).toBe('');
   });
-  it('reports Fallow exit status and its structured diagnostic for a failed base snapshot', () => {
-    const baseCommit = git('rev-parse', 'HEAD');
-    write('app/a.ts', 'two\n');
-    git('add', 'app/a.ts');
-    git('commit', '--quiet', '-m', 'head');
-    write(
-      'node_modules/fallow/bin/fallow/index.cjs',
-      `
+  it.each([
+    ['base', 'one'],
+    ['head', 'two'],
+  ])(
+    'reports Fallow exit status and its structured diagnostic for a failed %s snapshot',
+    (revision, source) => {
+      const baseCommit = git('rev-parse', 'HEAD');
+      write('app/a.ts', 'two\n');
+      git('add', 'app/a.ts');
+      git('commit', '--quiet', '-m', 'head');
+      write(
+        'node_modules/fallow/bin/fallow/index.cjs',
+        `
       const fs = require('node:fs');
-      if (fs.readFileSync('app/a.ts', 'utf8').trim() === 'one') {
+      if (fs.readFileSync('app/a.ts', 'utf8').trim() === ${JSON.stringify(source)}) {
         process.stdout.write(JSON.stringify({ error: true, message: 'invalid coverage input', exit_code: 2 }));
         process.exitCode = 2;
       } else {
         process.stdout.write(JSON.stringify({ summary: { coverage_model: 'static_estimated' } }));
       }
       `
-    );
-    const result = run('--base', baseCommit);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain(`base ${baseCommit}`);
-    expect(result.stderr).toContain('exit 2');
-    expect(result.stderr).toContain('invalid coverage input');
-    expect(result.stdout).toBe('');
-  });
+      );
+      const result = run('--base', baseCommit);
+      expect(result.status).toBe(1);
+      const commit = revision === 'base' ? baseCommit : git('rev-parse', 'HEAD');
+      expect(result.stderr).toContain(`${revision} ${commit}`);
+      expect(result.stderr).toContain('exit 2');
+      expect(result.stderr).toContain('invalid coverage input');
+      expect(result.stdout).toBe('');
+    }
+  );
   it('rejects coverage paths outside the source checkout', () => {
     const path = join(root, '..', 'other', 'app/a.ts');
     write('head.json', JSON.stringify({ [path]: { path } }));
