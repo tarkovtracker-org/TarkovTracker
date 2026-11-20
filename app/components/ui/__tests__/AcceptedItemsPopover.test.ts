@@ -51,6 +51,31 @@ describe('AcceptedItemsPopover', () => {
     expect(links.map((l) => l.text())).toEqual(['Item A', 'Item B', 'Item C']);
     expect(links[0]?.attributes('href')).toBe('https://escapefromtarkov.fandom.com/wiki/a');
   });
+  it('uses available preset images while keeping the accepted weapon identity', () => {
+    const weapon = makeItem('weapon', 'Weapon');
+    const wrapper = mountPopover({
+      items: [
+        { ...weapon, properties: { defaultPreset: { id: 'preset', iconLink: 'preset-icon' } } },
+        {
+          ...makeItem('weapon-two', 'Weapon Two'),
+          properties: { defaultPreset: { id: 'preset-two', image512pxLink: 'preset-preview' } },
+        },
+        {
+          ...makeItem('weapon-three', 'Weapon Three'),
+          properties: { defaultPreset: { id: 'preset-three' } },
+        },
+        makeItem('gear', 'Gear'),
+      ],
+    });
+    expect(wrapper.findAll('img').map((img) => img.attributes('src'))).toEqual([
+      'preset-icon',
+      'preset-preview',
+      'https://img/weapon-three.png',
+      'https://img/gear.png',
+    ]);
+    expect(wrapper.get('a').attributes('href')).toBe(weapon.wikiLink);
+    expect(wrapper.get('img').attributes('alt')).toBe(weapon.name);
+  });
   it('never renders an untrusted upstream link as an href', () => {
     const evil = {
       ...makeItem('evil', 'Evil'),
