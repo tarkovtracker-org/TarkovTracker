@@ -129,7 +129,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({
       const template = resolveEn(key);
       if (typeof template !== 'string') return key;
       const params = (args[0] ?? {}) as Record<string, unknown>;
-      return template.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? name));
+      const [singular, plural = singular] = template.split(' | ');
+      const message = (params.count === 1 ? singular : plural) ?? template;
+      return message.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? name));
     },
   }),
 }));
@@ -239,12 +241,15 @@ describe('TaskCard appearance and expansion controls', () => {
     metadataStoreMock.tasksObjectivesPending = false;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
   });
-  it('reveals named, directional alternatives from a compact chip on a collapsed card', async () => {
+  it('shows counted groups of name-only quest links from a compact chip on a collapsed card', async () => {
     preferencesState.collapseDefault = true;
-    metadataStoreMock.alternativeTasks = { 'task-1': ['mutual', 'outgoing', 'missing'] };
-    metadataStoreMock.alternativeTaskSources = { 'task-1': ['mutual', 'incoming'] };
+    metadataStoreMock.alternativeTasks = {
+      'task-1': ['mutual', 'same-name', 'outgoing', 'missing'],
+    };
+    metadataStoreMock.alternativeTaskSources = { 'task-1': ['mutual', 'same-name', 'incoming'] };
     metadataStoreMock.tasks = [
       { id: 'mutual', name: 'Mutual choice' },
+      { id: 'same-name', name: 'Mutual choice', trader: { name: 'Skier' } },
       { id: 'outgoing', name: 'Quest this one fails' },
       { id: 'incoming', name: 'Quest that fails this one' },
     ] as Task[];
@@ -253,10 +258,8 @@ describe('TaskCard appearance and expansion controls', () => {
     );
     const wrapper = await mountTaskCard();
     expect(wrapper.find('#task-content-task-1').exists()).toBe(false);
-    const chip = wrapper.get(
-      '[data-testid="task-card-badges"] button[aria-label="Quest alternatives (3)"]'
-    );
-    expect(chip.text()).toBe('3 alt');
+    const chip = wrapper.get('[data-testid="task-card-badges"] button[aria-label="Quest links"]');
+    expect(chip.text()).toBe('Quest links');
     const overlays = new DOMWrapper(document.body);
     expect(overlays.find('[data-testid="task-alternatives"]').exists()).toBe(false);
     expect(chip.attributes('aria-expanded')).toBe('false');
@@ -264,19 +267,26 @@ describe('TaskCard appearance and expansion controls', () => {
     await flushPromises();
     expect(chip.attributes('aria-expanded')).toBe('true');
     const alternatives = overlays.get('[data-testid="task-alternatives"]');
-    expect(alternatives.text()).toContain('Quest alternatives');
-    expect(alternatives.findAll('li p').map((label) => label.text())).toEqual([
-      'Mutually exclusive with this quest',
-      'Quests that fail when you complete this one',
-      'Quests that fail this one when completed',
+    expect(alternatives.get('h3').text()).toBe('Quest links');
+    expect(alternatives.text()).toContain('4 linked quests');
+    expect(alternatives.text()).toContain('Completing either quest fails the other.');
+    expect(alternatives.findAll('h4').map((label) => label.text())).toEqual([
+      'Mutually exclusive',
+      'Completing this quest fails',
+      'Completing any of these fails this quest',
+    ]);
+    expect(alternatives.findAll('ul').map((group) => group.findAll('li').length)).toEqual([
+      2, 1, 1,
     ]);
     expect(alternatives.findAll('a').map((link) => [link.text(), link.attributes('href')])).toEqual(
       [
         ['Mutual choice', '/tasks?task=mutual'],
+        ['Mutual choice', '/tasks?task=same-name'],
         ['Quest this one fails', '/tasks?task=outgoing'],
         ['Quest that fails this one', '/tasks?task=incoming'],
       ]
     );
+    expect(alternatives.text()).not.toMatch(/Skier|same-name/);
     const { alternativeTasks, alternativeTaskSources } = metadataStoreMock;
     metadataStoreMock.alternativeTasks = {};
     metadataStoreMock.alternativeTaskSources = {};

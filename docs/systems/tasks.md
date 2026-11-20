@@ -72,12 +72,13 @@ keeping upstream order within each group, so it has no sort setting. Maxed cards
 own collapse toggle. The drawer holds only the availability requirements. The legacy
 `hideout_sort_ready_first` and `hideout_collapse_completed` columns are no longer read or written.
 
-## Quest alternatives
+## Quest links
 
-The alternatives chip is available on collapsed quest cards. Hover over it, or activate it with a
+The Quest links chip is available on collapsed quest cards. Hover over it, or activate it with a
 click, tap, or keyboard, to see links to named quests. The links use the selected mode's quest
 catalog and the completion-failure relationships derived from Tarkov.dev failure conditions.
-The card distinguishes mutual choices from cases where only one quest's completion fails the other.
+The popover shows the total and one quest per row. It groups mutual choices separately from quests
+that fail when this one is completed and quests whose completion fails this one.
 
 ## Hidden tasks
 
