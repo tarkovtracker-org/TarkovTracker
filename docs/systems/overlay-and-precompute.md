@@ -146,6 +146,11 @@ catalog generation uses `neutralOverlay.ts` and publishes immutable results.
   the write leaves the new pointer potentially active. Verify its release identity
   and served objects before retrying or promoting a reader.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
+- Objective adaptation preserves weapon lists and grouped weapon modifications and clothing.
+  Legacy scalar and flat references retain their shape. Explicit empty lists remain empty,
+  malformed leaves remain `{ id: '' }`, and unknown nonempty IDs are retained.
+  Hydration preserves the groups. Task and map item previews flatten equipment for display.
+  A complete precompute run from the updated producer publishes the corrected references.
 - In the legacy artifact, `locales[locale]` patches fields after shared and mode
   corrections. The neutral sidecar compiles those corrections into key overrides
   and field-target bindings with the same precedence.
@@ -221,8 +226,9 @@ unlocks and completion state; layout parents never imply completion, prerequisit
 relationships. Older overlays without this field keep the standalone layout.
 
 Prestige fetches the requested upstream mode, preserving mode-specific gates and
-metadata. Neutral catalogs are stored per mode under `neutral-v1`; string tables
-are stored per API language under `strings-v1`. IndexedDB schema 9 clears the older
+metadata. Most neutral catalogs use `neutral-v1` mode scopes. Objectives use `neutral-v2`
+to retire browser snapshots with incomplete equipment. String tables use `strings-v1`
+language scopes. IndexedDB schema 9 clears the older
 localized payload layout. Superseded scope responses cannot replace the active
 mode's data. Story references name own chapter entries, and seasonal perk exclusion
 lists contain only string IDs.

@@ -21,6 +21,28 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => tarkovStoreMock,
 }));
 describe('useMetadataStore fetchTaskObjectivesData', () => {
+  it('hydrates grouped equipment and legacy scalars on objectives and fail conditions', () => {
+    setActivePinia(createPinia());
+    const store = useMetadataStore();
+    store.items = [{ id: 'known', name: 'Known item', iconLink: 'https://example.com/item.png' }];
+    const objective = {
+      id: 'obj',
+      usingWeapon: [{ id: 'known' }, { id: 'unknown' }],
+      usingWeaponMods: [[{ id: 'known' }, { id: '' }], []],
+      wearing: { id: 'known' },
+      notWearing: [[{ id: 'unknown' }]],
+    };
+    store.tasks = [{ id: 'task', objectives: [objective], failConditions: [objective] }] as Task[];
+    store.hydrateTaskItems({ rebuildDerivedData: false });
+    const expected = {
+      ...objective,
+      usingWeapon: [store.items[0], { id: 'unknown' }],
+      usingWeaponMods: [[store.items[0], { id: '' }], []],
+      wearing: store.items[0],
+    };
+    expect(store.tasks[0]?.objectives?.[0]).toMatchObject(expected);
+    expect(store.tasks[0]?.failConditions?.[0]).toMatchObject(expected);
+  });
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
@@ -135,7 +157,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     expect(store.tasks[0]?.objectives?.[0]?.count).toBe(3);
     expect(setCached).toHaveBeenCalledWith(
       'tasks-objectives',
-      `neutral-v1-regular-${Date.parse(purge)}`,
+      `neutral-v2-regular-${Date.parse(purge)}`,
       'en',
       catalog.data,
       expect.any(Number),
@@ -272,7 +294,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 1, pve: 3 } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/tarkov/tasks-objectives', {
-      query: { gameMode: 'pve', version: 'neutral-v1' },
+      query: { gameMode: 'pve', version: 'neutral-v2' },
       onResponse: expect.any(Function),
     });
     // A language switch reloads the catalog; the counts come from the session memo.
@@ -320,7 +342,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     });
     const fetch = vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
     await store.fetchTaskObjectivesData(true);
-    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({ cacheKey: 'neutral-v1-regular' }));
+    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({ cacheKey: 'neutral-v2-regular' }));
   });
   it('reads persisted other-mode counts without a request', async () => {
     const getCached = vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({ 'obj-1': 5 });
@@ -331,7 +353,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     vi.stubGlobal('$fetch', fetchMock);
     await store.fetchObjectiveModeCountDifferences();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(getCached).toHaveBeenCalledWith('tasks-objectives', 'neutral-v1-counts-regular', 'en');
+    expect(getCached).toHaveBeenCalledWith('tasks-objectives', 'neutral-v2-counts-regular', 'en');
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 5, pve: 2 } });
   });
   it('retries other-mode counts after a failed load', async () => {

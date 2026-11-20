@@ -59,7 +59,7 @@ describe('immutable catalog snapshots after an operator purge', () => {
       expect(store.tasks[0]?.objectives?.[0]?.count).toBe(3);
       expect(cache.setCachedData).toHaveBeenCalledWith(
         'tasks-objectives',
-        `neutral-v1-regular-${Date.parse(purgeAt)}`,
+        `neutral-v2-regular-${Date.parse(purgeAt)}`,
         'en',
         payload(3).data,
         expect.any(Number),

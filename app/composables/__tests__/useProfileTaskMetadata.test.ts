@@ -40,7 +40,7 @@ afterEach(() => {
 describe('profile mode metadata', () => {
   it('fences a profile objective cache read that crosses a purge and writes only the current key', async () => {
     const purge = '2026-11-18T13:00:00Z';
-    const scopedKey = `neutral-v1-regular-${Date.parse(purge)}`;
+    const scopedKey = `neutral-v2-regular-${Date.parse(purge)}`;
     const staleRead = createDeferred<unknown>();
     const fresh = { tasks: [{ id: 'task', objectives: [{ id: 'fresh' }] }] };
     vi.mocked(cache.getCachedData).mockImplementation(async (type, key) => {
@@ -70,7 +70,7 @@ describe('profile mode metadata', () => {
     await vi.waitFor(() =>
       expect(cache.getCachedData).toHaveBeenCalledWith(
         'tasks-objectives',
-        'neutral-v1-regular',
+        'neutral-v2-regular',
         'en'
       )
     );
@@ -91,14 +91,14 @@ describe('profile mode metadata', () => {
       vi
         .mocked(cache.setCachedData)
         .mock.calls.some(
-          ([type, key]) => type === 'tasks-objectives' && key === 'neutral-v1-regular'
+          ([type, key]) => type === 'tasks-objectives' && key === 'neutral-v2-regular'
         )
     ).toBe(false);
     scope.stop();
   });
   it('rejects a profile network objective response started before the purge and never caches it unscoped', async () => {
     const purge = '2026-11-18T13:00:00Z';
-    const scopedKey = `neutral-v1-regular-${Date.parse(purge)}`;
+    const scopedKey = `neutral-v2-regular-${Date.parse(purge)}`;
     const staleResponse = createDeferred<unknown>();
     const fresh = { tasks: [{ id: 'task', objectives: [{ id: 'fresh' }] }] };
     vi.mocked(cache.getCachedData).mockImplementation(async (type, key) => {
@@ -137,7 +137,7 @@ describe('profile mode metadata', () => {
       vi
         .mocked(cache.setCachedData)
         .mock.calls.some(
-          ([type, key]) => type === 'tasks-objectives' && key === 'neutral-v1-regular'
+          ([type, key]) => type === 'tasks-objectives' && key === 'neutral-v2-regular'
         )
     ).toBe(false);
     scope.stop();
@@ -145,7 +145,7 @@ describe('profile mode metadata', () => {
   it('reuses current generation objective caches without an extra profile request', async () => {
     const purge = '2026-11-18T13:00:00Z';
     localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
-    const key = `neutral-v1-regular-${Date.parse(purge)}`;
+    const key = `neutral-v2-regular-${Date.parse(purge)}`;
     vi.mocked(cache.getCachedData).mockImplementation(async (type, requested) => {
       if (type === 'tasks-core')
         return { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } as never;

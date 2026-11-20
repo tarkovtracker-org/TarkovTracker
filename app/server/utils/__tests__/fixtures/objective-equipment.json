@@ -1,0 +1,344 @@
+{
+  "regular": {
+    "source": {
+      "url": "https://json.tarkov.dev/regular/tasks",
+      "date": "Thu, 19 Nov 2026 15:05:55 GMT",
+      "sha256": "49ad1b284f35389ed1e135808cc96d2eb8e3df6d875b62b94c1a726c9631a253"
+    },
+    "tasks": {
+      "657315df034d76585f032e01": {
+        "id": "657315df034d76585f032e01",
+        "objectives": [
+          {
+            "id": "6a54a310b22ea41cf1c54a20",
+            "type": "shoot",
+            "usingWeapon": [],
+            "usingWeaponMods": [],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "5c0d190cd09282029f5390d8": {
+        "id": "5c0d190cd09282029f5390d8",
+        "objectives": [
+          {
+            "id": "5c1b760686f77412780211a3",
+            "type": "shoot",
+            "usingWeapon": [
+              "5a2a57cfc4a2826c6e06d44a",
+              "5a0c27731526d80618476ac4",
+              "58d3db5386f77426186285a0",
+              "5e340dcdcb6d5863cc5e5efb",
+              "5e32f56fcb6d5863cc5e5ee4",
+              "5448be9a4bdc2dfd2f8b456a",
+              "5710c24ad2720bc3458b45a3",
+              "618a431df1eb8e24b8741deb",
+              "617fd91e5539a84ec44ce155",
+              "66dae7cbeb28f0f96809f325",
+              "67b49e7335dec48e3e05e057",
+              "62e7e7bbe6da9612f743f1e0",
+              "6357c98711fb55120211f7e1"
+            ],
+            "usingWeaponMods": [],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "64f5deac39e45b527a7c4232": {
+        "id": "64f5deac39e45b527a7c4232",
+        "objectives": [
+          {
+            "id": "64f5deac39e45b527a7c4235",
+            "type": "shoot",
+            "usingWeapon": ["6499849fc93611967b034949"],
+            "usingWeaponMods": [["5c0517910db83400232ffee5", "64c196ad26a15b84aa07132f"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "65734c186dc1e402c80dc19e": {
+        "id": "65734c186dc1e402c80dc19e",
+        "objectives": [
+          {
+            "id": "65734c186dc1e402c80dc1a2",
+            "type": "shoot",
+            "usingWeapon": [],
+            "usingWeaponMods": [],
+            "wearing": [
+              [
+                {
+                  "id": "60bf74184a63fc79b60c57f6",
+                  "name": "Bomber beanie"
+                }
+              ],
+              [
+                {
+                  "id": "5aa2b9aee5b5b00015693121",
+                  "name": "RayBench Hipster Reserve sunglasses"
+                }
+              ]
+            ],
+            "notWearing": []
+          }
+        ]
+      },
+      "5c0bd94186f7747a727f09b2": {
+        "id": "5c0bd94186f7747a727f09b2",
+        "objectives": [
+          {
+            "id": "5c1b765d86f77413193fa4f2",
+            "type": "shoot",
+            "usingWeapon": ["5df8ce05b11454561e39243b", "6932abeb5403890d0c09c926"],
+            "usingWeaponMods": [["59bffbb386f77435b379b9c2", "617151c1d92c473c770214ab"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "63a5cf262964a7488f5243ce": {
+        "id": "63a5cf262964a7488f5243ce",
+        "objectives": [
+          {
+            "id": "63a5cf262964a7488f5243d1",
+            "type": "shoot",
+            "usingWeapon": ["5926bb2186f7744b1c6c6e60"],
+            "usingWeaponMods": [["5926d33d86f77410de68ebc0"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      }
+    }
+  },
+  "pve": {
+    "source": {
+      "url": "https://json.tarkov.dev/pve/tasks",
+      "date": "Thu, 19 Nov 2026 15:05:56 GMT",
+      "sha256": "0cbc2eacbfd2cd388de2de1927d6bbd000a97e87a3fe25427c88778c1e62ef51"
+    },
+    "tasks": {
+      "657315df034d76585f032e01": {
+        "id": "657315df034d76585f032e01",
+        "objectives": [
+          {
+            "id": "6a54a310b22ea41cf1c54a20",
+            "type": "shoot",
+            "usingWeapon": [],
+            "usingWeaponMods": [],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "5c0d190cd09282029f5390d8": {
+        "id": "5c0d190cd09282029f5390d8",
+        "objectives": [
+          {
+            "id": "5c1b760686f77412780211a3",
+            "type": "shoot",
+            "usingWeapon": [
+              "5a2a57cfc4a2826c6e06d44a",
+              "5a0c27731526d80618476ac4",
+              "58d3db5386f77426186285a0",
+              "5e340dcdcb6d5863cc5e5efb",
+              "5e32f56fcb6d5863cc5e5ee4",
+              "5448be9a4bdc2dfd2f8b456a",
+              "5710c24ad2720bc3458b45a3",
+              "618a431df1eb8e24b8741deb",
+              "617fd91e5539a84ec44ce155",
+              "66dae7cbeb28f0f96809f325",
+              "67b49e7335dec48e3e05e057",
+              "62e7e7bbe6da9612f743f1e0",
+              "6357c98711fb55120211f7e1"
+            ],
+            "usingWeaponMods": [],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "64f5deac39e45b527a7c4232": {
+        "id": "64f5deac39e45b527a7c4232",
+        "objectives": [
+          {
+            "id": "64f5deac39e45b527a7c4235",
+            "type": "shoot",
+            "usingWeapon": ["6499849fc93611967b034949"],
+            "usingWeaponMods": [["5c0517910db83400232ffee5", "64c196ad26a15b84aa07132f"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "65734c186dc1e402c80dc19e": {
+        "id": "65734c186dc1e402c80dc19e",
+        "objectives": [
+          {
+            "id": "65734c186dc1e402c80dc1a2",
+            "type": "shoot",
+            "usingWeapon": [],
+            "usingWeaponMods": [],
+            "wearing": [
+              [
+                {
+                  "id": "60bf74184a63fc79b60c57f6",
+                  "name": "Bomber beanie"
+                }
+              ],
+              [
+                {
+                  "id": "5aa2b9aee5b5b00015693121",
+                  "name": "RayBench Hipster Reserve sunglasses"
+                }
+              ]
+            ],
+            "notWearing": []
+          }
+        ]
+      },
+      "5c0bd94186f7747a727f09b2": {
+        "id": "5c0bd94186f7747a727f09b2",
+        "objectives": [
+          {
+            "id": "5c1b765d86f77413193fa4f2",
+            "type": "shoot",
+            "usingWeapon": ["5df8ce05b11454561e39243b", "6932abeb5403890d0c09c926"],
+            "usingWeaponMods": [["59bffbb386f77435b379b9c2", "617151c1d92c473c770214ab"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "63a5cf262964a7488f5243ce": {
+        "id": "63a5cf262964a7488f5243ce",
+        "objectives": [
+          {
+            "id": "63a5cf262964a7488f5243d1",
+            "type": "shoot",
+            "usingWeapon": ["5926bb2186f7744b1c6c6e60"],
+            "usingWeaponMods": [["5926d33d86f77410de68ebc0"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      }
+    }
+  },
+  "pvp-season": {
+    "source": {
+      "url": "https://json.tarkov.dev/pvp-season/tasks",
+      "date": "Thu, 19 Nov 2026 15:05:56 GMT",
+      "sha256": "902a4e75b4b1200d9bc41b20db76245dd336a719f7d82eec2d2d8261b1b3d7b2"
+    },
+    "tasks": {
+      "657315df034d76585f032e01": {
+        "id": "657315df034d76585f032e01",
+        "objectives": [
+          {
+            "id": "6a54a310b22ea41cf1c54a20",
+            "type": "shoot",
+            "usingWeapon": [],
+            "usingWeaponMods": [],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "5c0d190cd09282029f5390d8": {
+        "id": "5c0d190cd09282029f5390d8",
+        "objectives": [
+          {
+            "id": "5c1b760686f77412780211a3",
+            "type": "shoot",
+            "usingWeapon": [
+              "5a2a57cfc4a2826c6e06d44a",
+              "5a0c27731526d80618476ac4",
+              "58d3db5386f77426186285a0",
+              "5e340dcdcb6d5863cc5e5efb",
+              "5e32f56fcb6d5863cc5e5ee4",
+              "5448be9a4bdc2dfd2f8b456a",
+              "5710c24ad2720bc3458b45a3",
+              "618a431df1eb8e24b8741deb",
+              "617fd91e5539a84ec44ce155",
+              "66dae7cbeb28f0f96809f325",
+              "67b49e7335dec48e3e05e057",
+              "62e7e7bbe6da9612f743f1e0",
+              "6357c98711fb55120211f7e1"
+            ],
+            "usingWeaponMods": [],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "64f5deac39e45b527a7c4232": {
+        "id": "64f5deac39e45b527a7c4232",
+        "objectives": [
+          {
+            "id": "64f5deac39e45b527a7c4235",
+            "type": "shoot",
+            "usingWeapon": ["6499849fc93611967b034949"],
+            "usingWeaponMods": [["5c0517910db83400232ffee5", "64c196ad26a15b84aa07132f"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "65734c186dc1e402c80dc19e": {
+        "id": "65734c186dc1e402c80dc19e",
+        "objectives": [
+          {
+            "id": "65734c186dc1e402c80dc1a2",
+            "type": "shoot",
+            "usingWeapon": [],
+            "usingWeaponMods": [],
+            "wearing": [
+              [
+                {
+                  "id": "60bf74184a63fc79b60c57f6",
+                  "name": "Bomber beanie"
+                }
+              ],
+              [
+                {
+                  "id": "5aa2b9aee5b5b00015693121",
+                  "name": "RayBench Hipster Reserve sunglasses"
+                }
+              ]
+            ],
+            "notWearing": []
+          }
+        ]
+      },
+      "5c0bd94186f7747a727f09b2": {
+        "id": "5c0bd94186f7747a727f09b2",
+        "objectives": [
+          {
+            "id": "5c1b765d86f77413193fa4f2",
+            "type": "shoot",
+            "usingWeapon": ["5df8ce05b11454561e39243b", "6932abeb5403890d0c09c926"],
+            "usingWeaponMods": [["59bffbb386f77435b379b9c2", "617151c1d92c473c770214ab"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      },
+      "63a5cf262964a7488f5243ce": {
+        "id": "63a5cf262964a7488f5243ce",
+        "objectives": [
+          {
+            "id": "63a5cf262964a7488f5243d1",
+            "type": "shoot",
+            "usingWeapon": ["5926bb2186f7744b1c6c6e60"],
+            "usingWeaponMods": [["5926d33d86f77410de68ebc0"]],
+            "wearing": [],
+            "notWearing": []
+          }
+        ]
+      }
+    }
+  }
+}

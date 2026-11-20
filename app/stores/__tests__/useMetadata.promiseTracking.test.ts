@@ -271,7 +271,7 @@ describe('useMetadataStore promise tracking', () => {
     expect(await store.hasCriticalLocaleCache('de')).toBe(true);
     expect(cacheUtils.getCachedData).toHaveBeenCalledWith(
       'tasks-objectives',
-      'neutral-v1-regular',
+      'neutral-v2-regular',
       'en'
     );
     expect(cacheUtils.getCachedData).toHaveBeenCalledWith('bootstrap', 'json-v2-regular', 'en');

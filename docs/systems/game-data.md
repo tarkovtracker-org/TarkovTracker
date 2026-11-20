@@ -99,8 +99,8 @@ procedure in [Overlay and precompute](./overlay-and-precompute.md#precompute-wor
 ### Browser cache and translation
 
 IndexedDB schema 9 stores neutral catalogs under `neutral-v1` mode scopes and
-string tables under `strings-v1` language scopes. Numeric bootstrap data retains
-its existing mode-scoped cache. A localized view is materialized
+objectives under `neutral-v2` mode scopes. String tables use `strings-v1` language scopes.
+Numeric bootstrap data retains its existing mode-scoped cache. A localized view is materialized
 for consumers, so existing name-based search, sort, filters, and component labels
 operate on resolved strings. The original neutral data remains available for a
 later language switch.
