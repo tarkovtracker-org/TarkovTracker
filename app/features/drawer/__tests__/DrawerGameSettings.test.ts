@@ -72,18 +72,19 @@ describe('DrawerGameSettings', () => {
     expect(group.get('[aria-pressed="true"]').text()).toBe('PvE');
     wrapper.unmount();
   });
-  it('shows the matching decorative emblem in each faction button', async () => {
+  it('renders BEAR before USEC with their matching emblems', async () => {
     const wrapper = mount(DrawerGameSettings);
     const group = wrapper.get('[role="group"][aria-label="game_settings.select_faction_label"]');
     const buttons = group.findAll('button');
-    expect(buttons.map((button) => button.text())).toEqual(['USEC', 'BEAR']);
+    expect(buttons.map((button) => button.text())).toEqual(['BEAR', 'USEC']);
     expect(buttons[0]!.get('[aria-hidden="true"]').attributes('style')).toContain(
-      '/img/factions/USEC.webp'
-    );
-    expect(buttons[1]!.get('[aria-hidden="true"]').attributes('style')).toContain(
       '/img/factions/BEAR.webp'
     );
-    await buttons[1]!.trigger('click');
+    expect(buttons[1]!.get('[aria-hidden="true"]').attributes('style')).toContain(
+      '/img/factions/USEC.webp'
+    );
+    expect(buttons[1]!.attributes('aria-pressed')).toBe('true');
+    await buttons[0]!.trigger('click');
     expect(setPMCFactionMock).toHaveBeenCalledWith('BEAR');
     wrapper.unmount();
   });
