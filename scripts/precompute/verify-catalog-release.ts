@@ -6,6 +6,7 @@ import { OVERLAY_PROPAGATION_WINDOW_MS } from './verify-overlay';
 import type { CatalogRelease } from '@/utils/catalogDatasets';
 export const CATALOG_SCOPES = [
   ...CATALOG_DATASETS.flatMap((dataset) => VALID_GAME_MODES.map((mode) => `${dataset}/${mode}`)),
+  ...VALID_GAME_MODES.map((mode) => `tasks-objectives/${mode}/counts`),
   ...CATALOG_LANGUAGES.map((lang) => `strings/${lang}`),
 ];
 export type CatalogVerificationRow = {

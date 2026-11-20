@@ -205,12 +205,16 @@ Fetches task objectives and fail conditions.
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description                                   |
-| ---------- | ------ | --------- | --------------------------------------------- |
-| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
+| Parameter  | Type   | Default      | Description                                         |
+| ---------- | ------ | ------------ | --------------------------------------------------- |
+| `gameMode` | string | `regular`    | Game mode (`regular`, `pve`, or `pvp-season`)       |
+| `view`     | string | Full catalog | Use `counts` for task and objective IDs with counts |
 
 The published snapshot includes overlay provenance. A missing snapshot without an
 eligible last-good copy returns `503`. A KV-failure fallback is marked `STALE`.
+
+The counts view retains overlay provenance. Releases published before this view
+was introduced return the full payload.
 
 ---
 
@@ -330,9 +334,9 @@ previous complete manifest. Responses follow the shared neutral snapshot policy.
 ### GET /api/tarkov/overlay-status
 
 Returns the activated neutral release manifest with `completedAt`, `overlaySha`,
-and exactly 43 entries covering 30 mode catalogs and 13 language bundles. Each
-entry records its immutable object key, uncompressed byte length, and overlay
-response headers. `verify:overlay` compares every served response against this
+and exactly 46 entries covering 30 mode catalogs, 3 objective count views, and
+13 language bundles. Each entry records its immutable object key, uncompressed
+byte length, and overlay response headers. `verify:overlay` compares every served response against this
 manifest and the freshly published overlay, then checks English imports separately.
 
 This endpoint takes no query parameters. Responses use `Cache-Control: no-store`

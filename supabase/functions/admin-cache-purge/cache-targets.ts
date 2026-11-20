@@ -74,6 +74,7 @@ function buildNeutralCatalogUrls(origin: string): string[] {
     ...NEUTRAL_CATALOG_DATASETS.flatMap((dataset) =>
       TARKOV_GAME_MODES.map((mode) => `${base}/${dataset}/${mode}`)
     ),
+    ...TARKOV_GAME_MODES.map((mode) => `${base}/tasks-objectives/${mode}/counts`),
     ...NEUTRAL_CATALOG_LANGUAGES.map((lang) => `${base}/strings/${lang}`),
   ];
 }

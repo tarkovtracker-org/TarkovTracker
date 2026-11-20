@@ -134,16 +134,17 @@ function stubRelease(fleet: ReturnType<typeof release>, unavailableImport = fals
       );
     }
     const value = url.searchParams.get(dataset === 'strings' ? 'lang' : 'gameMode');
-    const scope = `${dataset}/${value}`;
+    const view = url.searchParams.get('view') === 'counts' ? '/counts' : '';
+    const scope = `${dataset}/${value}${view}`;
     return response(fleet.bodies.get(scope)!, fleet.manifest, scope);
   });
   vi.stubGlobal('fetch', fetcher);
   return fetcher;
 }
-it('certifies exactly 30 mode catalogs and 13 language bundles, preserving import failure evidence', async () => {
+it('certifies exactly 30 mode catalogs, 3 counts views, and 13 language bundles, preserving import failure evidence', async () => {
   const fetcher = stubRelease(release(), true);
   await import('../check-overlay');
-  expect(report.value?.rows).toHaveLength(43);
+  expect(report.value?.rows).toHaveLength(46);
   expect(report.value?.rows.every((row) => row.status === 'current')).toBe(true);
   expect(report.value?.imports.filter((row) => row.status === 'current')).toHaveLength(2);
   expect(report.value?.imports.filter((row) => row.status === 'unverified')).toHaveLength(1);
@@ -291,7 +292,7 @@ it('keeps import evidence and fails certification for an incomplete manifest', a
   delete fleet.manifest.entries['strings/tr'];
   stubRelease(fleet);
   await import('../check-overlay');
-  expect(report.value?.rows.filter((row) => row.status === 'unverified')).toHaveLength(43);
+  expect(report.value?.rows.filter((row) => row.status === 'unverified')).toHaveLength(46);
   expect(report.value?.imports.every((row) => row.status === 'current')).toBe(true);
   expect(process.exitCode).toBe(1);
 });

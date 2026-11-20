@@ -294,7 +294,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 1, pve: 3 } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/tarkov/tasks-objectives', {
-      query: { gameMode: 'pve', version: 'neutral-v2' },
+      query: { gameMode: 'pve', version: 'neutral-v2', view: 'counts' },
       onResponse: expect.any(Function),
     });
     // A language switch reloads the catalog; the counts come from the session memo.
