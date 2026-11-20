@@ -131,6 +131,7 @@ and [Pages Function billing](https://developers.cloudflare.com/pages/functions/p
 
 ### Cloudflare cache rule
 
+Verify that the Pages deployment with the admin `?fresh=1` read is live before applying the rule.
 Create a zone Cache Rule for this public route on `tarkovtracker.org`. Use the default cache key
 and set cache eligibility to **Eligible for cache**. For Edge TTL, use the origin cache-control
 header and bypass caching when the header is missing. Leave Browser TTL governed by the origin.
@@ -142,13 +143,16 @@ Keep existing rules in place.
  and http.request.uri.query eq ""
  and (http.request.method eq "PURGE"
       or (http.request.method eq "GET"
-          and not any(http.request.headers.names[*] in {"authorization" "origin"}))))
+          and not any(http.request.headers.names[*] in {"authorization" "origin"})
+          and not any(http.request.headers["cache-control"][*] contains "no-cache")
+          and not any(http.request.headers["cache-control"][*] contains "no-store"))))
 ```
 
 After rollout, send two ordinary GETs from the same location and check for `CF-Cache-Status: HIT`
 on the warm response. Check that `?fresh=1` returns the current version with `Cache-Control: no-store`
 and never returns `HIT`. Requests with an explicit `Origin` stay outside the rule because Cloudflare
 includes that header in the default cache key and URL-only purge fallback targets the default variant.
+Explicit browser cache bypass requests also stay outside the rule, including reads from older admin tabs.
 The existing admin save purges the tag with a fallback to the two exact public URLs. The internal
 `PURGE` method matches so that [Cloudflare can clear those URLs](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/#cache-rules-that-match-on-request-properties).
 Disable this rule to roll back edge caching.
