@@ -88,7 +88,14 @@
             :inert="reviewInert"
             :aria-busy="busy"
           >
-            <div class="flex min-h-0 flex-col gap-3">
+            <div class="flex min-h-0 min-w-0 flex-col gap-3">
+              <StashSellAdvice
+                :groups="sellAdvice.groups.value"
+                :ready="sellAdvice.ready.value"
+                :incomplete-tasks="sellAdvice.incompleteTasks.value"
+                :mode-label="modeLabel"
+                :bitmap="bitmap"
+              />
               <StashScreenshot
                 :bitmap="bitmap"
                 :image-error="bitmapFailed"
@@ -172,6 +179,7 @@
   import StashImportSteps from '@/features/stash-import/StashImportSteps.vue';
   import StashRegionEditor from '@/features/stash-import/StashRegionEditor.vue';
   import StashScreenshot from '@/features/stash-import/StashScreenshot.vue';
+  import StashSellAdvice from '@/features/stash-import/StashSellAdvice.vue';
   import { useScreenshotBitmap } from '@/features/stash-import/useScreenshotBitmap';
   import {
     useStashImport,
@@ -180,6 +188,7 @@
     type StashImportPreview as PreviewData,
   } from '@/features/stash-import/useStashImport';
   import { useStashScanSession } from '@/features/stash-import/useStashScanSession';
+  import { useStashSellAdvice } from '@/features/stash-import/useStashSellAdvice';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { reviewedTotals } from '@/utils/stashScan/review';
   import { scanError } from '@/utils/stashScan/types';
@@ -252,6 +261,7 @@
   const modeLabel = computed(() => t(modeLabels[store.currentGameMode]));
   const allowDecreases = ref(false);
   const pendingRegion = ref<ScanRect>();
+  const sellAdvice = useStashSellAdvice(rows, result);
   const totals = computed(() => {
     try {
       return reviewedTotals(rows.value, tracked());

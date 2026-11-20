@@ -19,6 +19,14 @@ const mocks = vi.hoisted(() => ({
 }));
 mockNuxtImport('useI18n', () => () => ({ t: (key: string) => key }));
 vi.mock('@/stores/useTarkov', () => ({ useTarkovStore: () => ({ currentGameMode: 'pvp' }) }));
+vi.mock('@/stores/useMetadata', () => ({
+  useMetadataStore: () => ({
+    initialized: false,
+    tasks: [],
+    hideoutModules: [],
+    getItemById: () => undefined,
+  }),
+}));
 vi.mock('@/features/stash-import/useStashScanSession', () => ({
   useStashScanSession: () => {
     const rows = ref([
