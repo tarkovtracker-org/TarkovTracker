@@ -580,6 +580,10 @@ Enhanced PR validation:
 - `Lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
   `.github/lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
 
+The Lighthouse job downloads the active public catalog release, verifies each snapshot's
+release ID, size, and digest, and seeds an isolated local Wrangler KV store. The audit
+then opens the compiled Pages app against those snapshots.
+
 **Lighthouse collection (`.github/lighthouserc.json`):** each selected URL is audited once per Lighthouse
 job. Repeated runs are reserved for investigating a failure or for dedicated performance analysis;
 running each of three routes three times made the Lighthouse job the dominant PR bottleneck.
