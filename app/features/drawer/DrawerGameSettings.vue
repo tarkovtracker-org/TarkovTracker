@@ -8,7 +8,7 @@
       :disabled="dataLoading"
       :aria-label="t('game_settings.select_game_mode_label', 'Select game mode')"
       class="w-full"
-      :ui="{ base: 'min-h-9 w-full' }"
+      :ui="{ base: 'min-h-9 w-full ps-12' }"
       @update:model-value="switchMode($event as GameMode)"
     >
       <template #leading>
