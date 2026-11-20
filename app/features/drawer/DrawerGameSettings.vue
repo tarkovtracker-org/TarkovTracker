@@ -15,13 +15,7 @@
         :disabled="dataLoading"
         @click="switchMode(option.value)"
       >
-        <img
-          :src="`/img/game-modes/${option.value}.png`"
-          alt=""
-          width="52"
-          height="52"
-          class="-my-1.5 size-13 max-w-full shrink-0 object-contain"
-        />
+        <GameModeBadge :mode="option.value" :size="52" class="-my-1.5 size-13 max-w-full" />
         <span class="grid min-h-7 w-full place-items-center wrap-anywhere">{{ option.label }}</span>
       </button>
     </div>
@@ -63,6 +57,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useTarkovStore } from '@/stores/useTarkov';
   import {

@@ -57,7 +57,12 @@
                       :disabled="isAnyImportActive || option.disabled"
                       @click="selectTarkovDevRefetchMode(option.value)"
                     >
-                      {{ option.label }}
+                      <GameModeBadge
+                        v-if="isTarkovDevProfileMode(option.value)"
+                        :mode="option.value"
+                        class="-my-1"
+                      />
+                      <span class="min-w-0 wrap-anywhere">{{ option.label }}</span>
                     </UButton>
                   </div>
                   <p class="text-surface-500 text-xs">
@@ -977,7 +982,10 @@
                   block
                   @click="importTarget = 'pvp'"
                 >
-                  {{ $t('settings.data_management.import_target_pvp') }}
+                  <GameModeBadge :mode="GAME_MODES.PVP" class="-my-1" />
+                  <span class="min-w-0 wrap-anywhere">
+                    {{ $t('settings.data_management.import_target_pvp') }}
+                  </span>
                 </UButton>
                 <UButton
                   :variant="importTarget === 'pve' ? 'solid' : 'soft'"
@@ -986,7 +994,10 @@
                   block
                   @click="importTarget = 'pve'"
                 >
-                  {{ $t('settings.data_management.import_target_pve') }}
+                  <GameModeBadge :mode="GAME_MODES.PVE" class="-my-1" />
+                  <span class="min-w-0 wrap-anywhere">
+                    {{ $t('settings.data_management.import_target_pve') }}
+                  </span>
                 </UButton>
                 <UButton
                   :variant="importTarget === GAME_MODES.SEASONAL ? 'solid' : 'soft'"
@@ -996,7 +1007,10 @@
                   :disabled="!backupPreview.seasonal"
                   @click="importTarget = GAME_MODES.SEASONAL"
                 >
-                  {{ $t('common.seasonal_pvp', 'Seasonal PvP') }}
+                  <GameModeBadge :mode="GAME_MODES.SEASONAL" class="-my-1" />
+                  <span class="min-w-0 wrap-anywhere">
+                    {{ $t('common.seasonal_pvp', 'Seasonal PvP') }}
+                  </span>
                 </UButton>
                 <UButton
                   :variant="importTarget === 'all' ? 'solid' : 'soft'"
@@ -1062,6 +1076,7 @@
   </template>
 </template>
 <script setup lang="ts">
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useTurnstileWidget } from '@/composables/useTurnstile';
   import BugReportCard from '@/features/settings/BugReportCard.vue';

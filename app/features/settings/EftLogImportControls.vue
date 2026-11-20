@@ -12,7 +12,14 @@
           :label="`${modeLabel(mode)} (${modeCount(mode)})`"
           :disabled="disabled"
           @update:model-value="(enabled) => toggleMode(mode, Boolean(enabled))"
-        />
+        >
+          <template #label="{ label }">
+            <span class="inline-flex items-center gap-1">
+              <GameModeBadge v-if="mode !== 'unknown'" :mode="mode" class="-my-2" />
+              {{ label }}
+            </span>
+          </template>
+        </UCheckbox>
       </div>
       <p class="text-surface-400 text-xs">{{ $t('settings.log_import.mode_filter_hint') }}</p>
     </fieldset>
@@ -55,6 +62,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import { GAME_MODE_VALUES, getGameModeLabel, type GameMode } from '@/utils/constants';
   import {
     EFT_QUEST_STATES,

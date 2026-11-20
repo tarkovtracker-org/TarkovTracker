@@ -10,21 +10,19 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 describe('GameModeToggle', () => {
-  const UIconStub = {
-    props: ['name'],
-    template: '<i :data-icon-name="name" />',
-  };
   it('renders all mode options and applies active/inactive classes', () => {
     const wrapper = mount(GameModeToggle, {
       props: {
         modelValue: GAME_MODES.PVP,
       },
-      global: {
-        stubs: { UIcon: UIconStub },
-      },
     });
     const buttons = wrapper.findAll('button');
-    expect(buttons).toHaveLength(3);
+    expect(buttons.map((button) => button.get('img').attributes('src'))).toEqual([
+      '/img/game-modes/pvp.png',
+      '/img/game-modes/pve.png',
+      '/img/game-modes/seasonal.png',
+    ]);
+    expect(buttons.every((button) => button.get('img').attributes('alt') === '')).toBe(true);
     const pvpBtn = buttons[0]!;
     const pveBtn = buttons[1]!;
     const seasonalBtn = buttons[2]!;
@@ -41,7 +39,6 @@ describe('GameModeToggle', () => {
   it('keeps every mode unselected until an explicit choice', async () => {
     const wrapper = mount(GameModeToggle, {
       props: { modelValue: undefined },
-      global: { stubs: { UIcon: UIconStub } },
     });
     expect(
       wrapper.findAll('button').every((button) => button.attributes('aria-pressed') === 'false')
@@ -55,9 +52,6 @@ describe('GameModeToggle', () => {
       props: {
         modelValue: GAME_MODES.PVP,
       },
-      global: {
-        stubs: { UIcon: UIconStub },
-      },
     });
     const buttons = wrapper.findAll('button');
     await buttons[1]!.trigger('click');
@@ -68,9 +62,6 @@ describe('GameModeToggle', () => {
       props: {
         modelValue: GAME_MODES.PVP,
         disabledModes: [GAME_MODES.SEASONAL],
-      },
-      global: {
-        stubs: { UIcon: UIconStub },
       },
     });
     const seasonalButton = wrapper.findAll('button')[2]!;
