@@ -22,9 +22,9 @@ bounds stored-object lifetime.
 The same run refreshes three independent whole English import snapshots. Their
 scope, age, progress-critical task/objective structure, and overlay provenance
 remain independently validated. They use `tasks-import-json-v1-en-<mode>` keys.
-During migration the workflow also refreshes the 48 legacy localized entries.
-Retire that producer only after the new reader passes production verification.
-Those temporary entries are outside the neutral release contract.
+The 48 legacy localized entries were retained through reader verification and
+expire under their original TTL once the writer stops refreshing them.
+The producer now refreshes only the neutral release and English import snapshots.
 
 ## Preseed and promote
 
@@ -66,19 +66,19 @@ reasons without raw private payloads. Missing data or any failed check exits non
 
 ## Files
 
-| File                        | Responsibility                                                           | Run by                                         |
-| --------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
-| `run.ts`                    | Trusted CLI and publication diagnostics                                  | Precompute Tarkov Data workflow                |
-| `precompute.ts`             | Legacy localized publication during migration, TTL and filter validation | run.ts and snapshot producers                  |
-| `catalog-release.ts`        | Immutable object staging, readback, and pointer activation               | run.ts                                         |
-| `import-snapshots.ts`       | Whole English import generation and validation                           | run.ts                                         |
-| `kv.ts`                     | Bounded KV reads and writes                                              | run.ts and catalog-release.ts                  |
-| `check-overlay.ts`          | Served-release and import verification                                   | pnpm run verify:overlay                        |
-| `verify-catalog-release.ts` | Exact scope, digest, headers, age and source checks                      | check-overlay.ts                               |
-| `verify-overlay.ts`         | Whole English import comparison and freshness window                     | check-overlay.ts and verify-catalog-release.ts |
-| `nuxt-imports.ts`           | Standalone Nuxt import shim                                              | Script TypeScript configuration                |
-| `tsconfig.json`             | Standalone module aliases and compiler settings                          | tsx and tsc                                    |
-| `__tests__/`                | Producer and verifier regressions                                        | Vitest                                         |
+| File                        | Responsibility                                             | Run by                                         |
+| --------------------------- | ---------------------------------------------------------- | ---------------------------------------------- |
+| `run.ts`                    | Trusted CLI and publication diagnostics                    | Precompute Tarkov Data workflow                |
+| `precompute.ts`             | Catalog object TTL and English import filter validation    | run.ts and snapshot producers                  |
+| `catalog-release.ts`        | Immutable object staging, readback, and pointer activation | run.ts                                         |
+| `import-snapshots.ts`       | Whole English import generation and validation             | run.ts                                         |
+| `kv.ts`                     | Bounded KV reads and writes                                | run.ts and catalog-release.ts                  |
+| `check-overlay.ts`          | Served-release and import verification                     | pnpm run verify:overlay                        |
+| `verify-catalog-release.ts` | Exact scope, digest, headers, age and source checks        | check-overlay.ts                               |
+| `verify-overlay.ts`         | Whole English import comparison and freshness window       | check-overlay.ts and verify-catalog-release.ts |
+| `nuxt-imports.ts`           | Standalone Nuxt import shim                                | Script TypeScript configuration                |
+| `tsconfig.json`             | Standalone module aliases and compiler settings            | tsx and tsc                                    |
+| `__tests__/`                | Producer and verifier regressions                          | Vitest                                         |
 
 The complete architecture and release rules are in
 [Overlay and precompute](../../docs/systems/overlay-and-precompute.md#precompute-workflow).
