@@ -12,7 +12,22 @@
       @update:model-value="switchMode($event as GameMode)"
     >
       <template #leading>
-        <UIcon :name="currentModeOption.icon" class="h-4 w-4" />
+        <img
+          :src="`/img/game-modes/${currentGameMode}.png`"
+          alt=""
+          width="32"
+          height="32"
+          class="size-8 shrink-0"
+        />
+      </template>
+      <template #item-leading="{ item }">
+        <img
+          :src="`/img/game-modes/${item.value}.png`"
+          alt=""
+          width="32"
+          height="32"
+          class="size-8 shrink-0"
+        />
       </template>
     </SelectMenuFixed>
     <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
@@ -113,22 +128,13 @@
     { immediate: true }
   );
   const modeOptions = computed(() => [
-    { icon: 'i-mdi-sword-cross', label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
-    { icon: 'i-mdi-account-group', label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },
+    { label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
+    { label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },
     {
-      icon: 'i-mdi-calendar-star',
       label: t('common.seasonal_pvp', 'Seasonal PvP'),
       value: GAME_MODES.SEASONAL,
     },
   ]);
-  const currentModeOption = computed(
-    () =>
-      modeOptions.value.find((option) => option.value === currentGameMode.value) ?? {
-        icon: 'i-mdi-sword-cross',
-        label: t('common.pvp', 'PvP'),
-        value: GAME_MODES.PVP,
-      }
-  );
   const { loading: dataLoading } = storeToRefs(metadataStore);
   async function switchMode(mode: GameMode) {
     if (mode !== currentGameMode.value && !dataLoading.value) {
