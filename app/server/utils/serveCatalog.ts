@@ -1,4 +1,5 @@
 import {
+  appendHeader,
   createError,
   defineEventHandler,
   getQuery,
@@ -7,6 +8,7 @@ import {
   type H3Event,
 } from 'h3';
 import { scheduleBackgroundTask } from '@/server/utils/backgroundTask';
+import { canSendCatalogGzip, markCatalogGzip } from '@/server/utils/catalogEncoding';
 import {
   CATALOG_BYTES_HEADER,
   gateCatalogCacheBody,
@@ -27,8 +29,7 @@ function catalogLanguage(input: unknown) {
 }
 const logger = createLogger('CatalogSnapshot');
 type EdgeStorage = Pick<Cache, 'match' | 'put'>;
-async function responseFromStored(value: Response, status: 'PRECOMPUTE' | 'STALE', scope: string) {
-  const { body, completion } = await openCatalogBody(value, scope);
+function snapshotHeaders(value: Response, status: 'PRECOMPUTE' | 'STALE') {
   const headers = new Headers(value.headers);
   headers.delete('X-Catalog-Key');
   headers.delete(CATALOG_BYTES_HEADER);
@@ -38,7 +39,24 @@ async function responseFromStored(value: Response, status: 'PRECOMPUTE' | 'STALE
   headers.set('Cloudflare-CDN-Cache-Control', 'no-store');
   headers.set('X-Cache-Status', status);
   headers.set('Content-Type', 'application/json');
-  return { response: new Response(body, { headers }), completion };
+  return headers;
+}
+async function responseFromStored(value: Response, status: 'PRECOMPUTE' | 'STALE', scope: string) {
+  const { body, completion } = await openCatalogBody(value, scope);
+  return { response: new Response(body, { headers: snapshotHeaders(value, status) }), completion };
+}
+async function serveCachedSnapshot(event: H3Event, value: Response, scope: string) {
+  // Cache writes close only after the entire gzip stream passes expanded-length validation.
+  if (
+    scope.startsWith('strings/') &&
+    value.body &&
+    canSendCatalogGzip(event.context.cloudflare?.request)
+  ) {
+    const headers = snapshotHeaders(value, 'PRECOMPUTE');
+    markCatalogGzip(headers);
+    return new Response(value.body, { headers });
+  }
+  return (await responseFromStored(value, 'PRECOMPUTE', scope)).response;
 }
 function catalogEntry(manifest: CatalogRelease | null, scope: string) {
   const entries = manifest?.entries;
@@ -129,8 +147,8 @@ async function serveSnapshot(event: H3Event, store: CatalogKvReader | null, scop
   try {
     if (!store) throw new Error('Missing catalog store');
     const value = await readCatalogSnapshot(store, scope, cached);
-    const target = cache && value !== cached ? { cache, key } : undefined;
-    return await prepareSnapshot(event, target, value, scope);
+    if (value === cached) return await serveCachedSnapshot(event, value, scope);
+    return await prepareSnapshot(event, cache ? { cache, key } : undefined, value, scope);
   } catch (error) {
     logger.warn('Unable to read catalog snapshot', { scope, error });
     return fallbackSnapshot(cached, scope);
@@ -145,6 +163,7 @@ export function catalogHandler(dataset: CatalogDataset | 'strings') {
     const scope =
       dataset === 'tasks-objectives' && query.view === 'counts' ? baseScope + '/counts' : baseScope;
     setHeader(event, 'Cache-Control', 'no-store');
+    if (dataset === 'strings') appendHeader(event, 'Vary', 'Accept-Encoding');
     const store = getPrecomputedStore(event);
     if (import.meta.dev && !store) {
       setHeader(event, 'X-Catalog-Release', 'development');
