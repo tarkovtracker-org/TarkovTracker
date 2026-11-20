@@ -145,10 +145,7 @@ jobs:
           # status, which made the Lighthouse gate non-deterministic.
           NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED: 'false'
       - name: Seed local Lighthouse catalogs
-        run: |
-          node scripts/checks/seed-lighthouse-catalog.mjs "$RUNNER_TEMP/lighthouse-catalog-kv.json"
-          pnpm exec wrangler kv bulk put "$RUNNER_TEMP/lighthouse-catalog-kv.json" \
-            --binding TARKOV_DATA --local --persist-to "$RUNNER_TEMP/lighthouse-kv"
+        run: node scripts/checks/seed-lighthouse-catalog.mjs "$RUNNER_TEMP/lighthouse-kv"
       - name: Start preview server
         run: |
           pnpm exec wrangler pages dev dist \

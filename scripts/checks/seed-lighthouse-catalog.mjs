@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
+import { getPlatformProxy } from 'wrangler';
 const api = 'https://tarkovtracker.org/api/tarkov/';
 const manifestKey = 'neutral-catalog-v1-manifest';
 async function get(path) {
@@ -28,12 +29,12 @@ async function snapshot(scope, entry, release) {
   if (!matchesRelease) {
     throw new Error(`Lighthouse catalog ${scope} did not match release ${release}`);
   }
-  return { key: entry.key, value: gzipSync(body).toString('base64'), base64: true };
+  return { key: entry.key, value: Uint8Array.from(gzipSync(body)).buffer };
 }
-const output = process.argv[2];
-if (!output) throw new Error('Specify an output file for the local Wrangler KV data.');
+const statePath = process.argv[2];
+if (!statePath) throw new Error('Specify a persistence directory for the local Wrangler KV store.');
 const manifest = await (await get('overlay-status')).json();
-const entries = Object.entries(manifest.entries);
+const entries = Object.entries(manifest?.entries ?? {});
 if (!entries.length || !Number.isSafeInteger(manifest.completedAt) || manifest.completedAt <= 0) {
   throw new Error('Lighthouse requires an active catalog release.');
 }
@@ -46,6 +47,15 @@ for (let start = 0; start < entries.length; start += 6) {
     ))
   );
 }
-pairs.push({ key: manifestKey, value: JSON.stringify(manifest) });
-await writeFile(output, JSON.stringify(pairs));
-console.log(`Prepared ${entries.length} Lighthouse catalogs from release ${manifest.completedAt}.`);
+const { env, dispose } = await getPlatformProxy({
+  configPath: 'wrangler.toml',
+  persist: { path: join(statePath, 'v3') },
+  remoteBindings: false,
+});
+try {
+  for (const { key, value } of pairs) await env.TARKOV_DATA.put(key, value);
+  await env.TARKOV_DATA.put(manifestKey, JSON.stringify(manifest));
+} finally {
+  await dispose();
+}
+console.log(`Seeded ${entries.length} Lighthouse catalogs from release ${manifest.completedAt}.`);
