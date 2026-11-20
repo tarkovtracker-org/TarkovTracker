@@ -4,6 +4,9 @@ import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
 import SettingsPage from '@/pages/settings.vue';
+import type { PMCFaction } from '@/utils/constants';
+const currentFaction = ref<PMCFaction>('USEC');
+const metadataLoading = ref(false);
 const { mockFns, mockState } = vi.hoisted(() => ({
   mockState: {
     isLoggedIn: false,
@@ -47,6 +50,7 @@ mockNuxtImport('useRoute', () => () => ({
 mockNuxtImport('useSeoMeta', () => mockFns.seoMeta);
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
+    loading: metadataLoading,
     editions: [
       { value: 1, title: 'Standard' },
       { value: 2, title: 'Left Behind' },
@@ -70,6 +74,10 @@ vi.mock('@/stores/useTarkov', () => ({
       return mockState.gameMode;
     },
     getCurrentGameMode: () => mockState.gameMode,
+    getPMCFaction: () => currentFaction.value,
+    setPMCFaction: (faction: PMCFaction) => {
+      currentFaction.value = faction;
+    },
     getGameEdition: () => mockState.gameEdition,
     setGameEdition: mockFns.setGameEdition,
     getPvPProgressData: () => ({ prestigeLevel: mockState.prestigeLevel }),
@@ -190,11 +198,13 @@ describe('settings page', () => {
   });
   beforeEach(() => {
     configureMockState();
+    currentFaction.value = 'USEC';
+    metadataLoading.value = false;
     vi.clearAllMocks();
   });
   const globalConfig = {
     stubs: defaultGlobalStubs,
-    mocks: { $t: (key: string) => key },
+    mocks: { $t: (key: string, fallback?: string) => fallback ?? key },
   };
   it.each([
     { hash: '#preferences', mobile: true, expected: 'tab' },
@@ -252,6 +262,22 @@ describe('settings page', () => {
     expect(wrapper.find('#progression [data-testid="player-level-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="experience-card"]').exists()).toBe(false);
     expect(wrapper.find('#progression').exists()).toBe(true);
+  });
+  it('sets the active faction from the compact progression picker', async () => {
+    const wrapper = await mountSuspended(SettingsPage, { global: globalConfig });
+    const progression = wrapper.get('#progression');
+    expect(progression.text()).toContain('Faction');
+    const group = progression.get('[role="group"][aria-label="Select faction"]');
+    const buttons = group.findAll('button');
+    expect(buttons.map((button) => button.text())).toEqual(['BEAR', 'USEC']);
+    expect(group.get('[aria-pressed="true"]').text()).toBe('USEC');
+    await buttons[0]!.trigger('click');
+    expect(currentFaction.value).toBe('BEAR');
+    expect(group.get('[aria-pressed="true"]').text()).toBe('BEAR');
+    metadataLoading.value = true;
+    await nextTick();
+    expect(buttons.every((button) => button.element.disabled)).toBe(true);
+    wrapper.unmount();
   });
   describe('user states', () => {
     it('renders logged out state', async () => {

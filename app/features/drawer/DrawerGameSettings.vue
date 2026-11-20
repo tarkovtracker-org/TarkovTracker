@@ -6,19 +6,17 @@
       :aria-label="t('game_settings.select_game_mode_label', 'Select game mode')"
       :aria-busy="dataLoading"
     >
-      <button
+      <CompactChoiceButton
         v-for="option in modeOptions"
         :key="option.value"
-        type="button"
         class="flex flex-col items-center px-0.5 py-1.5 leading-tight"
-        :class="choiceButtonClass"
         :aria-pressed="selectedMode === option.value"
         :disabled="dataLoading"
         @click="switchMode(option.value)"
       >
         <GameModeBadge :mode="option.value" :size="52" class="-my-1.5 size-13 max-w-full" />
         <span class="w-full wrap-anywhere">{{ option.label }}</span>
-      </button>
+      </CompactChoiceButton>
     </div>
     <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
       {{ t(switchModeError) }}
@@ -31,56 +29,22 @@
     >
       {{ seasonCountdownLabel }}
     </time>
-    <div
-      class="grid grid-cols-2 gap-1"
-      role="group"
-      :aria-label="t('game_settings.select_faction_label')"
-    >
-      <button
-        v-for="faction in factions"
-        :key="faction"
-        type="button"
-        class="flex min-h-8 items-center justify-center gap-1.5 px-2 py-1.5 leading-none uppercase"
-        :class="choiceButtonClass"
-        :disabled="dataLoading"
-        :aria-pressed="faction === currentFaction"
-        @click="setFaction(faction)"
-      >
-        <span
-          aria-hidden="true"
-          class="size-5 shrink-0 bg-current mask-contain mask-center mask-no-repeat"
-          :style="{ maskImage: `url(${getFactionIconPath(faction)})` }"
-        />
-        <span class="leading-none">{{ faction }}</span>
-      </button>
-    </div>
+    <FactionPicker v-model="currentFaction" :disabled="dataLoading" />
   </div>
 </template>
 <script setup lang="ts">
+  import FactionPicker from '@/components/FactionPicker.vue';
   import GameModeBadge from '@/components/GameModeBadge.vue';
+  import CompactChoiceButton from '@/components/ui/CompactChoiceButton.vue';
+  import { useCurrentFaction } from '@/composables/useCurrentFaction';
   import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import {
-    ACTIVE_SEASON,
-    GAME_MODES,
-    PMC_FACTIONS,
-    getActiveSeasonTimeRemaining,
-    type PMCFaction,
-  } from '@/utils/constants';
-  import { getFactionIconPath } from '@/utils/factionIcons';
+  import { ACTIVE_SEASON, GAME_MODES, getActiveSeasonTimeRemaining } from '@/utils/constants';
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
   const { dataLoading, switchMode, switchModeError } = useGameModeSwitch();
   const seasonCountdownNow = ref(Date.now());
-  const choiceButtonClass =
-    'border-default bg-default text-muted enabled:hover:bg-elevated aria-pressed:border-primary/70 aria-pressed:bg-primary/10 aria-pressed:text-highlighted focus-visible:outline-primary min-w-0 cursor-pointer rounded-md border text-center text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
-  const factions = [...PMC_FACTIONS].reverse();
-  const currentFaction = computed<PMCFaction>(() => tarkovStore.getPMCFaction());
-  function setFaction(faction: PMCFaction) {
-    if (faction !== currentFaction.value) {
-      tarkovStore.setPMCFaction(faction);
-    }
-  }
+  const currentFaction = useCurrentFaction();
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
   const seasonEndDate = computed(() => new Date(ACTIVE_SEASON.endsAt).toLocaleString());
   const seasonCountdownLabel = computed(() => {

@@ -74,7 +74,7 @@ describe('DrawerGameSettings', () => {
   });
   it('renders BEAR before USEC with their matching emblems', async () => {
     const wrapper = mount(DrawerGameSettings);
-    const group = wrapper.get('[role="group"][aria-label="game_settings.select_faction_label"]');
+    const group = wrapper.get('[role="group"][aria-label="Select faction"]');
     const buttons = group.findAll('button');
     expect(buttons.map((button) => button.text())).toEqual(['BEAR', 'USEC']);
     expect(buttons[0]!.get('[aria-hidden="true"]').attributes('style')).toContain(

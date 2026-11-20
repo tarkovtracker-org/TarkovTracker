@@ -70,6 +70,7 @@
             >
               <DisplayNameCard />
               <PlayerLevelCard />
+              <FactionSettingsCard />
               <SkillsCard />
               <ResetProgressCard />
             </section>
@@ -175,6 +176,7 @@
   import DeviceDataCard from '@/features/settings/DeviceDataCard.vue';
   import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
+  import FactionSettingsCard from '@/features/settings/FactionSettingsCard.vue';
   import GeneralPreferencesCard from '@/features/settings/GeneralPreferencesCard.vue';
   import KeybindsCard from '@/features/settings/KeybindsCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
