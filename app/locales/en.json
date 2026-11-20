@@ -2662,6 +2662,9 @@
       "active_mode": "Active",
       "game_edition_hint": "Select the game edition you own so tracking matches your available content."
     },
+    "faction": {
+      "title": "Faction"
+    },
     "player_level": {
       "title": "Current Level",
       "label": "Current level",
