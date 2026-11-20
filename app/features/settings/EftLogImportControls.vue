@@ -15,7 +15,7 @@
         >
           <template #label="{ label }">
             <span class="inline-flex items-center gap-1">
-              <GameModeBadge v-if="mode !== 'unknown'" :mode="mode" class="-my-2" />
+              <GameModeBadge :mode="mode" class="-my-2" />
               {{ label }}
             </span>
           </template>

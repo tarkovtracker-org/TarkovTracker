@@ -1,5 +1,6 @@
 <template>
   <img
+    v-if="hasBadge"
     :src="`/img/game-modes/${mode}.png`"
     alt=""
     :width="size"
@@ -8,6 +9,7 @@
   />
 </template>
 <script setup lang="ts">
-  import type { GameMode } from '@/utils/constants';
-  withDefaults(defineProps<{ mode: GameMode; size?: number }>(), { size: 36 });
+  import { GAME_MODE_VALUES } from '@/utils/constants';
+  const { mode, size = 36 } = defineProps<{ mode: string; size?: number }>();
+  const hasBadge = computed(() => GAME_MODE_VALUES.some((value) => value === mode));
 </script>

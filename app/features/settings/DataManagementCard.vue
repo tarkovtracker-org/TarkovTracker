@@ -57,11 +57,7 @@
                       :disabled="isAnyImportActive || option.disabled"
                       @click="selectTarkovDevRefetchMode(option.value)"
                     >
-                      <GameModeBadge
-                        v-if="isTarkovDevProfileMode(option.value)"
-                        :mode="option.value"
-                        class="-my-1"
-                      />
+                      <GameModeBadge :mode="option.value" class="-my-1" />
                       <span class="min-w-0 wrap-anywhere">{{ option.label }}</span>
                     </UButton>
                   </div>
