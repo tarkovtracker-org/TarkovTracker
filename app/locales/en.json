@@ -1115,6 +1115,13 @@
     "tasks": {
       "status_tabs_label": "Task status",
       "auto_tracking_guide": "Automatic quest tracking with TarkovMonitor",
+      "shared_link": {
+        "unavailable": "Linked quest unavailable in {mode}",
+        "checking_modes": "Checking other game modes…",
+        "choose_mode": "Switch game modes to open this quest.",
+        "switch_mode": "Switch to {mode}",
+        "no_match": "Check the link or try another game mode."
+      },
       "primary_views": {
         "aria_label": "Task views",
         "graph": "Graph",

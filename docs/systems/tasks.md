@@ -831,7 +831,11 @@ database column for older clients; this UI change requires no column removal or 
 
 Collapse-by-default and hide-rewards remain independent preferences, both off by default.
 Collapse-by-default applies to list cards; map cards start expanded. Matching deep links expand
-their card. The dedicated chevron controls card expansion in both views. Hide-rewards applies
+their card. If a linked quest is absent from the current mode's catalog, the Tasks page explains
+why and offers to switch to any mode where the quest ID matches. The link stays active until
+the quest opens or the player dismisses the notice.
+
+The dedicated chevron controls card expansion in both views. Hide-rewards applies
 to both list and map cards. Missing database columns use the existing preference-sync fallback,
 so new settings remain local until the compact-list preference migration is deployed.
 
