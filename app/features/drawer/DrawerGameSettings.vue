@@ -1,35 +1,30 @@
 <template>
   <div class="flex flex-col gap-1.5 px-3 py-1">
-    <SelectMenuFixed
-      :model-value="currentGameMode"
-      :items="modeOptions"
-      value-key="value"
-      label-key="label"
-      :disabled="dataLoading"
+    <div
+      class="grid grid-cols-3 gap-1"
+      role="group"
       :aria-label="t('game_settings.select_game_mode_label', 'Select game mode')"
-      class="w-full"
-      :ui="{ base: 'min-h-9 w-full ps-12' }"
-      @update:model-value="switchMode($event as GameMode)"
+      :aria-busy="dataLoading"
     >
-      <template #leading>
+      <button
+        v-for="option in modeOptions"
+        :key="option.value"
+        type="button"
+        class="border-default bg-default text-muted enabled:hover:bg-elevated aria-pressed:border-primary/70 aria-pressed:bg-primary/10 aria-pressed:text-highlighted focus-visible:outline-primary flex min-w-0 cursor-pointer flex-col items-center rounded-md border px-0.5 py-1.5 text-center text-xs leading-tight font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        :aria-pressed="selectedMode === option.value"
+        :disabled="dataLoading"
+        @click="switchMode(option.value)"
+      >
         <img
-          :src="`/img/game-modes/${currentBadgeMode}.png`"
+          :src="`/img/game-modes/${option.value}.png`"
           alt=""
-          width="32"
-          height="32"
-          class="size-8 shrink-0"
+          width="52"
+          height="52"
+          class="-my-1.5 size-13 max-w-full shrink-0 object-contain"
         />
-      </template>
-      <template #item-leading="{ item }">
-        <img
-          :src="`/img/game-modes/${item.value}.png`"
-          alt=""
-          width="32"
-          height="32"
-          class="size-8 shrink-0"
-        />
-      </template>
-    </SelectMenuFixed>
+        <span class="grid min-h-7 w-full place-items-center wrap-anywhere">{{ option.label }}</span>
+      </button>
+    </div>
     <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
       {{ t(switchModeError) }}
     </div>
@@ -68,7 +63,6 @@
   </div>
 </template>
 <script setup lang="ts">
-  import SelectMenuFixed from '@/components/SelectMenuFixed.vue';
   import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useTarkovStore } from '@/stores/useTarkov';
   import {
@@ -76,7 +70,6 @@
     GAME_MODES,
     getActiveSeasonTimeRemaining,
     PMC_FACTIONS,
-    type GameMode,
     type PMCFaction,
   } from '@/utils/constants';
   const tarkovStore = useTarkovStore();
@@ -132,7 +125,7 @@
       value: GAME_MODES.SEASONAL,
     },
   ]);
-  const currentBadgeMode = computed(
+  const selectedMode = computed(
     () =>
       modeOptions.value.find((option) => option.value === currentGameMode.value)?.value ??
       GAME_MODES.PVP
