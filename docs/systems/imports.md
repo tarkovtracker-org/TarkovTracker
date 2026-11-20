@@ -19,7 +19,8 @@ PNG is at `public/img/demos/stash-1440p.png` and is also the offline regression 
 ### Read-only sell view
 
 The scan review starts with **What can I sell?**. This is scoped to the selected mode,
-visible screenshot and loaded quest/hideout catalog, not item usefulness or market eligibility.
+visible screenshot and the loaded task and hideout catalog. Story chapters and Seasonal perks
+have their own requirements and are outside this view.
 It reads the full metadata catalog rather than the filtered Needed Items/import target set.
 Unfinished tasks protect accepted alternatives, later/conditional quests, required keys,
 weapon-build components, item categories and equipment. Unfinished hideout modules protect
