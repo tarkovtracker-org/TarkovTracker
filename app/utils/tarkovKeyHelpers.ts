@@ -22,7 +22,7 @@ export const getKeyIconSrc = (key: TarkovItem): string =>
   getItemDisplayIcon(key) || buildItemImageUrl(key.id, 'icon');
 export const getKeyPreviewSrc = (key: TarkovItem): string =>
   getItemPreview(key.properties?.defaultPreset) ||
-  key.image512pxLink ||
+  getItemPreview(key) ||
   buildItemImageUrl(key.id, '512');
 export const getKeyBackgroundClass = (key: TarkovItem): string =>
   BACKGROUND_CLASS_MAP[(key.backgroundColor || 'default').toLowerCase()] ??
