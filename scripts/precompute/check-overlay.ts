@@ -3,101 +3,187 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fetchOverlay } from '@/server/utils/overlay';
 import { VALID_GAME_MODES } from '@/server/utils/tarkov-cache-config';
-import { API_SUPPORTED_LANGUAGES } from '@/utils/constants';
 import {
-  compareOverlayFleet,
-  compareImportCatalog,
-  type ImportCatalogComparison,
-  type OverlayManifest,
-} from './verify-overlay';
-// This command verifies the production fleet and writes a private, unique report.
-const productionOrigin = process.env.TARKOV_OPERATIONS_ORIGIN || 'https://tarkovtracker.org';
-const operationsUrl = new URL(productionOrigin);
-if (operationsUrl.protocol !== 'https:' || operationsUrl.origin !== productionOrigin) {
+  CATALOG_SCOPES,
+  catalogManifestProblems,
+  parseCatalogJson,
+  verifyCatalogResponse,
+} from './verify-catalog-release';
+import { compareImportCatalog } from './verify-overlay';
+import type { CatalogHttpEvidence, CatalogVerificationRow } from './verify-catalog-release';
+import type { CatalogRelease } from '@/utils/catalogDatasets';
+// Reusable Access credentials travel only to the explicitly configured operations origin.
+const origin = process.env.TARKOV_OPERATIONS_ORIGIN || 'https://tarkovtracker.org';
+const operationsUrl = new URL(origin);
+if (operationsUrl.protocol !== 'https:' || operationsUrl.origin !== origin)
   throw new Error('TARKOV_OPERATIONS_ORIGIN must be an HTTPS origin without a path.');
-}
 const operationsId = process.env.TARKOV_OPERATIONS_CLIENT_ID;
 const operationsSecret = process.env.TARKOV_OPERATIONS_CLIENT_SECRET;
-if (Boolean(operationsId) !== Boolean(operationsSecret)) {
+if (Boolean(operationsId) !== Boolean(operationsSecret))
   throw new Error('Both operations Access credentials are required.');
-}
-// Reusable Access credentials only ever travel to an explicitly configured operations host.
-if (operationsId && !process.env.TARKOV_OPERATIONS_ORIGIN) {
+if (operationsId && !process.env.TARKOV_OPERATIONS_ORIGIN)
   throw new Error('TARKOV_OPERATIONS_ORIGIN is required when operations credentials are set.');
-}
 const operationsHeaders: Record<string, string> =
   operationsId && operationsSecret
     ? { 'CF-Access-Client-Id': operationsId, 'CF-Access-Client-Secret': operationsSecret }
     : {};
-const getJson = async (url: string) => {
-  const response = await fetch(url, {
-    headers: { ...operationsHeaders, 'User-Agent': 'TarkovTracker-overlay-verification/1.0' },
+async function readResponse(path: string): Promise<CatalogHttpEvidence> {
+  const response = await fetch(`${origin}${path}`, {
+    headers: { ...operationsHeaders, 'User-Agent': 'TarkovTracker-overlay-verification/2.0' },
     redirect: 'error',
     signal: AbortSignal.timeout(60000),
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
-  return { payload: await response.json(), source: response.headers.get('X-Cache-Status') };
-};
-let published: unknown;
-try {
-  published = (await fetchOverlay(true)).overlay?.$meta;
-} catch (error) {
-  console.error(String(error));
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${path}`);
+  return { body: new Uint8Array(await response.arrayBuffer()), headers: response.headers };
 }
-let manifest: OverlayManifest | null = null;
-try {
-  manifest = (await getJson(`${productionOrigin}/api/tarkov/overlay-status`)).payload;
-} catch (error) {
-  console.error(String(error));
-}
-const served = [];
-for (const lang of API_SUPPORTED_LANGUAGES)
-  for (const gameMode of VALID_GAME_MODES) {
-    try {
-      const { payload, source } = await getJson(
-        `${productionOrigin}/api/tarkov/tasks-core?lang=${lang}&gameMode=${gameMode}`
-      );
-      served.push({ lang, gameMode, overlay: payload.dataOverlay ?? {}, source });
-    } catch (error) {
-      console.error(String(error));
-    }
-  }
-const rows = compareOverlayFleet(published, manifest, served);
-const imports: ImportCatalogComparison[] = [];
-for (const gameMode of VALID_GAME_MODES) {
-  let payload: unknown;
+const readManifest = async () =>
+  parseCatalogJson((await readResponse('/api/tarkov/overlay-status')).body);
+const problem = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+async function checkScope(
+  scope: string,
+  published: unknown,
+  manifest: CatalogRelease
+): Promise<CatalogVerificationRow> {
+  const [dataset, value] = scope.split('/');
+  const query = dataset === 'strings' ? `lang=${value}` : `gameMode=${value}`;
   try {
-    payload = (await getJson(`${productionOrigin}/api/tarkov/tasks-import?gameMode=${gameMode}`))
-      .payload;
+    return verifyCatalogResponse(
+      scope,
+      published,
+      manifest,
+      await readResponse(`/api/tarkov/${dataset}?${query}`)
+    );
   } catch (error) {
-    console.error(String(error));
+    return { scope, status: 'unverified', problems: [problem(error)] };
   }
-  imports.push(compareImportCatalog(gameMode, published, payload));
 }
+function importHeadersCurrent(headers: Headers, published: unknown): boolean {
+  const meta = (published ?? {}) as { sha256?: string; version?: string };
+  const expected = {
+    'X-Cache-Status': 'PRECOMPUTE',
+    'Cache-Control': 'no-store',
+    'X-Overlay-Sha256': meta.sha256,
+    'X-Overlay-Version': meta.version,
+  };
+  return Object.entries(expected).every(
+    ([name, value]) => typeof value === 'string' && headers.get(name) === value
+  );
+}
+async function checkImport(gameMode: string, published: unknown) {
+  try {
+    const evidence = await readResponse(`/api/tarkov/tasks-import?gameMode=${gameMode}`);
+    const comparison = compareImportCatalog(gameMode, published, parseCatalogJson(evidence.body));
+    const healthyHeaders = importHeadersCurrent(evidence.headers, published);
+    return {
+      ...comparison,
+      status: healthyHeaders ? comparison.status : 'unverified',
+      problems: healthyHeaders ? [] : ['Import response headers differ from published overlay'],
+    };
+  } catch (error) {
+    return { ...compareImportCatalog(gameMode, published, undefined), problems: [problem(error)] };
+  }
+}
+const hasUnconsumedSections = (sections?: string[]): boolean => Boolean(sections?.length);
+async function readPublishedOverlay() {
+  const result = await fetchOverlay(true);
+  if (result.meta.status !== 'fresh') throw new Error('Published overlay refresh is unverified');
+  if (hasUnconsumedSections(result.meta.unconsumedSections))
+    throw new Error('Published overlay has unconsumed sections');
+  return structuredClone(result.overlay?.$meta);
+}
+async function readObservation() {
+  let manifest: unknown;
+  let published: unknown;
+  const manifestProblems: string[] = [];
+  try {
+    manifest = await readManifest();
+  } catch (error) {
+    manifestProblems.push(problem(error));
+  }
+  try {
+    published = await readPublishedOverlay();
+  } catch (error) {
+    manifestProblems.push(problem(error));
+  }
+  manifestProblems.push(
+    ...catalogManifestProblems(published, manifest, process.env.EXPECTED_OVERLAY_SHA)
+  );
+  return { manifest, published, manifestProblems };
+}
+async function inspectRelease() {
+  const observation = await readObservation();
+  const { published, manifest, manifestProblems } = observation;
+  const rows: CatalogVerificationRow[] = [];
+  for (const scope of CATALOG_SCOPES) {
+    rows.push(
+      manifestProblems.length
+        ? { scope, status: 'unverified', problems: ['Complete release manifest is unverified'] }
+        : await checkScope(scope, published, manifest as CatalogRelease)
+    );
+  }
+  const imports = await Promise.all(VALID_GAME_MODES.map((mode) => checkImport(mode, published)));
+  return { ...observation, rows, imports };
+}
+function publishedIdentity(value: unknown): string {
+  const meta = (value ?? {}) as { version?: string; sha256?: string };
+  return JSON.stringify([meta.version, meta.sha256]);
+}
+async function observeRelease() {
+  const result = await inspectRelease();
+  const conclusion = await readObservation();
+  const changed =
+    JSON.stringify(conclusion.manifest) !== JSON.stringify(result.manifest) ||
+    publishedIdentity(conclusion.published) !== publishedIdentity(result.published);
+  result.manifestProblems.push(...conclusion.manifestProblems);
+  return { ...result, changed };
+}
+let result = await observeRelease();
+let attempts = 1;
+if (result.changed) {
+  result = await observeRelease();
+  attempts = 2;
+  if (result.changed)
+    result.manifestProblems.push(
+      'Catalog release or published overlay changed again during verification'
+    );
+}
+const { rows, imports, manifestProblems } = result;
+const manifest = result.manifest as CatalogRelease | undefined;
 const reportDirectory = await mkdtemp(join(tmpdir(), 'tarkov-overlay-fleet-'));
 const output = join(reportDirectory, 'report.json');
 await writeFile(
   output,
-  JSON.stringify({ checkedAt: new Date().toISOString(), rows, imports }, null, 2),
-  {
-    mode: 0o600,
-    flag: 'wx',
-  }
+  JSON.stringify(
+    {
+      checkedAt: new Date().toISOString(),
+      origin,
+      attempts,
+      release: { completedAt: manifest?.completedAt, overlaySha: manifest?.overlaySha },
+      manifestProblems,
+      rows,
+      imports,
+    },
+    null,
+    2
+  ),
+  { mode: 0o600, flag: 'wx' }
 );
 console.log(
   JSON.stringify({
     output,
+    attempts,
     total: rows.length,
     current: rows.filter((row) => row.status === 'current').length,
-    propagating: rows.filter((row) => row.status === 'propagating').length,
-    drift: rows.filter((row) => row.status === 'drift').length,
-    unverified: rows.filter((row) => row.status === 'unverified').length,
+    unverified: rows.filter((row) => row.status !== 'current').length,
+    manifestProblems,
     importMismatches: imports.filter((row) => row.status === 'mismatch').length,
     importUnverified: imports.filter((row) => row.status === 'unverified').length,
   })
 );
 if (
-  rows.some((row) => row.status === 'drift' || row.status === 'unverified') ||
+  manifestProblems.length ||
+  rows.some((row) => row.status !== 'current') ||
   imports.some((row) => row.status !== 'current')
 )
   process.exitCode = 1;

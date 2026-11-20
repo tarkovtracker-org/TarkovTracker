@@ -82,6 +82,8 @@ export interface TarkovApiRequestOptions {
   retry?: number;
   /** Fetch cache mode; the shared probe forces `no-store`, data requests inherit freshness. */
   cache?: RequestCache;
+  /** Receives the final data response after challenge handling, matching the ofetch hook. */
+  onResponse?: (context: { response: Response }) => void | Promise<void>;
 }
 /**
  * Typed failure of the access flow or of a data request blocked by it. The
@@ -760,5 +762,6 @@ export const tarkovApiFetch = async <T>(
   if (isChallengeMitigated(response)) {
     response = await renewOnceAndRetry(endpoint, options, fromGeneration);
   }
+  await options.onResponse?.({ response });
   return await readTarkovApiJson<T>(response, endpoint);
 };

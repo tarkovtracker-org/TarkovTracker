@@ -39,6 +39,44 @@ const TARKOV_LANGUAGES = [
   'zh',
 ];
 const TARKOV_GAME_MODES = ['regular', 'pve', 'pvp-season'];
+// Match app/utils/catalogDatasets.ts without importing Nuxt application modules into the function.
+const NEUTRAL_CATALOG_DATASETS = [
+  'bootstrap',
+  'tasks-core',
+  'tasks-objectives',
+  'tasks-rewards',
+  'hideout',
+  'items-lite',
+  'items',
+  'prestige',
+  'editions',
+  'map-spawns',
+];
+// UI locales mapped to API languages, including uk -> en and excluding duplicate en.
+const NEUTRAL_CATALOG_LANGUAGES = [
+  'cs',
+  'de',
+  'en',
+  'es',
+  'fr',
+  'it',
+  'ja',
+  'ko',
+  'pl',
+  'pt',
+  'ru',
+  'tr',
+  'zh',
+];
+function buildNeutralCatalogUrls(origin: string): string[] {
+  const base = `${origin}/__neutral-catalog-v1`;
+  return [
+    ...NEUTRAL_CATALOG_DATASETS.flatMap((dataset) =>
+      TARKOV_GAME_MODES.map((mode) => `${base}/${dataset}/${mode}`)
+    ),
+    ...NEUTRAL_CATALOG_LANGUAGES.map((lang) => `${base}/strings/${lang}`),
+  ];
+}
 function buildEntryUrls(
   cacheBase: string,
   entry: { key: string; includesLanguage?: boolean; includesGameMode: boolean }
@@ -54,6 +92,7 @@ export function buildTarkovCacheUrls(origins: string[]): string[] {
   const urls: string[] = [];
   for (const origin of origins) {
     urls.push(`${origin}/api/tarkov/extract-requirements`);
+    urls.push(...buildNeutralCatalogUrls(origin));
     for (const entry of TARKOV_CACHE_KEYS)
       urls.push(...buildEntryUrls(`${origin}${EDGE_CACHE_PATH}`, entry));
   }

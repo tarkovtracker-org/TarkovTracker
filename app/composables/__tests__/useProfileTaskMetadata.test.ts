@@ -1,9 +1,15 @@
 // @vitest-environment happy-dom
 import { flushPromises } from '@vue/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { effectScope, ref } from 'vue';
 import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
+import { useMetadataStore } from '@/stores/useMetadata';
+import * as asyncUtils from '@/utils/async';
+import { localizeMetadata } from '@/utils/metadataLocalization';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { getTarkovAccessState } from '@/utils/tarkovApiFetch';
+import * as cache from '@/utils/tarkovCache';
 import { projectDuplicateObjectiveProgress } from '@/utils/taskNormalization';
 import { createDeferred } from '@/utils/test-helpers';
 import type { GameMode } from '@/utils/constants';
@@ -18,12 +24,332 @@ vi.mock('@/utils/tarkovApiFetch', async (importOriginal) => {
       accessGate.pending ?? actual.ensureTarkovAccess(signal),
   };
 });
+beforeEach(() => {
+  setActivePinia(createPinia());
+  localStorage.clear();
+  vi.spyOn(cache, 'getCachedData').mockResolvedValue(null);
+  vi.spyOn(cache, 'setCachedData').mockResolvedValue();
+});
 afterEach(() => {
+  vi.restoreAllMocks();
   accessGate.pending = null;
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  localStorage.clear();
 });
 describe('profile mode metadata', () => {
+  it('fences a profile objective cache read that crosses a purge and writes only the current key', async () => {
+    const purge = '2026-11-18T13:00:00Z';
+    const scopedKey = `neutral-v1-regular-${Date.parse(purge)}`;
+    const staleRead = createDeferred<unknown>();
+    const fresh = { tasks: [{ id: 'task', objectives: [{ id: 'fresh' }] }] };
+    vi.mocked(cache.getCachedData).mockImplementation(async (type, key) => {
+      if (type === 'tasks-core')
+        return { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } as never;
+      if (type === 'tasks-objectives')
+        return (key === scopedKey ? fresh : staleRead.promise) as never;
+      if (type === 'prestige') return { prestige: [] } as never;
+      return { editions: [], storyChapters: [] } as never;
+    });
+    const fetch = vi.fn(
+      async (
+        _url: string,
+        options: { onResponse?: (context: { response: Response }) => unknown }
+      ) => {
+        await options.onResponse?.({
+          response: new Response(null, {
+            headers: { 'X-Cache-Status': 'PRECOMPUTE', 'X-Catalog-Release': '1795000000000' },
+          }),
+        });
+        return { data: fresh };
+      }
+    );
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await vi.waitFor(() =>
+      expect(cache.getCachedData).toHaveBeenCalledWith(
+        'tasks-objectives',
+        'neutral-v1-regular',
+        'en'
+      )
+    );
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
+    staleRead.resolve({ tasks: [{ id: 'task', objectives: [{ id: 'stale' }] }] });
+    await flushPromises();
+    expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('fresh');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(cache.setCachedData).toHaveBeenCalledWith(
+      'tasks-objectives',
+      scopedKey,
+      'en',
+      fresh,
+      expect.any(Number),
+      expect.any(Function)
+    );
+    expect(
+      vi
+        .mocked(cache.setCachedData)
+        .mock.calls.some(
+          ([type, key]) => type === 'tasks-objectives' && key === 'neutral-v1-regular'
+        )
+    ).toBe(false);
+    scope.stop();
+  });
+  it('rejects a profile network objective response started before the purge and never caches it unscoped', async () => {
+    const purge = '2026-11-18T13:00:00Z';
+    const scopedKey = `neutral-v1-regular-${Date.parse(purge)}`;
+    const staleResponse = createDeferred<unknown>();
+    const fresh = { tasks: [{ id: 'task', objectives: [{ id: 'fresh' }] }] };
+    vi.mocked(cache.getCachedData).mockImplementation(async (type, key) => {
+      if (type === 'tasks-core')
+        return { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } as never;
+      if (type === 'tasks-objectives') return (key === scopedKey ? fresh : null) as never;
+      if (type === 'prestige') return { prestige: [] } as never;
+      return { editions: [], storyChapters: [] } as never;
+    });
+    vi.spyOn(asyncUtils, 'delay').mockResolvedValue();
+    let reads = 0;
+    const fetch = vi.fn(
+      async (
+        _url: string,
+        options: { onResponse?: (context: { response: Response }) => unknown }
+      ) => {
+        const body = ++reads === 1 ? await staleResponse.promise : fresh;
+        await options.onResponse?.({
+          response: new Response(null, {
+            headers: { 'X-Cache-Status': 'PRECOMPUTE', 'X-Catalog-Release': '1795000000000' },
+          }),
+        });
+        return { data: body };
+      }
+    );
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
+    staleResponse.resolve({ tasks: [{ id: 'task', objectives: [{ id: 'stale' }] }] });
+    await flushPromises();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('fresh');
+    expect(
+      vi
+        .mocked(cache.setCachedData)
+        .mock.calls.some(
+          ([type, key]) => type === 'tasks-objectives' && key === 'neutral-v1-regular'
+        )
+    ).toBe(false);
+    scope.stop();
+  });
+  it('reuses current generation objective caches without an extra profile request', async () => {
+    const purge = '2026-11-18T13:00:00Z';
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
+    const key = `neutral-v1-regular-${Date.parse(purge)}`;
+    vi.mocked(cache.getCachedData).mockImplementation(async (type, requested) => {
+      if (type === 'tasks-core')
+        return { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } as never;
+      if (type === 'tasks-objectives')
+        return {
+          tasks: [{ id: 'task', objectives: [{ id: requested === key ? 'fresh' : 'stale' }] }],
+        } as never;
+      if (type === 'prestige') return { prestige: [] } as never;
+      return { editions: [], storyChapters: [] } as never;
+    });
+    const fetch = vi.fn();
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await flushPromises();
+    expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('fresh');
+    expect(cache.getCachedData).toHaveBeenCalledWith('tasks-objectives', key, 'en');
+    expect(fetch).not.toHaveBeenCalled();
+    scope.stop();
+  });
+  it.each([undefined, null, [], 'invalid'])(
+    'caches chapters only when optional objectives are valid: %j',
+    async (objectives) => {
+      const chapter = {
+        id: 'tour',
+        name: 'Tour',
+        normalizedName: 'tour',
+        order: 1,
+        wikiLink: '',
+        ...(objectives === undefined ? {} : { objectives }),
+      };
+      vi.stubGlobal(
+        '$fetch',
+        vi.fn(async (url: string) => {
+          if (url.endsWith('/tasks-core'))
+            return { data: { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } };
+          if (url.endsWith('/tasks-objectives')) return { data: { tasks: [] } };
+          if (url.endsWith('/prestige')) return { data: { prestige: [] } };
+          return { data: { editions: [], storyChapters: [chapter] } };
+        })
+      );
+      const scope = effectScope();
+      scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')));
+      await flushPromises();
+      const writes = vi
+        .mocked(cache.setCachedData)
+        .mock.calls.filter(([type]) => type === 'editions');
+      expect(writes).toHaveLength(objectives === undefined ? 1 : 0);
+      scope.stop();
+    }
+  );
+  it.each([
+    ['tasks-core', null],
+    ['tasks-core', {}],
+    ['tasks-core', { id: 123 }],
+    ['tasks-objectives', null],
+    ['tasks-objectives', {}],
+    ['tasks-objectives', { id: 123 }],
+  ])('refetches cached %s with an incompatible task entry %j', async (type, entry) => {
+    vi.mocked(cache.getCachedData).mockImplementation(async (candidate) =>
+      candidate === type ? ({ tasks: [entry], maps: [], traders: [] } as never) : null
+    );
+    const fetch = vi.fn(async (url: string) => {
+      if (url.endsWith('/tasks-core'))
+        return { data: { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } };
+      if (url.endsWith('/tasks-objectives'))
+        return { data: { tasks: [{ id: 'task', objectives: [{ id: 'objective' }] }] } };
+      if (url.endsWith('/prestige')) return { data: { prestige: [] } };
+      return { data: { editions: [], storyChapters: [] } };
+    });
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await flushPromises();
+    expect(fetch.mock.calls.filter(([url]) => url.endsWith('/' + type))).toHaveLength(1);
+    expect(result.tasks.value[0]?.id).toBe('task');
+    expect(result.tasks.value[0]?.objectives?.[0]?.id).toBe('objective');
+    expect(result.error.value).toBeNull();
+    scope.stop();
+  });
+  it('refetches malformed cached prestige and stores valid editions with a one-hour TTL', async () => {
+    vi.mocked(cache.getCachedData).mockImplementation(async (type) =>
+      type === 'prestige' ? ({ prestige: [{ id: 'bad', level: 'invalid' }] } as never) : null
+    );
+    const fetch = vi.fn(async (url: string) => {
+      if (url.endsWith('/tasks-core'))
+        return { data: { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] } };
+      if (url.endsWith('/tasks-objectives')) return { data: { tasks: [] } };
+      if (url.endsWith('/prestige')) return { data: { prestige: [] } };
+      return { data: { editions: [], storyChapters: [] } };
+    });
+    vi.stubGlobal('$fetch', fetch);
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+    await flushPromises();
+    expect(result.error.value).toBeNull();
+    expect(fetch.mock.calls.filter(([url]) => url.endsWith('/prestige'))).toHaveLength(1);
+    expect(cache.setCachedData).toHaveBeenCalledWith(
+      'prestige',
+      'neutral-v1-regular',
+      'en',
+      { prestige: [] },
+      cache.CACHE_CONFIG.DEFAULT_TTL,
+      expect.any(Function)
+    );
+    expect(cache.setCachedData).toHaveBeenCalledWith(
+      'editions',
+      'neutral-v1-regular',
+      'en',
+      { editions: [], storyChapters: [] },
+      3_600_000,
+      expect.any(Function)
+    );
+    scope.stop();
+  });
+  it('keeps malformed network chapters out of the shared catalog cache', async () => {
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/tasks-core'))
+          return { data: { tasks: [{ id: 'task' }], maps: [], traders: [] } };
+        if (url.endsWith('/tasks-objectives')) return { data: { tasks: [] } };
+        if (url.endsWith('/prestige')) return { data: { prestige: [] } };
+        return { data: { editions: [], storyChapters: [{ id: 'incomplete' }] } };
+      })
+    );
+    const scope = effectScope();
+    scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')));
+    await flushPromises();
+    expect(
+      vi.mocked(cache.setCachedData).mock.calls.filter(([type]) => type === 'editions')
+    ).toEqual([]);
+    scope.stop();
+  });
+  it('keeps an older profile request from overwriting a newer shared metadata request', async () => {
+    const old = createDeferred<object>();
+    const fresh = createDeferred<object>();
+    let coreRequests = 0;
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn(async (url: string) => {
+        if (url.endsWith('/tasks-core')) return ++coreRequests === 1 ? old.promise : fresh.promise;
+        if (url.endsWith('/tasks-objectives')) return { data: { tasks: [] } };
+        if (url.endsWith('/prestige')) return { data: { prestige: [] } };
+        return { data: { editions: [], storyChapters: [] } };
+      })
+    );
+    const scope = effectScope();
+    scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')));
+    await vi.waitFor(() => expect(coreRequests).toBe(1));
+    const current = useMetadataStore().fetchTasksCoreData(true);
+    await vi.waitFor(() => expect(coreRequests).toBe(2));
+    old.resolve({ data: { tasks: [{ id: 'old', name: 'Old' }], maps: [], traders: [] } });
+    await flushPromises();
+    expect(
+      vi.mocked(cache.setCachedData).mock.calls.filter(([type]) => type === 'tasks-core')
+    ).toEqual([]);
+    fresh.resolve({ data: { tasks: [{ id: 'fresh', name: 'Fresh' }], maps: [], traders: [] } });
+    await current;
+    expect(
+      vi.mocked(cache.setCachedData).mock.calls.filter(([type]) => type === 'tasks-core')
+    ).toHaveLength(1);
+    scope.stop();
+  });
+  it('reuses neutral profile catalogs and loads one table when the language changes', async () => {
+    const entries = new Map<string, unknown>();
+    vi.mocked(cache.getCachedData).mockImplementation(
+      async (type, key, language) => (entries.get(`${type}/${key}/${language}`) ?? null) as never
+    );
+    vi.mocked(cache.setCachedData).mockImplementation(async (type, key, language, data) => {
+      entries.set(`${type}/${key}/${language}`, structuredClone(data));
+    });
+    const language = ref('en');
+    const name = '@tt:regular:tasks:name';
+    const fetch = vi.fn(async (url: string, options: { query: Record<string, string> }) => {
+      if (url.endsWith('/strings'))
+        return { data: { strings: { [name]: options.query.lang === 'de' ? 'Aufgabe' : 'Task' } } };
+      expect(options.query).not.toHaveProperty('lang');
+      if (url.endsWith('/tasks-core'))
+        return { data: { tasks: [{ id: 'task', name }], maps: [], traders: [] } };
+      if (url.endsWith('/tasks-objectives')) return { data: { tasks: [] } };
+      if (url.endsWith('/prestige')) return { data: { prestige: [] } };
+      return { data: { editions: [], storyChapters: [] } };
+    });
+    vi.stubGlobal('$fetch', fetch);
+    const mainView = localizeMetadata(useMetadataStore(), { name }, 'en');
+    const scope = effectScope();
+    const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), language))!;
+    await mainView;
+    await flushPromises();
+    expect(fetch.mock.calls.filter(([url]) => url.endsWith('/strings'))).toHaveLength(1);
+    expect(result.tasks.value[0]?.name).toBe('Task');
+    fetch.mockClear();
+    language.value = 'de';
+    await flushPromises();
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(['/api/tarkov/strings']);
+    expect(result.tasks.value[0]?.name).toBe('Aufgabe');
+    fetch.mockClear();
+    language.value = 'en';
+    await flushPromises();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.tasks.value[0]?.name).toBe('Task');
+    scope.stop();
+  });
   it('requests the selected mode and ignores responses from an obsolete mode', async () => {
     const old = createDeferred<object>();
     const mode = ref<GameMode>('pvp');
@@ -51,7 +377,7 @@ describe('profile mode metadata', () => {
     expect(fetch).toHaveBeenCalledWith(
       '/api/tarkov/tasks-objectives',
       expect.objectContaining({
-        query: { gameMode: 'pve', lang: 'de' },
+        query: { gameMode: 'pve' },
       })
     );
     expect(result.tasks.value).toEqual([
@@ -290,6 +616,7 @@ it('ignores a required catalog rejection after its scope is disposed', async () 
   );
   const scope = effectScope();
   const result = scope.run(() => useProfileTaskMetadata(ref<GameMode>('pvp'), ref('en')))!;
+  await vi.waitFor(() => expect($fetch).toHaveBeenCalledTimes(4));
   scope.stop();
   pending.reject(new Error('Old request failed'));
   await flushPromises();

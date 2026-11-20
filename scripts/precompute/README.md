@@ -1,35 +1,84 @@
-# scripts/precompute/
+# Game-data precompute
 
-## Neutral catalog release
+The scheduled and manually dispatched producer prepares neutral game catalogs and
+English import snapshots for `TARKOV_DATA`. Production credentials are available
+only to the trusted `main` workflow in the `production-precompute` environment.
 
-A full run stages ten game-data catalogs for each of the three game modes and one strings bundle per
-distinct selectable API language. Every object is gzip-compressed, addressed by a SHA-256 of its
-uncompressed JSON, written to KV, and read back byte-for-byte. The publisher replaces
-`neutral-catalog-v1-manifest` only after all object checks succeed. Filtered legacy/import runs
-leave this manifest alone. Failed staging leaves the previous complete manifest available.
+## Release contents
 
-During migration the same workflow continues to refresh the localized catalog fleet and the three
-English import snapshots. First publish the overlay's neutral sidecar alongside its existing
-artifact. Merge the Tracker producer while the deployed reader still uses the previous keys.
-Dispatch **Precompute Tarkov Data** on `main` with the legacy overlay digest as
-`expectedOverlaySha` and both filters empty. Download the run's `overlay-precompute-manifest`
-artifact and check `catalogRelease.overlaySha`, all catalog and language scopes, and all three
-import results before deploying a reader of the new manifest.
+A full run publishes ten neutral datasets for each of the three game modes
+and one strings bundle per distinct selectable API language. The current scope is
+30 catalog objects plus 13 language objects. These constants come from
+`app/utils/catalogDatasets.ts`. Strings contain only references the final adapted
+catalogs use and include English fallback for every mode.
 
-Scheduled every 12 hours by `precompute-tarkov-data.yml`: fetches Tarkov.dev data, runs the same
-adapt/overlay pipeline as the API, and writes the result to Cloudflare KV. TypeScript run with
-`tsx` because it imports the app's server code. See the precompute section of
-[`docs/systems/overlay-and-precompute.md`](../../docs/systems/overlay-and-precompute.md).
+Every object is gzip-compressed and addressed by SHA256 of its uncompressed UTF-8
+JSON. The writer enforces size limits and reads stored bytes back before replacing
+`neutral-catalog-v1-manifest`. That manifest includes the source-overlay SHA,
+completion timestamp, object keys, uncompressed lengths, and overlay headers.
+Failed staging preserves the previous complete manifest. Seven-day retention
+bounds stored-object lifetime.
 
-| File                  | What it does                                                               | Run by                     |
-| --------------------- | -------------------------------------------------------------------------- | -------------------------- |
-| `run.ts`              | Command-line entry point.                                                  | `precompute:tarkov`        |
-| `catalog-release.ts`  | Stage, verify and activate immutable neutral catalogs and language tables. | `run.ts`                   |
-| `precompute.ts`       | The pipeline itself.                                                       | `run.ts`                   |
-| `import-snapshots.ts` | Produces three whole English EFT import snapshots off the request path.    | `run.ts`                   |
-| `kv.ts`               | Writes to Cloudflare KV over its REST API.                                 | `precompute.ts`            |
-| `nuxt-imports.ts`     | Stand-in for Nuxt's `#imports` so app server code runs outside Nuxt.       | `tsconfig.json` path alias |
-| `check-overlay.ts`    | Verifies production is serving a fresh, correctly overlaid payload.        | `verify:overlay`           |
-| `verify-overlay.ts`   | Freshness and overlay comparison used by `check-overlay.ts`.               | `check-overlay.ts`         |
-| `tsconfig.json`       | TypeScript settings for this folder.                                       | `typecheck`, `tsx`         |
-| `__tests__/`          | Vitest tests.                                                              | `pnpm run test`            |
+The same run refreshes three independent whole English import snapshots. Their
+scope, age, progress-critical task/objective structure, and overlay provenance
+remain independently validated. They use `tasks-import-json-v1-en-<mode>` keys.
+During migration the workflow also refreshes the 48 legacy localized entries.
+Retire that producer only after the new reader passes production verification.
+Those temporary entries are outside the neutral release contract.
+
+## Preseed and promote
+
+1. Release the overlay producer's neutral sidecar alongside its existing artifact.
+2. Merge the reviewed Tracker producer while the deployed reader still uses its
+   previous contract.
+3. Dispatch **Precompute Tarkov Data** on `main` with the legacy-overlay digest in
+   `expectedOverlaySha` and both filters empty.
+4. Inspect the uploaded `overlay-precompute-manifest` artifact. Require the matching
+   `catalogRelease.overlaySha`, every catalog/language scope, successful readbacks,
+   and all three import results before promoting the new reader.
+5. Verify production with `pnpm run verify:overlay`. Allow 90 seconds after the
+   successful pointer readback for KV propagation. Recheck the intended release
+   before using **Purge Game Data**, then record the language-switch evidence.
+
+A filtered maintenance run leaves the neutral manifest untouched. Preview namespaces
+need their own complete release and imports. Use a reviewed producer with the
+explicit preview namespace through an approved operator or broker path. Candidate
+preview code receives no production credentials. Local Nuxt development without
+KV uses the neutral builders directly through `devCatalog`; it needs the overlay
+read token and does not certify a deployed release.
+
+## Verification
+
+`pnpm run verify:overlay` checks canonical production by default. Set
+`TARKOV_OPERATIONS_ORIGIN` to the exact authorized HTTPS operations origin when
+using paired `TARKOV_OPERATIONS_CLIENT_ID` and `TARKOV_OPERATIONS_CLIENT_SECRET`.
+Redirects are rejected. `OVERLAY_TOKEN` supplies read-only access to the private
+overlay. `EXPECTED_OVERLAY_SHA` can pin the release being certified.
+
+The command requires a fresh published-overlay read and verifies the complete exact
+scope set, a release timestamp no older
+than 14 hours, matching published overlay, raw response digest and length,
+`PRECOMPUTE` source, `no-store`, release timestamp, and overlay headers/body identity.
+`STALE` fallback is a failed certification. It checks all three whole English import
+responses separately. A changed manifest triggers one full retry; another change
+fails. A unique private temporary report retains keys, digests, counts, and failure
+reasons without raw private payloads. Missing data or any failed check exits nonzero.
+
+## Files
+
+| File                        | Responsibility                                                           | Run by                                         |
+| --------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| `run.ts`                    | Trusted CLI and publication diagnostics                                  | Precompute Tarkov Data workflow                |
+| `precompute.ts`             | Legacy localized publication during migration, TTL and filter validation | run.ts and snapshot producers                  |
+| `catalog-release.ts`        | Immutable object staging, readback, and pointer activation               | run.ts                                         |
+| `import-snapshots.ts`       | Whole English import generation and validation                           | run.ts                                         |
+| `kv.ts`                     | Bounded KV reads and writes                                              | run.ts and catalog-release.ts                  |
+| `check-overlay.ts`          | Served-release and import verification                                   | pnpm run verify:overlay                        |
+| `verify-catalog-release.ts` | Exact scope, digest, headers, age and source checks                      | check-overlay.ts                               |
+| `verify-overlay.ts`         | Whole English import comparison and freshness window                     | check-overlay.ts and verify-catalog-release.ts |
+| `nuxt-imports.ts`           | Standalone Nuxt import shim                                              | Script TypeScript configuration                |
+| `tsconfig.json`             | Standalone module aliases and compiler settings                          | tsx and tsc                                    |
+| `__tests__/`                | Producer and verifier regressions                                        | Vitest                                         |
+
+The complete architecture and release rules are in
+[Overlay and precompute](../../docs/systems/overlay-and-precompute.md#precompute-workflow).
