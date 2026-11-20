@@ -140,13 +140,16 @@ Keep existing rules in place.
 (http.host in {"tarkovtracker.org" "www.tarkovtracker.org"}
  and http.request.method eq "GET"
  and http.request.uri.path eq "/api/twitch/config"
- and http.request.uri.query eq "")
+ and http.request.uri.query eq ""
+ and not any(http.request.headers.names[*] in {"authorization" "origin"}))
 ```
 
 After rollout, send two ordinary GETs from the same location and check for `CF-Cache-Status: HIT`
 on the warm response. Check that `?fresh=1` returns the current version with `Cache-Control: no-store`
-and never returns `HIT`. The existing admin save purges the tag with a fallback to the two exact
-public URLs. Disable this rule to roll back edge caching.
+and never returns `HIT`. Requests with an explicit `Origin` stay outside the rule because Cloudflare
+includes that header in the default cache key and URL-only purge fallback targets the default variant.
+The existing admin save purges the tag with a fallback to the two exact public URLs. Disable this rule
+to roll back edge caching.
 
 ### Files
 
