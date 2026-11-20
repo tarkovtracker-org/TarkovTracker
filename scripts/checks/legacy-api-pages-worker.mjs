@@ -54,6 +54,7 @@ export default {
     // Preserve native waitUntil concurrency: catalog cache publication completes after delivery
     // validates the public body. Awaiting those tasks here deadlocks the response itself.
     const response = await pagesWorker.fetch(request, testEnv, context);
+    if (request.headers.has('X-Test-Return-Original')) return response;
     const result = new Response(response.body, response);
     result.headers.set('X-Test-Body-Reads', String(bodyReads));
     result.headers.set('X-Test-Upstream-Reads', String(tarkovHeadOutbound.reads));

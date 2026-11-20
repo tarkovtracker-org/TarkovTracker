@@ -341,13 +341,17 @@ produced and validated separately by the same trusted runner.
 ### Reader behavior
 
 `serveCatalog.ts` reads the manifest on each request, finds the exact dataset/mode
-or strings/language scope, and streams the referenced compressed object through
-decompression. Responses use `no-store`, `X-Cache-Status: PRECOMPUTE`, and the
-manifest's `X-Catalog-Release` timestamp. A compressed per-colo Cache API copy can
+or strings/language scope, and streams the referenced object. Responses use
+`no-store`, `X-Cache-Status: PRECOMPUTE`, and the manifest's `X-Catalog-Release`
+timestamp. A compressed per-colo Cache API copy can
 be reused after the active manifest confirms its immutable key and release. KV
 failure may serve that last-good copy with `X-Cache-Status: STALE`. Without an
 eligible copy, a missing entry or body returns 503. A stale fallback keeps the UI
 available and cannot pass release verification.
+
+Direct Pages GET requests for strings can stream the original gzip bytes when
+the client accepts gzip and the active release matches a fully validated Cache
+API copy. KV reads and stale fallbacks still use bounded decompression.
 
 The producer and reader share per-dataset uncompressed size limits from
 `catalogDatasets.ts`. The reader checks the declared length, opens the

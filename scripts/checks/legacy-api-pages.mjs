@@ -330,6 +330,34 @@ async function waitForLastGoodCatalog(url) {
   assert.equal(response.headers.get('X-Cache-Status'), 'STALE');
   return response;
 }
+test('compiled warm strings sends one gzip encoding without changing its release or bytes', async () => {
+  const url = 'https://tarkovtracker.org/api/tarkov/strings?lang=de';
+  const identity = await harness.fetch(url, {
+    headers: { 'Accept-Encoding': 'identity', 'X-Test-Clear-Catalog-Cache': '1' },
+  });
+  assert.equal(identity.status, 200);
+  const body = await identity.text();
+  const release = identity.headers.get('X-Catalog-Release');
+  assert.equal(await (await waitForLastGoodCatalog(url)).text(), body);
+  const warm = await harness.fetch(url, {
+    headers: { 'Accept-Encoding': 'gzip', 'X-Test-Return-Original': '1' },
+  });
+  assert.equal(warm.status, 200);
+  assert.equal(warm.headers.get('MF-Content-Encoding'), 'gzip');
+  assert.match(warm.headers.get('Vary') ?? '', /Accept-Encoding/i);
+  assert.equal(warm.headers.has('X-Tarkov-Catalog-Precompressed'), false);
+  assert.equal(warm.headers.get('Cache-Control'), 'no-store');
+  assert.equal(warm.headers.get('X-Catalog-Release'), release);
+  assert.equal(warm.headers.get('X-Overlay-Sha256'), identity.headers.get('X-Overlay-Sha256'));
+  // Miniflare's fetch client removes exactly the advertised transport encoding.
+  assert.equal(await warm.text(), body);
+  const rejected = await harness.fetch(url, {
+    headers: { 'Accept-Encoding': 'gzip;q=0, identity', 'X-Test-Return-Original': '1' },
+  });
+  assert.equal(rejected.headers.get('Vary'), warm.headers.get('Vary'));
+  assert.notEqual(rejected.headers.get('MF-Content-Encoding'), 'gzip');
+  assert.equal(await rejected.text(), body);
+});
 test('compiled cold catalog HEAD prepares last-good bytes for a later outage GET', async () => {
   const url = 'https://tarkovtracker.org/api/tarkov/items?gameMode=pve';
   const head = await harness.fetch(url, {
