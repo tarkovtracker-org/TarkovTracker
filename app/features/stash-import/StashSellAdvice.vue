@@ -40,9 +40,6 @@
         </div>
       </li>
     </ul>
-    <p v-else-if="ready" class="text-surface-300 mt-2 text-xs">
-      {{ $t('stash_import.sell_empty') }}
-    </p>
     <p class="text-surface-400 mt-2 text-xs">
       {{ $t('stash_import.sell_scope', { mode: modeLabel }) }}
     </p>
@@ -60,9 +57,12 @@
   }>();
   const { t } = useI18n({ useScope: 'global' });
   const summary = computed(() => {
-    if (props.ready) return t('stash_import.sell_summary', { count: props.groups.length });
+    if (props.ready) {
+      const count = props.groups.length;
+      return count ? t('stash_import.sell_summary', count) : t('stash_import.sell_empty');
+    }
     if (props.incompleteTasks?.length)
-      return t('stash_import.sell_incomplete', { count: props.incompleteTasks.length });
+      return t('stash_import.sell_incomplete', props.incompleteTasks.length);
     return t('stash_import.sell_unavailable');
   });
   const headingId = useId();

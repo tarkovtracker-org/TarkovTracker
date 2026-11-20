@@ -242,6 +242,8 @@ export interface TaskObjective {
   status?: string[];
   /** All items that must be contained */
   containsAll?: TarkovItem[];
+  /** Item categories that a weapon build must include. */
+  containsCategory?: string[];
   /** Any of these items can be used */
   useAny?: TarkovItem[];
   /** Accepted weapons; legacy catalogs may supply a scalar reference. */

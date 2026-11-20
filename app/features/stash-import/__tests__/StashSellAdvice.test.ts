@@ -4,7 +4,7 @@ import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import StashSellAdvice from '@/features/stash-import/StashSellAdvice.vue';
 mockNuxtImport('useI18n', () => () => ({
-  t: (key: string, values?: { count?: number }) => `${key}:${values?.count ?? ''}`,
+  t: (key: string, count?: number) => `${key}:${count ?? ''}`,
 }));
 const global = {
   mocks: {

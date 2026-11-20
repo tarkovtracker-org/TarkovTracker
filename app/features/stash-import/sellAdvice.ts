@@ -1,3 +1,4 @@
+import { objectiveEquipmentItems } from '@/utils/objectiveEquipment';
 import { overlapsRegion } from '@/utils/stashScan/regions';
 import { reviewState } from '@/utils/stashScan/review';
 import { SCAN_LIMITS } from '@/utils/stashScan/types';
@@ -15,31 +16,66 @@ export interface SellGroup {
   quantity: number;
   cell: ReviewedCell['cell'];
 }
-const ITEM_FIELDS = [
-  'item',
-  'items',
-  'markerItem',
-  'questItem',
-  'containsAll',
-  'useAny',
-  'usingWeapon',
-  'usingWeaponMods',
-  'wearing',
-] as const;
-/** Unlike presentation helpers, never truncate accepted-item or equipment pools. */
-const objectiveItems = (objective: TaskObjective): TarkovItem[] =>
-  [
-    ...ITEM_FIELDS.flatMap<TarkovItem>((field) => objective[field] ?? []),
-    ...(objective.requiredKeys ?? []).flat(),
-  ].flat();
-const knownItem = (item: TarkovItem) => Boolean(item?.id);
-const ITEM_OBJECTIVES = new Set(['giveItem', 'findItem', 'plantItem', 'buildWeapon']);
+const REGULAR_ITEM_OBJECTIVES = ['giveItem', 'findItem', 'plantItem', 'place', 'sellItem'];
+const QUEST_ITEM_OBJECTIVES = ['findQuestItem', 'giveQuestItem', 'plantQuestItem'];
+const OTHER_OBJECTIVES = new Set([
+  'dialogue',
+  'experience',
+  'extract',
+  'globalVariable',
+  'hideoutStationLevel',
+  'key',
+  'playerLevel',
+  'shoot',
+  'skill',
+  'taskStatus',
+  'traderLevel',
+  'traderStanding',
+  'visit',
+]);
+const regularItems = (objective: TaskObjective) => [
+  ...(objective.item ? [objective.item] : []),
+  ...(objective.items ?? []),
+];
+const questItems = (objective: TaskObjective) => (objective.questItem ? [objective.questItem] : []);
+const markers = (objective: TaskObjective) => (objective.markerItem ? [objective.markerItem] : []);
+const knownId = (id: unknown): id is string => typeof id === 'string' && id.trim().length > 0;
+const knownItem = (item: TarkovItem) => knownId(item?.id);
+const requiredItemsByType = new Map<string, (objective: TaskObjective) => TarkovItem[]>([
+  ...REGULAR_ITEM_OBJECTIVES.map((type) => [type, regularItems] as const),
+  ...QUEST_ITEM_OBJECTIVES.map((type) => [type, questItems] as const),
+  ['buildWeapon', (objective) => (objective.item ? [objective.item] : [])],
+  ['mark', markers],
+  ['useItem', (objective) => [...regularItems(objective), ...(objective.useAny ?? [])]],
+]);
+/** Read all positive references. The presentation helper caps some pools. */
+const objectiveItems = (objective: TaskObjective): TarkovItem[] => [
+  ...regularItems(objective),
+  ...questItems(objective),
+  ...(objective.type === 'mark' ? markers(objective) : []),
+  ...(objective.containsAll ?? []),
+  ...(objective.useAny ?? []),
+  ...objectiveEquipmentItems(objective.usingWeapon),
+  ...objectiveEquipmentItems(objective.usingWeaponMods),
+  ...objectiveEquipmentItems(objective.wearing),
+  ...(objective.requiredKeys ?? []).flat(),
+];
+function knownObjectiveType(objective: TaskObjective, type: string): boolean {
+  const requiredItems = requiredItemsByType.get(type);
+  return requiredItems ? requiredItems(objective).some(knownItem) : OTHER_OBJECTIVES.has(type);
+}
+function knownCategories(categories: string[] | undefined): boolean {
+  if (categories === undefined) return true;
+  return Array.isArray(categories) && categories.every(knownId);
+}
 function knownObjective(objective: TaskObjective): boolean {
-  if (!objective?.id || !objective.type) return false;
-  const items = objectiveItems(objective);
-  return [!ITEM_OBJECTIVES.has(objective.type) || items.length > 0, items.every(knownItem)].every(
-    Boolean
-  );
+  if (!objective) return false;
+  return [
+    knownId(objective.id),
+    knownObjectiveType(objective, objective.type ?? ''),
+    objectiveItems(objective).every(knownItem),
+    knownCategories(objective.containsCategory),
+  ].every(Boolean);
 }
 const knownModule = (module: HideoutModule) => Array.isArray(module.itemRequirements);
 const finishedTask = (task: Task, progress: SellProgress) =>
@@ -47,19 +83,19 @@ const finishedTask = (task: Task, progress: SellProgress) =>
 const remainingObjectives = (task: Task, progress: SellProgress) =>
   progress.isTaskFailed(task.id)
     ? task.objectives!
-    : task.objectives!.filter((entry) => !progress.isTaskObjectiveComplete(entry.id));
+    : task.objectives!.filter((entry) => !progress.isTaskObjectiveComplete(entry?.id));
 function taskItems(task: Task, progress: SellProgress): TarkovItem[] {
   if (finishedTask(task, progress)) return [];
   // Pending, hidden, failed-branch and conditionally eligible tasks all remain protected.
   return [
     ...remainingObjectives(task, progress).flatMap(objectiveItems),
-    ...(task.requiredKeys ?? []).flatMap((group) => group.keys),
+    ...(task.requiredKeys ?? []).flatMap((group) => group?.keys),
   ];
 }
 const moduleItems = (module: HideoutModule, progress: SellProgress) =>
   progress.isHideoutModuleComplete(module.id)
     ? []
-    : module.itemRequirements.map((requirement) => requirement.item);
+    : module.itemRequirements.map((requirement) => requirement?.item);
 function knownTask(task: Task, progress: SellProgress): boolean {
   if (finishedTask(task, progress)) return true;
   if (!Array.isArray(task.objectives) || !task.objectives.length) return false;
@@ -84,8 +120,18 @@ export function remainingSellUses(
     ...tasks.flatMap((task) => taskItems(task, progress)),
     ...modules.flatMap((module) => moduleItems(module, progress)),
   ];
-  if (items.some((item) => !item?.id)) return undefined;
+  if (!items.every(knownItem)) return undefined;
   return new Set(items.map((item) => item.id));
+}
+export function remainingSellCategories(
+  tasks: Task[],
+  progress: SellProgress
+): ReadonlySet<string> {
+  const categories = tasks
+    .filter((task) => !finishedTask(task, progress))
+    .flatMap((task) => remainingObjectives(task, progress))
+    .flatMap((objective) => objective.containsCategory ?? []);
+  return new Set(categories);
 }
 function quantityFits(row: ReviewedCell, item: ScanItem): boolean {
   const maximum = Math.min(SCAN_LIMITS.quantity, item.maxStack);
@@ -133,6 +179,7 @@ export function sellGroups(
   independent
     .filter((row) => !remaining.has(row.itemId))
     .forEach((row) => accumulate(groups, row, byId.get(row.itemId)!));
+  // Use the import volume bound for each whole item group so a partial total never appears.
   return [...groups.values()]
     .filter((group) => group.quantity <= SCAN_LIMITS.quantity)
     .sort((a, b) => a.name.localeCompare(b.name));

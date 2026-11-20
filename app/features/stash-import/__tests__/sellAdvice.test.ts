@@ -90,7 +90,7 @@ describe('remaining tracked uses', () => {
     ).toBe(true);
   });
   it('retains every item in nested equipment alternatives present in the loaded catalog', () => {
-    const nested = [[item('vest-a')], [item('vest-b')]] as unknown as TarkovItem[];
+    const nested = [[item('vest-a')], [item('vest-b')]];
     expect(
       remainingSellUses([task({ objectives: [objective({ wearing: nested })] })], [], progress)
     ).toEqual(new Set(['needed', 'vest-a', 'vest-b']));
@@ -124,14 +124,69 @@ describe('remaining tracked uses', () => {
     ).toEqual(new Set(['needed']));
   });
   it.each([
-    task({ objectives: undefined }),
-    task({ objectives: [] }),
-    task({ objectives: [{ id: 'incomplete' }] }),
-    task({ objectives: [objective({ type: 'shoot', usingWeapon: { id: '' } as TarkovItem })] }),
-    task({ objectives: [objective({ item: undefined })] }),
-    task({ objectives: [objective({ items: [{} as TarkovItem] })] }),
-  ])('withholds the answer when task data is incomplete', (incomplete) => {
+    ['missing objectives', task({ objectives: undefined })],
+    ['empty objectives', task({ objectives: [] })],
+    ['missing type', task({ objectives: [{ id: 'incomplete' }] })],
+    ['unknown type', task({ objectives: [objective({ type: 'futureObjective' })] })],
+    [
+      'unmapped weapon',
+      task({ objectives: [objective({ type: 'shoot', usingWeapon: item('') })] }),
+    ],
+    ['no accepted item', task({ objectives: [objective({ item: undefined })] })],
+    ['malformed pool', task({ objectives: [objective({ items: [item('')] })] })],
+    ...[
+      'giveItem',
+      'findItem',
+      'plantItem',
+      'sellItem',
+      'place',
+      'findQuestItem',
+      'giveQuestItem',
+      'plantQuestItem',
+      'useItem',
+      'buildWeapon',
+    ].map(
+      (type) =>
+        [
+          `${type} with only a marker and a key`,
+          task({
+            objectives: [
+              objective({
+                type,
+                item: undefined,
+                markerItem: item('visual'),
+                requiredKeys: [[item('key')]],
+              }),
+            ],
+          }),
+        ] as const
+    ),
+    [
+      'unmapped build category',
+      task({ objectives: [objective({ type: 'buildWeapon', containsCategory: [''] })] }),
+    ],
+    ['mark with no marker', task({ objectives: [objective({ type: 'mark' })] })],
+    [
+      'build with parts but no base',
+      task({
+        objectives: [
+          objective({ type: 'buildWeapon', item: undefined, containsAll: [item('mod')] }),
+        ],
+      }),
+    ],
+  ] as const)('withholds advice for %s', (_label, incomplete) => {
     expect(remainingSellUses([task(), incomplete], [], progress)).toBeUndefined();
+  });
+  it('protects marker, quest-specific and use-item requirements in their canonical fields', () => {
+    const objectives = [
+      { id: 'marker', type: 'mark', markerItem: item('beacon') },
+      { id: 'quest', type: 'findQuestItem', questItem: item('quest-item') },
+      { id: 'use', type: 'useItem', useAny: [item('consumable')] },
+      { id: 'dialogue', type: 'dialogue' },
+    ];
+    expect(remainingSellUses([task({ objectives })], [], progress)).toEqual(
+      new Set(['beacon', 'quest-item', 'consumable'])
+    );
   });
   it('does not require missing data for a quest the player actually completed', () => {
     expect(

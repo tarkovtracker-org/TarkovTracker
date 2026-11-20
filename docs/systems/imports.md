@@ -22,7 +22,8 @@ The scan review starts with **What can I sell?**. This is scoped to the selected
 visible screenshot and loaded quest/hideout catalog, not item usefulness or market eligibility.
 It reads the full metadata catalog rather than the filtered Needed Items/import target set.
 Unfinished tasks protect accepted alternatives, later/conditional quests, required keys,
-weapon-build components and equipment; unfinished hideout modules protect their requirements.
+weapon-build components, item categories and equipment. Unfinished hideout modules protect
+their requirements.
 Collected counts never establish a physical surplus. No surplus recommendations are made.
 
 Only settled identities and valid known unit counts can appear. Excluded/empty, unknown,
@@ -31,7 +32,9 @@ are grouped once. An item referenced by any remaining requirement stays protecte
 of its FIR status or observed amount. A completed task/objective or built hideout module may
 release its cataloged use; merely filling its count does not. Missing/changing requirement data
 withholds the answer. Unfinished tasks with empty objectives, untyped objectives or unmapped
-item objectives are reported by quest name; they cannot establish that an item has no use. Changing mode while the importer is open requires reopening it.
+item objectives are reported by quest name. Changing the game mode withholds the sell view
+until the importer is reopened. If a pending weapon build requires an item category, only items
+with known categories outside all such requirements are eligible for advice.
 
 The panel only reads state: it does not plan, allocate, fetch prices, save counts, or upload
 screenshots. The normal review, selected-target preview and explicit save are unchanged.

@@ -49,6 +49,7 @@ beforeEach(() => {
     error: null,
     hideoutLoading: false,
     hideoutError: null,
+    itemsLoading: false,
     itemsError: null,
     currentGameMode: 'pvp',
     itemsGameMode: 'regular',
@@ -86,15 +87,19 @@ describe('read-only sell advice adapter', () => {
     expect(h.write).not.toHaveBeenCalled();
     expect(h.fetch).not.toHaveBeenCalled();
   });
-  it.each(['loading', 'tasksCoreRefreshing', 'tasksObjectivesPending', 'hideoutLoading'] as const)(
-    'withholds advice during %s',
-    (flag) => {
-      const advice = useStashSellAdvice(rows(), result);
-      h.metadata[flag] = true;
-      expect(advice.ready.value).toBe(false);
-      expect(advice.groups.value).toEqual([]);
-    }
-  );
+  it.each([
+    'loading',
+    'tasksCoreRefreshing',
+    'tasksObjectivesPending',
+    'hideoutLoading',
+    'itemsLoading',
+    'initializationFailed',
+  ] as const)('withholds advice during %s', (flag) => {
+    const advice = useStashSellAdvice(rows(), result);
+    h.metadata[flag] = true;
+    expect(advice.ready.value).toBe(false);
+    expect(advice.groups.value).toEqual([]);
+  });
   it.each(['tasksObjectivesError', 'hideoutError', 'itemsError', 'error'] as const)(
     'withholds advice when %s is present',
     (key) => {
@@ -104,11 +109,59 @@ describe('read-only sell advice adapter', () => {
       expect(advice.groups.value).toEqual([]);
     }
   );
+  it.each([
+    [
+      'initialization is incomplete',
+      () => {
+        h.metadata.initialized = false;
+      },
+    ],
+    [
+      'objective hydration is incomplete',
+      () => {
+        h.metadata.tasksObjectivesHydrated = false;
+      },
+    ],
+    [
+      'tasks are empty',
+      () => {
+        h.metadata.tasks = [];
+      },
+    ],
+    [
+      'hideout is empty',
+      () => {
+        h.metadata.hideoutModules = [];
+      },
+    ],
+    [
+      'item mode is stale',
+      () => {
+        h.metadata.itemsGameMode = 'pve';
+      },
+    ],
+    [
+      'catalog mode is stale',
+      () => {
+        h.metadata.currentGameMode = 'pve';
+      },
+    ],
+  ] as const)('withholds advice when %s', (_label, invalidate) => {
+    const advice = useStashSellAdvice(rows(), result);
+    expect(advice.groups.value).toHaveLength(1);
+    invalidate();
+    expect(advice.ready.value).toBe(false);
+    expect(advice.groups.value).toEqual([]);
+  });
   it('withdraws stale advice on mode changes and evaluates the new mode only after reopening', () => {
     const advice = useStashSellAdvice(rows(), result);
     expect(advice.groups.value).toHaveLength(1);
     h.store.currentGameMode = 'pve';
     expect(advice.ready.value).toBe(false);
+    expect(advice.groups.value).toEqual([]);
+    h.store.currentGameMode = 'pvp';
+    expect(advice.groups.value).toEqual([]);
+    h.store.currentGameMode = 'pve';
     h.metadata.currentGameMode = 'pve';
     h.metadata.itemsGameMode = 'pve';
     h.metadata.tasks[0]!.objectives![0]!.item = { id: 'item' } as never;
@@ -123,6 +176,32 @@ describe('read-only sell advice adapter', () => {
     expect(advice.ready.value).toBe(false);
     expect(advice.groups.value).toEqual([]);
     expect(advice.incompleteTasks.value).toEqual(['later']);
+  });
+  it('withholds items that can satisfy a pending weapon category and items with unknown categories', () => {
+    h.metadata.tasks[0]!.objectives = [
+      {
+        id: 'build',
+        type: 'buildWeapon',
+        item: { id: 'weapon' },
+        containsCategory: ['optic'],
+      },
+    ];
+    vi.mocked(h.metadata.getItemById).mockReturnValue({ id: 'item' });
+    const advice = useStashSellAdvice(rows(), result);
+    expect(advice.ready.value).toBe(true);
+    expect(advice.groups.value).toEqual([]);
+    vi.mocked(h.metadata.getItemById).mockReturnValue({
+      id: 'item',
+      categories: [{ id: 'optic', name: 'Optics' }],
+    });
+    h.metadata.tasks = [...h.metadata.tasks];
+    expect(advice.groups.value).toEqual([]);
+    vi.mocked(h.metadata.getItemById).mockReturnValue({
+      id: 'item',
+      categories: [{ id: 'food', name: 'Food' }],
+    });
+    h.metadata.tasks = [...h.metadata.tasks];
+    expect(advice.groups.value).toHaveLength(1);
   });
   it('does not claim an unknown current-mode metadata item can be sold', () => {
     vi.mocked(h.metadata.getItemById).mockReturnValue(undefined);

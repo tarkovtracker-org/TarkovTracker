@@ -1,12 +1,21 @@
 import {
   incompleteSellTasks,
+  remainingSellCategories,
   remainingSellUses,
   sellGroups,
 } from '@/features/stash-import/sellAdvice';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { API_GAME_MODES } from '@/utils/constants';
+import type { TarkovItem } from '@/types/tarkov';
 import type { ReviewedCell, ScanResult } from '@/utils/stashScan/types';
+function outsideProtectedCategories(item: TarkovItem, protectedCategories: ReadonlySet<string>) {
+  if (!protectedCategories.size) return true;
+  // Full metadata lists category membership. Sparse items cannot rule out a required category.
+  const categories = item.categories;
+  if (!categories?.length) return false;
+  return categories.every((category) => category?.id && !protectedCategories.has(category.id));
+}
 /** Read-only adapter. Never calls import planning, allocation, persistence or metadata fetches. */
 export function useStashSellAdvice(
   rows: MaybeRefOrGetter<ReviewedCell[]>,
@@ -15,6 +24,14 @@ export function useStashSellAdvice(
   const metadata = useMetadataStore();
   const store = useTarkovStore();
   const openedMode = store.currentGameMode;
+  const modeChanged = ref(false);
+  watch(
+    () => store.currentGameMode,
+    () => {
+      modeChanged.value = true;
+    },
+    { flush: 'sync' }
+  );
   const unavailable = computed(() =>
     [
       !metadata.initialized,
@@ -27,12 +44,13 @@ export function useStashSellAdvice(
       metadata.error,
       metadata.hideoutLoading,
       metadata.hideoutError,
+      metadata.itemsLoading,
       metadata.itemsError,
       !metadata.tasks.length,
       !metadata.hideoutModules.length,
       metadata.currentGameMode !== openedMode,
       metadata.itemsGameMode !== API_GAME_MODES[openedMode],
-      store.currentGameMode !== openedMode,
+      modeChanged.value,
     ].some(Boolean)
   );
   const remaining = computed(() =>
@@ -46,9 +64,14 @@ export function useStashSellAdvice(
       : incompleteSellTasks(metadata.tasks, store).map((task) => task.name ?? task.id)
   );
   const ready = computed(() => remaining.value !== undefined);
-  const items = computed(() =>
-    (toValue(result)?.catalog.items ?? []).filter((item) => Boolean(metadata.getItemById(item.id)))
-  );
+  const protectedCategories = computed(() => remainingSellCategories(metadata.tasks, store));
+  const items = computed(() => {
+    if (!remaining.value) return [];
+    return (toValue(result)?.catalog.items ?? []).filter((item) => {
+      const current = metadata.getItemById(item.id);
+      return current && outsideProtectedCategories(current, protectedCategories.value);
+    });
+  });
   const groups = computed(() => sellGroups(toValue(rows), items.value, remaining.value));
   return { ready, groups, incompleteTasks };
 }
