@@ -580,7 +580,8 @@ description, the item involved (the MS2000 Marker for a mark, the quest item for
 stash, otherwise the first accepted item plus how many alternatives exist, or, when no item is
 accepted, the weapon or gear an elimination must use) with its icon, item quantity when applicable
 and a FIR badge. The panel lists each required key group (`A / B` when any one works) and shows a
-progress bar when the objective counts more than one. Elimination counts appear in progress only.
+progress bar when the objective counts more than one. Weapon and clothing labels omit the
+elimination count.
 The footer has a labeled **Mark complete** / **Completed** toggle, a **Task list** button that
 scrolls to and highlights the objective, and the show-only and hide quest buttons. Compact tooltip
 density keeps the layout and makes the footer buttons icon-only.
