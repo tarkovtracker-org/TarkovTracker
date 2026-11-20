@@ -344,13 +344,9 @@
     const valid = items.filter((entry): entry is TarkovItem => Boolean(entry?.id));
     return valid.length > 1 ? valid : undefined;
   };
-  const rowHasGiveObjectives = (row: ConsolidatedRow): boolean => {
-    return row.objectives.some((objRow) => isHandoverObjective(objRow.objective.type));
-  };
-  const isRowReadyToHandOver = (row: ConsolidatedRow): boolean => {
-    if (!rowHasGiveObjectives(row)) return false;
-    return row.currentCount >= row.meta.neededCount && !row.allComplete;
-  };
+  const isRowReadyToHandOver = (row: ConsolidatedRow): boolean =>
+    row.currentCount >= row.meta.neededCount &&
+    row.countObjectives.some((objRow) => isHandoverObjective(objRow.objective.type));
   const rowHasMapLocation = (row: ConsolidatedRow): boolean => {
     if (!isMapView.value) return false;
     return row.objectives.some((objRow) => {

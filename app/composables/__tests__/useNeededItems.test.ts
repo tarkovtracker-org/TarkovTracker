@@ -313,11 +313,23 @@ describe('useNeededItems', () => {
       expect(neededItems.groupedItems.value[0]?.currentCount).toBe(savedCount);
     }
   );
+  it('treats checked handovers as owned when filtering Completed', async () => {
+    const handover = {
+      ...createTaskObjective('obj-1', 'task-1', createItem('item-bolts', 'Bolts'), 5),
+      type: 'giveItem',
+    };
+    const { neededItems } = await setup({
+      metadataStore: { neededItemTaskObjectives: [handover], neededItemHideoutModules: [] },
+      progressStore: { objectiveCompletions: { 'obj-1': { self: true } } },
+      preferencesStore: { getNeededTypeView: 'completed', getNeededItemsHideOwned: true },
+    });
+    expect(neededItems.filteredItems.value).toEqual([]);
+  });
   it('retains teammate needs without adding checked handovers to personal item totals', async () => {
     const bolts = createItem('item-bolts', 'Bolts');
     const handover = { ...createTaskObjective('obj-1', 'task-1', bolts, 5), type: 'giveItem' };
     const pending = { ...handover, id: 'obj-2' };
-    const { neededItems } = await setup({
+    const options = {
       metadataStore: {
         neededItemTaskObjectives: [handover, pending],
         neededItemHideoutModules: [],
@@ -327,7 +339,8 @@ describe('useNeededItems', () => {
         teamStores: { 'team-1': {} },
       },
       preferencesStore: { getNeededItemsHideOwned: true },
-    });
+    };
+    const { neededItems } = await setup(options);
     expect(neededIds(neededItems.filteredItems.value)).toEqual(
       expect.arrayContaining(['obj-1', 'obj-2'])
     );
@@ -335,6 +348,11 @@ describe('useNeededItems', () => {
     expect(neededIds(neededItems.objectivesByItemId.value.get(bolts.id)!.taskObjectives)).toEqual([
       'obj-2',
     ]);
+    const { neededItems: teamHidden } = await setup({
+      ...options,
+      preferencesStore: { ...options.preferencesStore, itemsTeamAllHidden: true },
+    });
+    expect(neededIds(teamHidden.filteredItems.value)).toEqual(['obj-2']);
   });
   describe('allItems', () => {
     it('combines task objectives and hideout modules', async () => {

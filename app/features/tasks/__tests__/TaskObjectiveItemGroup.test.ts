@@ -106,6 +106,15 @@ describe('TaskObjectiveItemGroup', () => {
     expect(tarkovStoreMock.setObjectiveCount).not.toHaveBeenCalled();
     wrapper.unmount();
   });
+  it('does not cue another turn-in when only the paired find objective is pending', () => {
+    const handover = metadataStoreMock.objectives[0]!;
+    metadataStoreMock.objectives.push({ ...handover, id: 'find-1', type: 'findItem' });
+    isObjectiveComplete.value = true;
+    const wrapper = mountComponent();
+    expect(wrapper.get('output').text()).toBe('3/3');
+    expect(wrapper.text()).not.toContain('Ready to hand over');
+    wrapper.unmount();
+  });
   it.each([
     ['decrease', 'setObjectiveCount'],
     ['increase', 'setObjectiveCount'],

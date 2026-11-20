@@ -477,7 +477,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     const count = neededCountOf(item);
     const currentCount =
       item.needType === 'taskObjective'
-        ? tarkovStore.getObjectiveCount(item.id)
+        ? taskNeedCount(item, count)
         : tarkovStore.getHideoutPartCount(item.id);
     return (currentCount ?? 0) < count;
   };
