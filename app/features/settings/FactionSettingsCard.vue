@@ -4,7 +4,7 @@
     icon-color="primary"
     highlight-color="primary"
     :fill-height="false"
-    :title="$t('settings.faction.title')"
+    :title="$t('settings.faction.title', 'Faction')"
     :subtitle="$t(getGameModeLabel(currentMode))"
     title-classes="text-lg font-semibold"
   >

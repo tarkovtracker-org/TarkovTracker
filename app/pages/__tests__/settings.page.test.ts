@@ -204,7 +204,7 @@ describe('settings page', () => {
   });
   const globalConfig = {
     stubs: defaultGlobalStubs,
-    mocks: { $t: (key: string) => key },
+    mocks: { $t: (key: string, fallback?: string) => fallback ?? key },
   };
   it.each([
     { hash: '#preferences', mobile: true, expected: 'tab' },
@@ -265,7 +265,9 @@ describe('settings page', () => {
   });
   it('sets the active faction from the compact progression picker', async () => {
     const wrapper = await mountSuspended(SettingsPage, { global: globalConfig });
-    const group = wrapper.get('#progression [aria-label="game_settings.select_faction_label"]');
+    const progression = wrapper.get('#progression');
+    expect(progression.text()).toContain('Faction');
+    const group = progression.get('[role="group"][aria-label="Select faction"]');
     const buttons = group.findAll('button');
     expect(buttons.map((button) => button.text())).toEqual(['BEAR', 'USEC']);
     expect(group.get('[aria-pressed="true"]').text()).toBe('USEC');

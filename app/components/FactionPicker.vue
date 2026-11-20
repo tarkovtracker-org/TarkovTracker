@@ -3,7 +3,7 @@
     class="grid grid-cols-2 gap-1"
     dir="ltr"
     role="group"
-    :aria-label="t('game_settings.select_faction_label')"
+    :aria-label="t('game_settings.select_faction_label', 'Select faction')"
   >
     <CompactChoiceButton
       v-for="faction in factions"
