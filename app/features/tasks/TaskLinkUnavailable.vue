@@ -23,12 +23,14 @@
         size="sm"
         @click="emit('switch-mode', availableMode)"
       >
+        <GameModeBadge :mode="availableMode" class="-my-1" />
         {{ t('page.tasks.shared_link.switch_mode', { mode: t(getGameModeLabel(availableMode)) }) }}
       </UButton>
     </template>
   </UAlert>
 </template>
 <script setup lang="ts">
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import {
     API_GAME_MODES,
     GAME_MODE_OPTIONS,
