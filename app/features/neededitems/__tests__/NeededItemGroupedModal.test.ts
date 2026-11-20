@@ -35,6 +35,14 @@ vi.mock('@/stores/useMetadata', () => ({
     getStationById: () => ({ name: 'Workbench' }),
   }),
 }));
+let completedObjectiveId: string | undefined;
+vi.mock('@/stores/useProgress', () => ({
+  useProgressStore: () => ({
+    get objectiveCompletions() {
+      return completedObjectiveId ? { [completedObjectiveId]: { self: true } } : {};
+    },
+  }),
+}));
 const {
   mockCounts,
   mockSetObjectiveCount,
@@ -69,6 +77,7 @@ vi.mock('@/stores/useTarkov', () => ({
 }));
 describe('NeededItemGroupedModal', () => {
   beforeEach(() => {
+    completedObjectiveId = undefined;
     mockCounts.objectiveCount = 1;
     mockCounts.hideoutCount = 2;
     mockCounts.currentGameMode = ref('pvp');
@@ -214,6 +223,19 @@ describe('NeededItemGroupedModal', () => {
     await increaseBtn.trigger('click');
     expect(mockSetHideoutPartCount).toHaveBeenCalledWith('module-1', 2);
     expect(mockSetHideoutPartComplete).toHaveBeenCalledWith('module-1');
+  });
+  it('protects the saved counts of completed handovers during Smart Fill and Reset', async () => {
+    const handover = { ...mockTaskObjective, type: 'giveItem' };
+    const pending = { ...handover, id: 'obj-2' };
+    completedObjectiveId = handover.id;
+    const wrapper = createWrapper({ taskObjectives: [handover, pending] });
+    expect(wrapper.text()).toContain('3/3');
+    const buttonWithText = (label: string) =>
+      wrapper.findAll('button').find((button) => button.text().includes(label))!;
+    await buttonWithText('needed_items.smart_fill').trigger('click');
+    expect(mockDistributeItems).toHaveBeenCalledWith(1, 2, [pending], [mockHideoutModule]);
+    await buttonWithText('common.reset').trigger('click');
+    expect(mockResetObjectives).toHaveBeenCalledWith([pending], [mockHideoutModule]);
   });
   it('keeps collected totals after Smart Fill so they can be reapplied', async () => {
     const wrapper = createWrapper();
