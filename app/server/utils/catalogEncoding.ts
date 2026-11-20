@@ -13,10 +13,15 @@ function acceptsGzip(value: string | null): boolean {
   const wildcard = encodings.find((entry) => /^\s*\*\s*(?:;|$)/.test(entry));
   return hasPositiveWeight(gzip ?? wildcard);
 }
-export function canSendCatalogGzip(request?: PagesRequest): boolean {
-  if (request?.method !== 'GET') return false;
+const GZIP_CATALOGS = new Set(['strings', 'items-lite', 'items']);
+export function negotiatesCatalogGzip(dataset?: string): boolean {
+  return dataset !== undefined && GZIP_CATALOGS.has(dataset);
+}
+export function canSendCatalogGzip(request: PagesRequest | undefined, dataset?: string): boolean {
+  if (request?.method !== 'GET' || !negotiatesCatalogGzip(dataset)) return false;
   // Nitro's same-worker fetches can inherit the outer request context.
-  if (!/^\/api\/tarkov\/strings\/?$/.test(new URL(request.url).pathname)) return false;
+  const path = new URL(request.url).pathname.replace(/\/$/, '');
+  if (path !== `/api/tarkov/${dataset}`) return false;
   return acceptsGzip(request.cf?.clientAcceptEncoding ?? request.headers.get('Accept-Encoding'));
 }
 export function markCatalogGzip(headers: Headers) {

@@ -8,7 +8,11 @@ import {
   type H3Event,
 } from 'h3';
 import { scheduleBackgroundTask } from '@/server/utils/backgroundTask';
-import { canSendCatalogGzip, markCatalogGzip } from '@/server/utils/catalogEncoding';
+import {
+  canSendCatalogGzip,
+  markCatalogGzip,
+  negotiatesCatalogGzip,
+} from '@/server/utils/catalogEncoding';
 import {
   CATALOG_BYTES_HEADER,
   gateCatalogCacheBody,
@@ -47,11 +51,7 @@ async function responseFromStored(value: Response, status: 'PRECOMPUTE' | 'STALE
 }
 async function serveCachedSnapshot(event: H3Event, value: Response, scope: string) {
   // Cache writes close only after the entire gzip stream passes expanded-length validation.
-  if (
-    scope.startsWith('strings/') &&
-    value.body &&
-    canSendCatalogGzip(event.context.cloudflare?.request)
-  ) {
+  if (value.body && canSendCatalogGzip(event.context.cloudflare?.request, scope.split('/')[0])) {
     const headers = snapshotHeaders(value, 'PRECOMPUTE');
     markCatalogGzip(headers);
     return new Response(value.body, { headers });
@@ -163,7 +163,7 @@ export function catalogHandler(dataset: CatalogDataset | 'strings') {
     const scope =
       dataset === 'tasks-objectives' && query.view === 'counts' ? baseScope + '/counts' : baseScope;
     setHeader(event, 'Cache-Control', 'no-store');
-    if (dataset === 'strings') appendHeader(event, 'Vary', 'Accept-Encoding');
+    if (negotiatesCatalogGzip(dataset)) appendHeader(event, 'Vary', 'Accept-Encoding');
     const store = getPrecomputedStore(event);
     if (import.meta.dev && !store) {
       setHeader(event, 'X-Catalog-Release', 'development');

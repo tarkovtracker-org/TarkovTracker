@@ -23,7 +23,7 @@ describe('catalog gzip negotiation', () => {
     ['br, identity', false],
   ])('handles %s', (encoding, accepted) => {
     const request = new Request(strings, { headers: { 'Accept-Encoding': encoding } });
-    expect(canSendCatalogGzip(request)).toBe(accepted);
+    expect(canSendCatalogGzip(request, 'strings')).toBe(accepted);
   });
   it('uses the original client encoding when Cloudflare overwrites the header', () => {
     const request = Object.assign(
@@ -32,50 +32,68 @@ describe('catalog gzip negotiation', () => {
         cf: { clientAcceptEncoding: 'identity' },
       }
     );
-    expect(canSendCatalogGzip(request)).toBe(false);
+    expect(canSendCatalogGzip(request, 'strings')).toBe(false);
   });
   it('keeps internal catalog calls and HEAD responses on the existing path', () => {
     const headers = { 'Accept-Encoding': 'gzip' };
-    expect(canSendCatalogGzip()).toBe(false);
-    expect(canSendCatalogGzip(new Request(strings, { method: 'HEAD', headers }))).toBe(false);
-    expect(canSendCatalogGzip(new Request('https://tarkovtracker.org/profile', { headers }))).toBe(
+    expect(canSendCatalogGzip(undefined, 'strings')).toBe(false);
+    expect(canSendCatalogGzip(new Request(strings, { method: 'HEAD', headers }), 'strings')).toBe(
       false
     );
+    expect(
+      canSendCatalogGzip(new Request('https://tarkovtracker.org/profile', { headers }), 'strings')
+    ).toBe(false);
   });
 });
-describe('warm strings responses', () => {
-  afterEach(() => vi.unstubAllGlobals());
-  it('reuses the current verified gzip body and strips the internal marker at the Pages boundary', async () => {
-    const scope = 'strings/en';
-    const key = 'neutral-catalog-v1/strings/en/fixture';
-    const body = '{"data":{"strings":{"key":"value"}}}';
-    const gzip = Uint8Array.from(gzipSync(body));
-    const cache = new Response(gzip, {
-      headers: {
-        'X-Catalog-Key': key,
-        'X-Catalog-Bytes': String(body.length),
-        'X-Catalog-Release': '123',
-      },
-    });
-    const put = vi.fn();
-    vi.stubGlobal('caches', { default: { match: async () => cache.clone(), put } });
-    const get = vi.fn().mockResolvedValue({
-      completedAt: 123,
-      entries: { [scope]: { key, bytes: body.length, headers: {} } },
-    });
-    const request = new Request(strings, { headers: { 'Accept-Encoding': 'gzip' } });
-    const fetch = toWebHandler(createApp().use(catalogHandler('strings')));
-    const response = sendCatalogGzip(
-      await fetch(request, {
-        cloudflare: { request, env: { TARKOV_DATA: { get } } },
-      })
-    );
-    expect(response.status).toBe(200);
-    expect(response.headers.get('Content-Encoding')).toBe('gzip');
-    expect(response.headers.get('X-Catalog-Release')).toBe('123');
-    expect(response.headers.has('X-Tarkov-Catalog-Precompressed')).toBe(false);
-    expect(new Uint8Array(await response.arrayBuffer())).toEqual(gzip);
-    expect(get.mock.calls).toEqual([[CATALOG_MANIFEST_KEY, 'json']]);
-    expect(put).not.toHaveBeenCalled();
+it('keeps same-worker requests for another catalog on the identity path', () => {
+  const request = new Request('https://tarkovtracker.org/api/tarkov/items-lite', {
+    headers: { 'Accept-Encoding': 'gzip' },
   });
+  expect(canSendCatalogGzip(request, 'items')).toBe(false);
+  expect(canSendCatalogGzip(request, 'items-lite')).toBe(true);
+});
+describe('warm gzip catalog responses', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each([
+    ['strings', 'en'],
+    ['items-lite', 'regular'],
+    ['items', 'regular'],
+  ] as const)(
+    'reuses the verified gzip body and strips the internal marker for %s',
+    async (dataset, variant) => {
+      const scope = `${dataset}/${variant}`;
+      const key = `neutral-catalog-v1/${scope}/fixture`;
+      const body = '{"data":{"strings":{"key":"value"}}}';
+      const gzip = Uint8Array.from(gzipSync(body));
+      const cache = new Response(gzip, {
+        headers: {
+          'X-Catalog-Key': key,
+          'X-Catalog-Bytes': String(body.length),
+          'X-Catalog-Release': '123',
+        },
+      });
+      const put = vi.fn();
+      vi.stubGlobal('caches', { default: { match: async () => cache.clone(), put } });
+      const get = vi.fn().mockResolvedValue({
+        completedAt: 123,
+        entries: { [scope]: { key, bytes: body.length, headers: {} } },
+      });
+      const request = new Request(`https://tarkovtracker.org/api/tarkov/${dataset}`, {
+        headers: { 'Accept-Encoding': 'gzip' },
+      });
+      const fetch = toWebHandler(createApp().use(catalogHandler(dataset)));
+      const response = sendCatalogGzip(
+        await fetch(request, {
+          cloudflare: { request, env: { TARKOV_DATA: { get } } },
+        })
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Content-Encoding')).toBe('gzip');
+      expect(response.headers.get('X-Catalog-Release')).toBe('123');
+      expect(response.headers.has('X-Tarkov-Catalog-Precompressed')).toBe(false);
+      expect(new Uint8Array(await response.arrayBuffer())).toEqual(gzip);
+      expect(get.mock.calls).toEqual([[CATALOG_MANIFEST_KEY, 'json']]);
+      expect(put).not.toHaveBeenCalled();
+    }
+  );
 });
