@@ -1,4 +1,4 @@
-/** Shared KV binding and envelope validation for the independent English import snapshots. */
+/** Shared KV binding for neutral catalogs and envelope validation for English import snapshots. */
 const PRECOMPUTED_KV_BINDING = 'TARKOV_DATA';
 const PRECOMPUTED_ENVELOPE_VERSION = 2;
 export type PrecomputedEnvelope<T> = {

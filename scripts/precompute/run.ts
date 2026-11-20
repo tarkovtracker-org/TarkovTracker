@@ -29,6 +29,16 @@ function requireEnv(name: string): string {
   if (!value) fail(`Missing required environment variable ${name}`);
   return value;
 }
+async function writeReport(report: Record<string, unknown>) {
+  try {
+    await writeFile(
+      'precompute-manifest.json',
+      JSON.stringify({ completedAt: Date.now(), ...report }, null, 2)
+    );
+  } catch (error) {
+    console.warn('[precompute] Could not write local diagnostic manifest:', error);
+  }
+}
 const { values: flags } = parseArgs({
   options: {
     'game-mode': { type: 'string' },
@@ -57,8 +67,7 @@ try {
     full && !imports.failures.length
       ? await catalogReleaseReport(kv, catalogBuilders, sha)
       : undefined;
-  const report = { completedAt: Date.now(), imports, ...neutral };
-  await writeFile('precompute-manifest.json', JSON.stringify(report, null, 2));
+  await writeReport({ imports, ...neutral });
   console.log(
     JSON.stringify({
       catalogObjects: Object.keys(neutral?.catalogRelease?.entries ?? {}).length,
@@ -68,5 +77,7 @@ try {
   );
   if (neutral?.catalogReleaseError || imports.failures.length) process.exitCode = 1;
 } catch (error) {
-  fail(error instanceof Error ? error.message : String(error));
+  const message = error instanceof Error ? error.message : String(error);
+  await writeReport({ error: message });
+  fail(message);
 }

@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       lang:
-        description: 'Use en only for a targeted English import refresh. Empty runs the complete catalog release.'
+        description: 'Use en for a targeted English import refresh. Leave both lang and gameMode empty for a complete catalog release.'
         required: false
         type: string
       gameMode:
