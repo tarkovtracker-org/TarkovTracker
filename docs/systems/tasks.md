@@ -74,8 +74,9 @@ own collapse toggle. The drawer holds only the availability requirements. The le
 
 ## Quest alternatives
 
-Quest cards link to named alternatives even when collapsed. The links use the selected mode's
-quest catalog and the completion-failure relationships derived from Tarkov.dev failure conditions.
+The alternatives chip is available on collapsed quest cards. Hover over it, or activate it with a
+click, tap, or keyboard, to see links to named quests. The links use the selected mode's quest
+catalog and the completion-failure relationships derived from Tarkov.dev failure conditions.
 The card distinguishes mutual choices from cases where only one quest's completion fails the other.
 
 ## Hidden tasks
