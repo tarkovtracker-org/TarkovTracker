@@ -67,7 +67,7 @@
 <script setup lang="ts">
   import { useCyclingItem } from '@/composables/useCyclingItem';
   import { useWikiLink } from '@/composables/useWikiLink';
-  import { getKeyDevUrl, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
+  import { getItemDisplayIcon, getKeyDevUrl, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
   import type { TarkovItem } from '@/types/tarkov';
   const props = defineProps<{
     /** Primary/fallback item (canonical for the objective). */
@@ -100,18 +100,7 @@
   const displayName = computed(
     () => currentItem.value?.name || currentItem.value?.shortName || props.fallbackName
   );
-  const displayIcon = computed(() => {
-    const img = imageItem.value;
-    const item = currentItem.value;
-    return (
-      img?.iconLink ||
-      img?.image512pxLink ||
-      img?.image8xLink ||
-      item?.iconLink ||
-      item?.image512pxLink ||
-      undefined
-    );
-  });
+  const displayIcon = computed(() => getItemDisplayIcon(currentItem.value));
   const displayPreview = computed(() => {
     const img = imageItem.value;
     const item = currentItem.value;
