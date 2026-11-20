@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
 import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
+import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
 import TaskObjective from '@/features/tasks/TaskObjective.vue';
 import type { TaskObjective as Objective } from '@/types/tarkov';
 const { toggle, setCount, fullObjectives, isComplete, isTaskComplete } = vi.hoisted(() => ({
@@ -118,6 +119,34 @@ describe('TaskObjective interaction boundaries', () => {
     const item = { id: 'item-1', name: 'Sellable item' };
     const wrapper = createWrapper({ type: 'sellItem', item });
     expect(wrapper.getComponent(ObjectiveItemDisplay).props('primaryItem')).toEqual(item);
+  });
+  it('shows all distinct weapon alternatives apart from the other required equipment', async () => {
+    const weapons = Array.from({ length: 55 }, (_, index) => ({
+      id: `weapon-${index}`,
+      name: `Weapon ${index}`,
+    }));
+    const mod = { id: 'mod' };
+    const gear = { id: 'gear' };
+    fullObjectives.push({
+      id: 'objective-1',
+      type: 'shoot',
+      usingWeapon: [...weapons, weapons[0]!, { id: '' }],
+      usingWeaponMods: [[mod]],
+      wearing: [[gear]],
+    });
+    const wrapper = createWrapper({ type: 'shoot', usingWeapon: [weapons[0]!] });
+    expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual(weapons);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([mod, gear]);
+    await wrapper.get('[data-testid="accepted-items"] button').trigger('click');
+    expect(toggle).not.toHaveBeenCalled();
+    expect(setCount).not.toHaveBeenCalled();
+  });
+  it('keeps a single required weapon and its mods visible inline', () => {
+    const weapon = { id: 'weapon' };
+    const mod = { id: 'mod' };
+    const wrapper = createWrapper({ type: 'shoot', usingWeapon: weapon, usingWeaponMods: [mod] });
+    expect(wrapper.findComponent(ObjectiveItemDisplay).exists()).toBe(false);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([weapon, mod]);
   });
   it('lets display clicks reach outside-dismissal listeners without changing progress', async () => {
     const wrapper = createWrapper({ type: 'sellItem', items: [{ id: 'a' }, { id: 'b' }] });
