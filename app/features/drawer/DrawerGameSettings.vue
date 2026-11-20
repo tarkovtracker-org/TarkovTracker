@@ -13,7 +13,7 @@
     >
       <template #leading>
         <img
-          :src="`/img/game-modes/${currentGameMode}.png`"
+          :src="`/img/game-modes/${currentBadgeMode}.png`"
           alt=""
           width="32"
           height="32"
@@ -135,6 +135,11 @@
       value: GAME_MODES.SEASONAL,
     },
   ]);
+  const currentBadgeMode = computed(
+    () =>
+      modeOptions.value.find((option) => option.value === currentGameMode.value)?.value ??
+      GAME_MODES.PVP
+  );
   const { loading: dataLoading } = storeToRefs(metadataStore);
   async function switchMode(mode: GameMode) {
     if (mode !== currentGameMode.value && !dataLoading.value) {

@@ -70,6 +70,18 @@ describe('DrawerGameSettings', () => {
     expect(fetchAllDataMock).toHaveBeenCalled();
     expect(setLoadingMock).toHaveBeenCalled();
   });
+  it('uses the PvP badge for an unrecognized saved mode', () => {
+    currentGameMode.value = 'unknown' as GameMode;
+    const wrapper = mount(DrawerGameSettings, {
+      global: {
+        stubs: {
+          SelectMenuFixed: { template: '<div><slot name="leading" /></div>' },
+        },
+      },
+    });
+    expect(wrapper.get('img').attributes('src')).toBe('/img/game-modes/pvp.png');
+    wrapper.unmount();
+  });
   it('shows the active-season countdown and exact end timestamp', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-05T13:44:00.000Z'));
