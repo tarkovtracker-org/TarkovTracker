@@ -31,7 +31,7 @@
       </template>
     </SelectMenuFixed>
     <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
-      {{ switchModeError }}
+      {{ t(switchModeError) }}
     </div>
     <time
       v-if="currentGameMode === GAME_MODES.SEASONAL"
@@ -68,9 +68,8 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { storeToRefs } from 'pinia';
   import SelectMenuFixed from '@/components/SelectMenuFixed.vue';
-  import { useMetadataStore } from '@/stores/useMetadata';
+  import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useTarkovStore } from '@/stores/useTarkov';
   import {
     ACTIVE_SEASON,
@@ -80,11 +79,9 @@
     type GameMode,
     type PMCFaction,
   } from '@/utils/constants';
-  import { logger } from '@/utils/logger';
-  const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
-  const switchModeError = ref('');
+  const { dataLoading, switchMode, switchModeError } = useGameModeSwitch();
   const seasonCountdownNow = ref(Date.now());
   const factions = PMC_FACTIONS;
   const currentFaction = computed<PMCFaction>(() => tarkovStore.getPMCFaction());
@@ -140,42 +137,4 @@
       modeOptions.value.find((option) => option.value === currentGameMode.value)?.value ??
       GAME_MODES.PVP
   );
-  const { loading: dataLoading } = storeToRefs(metadataStore);
-  async function switchMode(mode: GameMode) {
-    if (mode !== currentGameMode.value && !dataLoading.value) {
-      metadataStore.setLoading(true);
-      const previousMode = currentGameMode.value;
-      try {
-        switchModeError.value = '';
-        await tarkovStore.switchGameMode(mode);
-      } catch (err) {
-        switchModeError.value = t(
-          'settings.game_settings.switch_mode_failed',
-          'Failed to switch game mode, please retry'
-        );
-        logger.error('[DrawerGameSettings] Error switching mode:', err);
-        metadataStore.setLoading(false);
-        return;
-      }
-      try {
-        metadataStore.updateLanguageAndGameMode();
-        await metadataStore.fetchAllData();
-      } catch (err) {
-        try {
-          await tarkovStore.switchGameMode(previousMode);
-          metadataStore.updateLanguageAndGameMode();
-          await metadataStore.fetchAllData();
-        } catch (rollbackErr) {
-          logger.error('[DrawerGameSettings] rollback failed:', rollbackErr);
-        }
-        switchModeError.value = t(
-          'settings.game_settings.switch_mode_fetch_failed',
-          'Game mode switched but failed to refresh data, please retry'
-        );
-        logger.error('[DrawerGameSettings] Error fetching data after mode switch:', err);
-      } finally {
-        metadataStore.setLoading(false);
-      }
-    }
-  }
 </script>

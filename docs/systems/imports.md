@@ -16,6 +16,32 @@ worker and review/preview flow. Demo counts cannot be saved. Choosing a personal
 leaves demo mode; a late or cancelled demo download cannot replace that selection. The original
 PNG is at `public/img/demos/stash-1440p.png` and is also the offline regression fixture.
 
+### Read-only sell view
+
+The scan review starts with **What can I sell?**. This is scoped to the selected mode,
+visible screenshot and the loaded task and hideout catalog. Story chapters and Seasonal perks
+have their own requirements and are outside this view.
+It reads the full metadata catalog rather than the filtered Needed Items/import target set.
+Unfinished tasks protect accepted alternatives, later/conditional quests, required keys,
+weapon-build components, item categories and equipment. Unfinished hideout modules protect
+their requirements.
+Collected counts never establish a physical surplus. No surplus recommendations are made.
+
+Only settled identities and valid known unit counts can appear. Excluded/empty, unknown,
+overlapping or duplicate-key observations do not contribute; distinct observations of one item
+are grouped once. An item referenced by any remaining requirement stays protected regardless
+of its FIR status or observed amount. A completed task/objective or built hideout module may
+release its cataloged use; merely filling its count does not. Missing/changing requirement data
+withholds the answer. Unfinished tasks with empty objectives, untyped objectives or unmapped
+item objectives are reported by quest name. Changing the game mode withholds the sell view
+until the importer is reopened. If a pending weapon build requires an item category, only items
+with known categories outside all such requirements are eligible for advice. A verified
+quest-inventory-only annotation can cover a quest objective whose exact item template is
+unknown. Ordinary item, equipment, key and craft-input references still protect stash items.
+
+The panel only reads state: it does not plan, allocate, fetch prices, save counts, or upload
+screenshots. The normal review, selected-target preview and explicit save are unchanged.
+
 ### Review and allocation
 
 - Recognition scores route review attention; they are not probabilities. Uncertain identities

@@ -5,6 +5,14 @@
         <slot name="header" />
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
+          <TaskLinkUnavailable
+            :key="`${catalogMode}:${unavailableTaskId}`"
+            :task-id="unavailableTaskId"
+            :mode="catalogMode"
+            :switch-error="switchModeError"
+            @switch-mode="switchMode"
+            @dismiss="dismissTaskLink"
+          />
           <!-- Narrow Graph shows only its explanation; v-show keeps the bar's selection watchers. -->
           <TaskFilterBar
             v-show="!isNarrowGraphView"
@@ -568,6 +576,7 @@
     type DashboardFocusProgressInteraction,
     useDashboardFocusAnalytics,
   } from '@/composables/useDashboardFocusAnalytics';
+  import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
   import { useMapObjectiveMarks } from '@/composables/useMapObjectiveMarks';
   import { useMapObjectivePopup } from '@/composables/useMapObjectivePopup';
@@ -608,6 +617,7 @@
   } from '@/features/tasks/task-context';
   import TaskCard from '@/features/tasks/TaskCard.vue';
   import TaskEmptyState from '@/features/tasks/TaskEmptyState.vue';
+  import TaskLinkUnavailable from '@/features/tasks/TaskLinkUnavailable.vue';
   import TaskLoadingState from '@/features/tasks/TaskLoadingState.vue';
   import TaskSearchScopeHint from '@/features/tasks/TaskSearchScopeHint.vue';
   import {
@@ -619,8 +629,10 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { isGameMode } from '@/utils/constants';
   import { debounce, isDebounceRejection } from '@/utils/debounce';
   import { logger } from '@/utils/logger';
+  import { getQueryString, queueQueryWrite } from '@/utils/routeHelpers';
   import { STORAGE_KEYS } from '@/utils/storageKeys';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { MapViewState } from '@/composables/useLeafletMap';
@@ -1081,7 +1093,32 @@
     preferencesStore.setHideCompletedMapObjectives(!getHideCompletedMapObjectives.value);
   };
   const route = useRoute();
+  const router = useRouter();
   useTaskRouteSync({ maps, traders: sortedTraders });
+  const { dataLoading, switchMode, switchModeError } = useGameModeSwitch();
+  const linkedTaskId = computed(() => getQueryString(route.query.task));
+  const catalogMode = computed(() => {
+    const mode = metadataStore.currentGameMode;
+    return isGameMode(mode) ? mode : undefined;
+  });
+  const unavailableTaskId = computed(() => {
+    const id = linkedTaskId.value;
+    if (!id || !tasks.value.length) return undefined;
+    return metadataStore.getTaskById(id) ? undefined : id;
+  });
+  watch(linkedTaskId, () => {
+    switchModeError.value = '';
+  });
+  const dismissTaskLink = (taskId: string) => {
+    const path = router.currentRoute.value.path;
+    void queueQueryWrite(async () => {
+      const current = router.currentRoute.value;
+      if (current.path !== path || getQueryString(current.query.task) !== taskId) return;
+      await router.replace({
+        query: { ...current.query, task: undefined, highlightObjective: undefined },
+      });
+    }).catch((error) => logger.error('[Tasks] Failed to dismiss the quest link:', error));
+  };
   const canRefreshVisibleTasks = computed(
     () =>
       metadataStore.hasInitialized &&
@@ -1175,7 +1212,7 @@
     { immediate: true, flush: 'post' }
   );
   const isLoading = computed(
-    () => !canRefreshVisibleTasks.value || !hasRefreshedVisibleTasks.value
+    () => dataLoading.value || !canRefreshVisibleTasks.value || !hasRefreshedVisibleTasks.value
   );
   const {
     filteredTasks,

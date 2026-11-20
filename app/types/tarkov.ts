@@ -227,6 +227,8 @@ export interface TaskObjective {
   markerItem?: TarkovItem;
   /** Item that counts for quest completion/requirements */
   questItem?: TarkovItem;
+  /** Verified quest-inventory item with no confirmed objective-to-template mapping. */
+  questInventoryOnly?: boolean;
   count?: number;
   type?: string;
   foundInRaid?: boolean;
@@ -242,6 +244,8 @@ export interface TaskObjective {
   status?: string[];
   /** All items that must be contained */
   containsAll?: TarkovItem[];
+  /** Item categories that a weapon build must include. */
+  containsCategory?: string[];
   /** Any of these items can be used */
   useAny?: TarkovItem[];
   /** Accepted weapons; legacy catalogs may supply a scalar reference. */
