@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -107,6 +107,85 @@ describe('metrics CLI measured snapshots', () => {
       expect(fallback.stdout).toBe('');
       write(report, JSON.stringify({ [path]: { path } }));
     }
+  });
+  it('normalizes only synthetic implicit-else counts in both temporary reports', () => {
+    write(
+      'node_modules/fallow/bin/fallow/index.cjs',
+      `
+      const fs = require('node:fs');
+      const assert = require('node:assert/strict');
+      const args = process.argv;
+      const root = args[args.indexOf('--root') + 1];
+      const report = JSON.parse(fs.readFileSync(args[args.indexOf('--coverage') + 1], 'utf8'));
+      const [entry] = Object.values(report);
+      assert.deepEqual(entry.b, { 0: [1, 0], 1: [2, 0], 2: [3, 4] });
+      assert.deepEqual(entry.s, { 0: 5 });
+      assert.deepEqual(entry.f, { 0: 6 });
+      assert.deepEqual(entry.branchMap[0].locations[1], { start: {}, end: {} });
+      assert.equal(entry.path, require('node:path').join(root, 'app/a.ts'));
+      process.stdout.write(JSON.stringify({ summary: { coverage_model: 'istanbul' } }));
+      `
+    );
+    const path = join(root, 'app/a.ts');
+    const synthetic = { type: 'if', locations: [{ start: { line: 1 } }, { start: {}, end: {} }] };
+    const data = {
+      path,
+      s: { 0: 5 },
+      f: { 0: 6 },
+      b: { 0: [1, -1], 1: [2, -7], 2: [3, 4] },
+      branchMap: { 0: synthetic, 1: synthetic, 2: synthetic },
+    };
+    const artifact = JSON.stringify({ [path]: data });
+    write('head.json', artifact);
+    write('base.json', artifact);
+    const result = run('--base', 'HEAD', '--coverage', 'head.json', '--base-coverage', 'base.json');
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('CRAP model: istanbul');
+    expect(readFileSync(join(root, 'head.json'), 'utf8')).toBe(artifact);
+    expect(readFileSync(join(root, 'base.json'), 'utf8')).toBe(artifact);
+  });
+  it.each([
+    ['s', { 0: -1 }],
+    ['f', { 0: -1 }],
+    ['b', { 0: [1, -1] }],
+    ['bT', { 0: [-1] }],
+  ])('rejects a negative %s counter outside the synthetic implicit else', (counter, hits) => {
+    const path = join(root, 'app/a.ts');
+    const explicit = { type: 'if', locations: [{}, { start: { line: 1 }, end: { line: 1 } }] };
+    write(
+      'head.json',
+      JSON.stringify({ [path]: { path, [counter]: hits, branchMap: { 0: explicit } } })
+    );
+    const result = run('--coverage', 'head.json');
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`Negative Istanbul counter ${counter}[0]`);
+    expect(result.stderr).toContain(path);
+    expect(result.stdout).toBe('');
+  });
+  it('reports Fallow exit status and its structured diagnostic for a failed base snapshot', () => {
+    const baseCommit = git('rev-parse', 'HEAD');
+    write('app/a.ts', 'two\n');
+    git('add', 'app/a.ts');
+    git('commit', '--quiet', '-m', 'head');
+    write(
+      'node_modules/fallow/bin/fallow/index.cjs',
+      `
+      const fs = require('node:fs');
+      if (fs.readFileSync('app/a.ts', 'utf8').trim() === 'one') {
+        process.stdout.write(JSON.stringify({ error: true, message: 'invalid coverage input', exit_code: 2 }));
+        process.exitCode = 2;
+      } else {
+        process.stdout.write(JSON.stringify({ summary: { coverage_model: 'static_estimated' } }));
+      }
+      `
+    );
+    const result = run('--base', baseCommit);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(`base ${baseCommit}`);
+    expect(result.stderr).toContain('exit 2');
+    expect(result.stderr).toContain('invalid coverage input');
+    expect(result.stdout).toBe('');
   });
   it('rejects coverage paths outside the source checkout', () => {
     const path = join(root, '..', 'other', 'app/a.ts');
