@@ -46,11 +46,11 @@
           :required-keys="objectiveRequiredKeys"
         />
         <div
-          v-if="objectiveSellItems.length"
+          v-if="objectiveItemDisplayProps.acceptedItems.length"
           class="border-surface-700/50 bg-surface-800/30 mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1.5"
           data-objective-display
         >
-          <ObjectiveItemDisplay v-bind="sellItemDisplayProps" />
+          <ObjectiveItemDisplay v-bind="objectiveItemDisplayProps" />
         </div>
         <ObjectiveRequiredItems
           v-if="objectiveEquipment.length"
@@ -133,6 +133,7 @@
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES } from '@/utils/constants';
+  import { objectiveEquipmentItems } from '@/utils/objectiveEquipment';
   import type { TarkovItem, TaskObjective } from '@/types/tarkov';
   const FALLBACK_IS_MAP_VIEW_REF = ref(false);
   const { t } = useI18n({ useScope: 'global' });
@@ -180,23 +181,40 @@
   const fullObjective = computed(() => {
     return objectives.value.find((o) => o.id == props.objective.id);
   });
+  const currentObjective = computed(() => fullObjective.value ?? props.objective);
   const objectiveRequiredKeys = computed(() => {
     const keys = fullObjective.value?.requiredKeys ?? props.objective.requiredKeys;
     return (keys ?? []).filter((group) => group.length > 0);
   });
+  const weaponAlternatives = computed(() => {
+    const { type, usingWeapon } = currentObjective.value;
+    // Only a flat weapon list expresses a pool of individual alternatives.
+    if (type !== 'shoot' || !Array.isArray(usingWeapon) || usingWeapon.some(Array.isArray)) {
+      return [];
+    }
+    const seen = new Set<string>();
+    return objectiveEquipmentItems(usingWeapon).filter((weapon) => {
+      if (!weapon?.id || seen.has(weapon.id)) return false;
+      seen.add(weapon.id);
+      return true;
+    });
+  });
+  const hasWeaponAlternatives = computed(() => weaponAlternatives.value.length > 1);
   const objectiveEquipment = computed(() => {
-    const obj = fullObjective.value ?? props.objective;
-    if (obj.type === 'sellItem') return [];
-    return getObjectiveEquipmentItems(obj);
+    const objective = currentObjective.value;
+    if (objective.type === 'sellItem') return [];
+    return getObjectiveEquipmentItems(
+      hasWeaponAlternatives.value ? { ...objective, usingWeapon: undefined } : objective
+    );
   });
   const objectiveSellItems = computed(() => {
-    const objective = fullObjective.value ?? props.objective;
+    const objective = currentObjective.value;
     if (objective.type !== 'sellItem') return [];
     const items = objective.items?.length ? objective.items : [objective.item];
     return items.filter((item): item is TarkovItem => Boolean(item?.id));
   });
   const objectiveSellPrimaryItem = computed(
-    () => (fullObjective.value ?? props.objective).item ?? objectiveSellItems.value[0]
+    () => currentObjective.value.item ?? objectiveSellItems.value[0]
   );
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
@@ -214,9 +232,13 @@
   const isParentTaskLocked = computed(() => {
     return isParentTaskComplete.value || isParentTaskFailed.value;
   });
-  const sellItemDisplayProps = computed(() => ({
-    primaryItem: objectiveSellPrimaryItem.value,
-    acceptedItems: objectiveSellItems.value,
+  const objectiveItemDisplayProps = computed(() => ({
+    primaryItem: hasWeaponAlternatives.value
+      ? weaponAlternatives.value[0]
+      : objectiveSellPrimaryItem.value,
+    acceptedItems: hasWeaponAlternatives.value
+      ? weaponAlternatives.value
+      : objectiveSellItems.value,
     fallbackName: props.objective.description ?? '',
     paused: isParentTaskLocked.value || isComplete.value,
   }));

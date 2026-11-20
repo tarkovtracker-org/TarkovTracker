@@ -750,6 +750,10 @@ name and paged through without changing progress. Single-item sales still show t
 Cycling pauses for completed objectives and completed or failed parent tasks, while browsing stays
 available.
 
+Shoot objectives with multiple weapons in a flat alternatives list use the same display and
+popover. Required weapon mods and gear remain visible in the equipment strip. Single weapons
+and grouped weapon requirements stay in that strip.
+
 Weapon-build task objectives show their base weapon and explicit `containsAll` parts beneath the
 objective statement. `TaskWeaponBuildItems.vue` consumes the same `neededItemTaskObjectives`
 records and `useNeededItemProgress` helper as Needed Items: the base keeps the objective ID,
