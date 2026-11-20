@@ -73,6 +73,7 @@
         aria-hidden="true"
       />
     </AppTooltip>
+    <slot name="alternatives" />
     <AppTooltip
       v-if="showRequiredLabels && exclusiveEditionBadge"
       :text="

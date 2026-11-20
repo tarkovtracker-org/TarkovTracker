@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
+import { DOMWrapper, flushPromises } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
@@ -148,7 +149,8 @@ const TaskCardHeaderStub = {
   props: ['task'],
 };
 const TaskCardBadgesStub = {
-  template: '<div data-testid="task-card-badges"><slot name="actions" /></div>',
+  template:
+    '<div data-testid="task-card-badges"><slot name="alternatives" /><slot name="actions" /></div>',
   props: ['task'],
 };
 const TaskCardActionsStub = {
@@ -237,7 +239,7 @@ describe('TaskCard appearance and expansion controls', () => {
     metadataStoreMock.tasksObjectivesPending = false;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
   });
-  it('shows named quest links and describes the direction of each failure on collapsed cards', async () => {
+  it('reveals named, directional alternatives from a compact chip on a collapsed card', async () => {
     preferencesState.collapseDefault = true;
     metadataStoreMock.alternativeTasks = { 'task-1': ['mutual', 'outgoing', 'missing'] };
     metadataStoreMock.alternativeTaskSources = { 'task-1': ['mutual', 'incoming'] };
@@ -251,7 +253,17 @@ describe('TaskCard appearance and expansion controls', () => {
     );
     const wrapper = await mountTaskCard();
     expect(wrapper.find('#task-content-task-1').exists()).toBe(false);
-    const alternatives = wrapper.get('[data-testid="task-alternatives"]');
+    const chip = wrapper.get(
+      '[data-testid="task-card-badges"] button[aria-label="Quest alternatives (3)"]'
+    );
+    expect(chip.text()).toBe('3 alt');
+    const overlays = new DOMWrapper(document.body);
+    expect(overlays.find('[data-testid="task-alternatives"]').exists()).toBe(false);
+    expect(chip.attributes('aria-expanded')).toBe('false');
+    await chip.trigger('click');
+    await flushPromises();
+    expect(chip.attributes('aria-expanded')).toBe('true');
+    const alternatives = overlays.get('[data-testid="task-alternatives"]');
     expect(alternatives.text()).toContain('Quest alternatives');
     expect(alternatives.findAll('li p').map((label) => label.text())).toEqual([
       'Mutually exclusive with this quest',
@@ -266,7 +278,7 @@ describe('TaskCard appearance and expansion controls', () => {
       ]
     );
     await wrapper.setProps({ task: { id: 'unrelated', name: 'Unrelated quest' } });
-    expect(wrapper.find('[data-testid="task-alternatives"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-alternatives-trigger"]').exists()).toBe(false);
     wrapper.unmount();
   });
   it('offers a retry when objectives fail and shows the hydrated objectives afterward', async () => {

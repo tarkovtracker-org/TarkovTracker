@@ -38,6 +38,9 @@
               @toggle-hide="toggleHidden"
               @copy-link="copyTaskLink"
             >
+              <template #alternatives>
+                <TaskCardAlternatives :task-id="task.id" />
+              </template>
               <template #actions>
                 <TaskCardActions
                   :state="actionButtonState"
@@ -73,7 +76,6 @@
             </button>
           </div>
         </div>
-        <TaskCardAlternatives :task-id="task.id" />
         <!-- Extra Info Strips (padded area) -->
         <TaskRequirementChips
           v-if="isLocked"
