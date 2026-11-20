@@ -91,7 +91,6 @@ const remainingObjectives = (task: Task, progress: SellProgress) =>
   progress.isTaskFailed(task.id)
     ? task.objectives!
     : task.objectives!.filter((entry) => !progress.isTaskObjectiveComplete(entry?.id));
-// Pending, hidden, failed-branch and conditionally eligible tasks all remain protected.
 const taskKeys = (task: Task): TarkovItem[] =>
   (task.requiredKeys ?? []).flatMap((group) => group?.keys);
 const moduleItems = (module: HideoutModule, progress: SellProgress) =>
@@ -118,6 +117,7 @@ export function remainingSellUses(
   progress: SellProgress
 ): { itemIds: ReadonlySet<string>; categoryIds: ReadonlySet<string> } | undefined {
   if (!knownCatalog(tasks, modules, progress)) return undefined;
+  // Pending, hidden, failed-branch and conditionally eligible tasks all remain protected.
   const unfinishedTasks = tasks.filter((task) => !finishedTask(task, progress));
   const objectives = unfinishedTasks.flatMap((task) => remainingObjectives(task, progress));
   const items = [
