@@ -1,6 +1,7 @@
 <template>
   <component
     :is="link.to ? 'router-link' : 'div'"
+    v-if="link"
     :to="link.to"
     class="border-warning-500/20 bg-warning-950/20 group flex items-start gap-2 rounded-md border px-3 py-2 text-xs"
     :class="{ 'hover:border-warning-500/40 transition-colors': link.to }"
@@ -38,6 +39,7 @@
   });
   const link = computed(() => {
     const unlock = props.unlock;
+    if (unlock.kind === 'pending') return null;
     if (unlock.kind === 'story') return storyLink(unlock);
     if (unlock.kind === 'unknown') {
       return {

@@ -1,6 +1,6 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { describe, expect, it, vi } from 'vitest';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
 import { TASK_ID_REGISTRY } from '@/utils/constants';
 /**
  * Creates dashboard stats mock with configurable data states
@@ -87,7 +87,13 @@ const setup = async (
     traderSortMode?: 'default' | 'progress' | 'level';
     traderSortDirection?: 'asc' | 'desc';
   } = {},
-  metadata: { tasks?: unknown[]; storyChapters?: unknown[]; storyChaptersGameMode?: string } = {},
+  metadata: {
+    tasks?: unknown[];
+    tasksCoreGameMode?: string;
+    tasksRewardsHydrated?: boolean;
+    storyChapters?: unknown[];
+    storyChaptersGameMode?: string;
+  } = {},
   tarkovOverrides: Record<string, unknown> = {}
 ) => {
   const {
@@ -121,7 +127,15 @@ const setup = async (
   }));
   vi.doMock('@/stores/useMetadata', () => ({
     useMetadataStore: () => ({
-      tasks: metadata.tasks ?? [],
+      get tasks() {
+        return metadata.tasks ?? [];
+      },
+      get tasksCoreGameMode() {
+        return metadata.tasksCoreGameMode ?? 'pvp';
+      },
+      get tasksRewardsHydrated() {
+        return metadata.tasksRewardsHydrated ?? true;
+      },
       storyChapters: metadata.storyChapters ?? [],
       storyChaptersGameMode: metadata.storyChaptersGameMode ?? 'pvp',
     }),
@@ -276,6 +290,35 @@ describe('dashboard page', () => {
       wrapper
         .findAll('[data-testid="trader-card"]')
         .map((node) => `${node.attributes('data-id')}:${node.attributes('data-unlock')}`);
+    it('waits for the selected mode catalog and rewards before warning about a missing unlock', async () => {
+      const mode = ref('pvp');
+      const taskMetadata = reactive({
+        tasksCoreGameMode: 'pvp',
+        tasksRewardsHydrated: true,
+        tasks: [
+          { id: TASK_ID_REGISTRY.EASY_MONEY_PART_1_PVP as string, name: 'Easy Money - Part 1' },
+        ],
+      });
+      const refTrader = { ...traders[0]!, id: 'ref-id', name: 'Ref', normalizedName: 'ref' };
+      const { DashboardPage } = await setup({ traderStats: [refTrader] }, {}, taskMetadata, {
+        getCurrentGameMode: () => mode.value,
+      });
+      const wrapper = await mountSuspended(DashboardPage, {
+        global: { stubs: defaultGlobalStubs },
+      });
+      expect(renderedCards(wrapper)).toEqual(['ref-id:task']);
+      mode.value = 'seasonal';
+      await nextTick();
+      expect(renderedCards(wrapper)).toEqual(['ref-id:pending']);
+      taskMetadata.tasks = [{ id: 'other-task', name: 'Another task' }];
+      taskMetadata.tasksCoreGameMode = 'seasonal';
+      taskMetadata.tasksRewardsHydrated = false;
+      await nextTick();
+      expect(renderedCards(wrapper)).toEqual(['ref-id:pending']);
+      taskMetadata.tasksRewardsHydrated = true;
+      await nextTick();
+      expect(renderedCards(wrapper)).toEqual(['ref-id:unknown']);
+    });
     const praporGateMetadata = {
       ...metadata,
       storyChapters: [
