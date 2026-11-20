@@ -14,14 +14,17 @@ describe('objective popup details', () => {
     expect(getObjectivePopupItem({ id: 'o', usingWeapon: [weapon, other] })).toEqual({
       item: weapon,
       alternatives: 1,
+      isEquipment: true,
     });
     expect(getObjectivePopupItem({ id: 'o', wearing: [[weapon, other], [marker]] })).toEqual({
       item: weapon,
       alternatives: 0,
+      isEquipment: true,
     });
     expect(getObjectivePopupItem({ id: 'o', wearing: [weapon, other] })).toEqual({
       item: weapon,
       alternatives: 1,
+      isEquipment: true,
     });
   });
   it('shows the marker for marks and the quest item for pickups and stashes', () => {
@@ -53,7 +56,11 @@ describe('objective popup details', () => {
   it('shows the weapon or gear an elimination must be done with', () => {
     const rifle = { id: 'ash12', name: 'ASh-12' };
     const shoot = { id: 'o', type: 'shoot', usingWeapon: rifle } as TaskObjective;
-    expect(getObjectivePopupItem(shoot)).toEqual({ item: rifle, alternatives: 0 });
+    expect(getObjectivePopupItem(shoot)).toEqual({
+      item: rifle,
+      alternatives: 0,
+      isEquipment: true,
+    });
     const gear = [{ id: 'helmet', name: 'Helmet' }];
     const worn = { id: 'o', type: 'shoot', wearing: gear } as TaskObjective;
     expect(getObjectivePopupItem(worn)?.item).toBe(gear[0]);

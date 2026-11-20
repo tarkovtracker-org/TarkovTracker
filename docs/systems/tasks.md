@@ -578,11 +578,12 @@ Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`
 1, and a tarkov.dev link. A details panel names the action with its chip and shows the objective
 description, the item involved (the MS2000 Marker for a mark, the quest item for a quest pickup or
 stash, otherwise the first accepted item plus how many alternatives exist, or, when no item is
-accepted, the weapon or gear an elimination must use) with its icon, count and
-a FIR badge, each required key group (`A / B` when any one works), and a progress bar when the
-objective counts more than one. The footer has a labeled **Mark complete** / **Completed** toggle,
-a **Task list** button that scrolls to and highlights the objective, and the show-only and hide
-quest buttons. Compact tooltip density keeps the layout and makes the footer buttons icon-only.
+accepted, the weapon or gear an elimination must use) with its icon, item quantity when applicable
+and a FIR badge. The panel lists each required key group (`A / B` when any one works) and shows a
+progress bar when the objective counts more than one. Elimination counts appear in progress only.
+The footer has a labeled **Mark complete** / **Completed** toggle, a **Task list** button that
+scrolls to and highlights the objective, and the show-only and hide quest buttons. Compact tooltip
+density keeps the layout and makes the footer buttons icon-only.
 Read-only popups omit the toggle and progress. The stacked list shows each entry's trader
 portrait with the action chip on it.
 
