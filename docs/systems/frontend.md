@@ -143,7 +143,8 @@ Keep existing rules in place.
  and http.request.uri.query eq ""
  and (http.request.method eq "PURGE"
       or (http.request.method eq "GET"
-          and not any(http.request.headers.names[*] in {
+          and not http.request.headers.truncated
+          and not any(lower(http.request.headers.names[*])[*] in {
             "authorization" "cache-control" "origin" "forwarded" "x-forwarded-host"
             "x-forwarded-scheme" "x-host" "x-original-url" "x-rewrite-url"
             "x-http-method" "x-http-method-override" "x-method-override"
@@ -155,6 +156,7 @@ on the warm response. Check that `?fresh=1` returns the current version with `Ca
 and never returns `HIT`. GETs carrying headers that vary the
 [default cache key](https://developers.cloudflare.com/cache/how-to/cache-keys/) stay outside the rule
 so that a URL-only purge can clear the cached variant.
+The rule checks header names case-insensitively and skips GETs whose header list is truncated.
 GETs carrying `Cache-Control` also stay outside the rule, including explicit bypass requests from
 older admin tabs. The existing admin save purges the tag with a fallback to the two exact public URLs.
 The separate `PURGE` branch supports the internal method used by
