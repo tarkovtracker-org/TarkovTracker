@@ -99,6 +99,8 @@ flowchart LR
    sent with `no-store` so a transient outage never pins the env-default fallback at the edge.
    Missing or invalid Supabase credentials are treated as the same uncacheable failure. Successful
    responses include the settings version.
+   The admin read uses `?fresh=1`, which always reads Supabase and returns `no-store` for both
+   browsers and Cloudflare. Query strings are excluded from the public cache rule.
 5. `PromotedTwitchEmbed` fetches config on mount and at most once every five minutes while visible.
    Tab returns reuse fresh results instead of issuing extra requests. Shared client state still applies
    admin saves immediately; fetched configs older than the latest shared version are ignored.
@@ -126,6 +128,40 @@ added 720 requests regardless of dismissal. Browser cache hits may reduce actual
 These budgets are client call counts, not claims about the historical traffic spike or billing savings.
 See [Cloudflare's cache execution order](https://developers.cloudflare.com/workers/reference/how-the-cache-works/)
 and [Pages Function billing](https://developers.cloudflare.com/pages/functions/pricing/).
+
+### Cloudflare cache rule
+
+Verify that the Pages deployment with the admin `?fresh=1` read is live before applying the rule.
+Create a zone Cache Rule for this public route on `tarkovtracker.org`. Use the default cache key
+and set cache eligibility to **Eligible for cache**. For Edge TTL, use the origin cache-control
+header and bypass caching when the header is missing. Leave Browser TTL governed by the origin.
+Keep existing rules in place.
+
+```text
+(http.host in {"tarkovtracker.org" "www.tarkovtracker.org"}
+ and http.request.uri.path eq "/api/twitch/config"
+ and http.request.uri.query eq ""
+ and (http.request.method eq "PURGE"
+      or (http.request.method eq "GET"
+          and not http.request.headers.truncated
+          and not any(lower(http.request.headers.names[*])[*] in {
+            "authorization" "cache-control" "origin" "forwarded" "x-forwarded-host"
+            "x-forwarded-scheme" "x-host" "x-original-url" "x-rewrite-url"
+            "x-http-method" "x-http-method-override" "x-method-override"
+          }))))
+```
+
+After rollout, send two ordinary GETs from the same location and check for `CF-Cache-Status: HIT`
+on the warm response. Check that `?fresh=1` returns the current version with `Cache-Control: no-store`
+and never returns `HIT`. GETs carrying headers that vary the
+[default cache key](https://developers.cloudflare.com/cache/how-to/cache-keys/) stay outside the rule
+so that a URL-only purge can clear the cached variant.
+The rule checks header names case-insensitively and skips GETs whose header list is truncated.
+GETs carrying `Cache-Control` also stay outside the rule, including explicit bypass requests from
+older admin tabs. The existing admin save purges the tag with a fallback to the two exact public URLs.
+The separate `PURGE` branch supports the internal method used by
+[Cloudflare's single-file purge API](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/#cache-rules-that-match-on-request-properties).
+Disable this rule to roll back edge caching.
 
 ### Files
 
