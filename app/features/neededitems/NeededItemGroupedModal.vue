@@ -119,7 +119,7 @@
                     size="sm"
                     :current-count="handoverCount(obj)"
                     :needed-count="neededCountOf(obj)"
-                    :disabled="!isTargetGameModeActive || isCompletedHandover(obj)"
+                    :disabled="isTaskObjectiveDisabled(obj)"
                     :decrease-label="
                       t('needed_items.aria.decrease_objective_count', {
                         task_name: getTaskName(obj.taskId),
@@ -270,6 +270,8 @@
   const isTargetGameModeActive = computed(
     () => targetGameMode.value === tarkovStore.getCurrentGameMode()
   );
+  const isTaskObjectiveDisabled = (need: NeededItemTaskObjective) =>
+    !isTargetGameModeActive.value || isCompletedHandover(need);
   const canMutateTargetGameMode = () => {
     if (targetGameMode.value === tarkovStore.getCurrentGameMode()) return true;
     emit('update:open', false);

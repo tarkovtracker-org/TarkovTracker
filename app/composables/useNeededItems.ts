@@ -464,6 +464,10 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     const task = metadataStore.getTaskById(need.taskId);
     return task?.kappaRequired === true;
   };
+  const taskNeedCount = (need: NeededItemTaskObjective, count: number): number =>
+    isCompletedHandover(need)
+      ? count
+      : Math.min(tarkovStore.getObjectiveCount(need.id) ?? 0, count);
   const passesOwnershipFilter = (
     item: NeededItemTaskObjective | NeededItemHideoutModule
   ): boolean => {
@@ -708,8 +712,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       const count = neededCountOf(need);
       let needCurrentCount: number;
       if (need.needType === 'taskObjective') {
-        const objectiveCount = tarkovStore.getObjectiveCount(need.id);
-        needCurrentCount = isCompletedHandover(need) ? count : Math.min(objectiveCount ?? 0, count);
+        needCurrentCount = taskNeedCount(need, count);
         if (need.foundInRaid) {
           group.taskFir += count;
           group.taskFirCurrent += needCurrentCount;
