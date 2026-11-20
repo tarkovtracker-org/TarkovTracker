@@ -275,6 +275,9 @@ describe('TaskCard appearance and expansion controls', () => {
       'Completing this quest fails',
       'Completing any of these fails this quest',
     ]);
+    expect(
+      alternatives.findAll('section > div > span[aria-hidden="true"]').map((count) => count.text())
+    ).toEqual(['2', '1', '1']);
     expect(alternatives.findAll('ul').map((group) => group.findAll('li').length)).toEqual([
       2, 1, 1,
     ]);
