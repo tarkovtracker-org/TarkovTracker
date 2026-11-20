@@ -1,17 +1,10 @@
-import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { getPlatformProxy } from 'wrangler';
+import { fetchResponse, sha256 } from './dependency-evidence.mjs';
 const api = 'https://tarkovtracker.org/api/tarkov/';
 const manifestKey = 'neutral-catalog-v1-manifest';
-async function get(path) {
-  const response = await fetch(new URL(path, api), {
-    redirect: 'error',
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`Lighthouse catalog ${path} returned HTTP ${response.status}`);
-  return response;
-}
+const get = (path) => fetchResponse(new URL(path, api), { redirect: 'error' });
 async function snapshot(scope, entry, release) {
   const parts = /^([a-z-]+)\/([a-z-]+)$/.exec(scope);
   if (!parts) throw new Error(`Invalid Lighthouse catalog scope: ${scope}`);
@@ -19,7 +12,7 @@ async function snapshot(scope, entry, release) {
   const param = dataset === 'strings' ? 'lang' : 'gameMode';
   const response = await get(`${dataset}?${param}=${value}`);
   const body = Buffer.from(await response.arrayBuffer());
-  const digest = createHash('sha256').update(body).digest('hex');
+  const digest = sha256(body);
   const matchesRelease = [
     response.headers.get('X-Cache-Status') === 'PRECOMPUTE',
     response.headers.get('X-Catalog-Release') === String(release),
