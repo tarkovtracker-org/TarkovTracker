@@ -7,10 +7,10 @@ only to the trusted `main` workflow in the `production-precompute` environment.
 ## Release contents
 
 A full run publishes ten neutral datasets for each of the three game modes
-and one strings bundle per distinct selectable API language. The current scope is
-46 objects across 30 mode catalogs, 3 counts views, and 13 language bundles. These constants come from
-`app/utils/catalogDatasets.ts`. Strings contain only references the final adapted
-catalogs use and include English fallback for every mode.
+and one objective counts view per mode, plus a strings bundle per distinct
+selectable API language. The current scope is 46 objects across 30 mode catalogs,
+3 counts views, and 13 language bundles. Strings contain only references the final
+adapted catalogs use and include English fallback for every mode.
 
 Every object is gzip-compressed and addressed by SHA256 of its uncompressed UTF-8
 JSON. The writer enforces size limits and reads stored bytes back before replacing
