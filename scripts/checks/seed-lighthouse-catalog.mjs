@@ -5,12 +5,17 @@ import { fetchResponse, sha256 } from './dependency-evidence.mjs';
 const api = 'https://tarkovtracker.org/api/tarkov/';
 const manifestKey = 'neutral-catalog-v1-manifest';
 const get = (path) => fetchResponse(new URL(path, api), { redirect: 'error' });
-async function snapshot(scope, entry, release) {
+function snapshotPath(scope) {
+  const countsView = /^tasks-objectives\/([a-z-]+)\/counts$/.exec(scope);
+  if (countsView) return `tasks-objectives?gameMode=${countsView[1]}&view=counts`;
   const parts = /^([a-z-]+)\/([a-z-]+)$/.exec(scope);
   if (!parts) throw new Error(`Invalid Lighthouse catalog scope: ${scope}`);
   const [, dataset, value] = parts;
   const param = dataset === 'strings' ? 'lang' : 'gameMode';
-  const response = await get(`${dataset}?${param}=${value}`);
+  return `${dataset}?${param}=${value}`;
+}
+async function snapshot(scope, entry, release) {
+  const response = await get(snapshotPath(scope));
   const body = Buffer.from(await response.arrayBuffer());
   const digest = sha256(body);
   const matchesRelease = [

@@ -372,7 +372,7 @@ catalog cache and does not read these Pages catalog objects.
    the intended legacy-overlay digest and both filters empty. Production
    credentials remain inside the `production-precompute` environment.
 4. Inspect `precompute-manifest.json` from the run. Require the intended
-   `catalogRelease.overlaySha`, the exact 30 catalog and 13 language scopes,
+   `catalogRelease.overlaySha`, all 46 scopes (30 mode catalogs, 3 counts views, and 13 language bundles),
    successful immutable-object readbacks, and all three successful English imports.
 5. Promote the Tracker reader only after those objects are available in the
    production namespace. Run `pnpm run verify:overlay` against production and

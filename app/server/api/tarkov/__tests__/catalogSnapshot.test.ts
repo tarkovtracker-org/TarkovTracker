@@ -74,6 +74,7 @@ describe('catalog snapshot routes', () => {
     const response = await request(new Request(url));
     expect(response.headers.get('X-Catalog-Release')).toBe('124');
     expect(response.headers.get('X-Cache-Status')).toBe('PRECOMPUTE');
+    expect(response.headers.get('X-Overlay-Sha256')).toBe('active-sha');
     expect(await response.text()).toBe(counts);
     expect(await (await request(new Request('https://example.test/?gameMode=pve'))).text()).toBe(
       body

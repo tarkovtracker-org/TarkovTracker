@@ -205,15 +205,16 @@ Fetches task objectives and fail conditions.
 
 **Query Parameters:**
 
-| Parameter  | Type   | Default   | Description                                   |
-| ---------- | ------ | --------- | --------------------------------------------- |
-| `gameMode` | string | `regular` | Game mode (`regular`, `pve`, or `pvp-season`) |
+| Parameter  | Type   | Default      | Description                                         |
+| ---------- | ------ | ------------ | --------------------------------------------------- |
+| `gameMode` | string | `regular`    | Game mode (`regular`, `pve`, or `pvp-season`)       |
+| `view`     | string | Full catalog | Use `counts` for task and objective IDs with counts |
 
 The published snapshot includes overlay provenance. A missing snapshot without an
 eligible last-good copy returns `503`. A KV-failure fallback is marked `STALE`.
 
-Use `view=counts` for cross-mode comparisons. This view contains task IDs, objective
-IDs, and counts. Releases published before this view was introduced return the full payload.
+The counts view retains overlay provenance. Releases published before this view
+was introduced return the full payload.
 
 ---
 

@@ -1436,7 +1436,7 @@ matching reviewed producer and snapshots still inside their retention window.
 
 ### Language-neutral catalog rollout (#1065)
 
-The production release contains 30 neutral mode catalogs and 13 language bundles,
+The production release contains 46 neutral objects across 30 mode catalogs, 3 counts views, and 13 language bundles,
 plus three independently validated whole English import snapshots. Follow the
 [producer-before-consumer order](./systems/overlay-and-precompute.md#release-order).
 

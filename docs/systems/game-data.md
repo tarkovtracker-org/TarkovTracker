@@ -203,6 +203,4 @@ this data path. Production catalog handlers read prepared snapshots, and upstrea
 work stays in reviewed producers. The manifest is activated only after every
 required scope passes its storage and provenance checks. The verifier requires all
 46 scopes to be current and preserves failure evidence for each import mode.
-The `view=counts` option on `/api/tarkov/tasks-objectives` serves only task IDs, objective IDs,
-and counts for cross-mode comparison. It serves the full objectives payload while the active
-release predates publication of counts views.
+See the [task objectives API](../api.md#get-apitarkovtasks-objectives) for the counts view.
