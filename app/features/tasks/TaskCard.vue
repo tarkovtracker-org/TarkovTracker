@@ -73,6 +73,7 @@
             </button>
           </div>
         </div>
+        <TaskCardAlternatives :task-id="task.id" />
         <!-- Extra Info Strips (padded area) -->
         <TaskRequirementChips
           v-if="isLocked"
@@ -355,6 +356,7 @@
     type RequirementExpectedStatus,
   } from '@/features/tasks/task-requirement-helpers';
   import TaskCardActions from '@/features/tasks/TaskCardActions.vue';
+  import TaskCardAlternatives from '@/features/tasks/TaskCardAlternatives.vue';
   import TaskCardBackground from '@/features/tasks/TaskCardBackground.vue';
   import TaskCardBadges from '@/features/tasks/TaskCardBadges.vue';
   import TaskCardHeader from '@/features/tasks/TaskCardHeader.vue';

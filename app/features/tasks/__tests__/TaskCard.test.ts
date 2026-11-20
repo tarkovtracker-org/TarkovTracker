@@ -45,6 +45,7 @@ const tarkovStoreMock = {
   setObjectiveCount: vi.fn(),
 };
 const metadataStoreMock = reactive({
+  alternativeTasks: {} as Record<string, string[]>,
   alternativeTaskSources: {} as Record<string, string[]>,
   editions: [],
   fetchTaskObjectivesData: vi.fn<() => Promise<void>>(),
@@ -224,6 +225,8 @@ describe('TaskCard appearance and expansion controls', () => {
     progressStoreMock.tasksFailed = {};
     progressStoreMock.unlockedTasks = { 'task-1': { self: true } };
     vi.clearAllMocks();
+    metadataStoreMock.alternativeTasks = {};
+    metadataStoreMock.alternativeTaskSources = {};
     metadataStoreMock.getTaskById.mockReset();
     metadataStoreMock.fetchTaskObjectivesData.mockReset().mockResolvedValue();
     metadataStoreMock.storyChapters = [];
@@ -233,6 +236,38 @@ describe('TaskCard appearance and expansion controls', () => {
     metadataStoreMock.tasksObjectivesHydrated = true;
     metadataStoreMock.tasksObjectivesPending = false;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+  });
+  it('shows named quest links and describes the direction of each failure on collapsed cards', async () => {
+    preferencesState.collapseDefault = true;
+    metadataStoreMock.alternativeTasks = { 'task-1': ['mutual', 'outgoing', 'missing'] };
+    metadataStoreMock.alternativeTaskSources = { 'task-1': ['mutual', 'incoming'] };
+    metadataStoreMock.tasks = [
+      { id: 'mutual', name: 'Mutual choice' },
+      { id: 'outgoing', name: 'Quest this one fails' },
+      { id: 'incoming', name: 'Quest that fails this one' },
+    ] as Task[];
+    metadataStoreMock.getTaskById.mockImplementation((id) =>
+      metadataStoreMock.tasks.find((task) => task.id === id)
+    );
+    const wrapper = await mountTaskCard();
+    expect(wrapper.find('#task-content-task-1').exists()).toBe(false);
+    const alternatives = wrapper.get('[data-testid="task-alternatives"]');
+    expect(alternatives.text()).toContain('Quest alternatives');
+    expect(alternatives.findAll('li p').map((label) => label.text())).toEqual([
+      'Mutually exclusive with this quest',
+      'Quests that fail when you complete this one',
+      'Quests that fail this one when completed',
+    ]);
+    expect(alternatives.findAll('a').map((link) => [link.text(), link.attributes('href')])).toEqual(
+      [
+        ['Mutual choice', '/tasks?task=mutual'],
+        ['Quest this one fails', '/tasks?task=outgoing'],
+        ['Quest that fails this one', '/tasks?task=incoming'],
+      ]
+    );
+    await wrapper.setProps({ task: { id: 'unrelated', name: 'Unrelated quest' } });
+    expect(wrapper.find('[data-testid="task-alternatives"]').exists()).toBe(false);
+    wrapper.unmount();
   });
   it('offers a retry when objectives fail and shows the hydrated objectives afterward', async () => {
     metadataStoreMock.tasksObjectivesHydrated = false;
