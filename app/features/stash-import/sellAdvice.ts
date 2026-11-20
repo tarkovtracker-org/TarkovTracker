@@ -41,12 +41,19 @@ const questItems = (objective: TaskObjective) => (objective.questItem ? [objecti
 const markers = (objective: TaskObjective) => (objective.markerItem ? [objective.markerItem] : []);
 const knownId = (id: unknown): id is string => typeof id === 'string' && id.trim().length > 0;
 const knownItem = (item: TarkovItem) => knownId(item?.id);
-const requiredItemsByType = new Map<string, (objective: TaskObjective) => TarkovItem[]>([
-  ...REGULAR_ITEM_OBJECTIVES.map((type) => [type, regularItems] as const),
-  ...QUEST_ITEM_OBJECTIVES.map((type) => [type, questItems] as const),
-  ['buildWeapon', (objective) => (objective.item ? [objective.item] : [])],
-  ['mark', markers],
-  ['useItem', (objective) => [...regularItems(objective), ...(objective.useAny ?? [])]],
+const hasQuestItem = (objective: TaskObjective) =>
+  objective.questInventoryOnly === true || questItems(objective).some(knownItem);
+const hasRegularItem = (objective: TaskObjective) => regularItems(objective).some(knownItem);
+const validItemRequirement = new Map<string, (objective: TaskObjective) => boolean>([
+  ...REGULAR_ITEM_OBJECTIVES.map((type) => [type, hasRegularItem] as const),
+  ...QUEST_ITEM_OBJECTIVES.map((type) => [type, hasQuestItem] as const),
+  ['buildWeapon', (objective) => knownId(objective.item?.id)],
+  ['craft', (objective) => (objective.items ?? []).some(knownItem)],
+  ['mark', (objective) => markers(objective).some(knownItem)],
+  [
+    'useItem',
+    (objective) => [...regularItems(objective), ...(objective.useAny ?? [])].some(knownItem),
+  ],
 ]);
 /** Read all positive references. The presentation helper caps some pools. */
 const objectiveItems = (objective: TaskObjective): TarkovItem[] => [
@@ -61,8 +68,8 @@ const objectiveItems = (objective: TaskObjective): TarkovItem[] => [
   ...(objective.requiredKeys ?? []).flat(),
 ];
 function knownObjectiveType(objective: TaskObjective, type: string): boolean {
-  const requiredItems = requiredItemsByType.get(type);
-  return requiredItems ? requiredItems(objective).some(knownItem) : OTHER_OBJECTIVES.has(type);
+  const validate = validItemRequirement.get(type);
+  return validate ? validate(objective) : OTHER_OBJECTIVES.has(type);
 }
 function knownCategories(categories: string[] | undefined): boolean {
   if (categories === undefined) return true;

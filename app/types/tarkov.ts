@@ -227,6 +227,8 @@ export interface TaskObjective {
   markerItem?: TarkovItem;
   /** Item that counts for quest completion/requirements */
   questItem?: TarkovItem;
+  /** Verified quest-inventory item with no confirmed objective-to-template mapping. */
+  questInventoryOnly?: boolean;
   count?: number;
   type?: string;
   foundInRaid?: boolean;

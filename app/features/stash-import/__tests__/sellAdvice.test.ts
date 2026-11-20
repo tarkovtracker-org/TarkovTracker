@@ -188,6 +188,41 @@ describe('remaining tracked uses', () => {
       new Set(['beacon', 'quest-item', 'consumable'])
     );
   });
+  it('accepts explicitly verified quest-only references without skipping ordinary protections', () => {
+    const objectives: TaskObjective[] = [
+      {
+        id: 'camera',
+        type: 'findQuestItem',
+        questInventoryOnly: true,
+        requiredKeys: [[item('key')]],
+      },
+      { id: 'letter', type: 'plantQuestItem', questInventoryOnly: true, items: [item('supply')] },
+      { id: 'read', type: 'useItem', useAny: [item('data')] },
+      {
+        id: 'decrypt',
+        type: 'craft',
+        items: [item('paper'), item('tool')],
+        questItem: item('laptop'),
+      },
+    ];
+    expect(remainingSellUses([task({ objectives })], [], progress)).toEqual(
+      new Set(['key', 'supply', 'data', 'paper', 'tool', 'laptop'])
+    );
+  });
+  it.each([
+    [
+      'non-boolean quest inventory annotation',
+      { type: 'giveQuestItem', questInventoryOnly: 'yes' },
+    ],
+    [
+      'ordinary handover with a quest inventory annotation',
+      { type: 'giveItem', questInventoryOnly: true },
+    ],
+    ['craft without stash inputs', { type: 'craft', questItem: item('laptop') }],
+  ] as const)('withholds advice for %s', (_name, extra) => {
+    const incomplete = { id: 'objective', ...extra } as TaskObjective;
+    expect(remainingSellUses([task({ objectives: [incomplete] })], [], progress)).toBeUndefined();
+  });
   it('does not require missing data for a quest the player actually completed', () => {
     expect(
       remainingSellUses([task({ objectives: [] })], [], {

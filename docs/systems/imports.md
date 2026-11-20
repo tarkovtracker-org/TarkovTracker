@@ -35,7 +35,9 @@ release its cataloged use; merely filling its count does not. Missing/changing r
 withholds the answer. Unfinished tasks with empty objectives, untyped objectives or unmapped
 item objectives are reported by quest name. Changing the game mode withholds the sell view
 until the importer is reopened. If a pending weapon build requires an item category, only items
-with known categories outside all such requirements are eligible for advice.
+with known categories outside all such requirements are eligible for advice. A verified
+quest-inventory-only annotation can cover a quest objective whose exact item template is
+unknown. Ordinary item, equipment, key and craft-input references still protect stash items.
 
 The panel only reads state: it does not plan, allocate, fetch prices, save counts, or upload
 screenshots. The normal review, selected-target preview and explicit save are unchanged.
