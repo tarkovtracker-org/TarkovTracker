@@ -11,10 +11,12 @@ import {
   CATALOG_MANIFEST_KEY,
 } from '@/utils/catalogDatasets';
 import { collectGameDataStrings } from '@/utils/gameDataStrings';
+import { normalizeTaskObjectives } from '@/utils/taskNormalization';
 import { KvReadNotFound } from './kv';
 import { PRECOMPUTED_TTL_SECONDS } from './precompute';
 import type { CatalogStore } from './kv';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
+import type { TarkovTaskObjectivesQueryResult } from '@/types/tarkov';
 import type { CatalogDataset, CatalogRelease } from '@/utils/catalogDatasets';
 type Payload = { data: unknown; dataOverlay?: unknown };
 type Builders = {
@@ -68,6 +70,20 @@ export async function publishCatalogRelease(
       collectGameDataStrings(payload.data, references);
       const scope = `${dataset}/${mode}`;
       entries[scope] = await stage(kv, scope, payload);
+      if (dataset === 'tasks-objectives') {
+        const { tasks } = payload.data as TarkovTaskObjectivesQueryResult;
+        // Keep ordering and duplicate IDs for the same comparison rules as the full catalog.
+        const counts = tasks.map(({ id, objectives }) => ({
+          id,
+          objectives: normalizeTaskObjectives<{ id: string; count?: number }>(objectives).map(
+            ({ id, count }) => ({ id, count })
+          ),
+        }));
+        entries[scope + '/counts'] = await stage(kv, scope + '/counts', {
+          data: { tasks: counts },
+          dataOverlay: payload.dataOverlay,
+        });
+      }
     }
   }
   if (!references.size) throw new Error('Neutral catalogs contain no translation keys');

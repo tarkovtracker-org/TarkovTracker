@@ -45,14 +45,15 @@ async function checkScope(
   published: unknown,
   manifest: CatalogRelease
 ): Promise<CatalogVerificationRow> {
-  const [dataset, value] = scope.split('/');
+  const [dataset, value, view] = scope.split('/');
   const query = dataset === 'strings' ? `lang=${value}` : `gameMode=${value}`;
+  const viewQuery = view === 'counts' ? '&view=counts' : '';
   try {
     return verifyCatalogResponse(
       scope,
       published,
       manifest,
-      await readResponse(`/api/tarkov/${dataset}?${query}`)
+      await readResponse(`/api/tarkov/${dataset}?${query}${viewQuery}`)
     );
   } catch (error) {
     return { scope, status: 'unverified', problems: [problem(error)] };

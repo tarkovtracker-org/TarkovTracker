@@ -49,6 +49,36 @@ function serve(
 }
 describe('catalog snapshot routes', () => {
   afterEach(() => vi.unstubAllGlobals());
+  it('serves comparison input from the current release and falls back for older releases', async () => {
+    const scope = 'tasks-objectives/pve';
+    const { request, get, key, manifest } = serve('tasks-objectives', scope);
+    const url = 'https://example.test/?gameMode=pve&view=counts';
+    expect(await (await request(new Request(url))).text()).toBe(body);
+    expect(get).toHaveBeenCalledWith(key, 'stream');
+    const counts =
+      '{"data":{"tasks":[{"id":"quest","objectives":[{"id":"objective","count":2}]}]}}';
+    const countsScope = scope + '/counts';
+    const countsKey = `neutral-catalog-v1/${countsScope}/immutable-digest`;
+    manifest.completedAt++;
+    manifest.entries[countsScope] = {
+      ...manifest.entries[scope]!,
+      key: countsKey,
+      bytes: new TextEncoder().encode(counts).byteLength,
+    };
+    get.mockImplementation(async (requested) => {
+      if (requested === CATALOG_MANIFEST_KEY) return manifest;
+      return new Response(requested === countsKey ? counts : body).body!.pipeThrough(
+        new CompressionStream('gzip')
+      );
+    });
+    const response = await request(new Request(url));
+    expect(response.headers.get('X-Catalog-Release')).toBe('124');
+    expect(response.headers.get('X-Cache-Status')).toBe('PRECOMPUTE');
+    expect(await response.text()).toBe(counts);
+    expect(await (await request(new Request('https://example.test/?gameMode=pve'))).text()).toBe(
+      body
+    );
+  });
   it('bounds retained compressed bytes with ordinary chunks', async () => {
     const source = new ReadableStream<Uint8Array>({
       start(controller) {

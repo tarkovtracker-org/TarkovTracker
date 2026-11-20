@@ -1456,7 +1456,7 @@ plus three independently validated whole English import snapshots. Follow the
    this gate.
 5. Promote the consumer after the complete production manifest is available.
    Supply the private overlay read token through the `OVERLAY_TOKEN` process
-   environment or a secret store. `pnpm run verify:overlay` must report all 43 scopes current and three current
+   environment or a secret store. `pnpm run verify:overlay` must report all 46 scopes current and three current
    imports. It checks raw response digest/length, release timestamp, precompute
    source, cache policy, and overlay identity, retrying one concurrent release
    change. A `STALE` fallback does not certify the active release.
@@ -1485,7 +1485,7 @@ the consumer. Verify all three target envelopes in the selected namespace, their
 expected overlay SHA, fresh storage time, and whole catalog shape. A current
 neutral manifest alone cannot establish import readiness. An English-only
 maintenance refresh can update imports, but leaves the neutral manifest unchanged.
-Use the unfiltered run for the combined language-neutral release so the 43 neutral
+Use the unfiltered run for the combined language-neutral release so the 46 neutral
 scopes and all imports carry the intended source-overlay identity.
 
 After deployment, all three `tasks-import?gameMode=` requests must return 200 and
