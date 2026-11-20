@@ -490,8 +490,18 @@ describe('tasks page', () => {
     expect(switchGameModeMock).not.toHaveBeenCalled();
     expect(wrapper.find('[data-testid="task-list"]').exists()).toBe(true);
     handleTaskQueryParamMock.mockClear();
+    const focusAttempts: Array<{ mode: GameMode; task: unknown; catalogHasTask: boolean }> = [];
+    handleTaskQueryParamMock.mockImplementationOnce(() => {
+      focusAttempts.push({
+        mode: metadataStoreMock.currentGameMode,
+        task: wrapper.vm.$router.currentRoute.value.query.task,
+        catalogHasTask: metadataStoreMock.tasks.some((task) => task.id === id),
+      });
+    });
     await notice().get('[data-testid="task-link-switch-pve"]').trigger('click');
-    await vi.waitFor(() => expect(handleTaskQueryParamMock).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(focusAttempts).toEqual([{ mode: 'pve', task: id, catalogHasTask: true }])
+    );
     expect(switchGameModeMock).toHaveBeenCalledExactlyOnceWith('pve');
     expect(wrapper.vm.$router.currentRoute.value.query.task).toBe(id);
     expect(wrapper.find('[data-testid="task-link-unavailable"]').exists()).toBe(false);
@@ -504,6 +514,7 @@ describe('tasks page', () => {
     const notice = () => wrapper.get('[data-testid="task-link-unavailable"]');
     await vi.waitFor(() => expect(notice().text()).toContain('page.tasks.shared_link.no_match'));
     expect(notice().find('[data-testid^="task-link-switch-"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-list"]').exists()).toBe(true);
     await notice().get('[data-slot="close"]').trigger('click');
     const query = () => wrapper.vm.$router.currentRoute.value.query;
     await vi.waitFor(() => expect(query().task).toBeUndefined());
