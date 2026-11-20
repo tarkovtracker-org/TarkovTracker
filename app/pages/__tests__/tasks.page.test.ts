@@ -6,6 +6,7 @@ import { TASK_DETAIL_WAIT_MS } from '@/composables/useTaskDetailReadiness';
 import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { Task, TaskObjective } from '@/types/tarkov';
+import type { GameMode } from '@/utils/constants';
 /**
  * Factory to create a default Task with all required properties.
  * Use this instead of type assertions to ensure compile-time safety.
@@ -81,7 +82,13 @@ const preferencesStoreMock = {
 };
 const metadataStoreMock = reactive({
   tasks: [defaultTask],
+  currentGameMode: 'pvp' as GameMode,
   loading: false,
+  setLoading: (loading: boolean) => {
+    metadataStoreMock.loading = loading;
+  },
+  updateLanguageAndGameMode: vi.fn(),
+  fetchAllData: vi.fn(async () => {}),
   hasInitialized: true,
   languageCode: 'en',
   tasksCoreRevision: 0,
@@ -117,6 +124,12 @@ const clearPinnedTaskMock = vi.fn(() => {
   focusedTaskRef.value = null;
 });
 const handleTaskQueryParamMock = vi.fn();
+const switchGameModeMock = vi.fn(async (_mode: GameMode) => {});
+const fetchCatalogMock = vi.fn();
+vi.mock('@/utils/tarkovApiFetch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/tarkovApiFetch')>()),
+  tarkovApiFetch: (...args: unknown[]) => fetchCatalogMock(...args),
+}));
 const progressStoreMock = {
   visibleTeamStores: { self: {} } as Record<string, Record<string, never>>,
   tasksCompletions: {} as Record<string, Record<string, boolean>>,
@@ -188,6 +201,8 @@ vi.mock('@/stores/useProgress', () => ({
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     currentGameMode: 'pvp',
+    getCurrentGameMode: () => metadataStoreMock.currentGameMode,
+    switchGameMode: switchGameModeMock,
     getGameEdition: () => 1,
     pvp: {
       apiUpdateHistory: [],
@@ -351,7 +366,12 @@ const defaultGlobalStubs = {
   TaskLoadingState: true,
   Teleport: true,
   Transition: false,
-  UAlert: true,
+  UAlert: {
+    props: { title: String, description: String, close: Boolean },
+    emits: ['update:open'],
+    template:
+      '<div>{{ title }} {{ description }}<slot name="actions" /><button v-if="close" data-slot="close" @click="$emit(\'update:open\', false)" /></div>',
+  },
   UBadge: true,
   UButton: UButtonStub,
   UCard: true,
@@ -398,6 +418,10 @@ describe('tasks page', () => {
   beforeEach(async () => {
     metadataStoreMock.hasInitialized = true;
     metadataStoreMock.loading = false;
+    metadataStoreMock.currentGameMode = 'pvp';
+    fetchCatalogMock.mockReset();
+    switchGameModeMock.mockReset();
+    metadataStoreMock.fetchAllData.mockReset();
     visibleTasksRef.value = [defaultTask];
     focusedTaskRef.value = null;
     updateVisibleTasksMock.mockReset();
@@ -443,8 +467,59 @@ describe('tasks page', () => {
     await mountPage();
   });
   afterEach(async () => {
-    await setSearch('');
+    await wrapper.vm.$router.replace({ query: {} });
     wrapper?.unmount();
+  });
+  it('offers confirmed modes for a shared quest missing in Seasonal PvP and keeps its link on switch', async () => {
+    const id = '6745cbee909d2013670a4a55';
+    const linkedTask = createDefaultTask({ id });
+    metadataStoreMock.currentGameMode = 'seasonal';
+    fetchCatalogMock.mockResolvedValue({ data: { tasks: [linkedTask] } });
+    switchGameModeMock.mockImplementation(async (mode) => {
+      metadataStoreMock.currentGameMode = mode;
+    });
+    metadataStoreMock.fetchAllData.mockImplementation(async () => {
+      metadataStoreMock.tasks = [linkedTask];
+    });
+    await wrapper.vm.$router.replace({ query: { task: id } });
+    const notice = () => wrapper.get('[data-testid="task-link-unavailable"]');
+    await vi.waitFor(() =>
+      expect(notice().find('[data-testid="task-link-switch-pve"]').exists()).toBe(true)
+    );
+    expect(notice().find('[data-testid="task-link-switch-pvp"]').exists()).toBe(true);
+    expect(switchGameModeMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="task-list"]').exists()).toBe(true);
+    handleTaskQueryParamMock.mockClear();
+    const focusAttempts: Array<{ mode: GameMode; task: unknown; catalogHasTask: boolean }> = [];
+    handleTaskQueryParamMock.mockImplementationOnce(() => {
+      focusAttempts.push({
+        mode: metadataStoreMock.currentGameMode,
+        task: wrapper.vm.$router.currentRoute.value.query.task,
+        catalogHasTask: metadataStoreMock.tasks.some((task) => task.id === id),
+      });
+    });
+    await notice().get('[data-testid="task-link-switch-pve"]').trigger('click');
+    await vi.waitFor(() =>
+      expect(focusAttempts).toEqual([{ mode: 'pve', task: id, catalogHasTask: true }])
+    );
+    expect(switchGameModeMock).toHaveBeenCalledExactlyOnceWith('pve');
+    expect(wrapper.vm.$router.currentRoute.value.query.task).toBe(id);
+    expect(wrapper.find('[data-testid="task-link-unavailable"]').exists()).toBe(false);
+  });
+  it('keeps the notice dismissible when alternate catalogs are unavailable', async () => {
+    fetchCatalogMock.mockRejectedValue(new Error('offline'));
+    await wrapper.vm.$router.replace({
+      query: { task: 'unknown-task', highlightObjective: 'unknown-objective', q: 'sample' },
+    });
+    const notice = () => wrapper.get('[data-testid="task-link-unavailable"]');
+    await vi.waitFor(() => expect(notice().text()).toContain('page.tasks.shared_link.no_match'));
+    expect(notice().find('[data-testid^="task-link-switch-"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-list"]').exists()).toBe(true);
+    await notice().get('[data-slot="close"]').trigger('click');
+    const query = () => wrapper.vm.$router.currentRoute.value.query;
+    await vi.waitFor(() => expect(query().task).toBeUndefined());
+    expect(query().highlightObjective).toBeUndefined();
+    expect(query().q).toBe('sample');
   });
   it('defers deep links until cached detail readiness clears with unchanged task IDs', async () => {
     let release!: () => void;
