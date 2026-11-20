@@ -2957,6 +2957,8 @@
     "elite_level": "ELITE Level"
   },
   "game_settings": {
+    "mode_heading": "Game mode",
+    "seasonal_label": "Seasonal",
     "select_game_mode_label": "Select game mode",
     "select_faction_label": "Select faction",
     "season_ends_in": "Season {season} ends in {days}d {hours}h {minutes}m",

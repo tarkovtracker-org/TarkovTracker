@@ -16,7 +16,7 @@
         @click="switchMode(option.value)"
       >
         <GameModeBadge :mode="option.value" :size="52" class="-my-1.5 size-13 max-w-full" />
-        <span class="grid min-h-7 w-full place-items-center wrap-anywhere">{{ option.label }}</span>
+        <span class="w-full wrap-anywhere">{{ option.label }}</span>
       </button>
     </div>
     <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
@@ -38,7 +38,7 @@
       <button
         v-for="faction in factions"
         :key="faction"
-        class="light:focus:ring-surface-300/70 flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:ring-white/40 focus:outline-none"
+        class="light:focus:ring-surface-300/70 flex min-h-8 flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:ring-white/40 focus:outline-none"
         :class="[
           faction === currentFaction
             ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/15 text-white'
@@ -51,6 +51,11 @@
         :aria-pressed="faction === currentFaction"
         @click="setFaction(faction)"
       >
+        <span
+          aria-hidden="true"
+          class="size-5 shrink-0 bg-current mask-contain mask-center mask-no-repeat"
+          :style="{ maskImage: `url(${getFactionIconPath(faction)})` }"
+        />
         <span class="leading-none">{{ faction }}</span>
       </button>
     </div>
@@ -67,6 +72,7 @@
     PMC_FACTIONS,
     type PMCFaction,
   } from '@/utils/constants';
+  import { getFactionIconPath } from '@/utils/factionIcons';
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
   const { dataLoading, switchMode, switchModeError } = useGameModeSwitch();
@@ -116,7 +122,7 @@
     { label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
     { label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },
     {
-      label: t('common.seasonal_pvp', 'Seasonal PvP'),
+      label: t('game_settings.seasonal_label', 'Seasonal'),
       value: GAME_MODES.SEASONAL,
     },
   ]);

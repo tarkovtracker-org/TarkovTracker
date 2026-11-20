@@ -57,7 +57,7 @@
         <DrawerLevel :is-collapsed="false" />
         <div class="px-4 py-1">
           <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-            {{ t('common.game_settings') }}
+            {{ t('game_settings.mode_heading', 'Game mode') }}
           </h3>
         </div>
         <DrawerGameSettings />
