@@ -40,18 +40,21 @@ async function responseFromStored(value: Response, status: 'PRECOMPUTE' | 'STALE
   headers.set('Content-Type', 'application/json');
   return { response: new Response(body, { headers }), completion };
 }
-async function readCatalogSnapshot(store: CatalogKvReader, scope: string, cached?: Response) {
-  const manifest = (await store.get(CATALOG_MANIFEST_KEY, 'json')) as CatalogRelease | null;
+function catalogEntry(manifest: CatalogRelease | null, scope: string) {
+  const entries = manifest?.entries;
   // Older releases still serve the full catalog to comparison clients during rollout.
   const entryScope =
-    scope.endsWith('/counts') && !manifest?.entries?.[scope]
-      ? scope.slice(0, -'/counts'.length)
-      : scope;
-  const entry = manifest?.entries?.[entryScope];
+    scope.endsWith('/counts') && !entries?.[scope] ? scope.slice(0, -'/counts'.length) : scope;
+  const entry = entries?.[entryScope];
   if (!entry || !entry.key.startsWith(`neutral-catalog-v1/${entryScope}/`)) {
     throw new Error('Missing catalog manifest entry');
   }
-  const bytes = validateCatalogBytes(entry.bytes, entryScope);
+  return entry;
+}
+async function readCatalogSnapshot(store: CatalogKvReader, scope: string, cached?: Response) {
+  const manifest = (await store.get(CATALOG_MANIFEST_KEY, 'json')) as CatalogRelease | null;
+  const entry = catalogEntry(manifest, scope);
+  const bytes = validateCatalogBytes(entry.bytes, scope);
   if (
     cached?.headers.get('X-Catalog-Key') === entry.key &&
     cached.headers.get('X-Catalog-Release') === String(manifest!.completedAt) &&

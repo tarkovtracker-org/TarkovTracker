@@ -55,6 +55,36 @@ async function stage(kv: CatalogStore, scope: string, payload: Payload) {
     throw new Error(`KV readback differs for ${scope}`);
   return { key, bytes, headers: buildOverlayResponseHeaders(payload.dataOverlay) };
 }
+async function stageModeCatalogs(
+  kv: CatalogStore,
+  builders: Builders,
+  mode: ValidGameMode,
+  overlaySha: string,
+  target: { entries: CatalogRelease['entries']; references: Set<string> }
+) {
+  for (const dataset of CATALOG_DATASETS) {
+    const payload = await builders.buildNeutralCatalog(dataset, mode);
+    checkCatalog(dataset, payload, overlaySha);
+    collectGameDataStrings(payload.data, target.references);
+    const scope = `${dataset}/${mode}`;
+    target.entries[scope] = await stage(kv, scope, payload);
+    if (dataset === 'tasks-objectives') {
+      const { tasks } = payload.data as TarkovTaskObjectivesQueryResult;
+      // Keep ordering and duplicate IDs for the same comparison rules as the full catalog.
+      const counts = tasks.map(({ id, objectives }) => ({
+        id,
+        objectives: normalizeTaskObjectives<{ id: string; count?: number }>(objectives).map(
+          ({ id, count }) => ({ id, count })
+        ),
+      }));
+      const countsScope = scope + '/counts';
+      target.entries[countsScope] = await stage(kv, countsScope, {
+        data: { tasks: counts },
+        dataOverlay: payload.dataOverlay,
+      });
+    }
+  }
+}
 export async function publishCatalogRelease(
   kv: CatalogStore,
   builders: Builders,
@@ -64,27 +94,7 @@ export async function publishCatalogRelease(
   const references = new Set<string>();
   const entries: CatalogRelease['entries'] = {};
   for (const mode of VALID_GAME_MODES) {
-    for (const dataset of CATALOG_DATASETS) {
-      const payload = await builders.buildNeutralCatalog(dataset, mode);
-      checkCatalog(dataset, payload, overlaySha);
-      collectGameDataStrings(payload.data, references);
-      const scope = `${dataset}/${mode}`;
-      entries[scope] = await stage(kv, scope, payload);
-      if (dataset === 'tasks-objectives') {
-        const { tasks } = payload.data as TarkovTaskObjectivesQueryResult;
-        // Keep ordering and duplicate IDs for the same comparison rules as the full catalog.
-        const counts = tasks.map(({ id, objectives }) => ({
-          id,
-          objectives: normalizeTaskObjectives<{ id: string; count?: number }>(objectives).map(
-            ({ id, count }) => ({ id, count })
-          ),
-        }));
-        entries[scope + '/counts'] = await stage(kv, scope + '/counts', {
-          data: { tasks: counts },
-          dataOverlay: payload.dataOverlay,
-        });
-      }
-    }
+    await stageModeCatalogs(kv, builders, mode, overlaySha, { entries, references });
   }
   if (!references.size) throw new Error('Neutral catalogs contain no translation keys');
   for (const lang of CATALOG_LANGUAGES) {
