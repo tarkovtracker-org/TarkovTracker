@@ -202,4 +202,5 @@ All browser game-data requests use `/api/tarkov/*`. The retired GraphQL API is o
 this data path. Production catalog handlers read prepared snapshots, and upstream
 work stays in reviewed producers. The manifest is activated only after every
 required scope passes its storage and provenance checks. The verifier requires all
-43 scopes to be current and preserves failure evidence for each import mode.
+46 scopes to be current and preserves failure evidence for each import mode.
+See the [task objectives API](../api.md#get-apitarkovtasks-objectives) for the counts view.

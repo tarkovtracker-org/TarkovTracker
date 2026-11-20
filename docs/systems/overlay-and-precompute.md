@@ -318,14 +318,15 @@ produced and validated separately by the same trusted runner.
 ### Key and activation contract
 
 - The KV binding name is `TARKOV_DATA`. Every neutral object uses
-  `neutral-catalog-v1/<dataset>/<mode>/<digest>` or
+  `neutral-catalog-v1/<dataset>/<mode>/<digest>`,
+  `neutral-catalog-v1/tasks-objectives/<mode>/counts/<digest>`, or
   `neutral-catalog-v1/strings/<language>/<digest>`.
 - The digest is SHA256 of the uncompressed UTF-8 JSON. The producer stores gzip
   bytes, enforces the KV object-size limit, and reads the compressed object back
   byte-for-byte before including it in the release.
 - `neutral-catalog-v1-manifest` records `completedAt`, `overlaySha`, and exactly
-  43 entries. Each entry records its immutable key, uncompressed byte length, and
-  overlay response headers.
+  46 entries, including three objective count views. Each entry records its
+  immutable key, uncompressed byte length, and overlay response headers.
 - The manifest is replaced only after all required objects and references pass.
   Failed staging preserves the previous manifest. Readers use one complete release
   pointer, with the usual KV replication behavior. Old immutable objects remain
@@ -335,7 +336,7 @@ produced and validated separately by the same trusted runner.
   that all three import snapshots are ready.
 - Filtered maintenance runs do not activate a neutral manifest. Initial migration
   releases also refreshed the earlier localized fleet while old readers were live.
-  Those 48 legacy entries are outside the neutral release's 43-scope contract.
+  Those 48 legacy entries are outside the neutral release's 46-scope contract.
 
 ### Reader behavior
 
@@ -371,11 +372,11 @@ catalog cache and does not read these Pages catalog objects.
    the intended legacy-overlay digest and both filters empty. Production
    credentials remain inside the `production-precompute` environment.
 4. Inspect `precompute-manifest.json` from the run. Require the intended
-   `catalogRelease.overlaySha`, the exact 30 catalog and 13 language scopes,
+   `catalogRelease.overlaySha`, all 46 scopes (30 mode catalogs, 3 counts views, and 13 language bundles),
    successful immutable-object readbacks, and all three successful English imports.
 5. Promote the Tracker reader only after those objects are available in the
    production namespace. Run `pnpm run verify:overlay` against production and
-   require all 43 scopes and three imports to be current.
+   require all 46 scopes and three imports to be current.
 6. Allow at least 90 seconds after the producer confirms the active pointer write
    before purging browser metadata. This covers the default 60-second KV read cache
    in other colos. Recheck the intended manifest immediately before the Tarkov data
@@ -429,7 +430,7 @@ live building is limited to development and does not establish production
 precompute readiness.
 
 Production and preview namespaces are separate. The preview namespace needs its
-own complete 43-object release and all three English imports from a reviewed
+own complete 46-object release and all three English imports from a reviewed
 producer before catalog-dependent UI verification. An English-only legacy seed
 cannot satisfy neutral readers. Use an approved broker writer or authorized
 operator workflow with the preview namespace selected explicitly. Keep production

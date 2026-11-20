@@ -51,6 +51,7 @@ Deno.test(
       ...datasets.flatMap((dataset) =>
         modes.map((mode) => `${origin}/__neutral-catalog-v1/${dataset}/${mode}`)
       ),
+      ...modes.map((mode) => `${origin}/__neutral-catalog-v1/tasks-objectives/${mode}/counts`),
       ...catalogLanguages.map((lang) => `${origin}/__neutral-catalog-v1/strings/${lang}`),
     ]);
     const urls = buildTarkovCacheUrls(origins);
@@ -58,7 +59,7 @@ Deno.test(
       new URL(url).pathname.startsWith('/__neutral-catalog-v1/')
     );
     assertEquals(neutral.sort(), expected.sort());
-    assertEquals(neutral.length, 86);
+    assertEquals(neutral.length, 92);
     assertEquals(new Set(urls).size, urls.length);
   }
 );
