@@ -1,12 +1,14 @@
 import { isTaskSuccessful } from '@/composables/useTaskState';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
+import { isHandoverObjective } from '@/utils/taskObjectiveProgress';
 import type { NeededItemHideoutModule, NeededItemTaskObjective } from '@/types/tarkov';
 type Need = NeededItemTaskObjective | NeededItemHideoutModule;
 /**
  * A need is finished for the user once its parent task is turned in successfully, a task whose
  * completion fails that parent has been turned in (the other branch was chosen), or its parent
- * module is built. Items and Needs entries share this rule so a finished need is read-only in both.
+ * module is built. A checked handover also satisfies its own item requirement.
+ * Items and Needs entries share this rule so a finished need is read-only in both.
  */
 export function useNeedSelfCompletion() {
   const progressStore = useProgressStore();
@@ -16,9 +18,15 @@ export function useNeedSelfCompletion() {
     metadataStore.alternativeTaskSources[taskId]?.some(isTaskSuccessful) ?? false;
   const isModuleBuilt = (need: NeededItemHideoutModule) =>
     progressStore.moduleCompletions?.[need.hideoutModule.id]?.['self'] ?? false;
+  const isCompletedHandover = (need: Need): boolean =>
+    need.needType === 'taskObjective' &&
+    isHandoverObjective(need.type) &&
+    progressStore.objectiveCompletions?.[need.sourceObjectiveId ?? need.id]?.['self'] === true;
   const isSelfCompleted = (need: Need): boolean =>
     need.needType === 'hideoutModule'
       ? isModuleBuilt(need)
-      : isTaskSuccessful(need.taskId) || isFailedByAlternative(need.taskId);
-  return { isSelfCompleted, isTaskSuccessful };
+      : isCompletedHandover(need) ||
+        isTaskSuccessful(need.taskId) ||
+        isFailedByAlternative(need.taskId);
+  return { isCompletedHandover, isSelfCompleted, isTaskSuccessful };
 }

@@ -7,6 +7,7 @@ import {
   itemMatchesQuery,
   neededCountOf,
 } from '@/features/neededitems/neededItemFilters';
+import { useNeedSelfCompletion } from '@/features/neededitems/useNeedSelfCompletion';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -87,6 +88,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const { perfDebug: perfDebugOption = false, search = ref(''), t } = options;
   const metadataStore = useMetadataStore();
   const progressStore = useProgressStore();
+  const { isCompletedHandover } = useNeedSelfCompletion();
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
   const defaultTranslations: Record<string, string> = {
@@ -397,10 +399,14 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     }
     return false;
   };
+  const isCompletedNeed = (need: NeededItemTaskObjective | NeededItemHideoutModule): boolean =>
+    isParentCompleted(need) || isCompletedHandover(need);
+  const countsInCurrentView = (need: NeededItemTaskObjective | NeededItemHideoutModule): boolean =>
+    countsForSelf(need) && (activeFilter.value === 'completed' || !isCompletedHandover(need));
   const filterTabsWithCounts = computed((): FilterTab[] => {
     const counts = { tasks: 0, hideout: 0, completed: 0, incomplete: 0 };
     for (const item of allItems.value.filter(countsForSelf)) {
-      const completed = isParentCompleted(item);
+      const completed = isCompletedNeed(item);
       if (completed) {
         counts.completed++;
       } else {
@@ -463,7 +469,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   ): boolean => {
     // A teammate-only need is listed because a teammate still lacks it, so the
     // user's own count does not make it owned.
-    if (!countsForSelf(item)) return true;
+    if (!countsInCurrentView(item)) return true;
     const count = neededCountOf(item);
     const currentCount =
       item.needType === 'taskObjective'
@@ -481,10 +487,12 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const passesCompletionFilter = (
     item: NeededItemTaskObjective | NeededItemHideoutModule
   ): boolean => {
-    if (activeFilter.value === 'completed') {
-      return isParentCompleted(item);
+    if (activeFilter.value === 'completed') return isCompletedNeed(item);
+    if (isParentCompleted(item)) return false;
+    if (item.needType === 'taskObjective' && isCompletedHandover(item)) {
+      return neededByTeammate(item);
     }
-    return !isParentCompleted(item);
+    return true;
   };
   const passesTypeFilter = (item: NeededItemTaskObjective | NeededItemHideoutModule): boolean => {
     if (activeFilter.value === 'tasks') {
@@ -665,7 +673,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     );
     return resolved.filter((entry) => !isAcceptedRekey(entry) || !directIds.has(entry.target.id));
   };
-  const selfFilteredItems = computed(() => filteredItems.value.filter(countsForSelf));
+  const selfFilteredItems = computed(() => filteredItems.value.filter(countsInCurrentView));
   const groupedNeeds = computed((): GroupedNeed[] => resolveGroupedNeeds(selfFilteredItems.value));
   // Needs folded into the Group by item groups; teammate-only needs are not among them.
   const groupedNeedCount = computed(() => groupedNeeds.value.length);
@@ -701,7 +709,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
       let needCurrentCount: number;
       if (need.needType === 'taskObjective') {
         const objectiveCount = tarkovStore.getObjectiveCount(need.id);
-        needCurrentCount = Math.min(objectiveCount ?? 0, count);
+        needCurrentCount = isCompletedHandover(need) ? count : Math.min(objectiveCount ?? 0, count);
         if (need.foundInRaid) {
           group.taskFir += count;
           group.taskFirCurrent += needCurrentCount;
@@ -746,7 +754,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     // Ownership filtering is count-based, so build this from the same view
     // filters as `filteredItems` except `passesOwnershipToggleFilter`.
     const modalNeeds = allItems.value.filter(
-      (item) => passesViewFilters(item) && countsForSelf(item)
+      (item) => passesViewFilters(item) && countsInCurrentView(item)
     );
     const map = new Map<
       string,

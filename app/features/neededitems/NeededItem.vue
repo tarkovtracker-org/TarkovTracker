@@ -94,7 +94,6 @@
     }
     return (relatedTask.value?.parents ?? []).filter((s) => !isTaskSuccessful(s)).length;
   });
-  // A need is done once its parent task is turned in or its parent module is built.
   const selfCompletedNeed = computed(() => isSelfCompleted(props.need));
   // "Any of these" objectives rotate the displayed item; progress stays on the primary item.
   const acceptedItems = computed(() => {

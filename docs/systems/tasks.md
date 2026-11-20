@@ -861,6 +861,10 @@ the current account and game mode; Undo survives a filtered-out card and rejects
 The optional _See where it’s needed_ action opens per-need details and the existing Smart Fill
 replacement flow. The source badges count requirements in both modes; the result summary
 always states its units and also counts unique items when the switch is enabled.
+A checked handover displays its full quantity on the quest and moves to Completed in Needed
+Items, even while the quest is still open. A pending teammate's requirement can still appear in
+Needs. Unchecking restores the player's saved count.
+
 With Hide owned enabled, grouped counters and their source breakdown retain the full matching
 requirements, keeping tracked quantities and denominators stable as allocations fill. The
 remaining count determines whether an item is still needed; fully collected items disappear.
