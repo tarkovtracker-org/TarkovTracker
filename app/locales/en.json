@@ -948,6 +948,7 @@
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction"
         },
+        "unlock_unconfirmed": "Unlock requirement not yet confirmed",
         "unlock_via_task": "Unlocks after task",
         "unlock_via_storyline": "Unlocks in Storyline: {chapter}"
       },

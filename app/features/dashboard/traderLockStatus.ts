@@ -13,7 +13,8 @@ type LockTask = Pick<Task, 'id' | 'name' | 'trader' | 'finishRewards' | 'otherRe
 type LockChapter = TraderUnlockChapter;
 export type LockTrader = Pick<Trader, 'id' | 'normalizedName'>;
 export type TraderUnlockRequirement =
-  | { kind: 'task'; task: { id: string; name: string } | null }
+  | { kind: 'unknown' }
+  | { kind: 'task'; task: { id: string; name: string } }
   | {
       kind: 'story';
       chapter: { id: string; name: string };
@@ -52,7 +53,7 @@ const taskRequirement = (
   const configured = configuredUnlockTaskIds(trader, deps);
   if (hasCompletedUnlockTask(trader, deps)) return null;
   const [first] = unlockTasksFor(trader, deps, configured);
-  if (!first) return configured.length ? { kind: 'task', task: null } : null;
+  if (!first) return configured.length ? { kind: 'unknown' } : null;
   return { kind: 'task', task: { id: first.id, name: first.name ?? '' } };
 };
 const unlockChaptersFor = (trader: LockTrader, deps: TraderLockStatusDeps) =>

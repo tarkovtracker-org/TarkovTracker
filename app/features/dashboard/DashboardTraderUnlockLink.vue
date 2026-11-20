@@ -2,11 +2,12 @@
   <component
     :is="link.to ? 'router-link' : 'div'"
     :to="link.to"
-    class="border-warning-500/20 bg-warning-950/20 hover:border-warning-500/40 group flex items-start gap-2 rounded-md border px-3 py-2 text-xs transition-colors"
+    class="border-warning-500/20 bg-warning-950/20 group flex items-start gap-2 rounded-md border px-3 py-2 text-xs"
+    :class="{ 'hover:border-warning-500/40 transition-colors': link.to }"
     data-testid="trader-unlock-requirement"
   >
     <UIcon
-      name="i-mdi-lock-outline"
+      :name="unlock.kind === 'unknown' ? 'i-mdi-alert-outline' : 'i-mdi-lock-outline'"
       class="text-warning-400/80 mt-px h-3.5 w-3.5 shrink-0"
       aria-hidden="true"
     />
@@ -35,12 +36,15 @@
     labelParams: { chapter: unlock.chapter.name },
     target: unlock.objective.name,
   });
-  // A task requirement without a task means metadata is still loading; show the lock without a link.
   const link = computed(() => {
     const unlock = props.unlock;
     if (unlock.kind === 'story') return storyLink(unlock);
-    if (!unlock.task) {
-      return { to: undefined, labelKey: 'page.dashboard.traders.unlock_via_task', labelParams: {} };
+    if (unlock.kind === 'unknown') {
+      return {
+        to: undefined,
+        labelKey: 'page.dashboard.traders.unlock_unconfirmed',
+        labelParams: {},
+      };
     }
     return {
       to: { path: '/tasks', query: { task: unlock.task.id } },
