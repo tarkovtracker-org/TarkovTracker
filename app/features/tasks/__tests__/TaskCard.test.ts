@@ -277,6 +277,19 @@ describe('TaskCard appearance and expansion controls', () => {
         ['Quest that fails this one', '/tasks?task=incoming'],
       ]
     );
+    const { alternativeTasks, alternativeTaskSources } = metadataStoreMock;
+    metadataStoreMock.alternativeTasks = {};
+    metadataStoreMock.alternativeTaskSources = {};
+    await flushPromises();
+    expect(overlays.find('[data-testid="task-alternatives"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-alternatives-trigger"]').exists()).toBe(false);
+    metadataStoreMock.alternativeTasks = alternativeTasks;
+    metadataStoreMock.alternativeTaskSources = alternativeTaskSources;
+    await flushPromises();
+    expect(
+      wrapper.get('[data-testid="task-alternatives-trigger"]').attributes('aria-expanded')
+    ).toBe('false');
+    expect(overlays.find('[data-testid="task-alternatives"]').exists()).toBe(false);
     await wrapper.setProps({ task: { id: 'unrelated', name: 'Unrelated quest' } });
     expect(wrapper.find('[data-testid="task-alternatives-trigger"]').exists()).toBe(false);
     wrapper.unmount();

@@ -1,5 +1,5 @@
 <template>
-  <UPopover v-if="alternativeCount" :open="open" :content="contentOptions" @update:open="setOpen">
+  <UPopover v-if="hasAlternatives" :open="open" :content="contentOptions" @update:open="setOpen">
     <UButton
       type="button"
       size="xs"
@@ -131,4 +131,6 @@
   const alternativeCount = computed(() =>
     alternativeGroups.value.reduce((count, group) => count + group.tasks.length, 0)
   );
+  const hasAlternatives = computed(() => alternativeCount.value > 0);
+  watch([() => props.taskId, hasAlternatives], () => setOpen(false));
 </script>
