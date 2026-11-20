@@ -32,6 +32,48 @@ const upstream = (responses: Record<string, unknown>): TarkovJsonOptions => ({
   },
 });
 describe('neutral catalogs', () => {
+  it('retains equipment lists and groups in the neutral objective snapshot', async () => {
+    const payload = await buildNeutralCatalog('tasks-objectives', 'regular', {
+      snapshot,
+      upstream: upstream({
+        'https://json.tarkov.dev/regular/tasks': {
+          data: {
+            tasks: [
+              {
+                id: 'task',
+                objectives: [
+                  {
+                    id: 'elimination',
+                    type: 'shoot',
+                    usingWeapon: ['weapon-a', 'weapon-b'],
+                    usingWeaponMods: [['mod-a', 'mod-b']],
+                    wearing: [[{ id: 'gear', name: 'Gear' }], ['helmet']],
+                    notWearing: [['excluded']],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        'https://json.tarkov.dev/regular/hideout': { data: {} },
+        'https://json.tarkov.dev/regular/traders': { data: {} },
+      }),
+    });
+    expect(payload.data.tasks).toMatchObject([
+      {
+        id: 'task',
+        objectives: [
+          {
+            id: 'elimination',
+            usingWeapon: [{ id: 'weapon-a' }, { id: 'weapon-b' }],
+            usingWeaponMods: [[{ id: 'mod-a' }, { id: 'mod-b' }]],
+            wearing: [[{ id: 'gear', name: 'Gear' }], [{ id: 'helmet' }]],
+            notWearing: [[{ id: 'excluded' }]],
+          },
+        ],
+      },
+    ]);
+  });
   it('accepts signed name and objective-description targets while preserving both entity IDs', async () => {
     const name = '@tt:overlay:/tasks/task/name';
     const description = '@tt:overlay:/tasks/task/objectives/objective/description';

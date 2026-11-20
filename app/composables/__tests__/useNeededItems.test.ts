@@ -282,6 +282,78 @@ const setup = async (
   };
 };
 describe('useNeededItems', () => {
+  it.each([
+    { id: 'obj-1', sourceObjectiveId: undefined, savedCount: 2 },
+    { id: 'obj-1:part', sourceObjectiveId: 'obj-1', savedCount: 0 },
+  ])(
+    'moves the checked handover $id to Completed with a partial saved count',
+    async ({ id, sourceObjectiveId, savedCount }) => {
+      const objective = {
+        ...createTaskObjective(id, 'task-1', createItem('item-bolts', 'Bolts'), 5, true),
+        type: 'giveItem',
+        sourceObjectiveId,
+      };
+      const objectiveCompletions = reactive({ 'obj-1': { self: true } });
+      const { neededItems } = await setup({
+        metadataStore: { neededItemTaskObjectives: [objective], neededItemHideoutModules: [] },
+        progressStore: { objectiveCompletions },
+      });
+      expect(neededItems.filteredItems.value).toEqual([]);
+      expect(neededItems.groupedItems.value).toEqual([]);
+      expect(neededItems.objectivesByItemId.value.get('item-bolts')).toBeUndefined();
+      const completed = await setup({
+        metadataStore: { neededItemTaskObjectives: [objective], neededItemHideoutModules: [] },
+        progressStore: { objectiveCompletions },
+        preferencesStore: { getNeededTypeView: 'completed' },
+      });
+      expect(neededIds(completed.neededItems.filteredItems.value)).toEqual([id]);
+      expect(completed.neededItems.groupedItems.value[0]?.currentCount).toBe(5);
+      objectiveCompletions['obj-1'].self = false;
+      expect(neededIds(neededItems.filteredItems.value)).toEqual([id]);
+      expect(neededItems.groupedItems.value[0]?.currentCount).toBe(savedCount);
+    }
+  );
+  it('treats checked handovers as owned when filtering Completed', async () => {
+    const handover = {
+      ...createTaskObjective('obj-1', 'task-1', createItem('item-bolts', 'Bolts'), 5),
+      type: 'giveItem',
+    };
+    const { neededItems } = await setup({
+      metadataStore: { neededItemTaskObjectives: [handover], neededItemHideoutModules: [] },
+      progressStore: { objectiveCompletions: { 'obj-1': { self: true } } },
+      preferencesStore: { getNeededTypeView: 'completed', getNeededItemsHideOwned: true },
+    });
+    expect(neededItems.filteredItems.value).toEqual([]);
+  });
+  it('retains teammate needs without adding checked handovers to personal item totals', async () => {
+    const bolts = createItem('item-bolts', 'Bolts');
+    const handover = { ...createTaskObjective('obj-1', 'task-1', bolts, 5), type: 'giveItem' };
+    const pending = { ...handover, id: 'obj-2' };
+    const options = {
+      metadataStore: {
+        neededItemTaskObjectives: [handover, pending],
+        neededItemHideoutModules: [],
+      },
+      progressStore: {
+        objectiveCompletions: { 'obj-1': { self: true, 'team-1': false } },
+        teamStores: { 'team-1': {} },
+      },
+      preferencesStore: { getNeededItemsHideOwned: true },
+    };
+    const { neededItems } = await setup(options);
+    expect(neededIds(neededItems.filteredItems.value)).toEqual(
+      expect.arrayContaining(['obj-1', 'obj-2'])
+    );
+    expect(neededItems.groupedItems.value[0]).toMatchObject({ total: 5, currentCount: 1 });
+    expect(neededIds(neededItems.objectivesByItemId.value.get(bolts.id)!.taskObjectives)).toEqual([
+      'obj-2',
+    ]);
+    const { neededItems: teamHidden } = await setup({
+      ...options,
+      preferencesStore: { ...options.preferencesStore, itemsTeamAllHidden: true },
+    });
+    expect(neededIds(teamHidden.filteredItems.value)).toEqual(['obj-2']);
+  });
   describe('allItems', () => {
     it('combines task objectives and hideout modules', async () => {
       const { neededItems } = await setup();

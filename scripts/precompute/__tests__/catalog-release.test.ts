@@ -74,6 +74,25 @@ describe('neutral catalog publication', () => {
       expect(gunzipSync(staged.get(key)!).byteLength).toBe(bytes);
     }
   });
+  it('rejects oversized uncompressed catalog data before any KV write', async () => {
+    const kv = memoryStore();
+    const build = builders();
+    const oversized = { ...data, playerLevels: Array.from({ length: 18000 }, (_, i) => i) };
+    await expect(
+      publishCatalogRelease(
+        kv,
+        {
+          ...build,
+          buildNeutralCatalog: async () => ({
+            data: oversized,
+            dataOverlay: { sha256: 'sha', version: 'v1' },
+          }),
+        },
+        'sha'
+      )
+    ).rejects.toThrow('Uncompressed catalog exceeds limit for bootstrap/regular');
+    expect(kv.put).not.toHaveBeenCalled();
+  });
   it('preserves the prior release when a locale is incomplete', async () => {
     const kv = memoryStore();
     const { put } = kv;

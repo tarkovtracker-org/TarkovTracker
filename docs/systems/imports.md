@@ -357,9 +357,10 @@ require its global overlay SHA to match the separately cached UI release; a non-
 cannot cause an import outage by itself. The snapshot route and request are `no-store`, and the
 route never runs upstream adaptation on a Worker request. Seed the three import keys from the
 reviewed app revision before promoting it (see [overlay and precompute](./overlay-and-precompute.md)).
-The UI objective route and local metadata cache use `TASK_OBJECTIVES_CACHE_VERSION` (`json-v5`)
-to retire earlier incomplete corrected entries. Destination catalogs
-determine task eligibility and objective counts, and the original progress mode is restored. Application is not transactional across modes:
+The browser objective cache uses `TASK_OBJECTIVES_CACHE_VERSION` (`neutral-v2`) to retire
+earlier cached references. The endpoint serves objectives from the activated neutral release.
+Destination catalogs determine task eligibility and objective counts, and the original progress
+mode is restored. Application is not transactional across modes:
 failures explicitly warn that some progress may remain applied. Users can select the same logs
 to retry; state-setting operations preserve successful completions.
 Seasonal events outside the active season are skipped; assigning unresolved out-of-season

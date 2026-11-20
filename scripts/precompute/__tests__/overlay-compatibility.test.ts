@@ -1,23 +1,37 @@
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 const tasks = [{ id: 'task', objectives: [{ id: 'objective', count: 7 }], failConditions: [] }];
 vi.mock('@/server/utils/tarkov-json', () => ({
-  createTarkovJsonTasksCoreFetcher: () => async () => ({ data: { tasks } }),
   createTarkovJsonTasksImportFetcher: () => async () => ({ data: { tasks } }),
 }));
 const emptyMode = { tasks: {}, objectives: {} };
 const modes = { regular: emptyMode, pve: emptyMode, 'pvp-season': emptyMode };
 const inactiveAliases = { schemaVersion: 1, modes };
+const sourceOverlay = (sections: Record<string, unknown>) => ({
+  editions: testOverlayEditions,
+  $meta: { version: '1', generated: '2026-11-06', sha256: 'release-sha' },
+  ...sections,
+});
+const neutralOverlay = async (sections: Record<string, unknown>) => {
+  const source = sourceOverlay(sections);
+  const unsigned = {
+    ...source,
+    schemaVersion: 1,
+    $strings: { en: {} },
+    $localeTargets: {},
+    $source: source.$meta,
+    $meta: { version: '1', generated: '2026-11-06' },
+  };
+  const sha256 = createHash('sha256')
+    .update(JSON.stringify(unsigned, null, 2))
+    .digest('hex');
+  const { parseNeutralOverlay } = await import('@/server/utils/neutralOverlay');
+  return parseNeutralOverlay({ ...unsigned, $meta: { ...unsigned.$meta, sha256 } });
+};
 const stubOverlay = (sections: Record<string, unknown>) => {
-  const fetch = vi.fn(async () =>
-    Response.json({
-      editions: testOverlayEditions,
-      $meta: { version: '1', generated: '2026-11-06', sha256: 'release-sha' },
-      ...sections,
-    })
-  );
+  const fetch = vi.fn(async () => Response.json(sourceOverlay(sections)));
   vi.stubGlobal('fetch', fetch);
-  vi.stubEnv('EXPECTED_OVERLAY_SHA', '');
   return fetch;
 };
 afterEach(() => {
@@ -27,23 +41,20 @@ afterEach(() => {
 });
 describe('precompute overlay compatibility', () => {
   it.each([{}, { taskIdAliases: inactiveAliases }])(
-    'publishes the full fleet and import snapshots with an absent or inactive alias ledger: %j',
+    'accepts neutral overlays and publishes whole imports with an absent or inactive alias ledger: %j',
     async (sections) => {
       const fetch = stubOverlay(sections);
-      const { runPrecompute } = await import('@@/scripts/precompute/precompute');
       const { runImportPrecompute } = await import('@@/scripts/precompute/import-snapshots');
       const put = vi.fn();
-      const core = await runPrecompute({ put });
-      expect(core.failures).toEqual([]);
-      expect(core.successes).toHaveLength(48);
-      expect(core.manifest).toHaveLength(48);
-      const imports = await runImportPrecompute({ put }, {}, core.manifest[0]?.overlay.sha256);
+      const neutral = await neutralOverlay(sections);
+      expect(neutral.meta.sha256).toBe('release-sha');
+      const imports = await runImportPrecompute({ put }, {}, neutral.meta.sha256);
       expect(imports.failures).toEqual([]);
       expect(imports.successes).toHaveLength(3);
-      expect(put).toHaveBeenCalledTimes(52);
+      expect(put).toHaveBeenCalledTimes(3);
       expect(fetch).toHaveBeenCalledTimes(1);
       for (const [key, value] of put.mock.calls) {
-        if (key === 'overlay-precompute-manifest-json-v3') continue;
+        expect(key).toMatch(/^tasks-import-json-v1-en-(regular|pve|pvp-season)$/);
         expect(JSON.parse(value).payload.dataOverlay).toMatchObject({
           sha256: 'release-sha',
           unconsumedSections: [],
@@ -100,17 +111,11 @@ describe('precompute overlay compatibility', () => {
     'retains last-good entries for an unsupported alias ledger: %j',
     async (taskIdAliases) => {
       stubOverlay({ taskIdAliases });
-      const { runPrecompute } = await import('@@/scripts/precompute/precompute');
       const { runImportPrecompute } = await import('@@/scripts/precompute/import-snapshots');
       const put = vi.fn();
-      const core = await runPrecompute({ put }, { lang: 'en', gameMode: 'regular' });
-      expect(core.successes).toEqual([]);
-      expect(core.failures).toEqual([
-        {
-          key: 'tasks-core-json-v3-en-regular',
-          error: 'Unconsumed overlay sections: taskIdAliases',
-        },
-      ]);
+      await expect(neutralOverlay({ taskIdAliases })).rejects.toThrow(
+        'Invalid neutral overlay sections'
+      );
       const imports = await runImportPrecompute({ put }, {}, 'release-sha');
       expect(imports.successes).toEqual([]);
       expect(imports.failures).toHaveLength(3);
@@ -123,10 +128,13 @@ describe('precompute overlay compatibility', () => {
     { locales: { en: { taskIdAliases: inactiveAliases } } },
   ])('still blocks unconsumed root and scoped sections: %j', async (sections) => {
     stubOverlay({ taskIdAliases: inactiveAliases, ...sections });
-    const { runPrecompute } = await import('@@/scripts/precompute/precompute');
+    const { runImportPrecompute } = await import('@@/scripts/precompute/import-snapshots');
     const put = vi.fn();
-    const result = await runPrecompute({ put }, { lang: 'en', gameMode: 'regular' });
-    expect(result.failures).toHaveLength(1);
+    await expect(neutralOverlay({ taskIdAliases: inactiveAliases, ...sections })).rejects.toThrow(
+      'Invalid neutral overlay sections'
+    );
+    const result = await runImportPrecompute({ put }, {}, 'release-sha');
+    expect(result.failures).toHaveLength(3);
     expect(put).not.toHaveBeenCalled();
   });
 });

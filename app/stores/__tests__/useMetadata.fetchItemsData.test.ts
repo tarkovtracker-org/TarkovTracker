@@ -49,9 +49,10 @@ describe('useMetadataStore fetchItemsData', () => {
     const store = useMetadataStore();
     const enResponse = createDeferred<{ data: TarkovItemsQueryResult }>();
     const deResponse = createDeferred<{ data: TarkovItemsQueryResult }>();
-    const fetchMock = vi.fn((_: string, options?: { query?: Record<string, string> }) => {
-      return options?.query?.lang === 'de' ? deResponse.promise : enResponse.promise;
-    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(enResponse.promise)
+      .mockReturnValueOnce(deResponse.promise);
     vi.stubGlobal('$fetch', fetchMock);
     store.itemsLanguage = 'stale';
     const enRequest = store.fetchItemsLiteData();
@@ -78,9 +79,10 @@ describe('useMetadataStore fetchItemsData', () => {
     const store = useMetadataStore();
     const enResponse = createDeferred<{ data: TarkovItemsQueryResult }>();
     const deResponse = createDeferred<{ data: TarkovItemsQueryResult }>();
-    const fetchMock = vi.fn((_: string, options?: { query?: Record<string, string> }) => {
-      return options?.query?.lang === 'de' ? deResponse.promise : enResponse.promise;
-    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(enResponse.promise)
+      .mockReturnValueOnce(deResponse.promise);
     vi.stubGlobal('$fetch', fetchMock);
     store.itemsLanguage = 'stale';
     const enRequest = store.fetchItemsFullData();
@@ -104,9 +106,10 @@ describe('useMetadataStore fetchItemsData', () => {
     const store = useMetadataStore();
     const enResponse = createDeferred<{ data: TarkovItemsQueryResult }>();
     const deResponse = createDeferred<{ data: TarkovItemsQueryResult }>();
-    const fetchMock = vi.fn((_: string, options?: { query?: Record<string, string> }) => {
-      return options?.query?.lang === 'de' ? deResponse.promise : enResponse.promise;
-    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(enResponse.promise)
+      .mockReturnValueOnce(deResponse.promise);
     vi.stubGlobal('$fetch', fetchMock);
     const enRequest = store.fetchItemsLiteData();
     await flushPromises();
@@ -149,9 +152,10 @@ describe('useMetadataStore fetchItemsData', () => {
     const store = useMetadataStore();
     const enResponse = createDeferred<{ data: TarkovTasksCoreQueryResult }>();
     const deResponse = createDeferred<{ data: TarkovTasksCoreQueryResult }>();
-    const fetchMock = vi.fn((_: string, options?: { query?: Record<string, string> }) => {
-      return options?.query?.lang === 'de' ? deResponse.promise : enResponse.promise;
-    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(enResponse.promise)
+      .mockReturnValueOnce(deResponse.promise);
     vi.stubGlobal('$fetch', fetchMock);
     const processSpy = vi.spyOn(store, 'processTasksCoreData').mockImplementation(() => undefined);
     const enRequest = store.fetchTasksCoreData();
@@ -174,9 +178,10 @@ describe('useMetadataStore fetchItemsData', () => {
     const store = useMetadataStore();
     const enResponse = createDeferred<{ data: TarkovTasksCoreQueryResult }>();
     const deResponse = createDeferred<{ data: TarkovTasksCoreQueryResult }>();
-    const fetchMock = vi.fn((_: string, options?: { query?: Record<string, string> }) => {
-      return options?.query?.lang === 'de' ? deResponse.promise : enResponse.promise;
-    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(enResponse.promise)
+      .mockReturnValueOnce(deResponse.promise);
     vi.stubGlobal('$fetch', fetchMock);
     const processSpy = vi.spyOn(store, 'processTasksCoreData').mockImplementation(() => undefined);
     const resetSpy = vi.spyOn(store, 'resetTasksData');

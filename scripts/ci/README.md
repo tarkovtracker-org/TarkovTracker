@@ -30,3 +30,7 @@ Fallow results must report the `istanbul` model; estimated fallback fails the co
 Use `--coverage <report.json>` alone for a measured current snapshot, or omit both coverage
 options for the existing automatic coverage behavior.
 Each coverage argument accepts a JSON file or a directory containing `coverage-final.json`.
+The temporary Fallow inputs treat negative hits for a synthetic implicit else as uncovered.
+Other negative counters fail the comparison. The original reports and CI coverage totals are
+preserved. Diagnostics identify the failed revision and include Fallow's process status
+and structured error when available.

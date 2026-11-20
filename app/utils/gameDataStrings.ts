@@ -1,11 +1,17 @@
 /** Translation references are values only. Entity IDs and object keys are never translated. */
 export const GAME_DATA_STRING_PREFIX = '@tt:';
 export type GameDataStrings = Record<string, string>;
+export class MissingGameDataStringError extends Error {
+  constructor(key: string) {
+    super(`Missing game data string ${key}`);
+    this.name = 'MissingGameDataStringError';
+  }
+}
 export const isGameDataString = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith(GAME_DATA_STRING_PREFIX);
 export function localizeGameData<T>(value: T, strings: GameDataStrings): T {
   if (isGameDataString(value)) {
-    if (!Object.hasOwn(strings, value)) throw new Error(`Missing game data string ${value}`);
+    if (!Object.hasOwn(strings, value)) throw new MissingGameDataStringError(value);
     return strings[value] as T;
   }
   if (Array.isArray(value)) return value.map((entry) => localizeGameData(entry, strings)) as T;

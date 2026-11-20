@@ -1,7 +1,8 @@
 import { getObjectiveGlyphKind } from '@/features/maps/utils/objectiveGlyphs';
-import type { TarkovItem, Task, TaskObjective } from '@/types/tarkov';
+import { objectiveEquipmentItems } from '@/utils/objectiveEquipment';
+import type { ObjectiveEquipment, TarkovItem, Task, TaskObjective } from '@/types/tarkov';
 /** The item a player brings, plants or picks up for an objective, with how many alternatives. */
-export type ObjectivePopupItem = { item: TarkovItem; alternatives: number };
+export type ObjectivePopupItem = { item: TarkovItem; alternatives: number; isEquipment?: true };
 // Adapted objectives carry `{ id: '' }` placeholders for absent item refs; those are not items.
 const isRealItem = (item: TarkovItem | undefined): item is TarkovItem => Boolean(item?.id);
 const firstOf = (items: TarkovItem[] | undefined): ObjectivePopupItem | undefined => {
@@ -21,8 +22,18 @@ export function getObjectivePopupItem(objective: TaskObjective): ObjectivePopupI
 }
 const acceptedItem = (objective: TaskObjective) =>
   firstOf(objective.items) ?? firstOf(objective.useAny) ?? single(objective.item);
-const equipmentItem = (objective: TaskObjective) =>
-  single(objective.usingWeapon) ?? firstOf(objective.wearing);
+const equipmentItem = (objective: TaskObjective): ObjectivePopupItem | undefined => {
+  const entry =
+    firstOf(objectiveEquipmentItems(objective.usingWeapon)) ?? wearingItem(objective.wearing);
+  return entry ? { ...entry, isEquipment: true } : undefined;
+};
+const wearingItem = (value: ObjectiveEquipment | undefined) => {
+  const items = objectiveEquipmentItems(value);
+  // Wearing groups may require several items together. Do not label their leaves as alternatives.
+  return Array.isArray(value) && value.some(Array.isArray)
+    ? single(items.find(isRealItem))
+    : firstOf(items);
+};
 /** Each required key group as one label; any key in a group opens the way ("A / B"). */
 export function getObjectiveKeyLabels(
   objective: TaskObjective,
@@ -48,7 +59,7 @@ export function describeObjectiveItem(
   name: string,
   count: number
 ): { label: string; icon: string } {
-  const counted = count > 1 ? ` ×${count}` : '';
+  const counted = !entry.isEquipment && count > 1 ? ` ×${count}` : '';
   const more = entry.alternatives > 0 ? ` +${entry.alternatives}` : '';
   return { label: `${name}${counted}${more}`, icon: entry.item.iconLink ?? '' };
 }

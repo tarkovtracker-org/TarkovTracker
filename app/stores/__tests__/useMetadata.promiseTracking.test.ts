@@ -105,10 +105,11 @@ describe('useMetadataStore promise tracking', () => {
     expect(store.prestigeError).toBeNull();
     expect(cacheUtils.setCachedData).toHaveBeenCalledWith(
       'hideout',
-      'json-v5-regular',
+      'neutral-v1-regular',
       'en',
       expect.anything(),
-      60 * 60 * 1000
+      60 * 60 * 1000,
+      expect.any(Function)
     );
   });
   it('keeps tasks-core hydration working when each action call sees a fresh `this` proxy (Pinia devtools wrapping)', async () => {
@@ -242,7 +243,7 @@ describe('useMetadataStore promise tracking', () => {
     const store = useMetadataStore();
     const lookup = vi.spyOn(store, 'loadCriticalCacheData').mockResolvedValue(null);
     expect(await store.hasCriticalLocaleCache('de')).toBe(false);
-    expect(lookup).toHaveBeenCalledWith('de');
+    expect(lookup).toHaveBeenCalledWith('de', false);
     expect(store.languageCode).toBe('en');
   });
   it('checks the same fallback language that metadata loads for unsupported locales', async () => {
@@ -251,7 +252,7 @@ describe('useMetadataStore promise tracking', () => {
     store.updateLanguageAndGameMode('unsupported-region');
     expect(store.languageCode).toBe('en');
     await store.hasCriticalLocaleCache('unsupported-region');
-    expect(lookup).toHaveBeenCalledWith(store.languageCode);
+    expect(lookup).toHaveBeenCalledWith(store.languageCode, false);
   });
   it('treats a failed cache lookup as uncached so network switching remains available', async () => {
     const store = useMetadataStore();
@@ -270,8 +271,8 @@ describe('useMetadataStore promise tracking', () => {
     expect(await store.hasCriticalLocaleCache('de')).toBe(true);
     expect(cacheUtils.getCachedData).toHaveBeenCalledWith(
       'tasks-objectives',
-      'json-v5-regular',
-      'de'
+      'neutral-v2-regular',
+      'en'
     );
     expect(cacheUtils.getCachedData).toHaveBeenCalledWith('bootstrap', 'json-v2-regular', 'en');
   });

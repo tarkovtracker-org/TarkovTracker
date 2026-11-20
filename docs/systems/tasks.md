@@ -578,11 +578,13 @@ Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`
 1, and a tarkov.dev link. A details panel names the action with its chip and shows the objective
 description, the item involved (the MS2000 Marker for a mark, the quest item for a quest pickup or
 stash, otherwise the first accepted item plus how many alternatives exist, or, when no item is
-accepted, the weapon or gear an elimination must use) with its icon, count and
-a FIR badge, each required key group (`A / B` when any one works), and a progress bar when the
-objective counts more than one. The footer has a labeled **Mark complete** / **Completed** toggle,
-a **Task list** button that scrolls to and highlights the objective, and the show-only and hide
-quest buttons. Compact tooltip density keeps the layout and makes the footer buttons icon-only.
+accepted, the weapon or gear an elimination must use) with its icon, item quantity when applicable
+and a FIR badge. The panel lists each required key group (`A / B` when any one works) and shows a
+progress bar when the objective counts more than one. Weapon and clothing labels omit the
+elimination count.
+The footer has a labeled **Mark complete** / **Completed** toggle, a **Task list** button that
+scrolls to and highlights the objective, and the show-only and hide quest buttons. Compact tooltip
+density keeps the layout and makes the footer buttons icon-only.
 Read-only popups omit the toggle and progress. The stacked list shows each entry's trader
 portrait with the action chip on it.
 
@@ -859,6 +861,10 @@ the current account and game mode; Undo survives a filtered-out card and rejects
 The optional _See where it’s needed_ action opens per-need details and the existing Smart Fill
 replacement flow. The source badges count requirements in both modes; the result summary
 always states its units and also counts unique items when the switch is enabled.
+A checked handover displays its full quantity on the quest and moves to Completed in Needed
+Items, even while the quest is still open. A pending teammate's requirement can still appear in
+Needs. Unchecking restores the player's saved count.
+
 With Hide owned enabled, grouped counters and their source breakdown retain the full matching
 requirements, keeping tracked quantities and denominators stable as allocations fill. The
 remaining count determines whether an item is still needed; fully collected items disappear.

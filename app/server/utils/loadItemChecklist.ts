@@ -13,7 +13,7 @@ import type {
   TarkovTasksCoreQueryResult,
   TarkovItem,
 } from '@/types/tarkov';
-import { fetchPublicPvpCatalog } from '~/server/utils/publicPvpCatalog';
+import { fetchPublicPvpCatalogs } from '~/server/utils/publicPvpCatalog';
 interface Row {
   name: string;
   count: number;
@@ -117,12 +117,14 @@ function hideoutChecklist(hideout: TarkovHideoutQueryResult, itemName: ItemName)
     .sort(bySource);
 }
 export async function loadItemChecklist() {
-  const [core, objectives, items, hideout] = await Promise.all([
-    fetchPublicPvpCatalog<TarkovTasksCoreQueryResult>('tasks-core'),
-    fetchPublicPvpCatalog<TarkovTaskObjectivesQueryResult>('tasks-objectives'),
-    fetchPublicPvpCatalog<TarkovItemsQueryResult>('items-lite'),
-    fetchPublicPvpCatalog<TarkovHideoutQueryResult>('hideout'),
-  ]);
+  const [core, objectives, items, hideout] = await fetchPublicPvpCatalogs<
+    [
+      TarkovTasksCoreQueryResult,
+      TarkovTaskObjectivesQueryResult,
+      TarkovItemsQueryResult,
+      TarkovHideoutQueryResult,
+    ]
+  >(['tasks-core', 'tasks-objectives', 'items-lite', 'hideout']);
   const names = new Map(items.items.map((item) => [item.id, item.name]));
   const itemName = (item: TarkovItem) => names.get(item.id) ?? item.name;
   const tasks = taskChecklist(core, objectives, itemName);

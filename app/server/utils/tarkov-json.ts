@@ -17,6 +17,7 @@ import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
   FinishRewards,
   HideoutStation,
+  ObjectiveEquipment,
   PlayerLevel,
   PrestigeLevel,
   TarkovBootstrapQueryResult,
@@ -551,6 +552,19 @@ function adaptObjectiveItemRef(value: unknown, context: AdapterContext): TarkovI
     properties: defaultPreset ? { defaultPreset } : undefined,
   }) as TarkovItem;
 }
+function adaptObjectiveEquipment(
+  value: unknown,
+  context: AdapterContext
+): ObjectiveEquipment | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return adaptObjectiveItemRef(value, context);
+  // An empty list is known empty; malformed leaves remain explicit unknown references.
+  return value.map((entry) =>
+    Array.isArray(entry)
+      ? entry.map((item) => adaptObjectiveItemRef(item, context))
+      : adaptObjectiveItemRef(entry, context)
+  );
+}
 function adaptObjectiveItemRefs(
   values: unknown,
   context: AdapterContext
@@ -660,16 +674,10 @@ function adaptObjective(raw: JsonRecord, context: AdapterContext): TaskObjective
     useAny: Array.isArray(raw.useAny)
       ? raw.useAny.map((item) => adaptObjectiveItemRef(item, context))
       : undefined,
-    usingWeapon: raw.usingWeapon ? adaptObjectiveItemRef(raw.usingWeapon, context) : undefined,
-    usingWeaponMods: Array.isArray(raw.usingWeaponMods)
-      ? raw.usingWeaponMods.map((item) => adaptObjectiveItemRef(item, context))
-      : undefined,
-    wearing: Array.isArray(raw.wearing)
-      ? raw.wearing.map((item) => adaptObjectiveItemRef(item, context))
-      : undefined,
-    notWearing: Array.isArray(raw.notWearing)
-      ? raw.notWearing.map((item) => adaptObjectiveItemRef(item, context))
-      : undefined,
+    usingWeapon: adaptObjectiveEquipment(raw.usingWeapon, context),
+    usingWeaponMods: adaptObjectiveEquipment(raw.usingWeaponMods, context),
+    wearing: adaptObjectiveEquipment(raw.wearing, context),
+    notWearing: adaptObjectiveEquipment(raw.notWearing, context),
     hideoutStation: stationValue ? adaptHideoutRef(stationValue, context) : undefined,
     skillLevel:
       skillName && typeof skillLevelValue === 'number'

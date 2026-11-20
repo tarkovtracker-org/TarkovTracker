@@ -200,6 +200,22 @@ describe('LeafletObjectiveTooltip', () => {
     expect(bar.attributes('aria-valuenow')).toBe('1');
     expect(bar.attributes('aria-valuemax')).toBe('3');
   });
+  it.each([
+    { usingWeapon: [{ id: 'rifle', name: 'Rifle' }, { id: 'other' }], label: 'Rifle +1' },
+    { wearing: [[{ id: 'helmet', name: 'Helmet' }]], label: 'Helmet' },
+  ])('shows shoot equipment without using the kill target as its quantity', async (fixture) => {
+    const { label, ...equipment } = fixture;
+    const { wrapper } = await setup(
+      { id: 'task-1', name: 'Provocation' },
+      {},
+      { type: 'shoot', count: 20, ...equipment },
+      { complete: false, count: 5 }
+    );
+    expect(wrapper.get('[data-testid="objective-item"]').text()).toBe(label);
+    const bar = wrapper.get('[data-testid="objective-progress"] [role="progressbar"]');
+    expect(bar.attributes('aria-valuenow')).toBe('5');
+    expect(bar.attributes('aria-valuemax')).toBe('20');
+  });
   it('labels the completion toggle and completes a counted objective in full', async () => {
     const { wrapper, tarkovStore } = await setup({ id: 'task-1', name: 'Task' }, {}, { count: 2 });
     const toggle = wrapper.get('[data-testid="objective-complete-toggle"]');
