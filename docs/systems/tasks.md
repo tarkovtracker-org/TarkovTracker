@@ -311,6 +311,9 @@ editions, falling back to the active catalog while unavailable. Missing core/obj
 remain fatal.
 Explicit objective `unlocks` with `type: 'trader'` supply trader gates shared by dashboard cards
 and every pending task owned by that trader, including tasks without their own story requirements.
+Once the selected mode's task and reward catalogs load, the dashboard shows an unlinked warning
+for a configured unlock only if neither its task ID nor any task's trader rewards match. It shows
+a neutral status while the necessary catalog data is unavailable.
 Only a unique objective placement is authoritative; an omitted trader ID resolves only through a
 unique same-name chapter trader reference. Chapter summaries and objective wording never imply a
 gate. Exact objective completion (including the producer-declared tutorial baseline) opens the

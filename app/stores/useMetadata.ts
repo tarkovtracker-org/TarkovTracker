@@ -351,6 +351,7 @@ interface MetadataState {
   loading: boolean;
   // Only core replacement advances this token; detail and item merges leave it unchanged.
   tasksCoreRevision: number;
+  tasksCoreGameMode: GameMode | null;
   tasksCoreRefreshing: boolean;
   // Indicates objectives still need to be fetched (set when tasks exist but objectives not yet loaded)
   tasksObjectivesPending: boolean;
@@ -711,6 +712,7 @@ export const useMetadataStore = defineStore('metadata', {
     initializationFailed: false,
     loading: false,
     tasksCoreRevision: 0,
+    tasksCoreGameMode: null,
     tasksCoreRefreshing: false,
     tasksObjectivesPending: false,
     tasksObjectivesHydrated: false,
@@ -2298,6 +2300,7 @@ export const useMetadataStore = defineStore('metadata', {
         maps: data.maps || [],
         traders: data.traders || [],
       });
+      this.tasksCoreGameMode = gameModeForApiMode(this.getApiGameMode());
       this.tasksCoreRevision += 1;
       perfEnd(perfTimer, { tasks: this.tasks.length });
     },
@@ -2816,6 +2819,7 @@ export const useMetadataStore = defineStore('metadata', {
      * Reset tasks data to empty state
      */
     resetTasksData() {
+      this.tasksCoreGameMode = null;
       this.tasks = markRaw([]);
       this.maps = markRaw([]);
       this.traders = markRaw([]);

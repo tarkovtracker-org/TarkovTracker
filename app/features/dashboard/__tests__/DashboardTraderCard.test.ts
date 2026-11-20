@@ -166,11 +166,17 @@ describe('DashboardTraderCard', () => {
       query: { task: 'task-1' },
     });
   });
-  it('shows an unlinked lock notice while the unlock task is loading', () => {
-    const wrapper = createWrapper({ unlock: { kind: 'task', task: null } });
+  it('shows an unlinked warning when the unlock requirement is unconfirmed', () => {
+    const wrapper = createWrapper({ unlock: { kind: 'unknown' } });
     const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
     expect(requirement.element.tagName).toBe('DIV');
-    expect(requirement.text()).toBe('page.dashboard.traders.unlock_via_task');
+    expect(requirement.text()).toBe('page.dashboard.traders.unlock_unconfirmed');
+  });
+  it('shows a neutral status when unlock data is unavailable', () => {
+    const wrapper = createWrapper({ unlock: { kind: 'pending' } });
+    const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
+    expect(requirement.element.tagName).toBe('DIV');
+    expect(requirement.text()).toBe('page.dashboard.traders.unlock_unavailable');
   });
   it('hides progress and loyalty controls while locked', () => {
     const wrapper = createWrapper({
