@@ -91,14 +91,9 @@ const remainingObjectives = (task: Task, progress: SellProgress) =>
   progress.isTaskFailed(task.id)
     ? task.objectives!
     : task.objectives!.filter((entry) => !progress.isTaskObjectiveComplete(entry?.id));
-function taskItems(task: Task, progress: SellProgress): TarkovItem[] {
-  if (finishedTask(task, progress)) return [];
-  // Pending, hidden, failed-branch and conditionally eligible tasks all remain protected.
-  return [
-    ...remainingObjectives(task, progress).flatMap(objectiveItems),
-    ...(task.requiredKeys ?? []).flatMap((group) => group?.keys),
-  ];
-}
+// Pending, hidden, failed-branch and conditionally eligible tasks all remain protected.
+const taskKeys = (task: Task): TarkovItem[] =>
+  (task.requiredKeys ?? []).flatMap((group) => group?.keys);
 const moduleItems = (module: HideoutModule, progress: SellProgress) =>
   progress.isHideoutModuleComplete(module.id)
     ? []
@@ -121,24 +116,20 @@ export function remainingSellUses(
   tasks: Task[],
   modules: HideoutModule[],
   progress: SellProgress
-): ReadonlySet<string> | undefined {
+): { itemIds: ReadonlySet<string>; categoryIds: ReadonlySet<string> } | undefined {
   if (!knownCatalog(tasks, modules, progress)) return undefined;
+  const unfinishedTasks = tasks.filter((task) => !finishedTask(task, progress));
+  const objectives = unfinishedTasks.flatMap((task) => remainingObjectives(task, progress));
   const items = [
-    ...tasks.flatMap((task) => taskItems(task, progress)),
+    ...objectives.flatMap(objectiveItems),
+    ...unfinishedTasks.flatMap(taskKeys),
     ...modules.flatMap((module) => moduleItems(module, progress)),
   ];
   if (!items.every(knownItem)) return undefined;
-  return new Set(items.map((item) => item.id));
-}
-export function remainingSellCategories(
-  tasks: Task[],
-  progress: SellProgress
-): ReadonlySet<string> {
-  const categories = tasks
-    .filter((task) => !finishedTask(task, progress))
-    .flatMap((task) => remainingObjectives(task, progress))
-    .flatMap((objective) => objective.containsCategory ?? []);
-  return new Set(categories);
+  return {
+    itemIds: new Set(items.map((item) => item.id)),
+    categoryIds: new Set(objectives.flatMap((objective) => objective.containsCategory ?? [])),
+  };
 }
 function quantityFits(row: ReviewedCell, item: ScanItem): boolean {
   const maximum = Math.min(SCAN_LIMITS.quantity, item.maxStack);

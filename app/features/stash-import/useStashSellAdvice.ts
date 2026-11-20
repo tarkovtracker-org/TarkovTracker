@@ -1,6 +1,5 @@
 import {
   incompleteSellTasks,
-  remainingSellCategories,
   remainingSellUses,
   sellGroups,
 } from '@/features/stash-import/sellAdvice';
@@ -64,14 +63,14 @@ export function useStashSellAdvice(
       : incompleteSellTasks(metadata.tasks, store).map((task) => task.name ?? task.id)
   );
   const ready = computed(() => remaining.value !== undefined);
-  const protectedCategories = computed(() => remainingSellCategories(metadata.tasks, store));
   const items = computed(() => {
-    if (!remaining.value) return [];
+    const requirements = remaining.value;
+    if (!requirements) return [];
     return (toValue(result)?.catalog.items ?? []).filter((item) => {
       const current = metadata.getItemById(item.id);
-      return current && outsideProtectedCategories(current, protectedCategories.value);
+      return current && outsideProtectedCategories(current, requirements.categoryIds);
     });
   });
-  const groups = computed(() => sellGroups(toValue(rows), items.value, remaining.value));
+  const groups = computed(() => sellGroups(toValue(rows), items.value, remaining.value?.itemIds));
   return { ready, groups, incompleteTasks };
 }

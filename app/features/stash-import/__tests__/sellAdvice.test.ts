@@ -64,7 +64,7 @@ describe('remaining tracked uses', () => {
       taskRequirements: [{ task: { id: 'prerequisite' }, status: ['active'] }],
       objectives: [objective({ optional: true, items: [item('pool-a'), item('pool-b')] })],
     });
-    expect(remainingSellUses([later], [module()], progress)).toEqual(
+    expect(remainingSellUses([later], [module()], progress)?.itemIds).toEqual(
       new Set(['needed', 'pool-a', 'pool-b', 'hideout-item'])
     );
   });
@@ -83,7 +83,7 @@ describe('remaining tracked uses', () => {
         }),
       ],
     });
-    const protectedIds = remainingSellUses([requirements], [], progress)!;
+    const protectedIds = remainingSellUses([requirements], [], progress)!.itemIds;
     expect(protectedIds.has('alternative-29')).toBe(true);
     expect(
       ['mod', 'weapon', 'sight', 'vest', 'key-a', 'key-b'].every((id) => protectedIds.has(id))
@@ -93,11 +93,12 @@ describe('remaining tracked uses', () => {
     const nested = [[item('vest-a')], [item('vest-b')]];
     expect(
       remainingSellUses([task({ objectives: [objective({ wearing: nested })] })], [], progress)
+        ?.itemIds
     ).toEqual(new Set(['needed', 'vest-a', 'vest-b']));
   });
   it('does not treat collected counts as hand-in, construction or surplus', () => {
     const collected = { ...progress, getObjectiveCount: () => 100, getHideoutPartCount: () => 100 };
-    expect(remainingSellUses([task()], [module()], collected)).toEqual(
+    expect(remainingSellUses([task()], [module()], collected)?.itemIds).toEqual(
       new Set(['needed', 'hideout-item'])
     );
   });
@@ -107,11 +108,11 @@ describe('remaining tracked uses', () => {
         ...progress,
         isTaskObjectiveComplete: () => true,
         isHideoutModuleComplete: () => true,
-      })
+      })?.itemIds
     ).toEqual(new Set());
-    expect(remainingSellUses([task()], [], { ...progress, isTaskComplete: () => true })).toEqual(
-      new Set()
-    );
+    expect(
+      remainingSellUses([task()], [], { ...progress, isTaskComplete: () => true })?.itemIds
+    ).toEqual(new Set());
   });
   it('keeps failed branches protected even when failure also set completion flags', () => {
     expect(
@@ -120,7 +121,7 @@ describe('remaining tracked uses', () => {
         isTaskComplete: () => true,
         isTaskFailed: () => true,
         isTaskObjectiveComplete: () => true,
-      })
+      })?.itemIds
     ).toEqual(new Set(['needed']));
   });
   it.each([
@@ -184,7 +185,7 @@ describe('remaining tracked uses', () => {
       { id: 'use', type: 'useItem', useAny: [item('consumable')] },
       { id: 'dialogue', type: 'dialogue' },
     ];
-    expect(remainingSellUses([task({ objectives })], [], progress)).toEqual(
+    expect(remainingSellUses([task({ objectives })], [], progress)?.itemIds).toEqual(
       new Set(['beacon', 'quest-item', 'consumable'])
     );
   });
@@ -205,7 +206,7 @@ describe('remaining tracked uses', () => {
         questItem: item('laptop'),
       },
     ];
-    expect(remainingSellUses([task({ objectives })], [], progress)).toEqual(
+    expect(remainingSellUses([task({ objectives })], [], progress)?.itemIds).toEqual(
       new Set(['key', 'supply', 'data', 'paper', 'tool', 'laptop'])
     );
   });
@@ -223,18 +224,27 @@ describe('remaining tracked uses', () => {
     const incomplete = { id: 'objective', ...extra } as TaskObjective;
     expect(remainingSellUses([task({ objectives: [incomplete] })], [], progress)).toBeUndefined();
   });
+  it('withholds both item and category references when any unfinished task has missing objectives', () => {
+    const build = task({
+      objectives: [objective({ type: 'buildWeapon', containsCategory: ['optic'] })],
+    });
+    expect(remainingSellUses([build], [], progress)?.categoryIds).toEqual(new Set(['optic']));
+    expect(
+      remainingSellUses([build, task({ id: 'incomplete', objectives: undefined })], [], progress)
+    ).toBeUndefined();
+  });
   it('does not require missing data for a quest the player actually completed', () => {
     expect(
       remainingSellUses([task({ objectives: [] })], [], {
         ...progress,
         isTaskComplete: () => true,
-      })
+      })?.itemIds
     ).toEqual(new Set());
     expect(
       remainingSellUses([task({ objectives: [{ id: 'completed-placeholder' }] })], [], {
         ...progress,
         isTaskObjectiveComplete: () => true,
-      })
+      })?.itemIds
     ).toEqual(new Set());
   });
   it('withholds the answer when hideout requirements are incomplete', () => {
