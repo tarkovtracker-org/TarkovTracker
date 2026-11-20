@@ -37,9 +37,13 @@
   } from '@/utils/constants';
   import { tarkovApiFetch } from '@/utils/tarkovApiFetch';
   import type { TarkovTasksCoreQueryResult } from '@/types/tarkov';
-  const { taskId, mode, switchError } = defineProps<{
-    taskId?: string;
-    mode?: GameMode;
+  const {
+    taskId = null,
+    mode = null,
+    switchError,
+  } = defineProps<{
+    taskId?: string | null;
+    mode?: GameMode | null;
     switchError: string;
   }>();
   const emit = defineEmits<{
