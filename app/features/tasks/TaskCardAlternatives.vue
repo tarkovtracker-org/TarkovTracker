@@ -8,42 +8,70 @@
       icon="i-mdi-swap-horizontal"
       class="min-h-6 shrink-0 gap-1 px-1.5 py-0 text-[11px]"
       :ui="{ leadingIcon: 'size-3' }"
-      :aria-label="t('page.tasks.questcard.alternatives_button', { count: alternativeCount })"
+      :aria-label="t('page.tasks.questcard.quest_links')"
       data-testid="task-alternatives-trigger"
       @pointerenter="openOnHover"
       @pointerleave="scheduleHoverClose"
       @click.capture="keepHoverOpen"
     >
-      {{ t('page.tasks.questcard.alternatives_badge', { count: alternativeCount }) }}
+      {{ t('page.tasks.questcard.quest_links') }}
     </UButton>
     <template #content>
       <div
         ref="panel"
         data-testid="task-alternatives"
-        class="max-h-(--reka-popper-available-height) w-72 max-w-(--reka-popper-available-width) overflow-y-auto p-2.5 text-xs"
+        class="flex max-h-(--reka-popper-available-height) w-md max-w-(--reka-popper-available-width) flex-col text-xs"
         @focusin="activatePanel"
         @pointerenter="cancelHoverClose"
         @pointerleave="scheduleHoverClose"
       >
-        <div class="text-warning-200 font-semibold">
-          {{ t('page.tasks.questcard.quest_alternatives') }}
+        <div
+          class="border-surface-700 flex shrink-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b px-3 py-2.5"
+        >
+          <h3 class="text-surface-100 text-sm font-semibold">
+            {{ t('page.tasks.questcard.quest_links') }}
+          </h3>
+          <span class="text-surface-300">
+            {{ t('page.tasks.questcard.quest_links_count', { count: alternativeCount }) }}
+          </span>
         </div>
-        <ul class="mt-1 space-y-1.5">
-          <li v-for="group in alternativeGroups" :key="group.label">
-            <p class="text-surface-300">{{ group.label }}</p>
-            <div class="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
-              <router-link
-                v-for="alternative in group.tasks"
-                :key="alternative.id"
-                :to="{ path: '/tasks', query: { task: alternative.id } }"
-                class="text-link hover:text-link-hover focus-visible:ring-primary-500 block min-h-6 max-w-full content-center rounded-sm font-medium wrap-anywhere underline underline-offset-2 focus-visible:ring-2"
-                @click="closeAfterLink"
-              >
-                {{ alternative.name }}
-              </router-link>
+        <div
+          class="divide-surface-700 max-h-96 min-h-0 divide-y overflow-y-auto overscroll-contain"
+        >
+          <section v-for="group in alternativeGroups" :key="group.kind" class="px-3 pt-2.5 pb-1">
+            <div class="flex items-start justify-between gap-3">
+              <h4 class="text-surface-100 flex min-w-0 items-start gap-1.5 font-semibold">
+                <UIcon
+                  :name="group.icon"
+                  :class="group.kind === 'mutual' ? 'text-warning-200' : 'text-error-300'"
+                  class="size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
+                <span class="wrap-anywhere">{{ group.label }}</span>
+              </h4>
+              <span class="text-surface-300 shrink-0 tabular-nums" aria-hidden="true">
+                {{ group.tasks.length }}
+              </span>
             </div>
-          </li>
-        </ul>
+            <p v-if="group.hint" class="text-surface-300 mt-1 ps-5">{{ group.hint }}</p>
+            <ul class="divide-surface-700/70 mt-1 divide-y">
+              <li v-for="quest in group.tasks" :key="quest.id">
+                <router-link
+                  :to="{ path: '/tasks', query: { task: quest.id } }"
+                  class="text-link hover:text-link-hover hover:bg-surface-800 focus-visible:ring-primary-500 flex min-h-8 items-center justify-between gap-2 rounded-sm py-1.5 ps-5 pe-1 text-start font-medium focus-visible:ring-2 focus-visible:ring-inset pointer-coarse:min-h-11"
+                  @click="closeAfterLink"
+                >
+                  <span class="min-w-0 wrap-anywhere">{{ quest.name }}</span>
+                  <UIcon
+                    name="i-mdi-chevron-right"
+                    class="text-surface-300 size-3.5 shrink-0 rtl:rotate-180"
+                    aria-hidden="true"
+                  />
+                </router-link>
+              </li>
+            </ul>
+          </section>
+        </div>
       </div>
     </template>
   </UPopover>
@@ -60,7 +88,7 @@
   const contentOptions = computed(() => ({
     align: 'end' as const,
     sideOffset: 4,
-    'aria-label': t('page.tasks.questcard.quest_alternatives'),
+    'aria-label': t('page.tasks.questcard.quest_links'),
     onOpenAutoFocus: preserveFocus,
     onCloseAutoFocus: preserveFocus,
   }));
@@ -115,15 +143,22 @@
       });
     return [
       {
-        label: t('page.tasks.questcard.alternatives_mutual'),
+        kind: 'mutual',
+        label: t('page.tasks.questcard.quest_links_mutual'),
+        hint: t('page.tasks.questcard.quest_links_mutual_hint'),
+        icon: 'i-mdi-swap-horizontal',
         tasks: resolveTasks([...targets].filter((taskId) => sources.has(taskId))),
       },
       {
-        label: t('page.tasks.questcard.alternatives_failed_by_this'),
+        kind: 'outgoing',
+        label: t('page.tasks.questcard.quest_links_fails_others'),
+        icon: 'i-mdi-arrow-right',
         tasks: resolveTasks([...targets].filter((taskId) => !sources.has(taskId))),
       },
       {
-        label: t('page.tasks.questcard.alternatives_fail_this'),
+        kind: 'incoming',
+        label: t('page.tasks.questcard.quest_links_failed_by_others'),
+        icon: 'i-mdi-arrow-left',
         tasks: resolveTasks([...sources].filter((taskId) => !targets.has(taskId))),
       },
     ].filter((group) => group.tasks.length > 0);
