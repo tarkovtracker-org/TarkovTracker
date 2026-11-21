@@ -49,7 +49,10 @@
   </UPopover>
   <span v-else :class="chipClass">
     <UIcon v-if="!grouped" :name="icon" class="size-3.5 shrink-0" aria-hidden="true" />
-    {{ label }}
+    <span class="min-w-0 wrap-anywhere">
+      {{ label }}
+      <span v-if="detail" class="text-surface-400">· {{ detail }}</span>
+    </span>
   </span>
 </template>
 <script setup lang="ts">

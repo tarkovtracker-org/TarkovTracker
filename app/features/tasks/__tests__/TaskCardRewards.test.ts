@@ -133,6 +133,24 @@ describe('TaskCardRewards', () => {
     ]);
     wrapper.unmount();
   });
+  it('retains the trader level when an unlock lacks an item preview', async () => {
+    const wrapper = await mountSuspended(TaskCardRewards, {
+      props: {
+        ...emptyRewards,
+        offerUnlockRewards: [
+          {
+            id: 'offer',
+            item: { id: '', name: 'Unknown offer' },
+            trader: { id: 'skier', name: 'Skier' },
+            level: 4,
+          },
+        ],
+      },
+    });
+    expect(wrapper.text()).toMatch(/Purchase unlock · Unknown offer.*Skier LL4/);
+    expect(wrapper.find('button').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('shows all fifteen skill gains without adding empty reward groups', async () => {
     const skillRewards = Array.from({ length: 15 }, (_, index) => ({
       name: `Skill ${index + 1}`,
