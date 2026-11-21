@@ -64,19 +64,19 @@
     ...new Set(props.rows.flatMap((row) => (row.hint ? [row.hint] : []))),
   ]);
   const items = computed(() =>
-    [...props.rows]
-      .sort((a, b) => Number(a.met) - Number(b.met))
+    props.rows
       .map((row, index) => {
         const state = MET_STATE[row.met ? 'met' : 'unmet'];
         return {
           ...row,
           ...state,
-          key: `${row.kind}-${index}-${row.label}`,
+          key: row.pool?.id ?? `${row.kind}-${index}-${row.label}`,
           status: t(`page.tasks.requirements.${state.key}`),
           tag: row.to ? RouterLink : 'span',
           linkClass: row.to ? LINK_CLASS : '',
           pending: row.pool || !row.met ? row.progress : undefined,
         };
       })
+      .sort((a, b) => Number(a.met) - Number(b.met))
   );
 </script>
