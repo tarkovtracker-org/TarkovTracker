@@ -10,6 +10,7 @@ import {
 import { isProgressPayloadTooLarge } from '@/utils/progressPayload';
 import type {
   CloudSaveFailure,
+  CloudSaveRetryResult,
   CloudSaveState,
   CloudSaveStatus,
 } from '@/stores/tarkov/progressSaveStatus';
@@ -62,7 +63,7 @@ export interface SupabaseSyncReturn<
   isPaused: Ref<boolean>;
   saveStatus: Ref<CloudSaveStatus>;
   /** Resets the retry budget and saves now; resolves `true` once nothing is pending. */
-  retryNow: () => Promise<boolean>;
+  retryNow: () => Promise<CloudSaveRetryResult>;
   cleanup: () => void;
   pause: () => void;
   resume: () => void;
@@ -547,7 +548,7 @@ export function useSupabaseSync<
     return reconcileThenSync();
   };
   /** A retry uploads only after the latest remote state was merged into the pending changes. */
-  const reconcileThenSync = async (): Promise<TPayload | null> => {
+  const reconcileForRetry = async (): Promise<boolean> => {
     const version = reconciliationVersion;
     try {
       await readRemoteForRetry();
@@ -556,10 +557,12 @@ export function useSupabaseSync<
       logger.warn(`[Sync] Remote state unavailable before retrying ${table}`, error);
       handleWriteFailure(error);
       publishSaveStatus();
-      return null;
+      return false;
     }
-    return enqueueSync();
+    return true;
   };
+  const reconcileThenSync = async (): Promise<TPayload | null> =>
+    (await reconcileForRetry()) ? enqueueSync() : null;
   /**
    * After a failed write, Realtime may have missed remote updates, so only a reconciled retry
    * uploads. It captures the latest state when it runs, carrying every edit made meanwhile.
@@ -607,12 +610,18 @@ export function useSupabaseSync<
     });
   });
   /** A manual retry restarts the bounded schedule; it never discards pending changes. */
-  const retryNow = async (): Promise<boolean> => {
-    if (!canQueueSync()) return false;
+  const retryNow = async (): Promise<CloudSaveRetryResult> => {
+    const ownerId = syncOwnerId();
+    if (disposed || !ownerId) return false;
     resetRetryBudget();
     debouncedSync.cancel();
     publishSaveStatus();
-    if (pendingLocalChanges) await reconcileThenSync();
+    if (!pendingLocalChanges) return true;
+    if (isSyncSuspended()) return 'deferred';
+    if (!(await reconcileForRetry()) || disposed || syncOwnerId() !== ownerId) return false;
+    // Applying the snapshot can pause writes again. Resume schedules any pending saves.
+    if (isSyncSuspended()) return 'deferred';
+    await enqueueSync();
     return !pendingLocalChanges;
   };
   const handleOnline = () => {

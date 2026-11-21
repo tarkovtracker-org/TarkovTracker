@@ -132,6 +132,7 @@
   });
   const handleRetry = async () => {
     const saved = await retry();
+    if (saved === 'deferred') return;
     toast.add({
       title: t(
         saved ? 'progress_save_status.retry_succeeded' : 'progress_save_status.retry_failed'
