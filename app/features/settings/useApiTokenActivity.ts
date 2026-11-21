@@ -1,11 +1,11 @@
 type ActivityScope = () => string | undefined;
-type ActivityRange = 'today' | '24h' | '7d' | '30d';
+export type ActivityRange = 'today' | '24h' | '7d' | '30d';
 export type ActivityCounts = { requests: number; counted: number; throttled: number };
 export type ActivityGroup = ActivityCounts & { value: string };
-type ActivityBucket = ActivityCounts & { at: string };
+export type ActivityBucket = ActivityCounts & { at: string };
 type ActivityOutcome = 'counted' | 'throttled' | 'unavailable';
 type ActivityKind = 'read' | 'write';
-type ActivityRequest = {
+export type ActivityRequest = {
   id: string;
   occurred_at: string;
   endpoint: string;
@@ -17,7 +17,7 @@ type ActivityRequest = {
   quota_remaining: number | null;
   quota_reset_at: string | null;
 };
-type QuotaSnapshot = {
+export type QuotaSnapshot = {
   kind: ActivityKind;
   at: string;
   limit: number;
@@ -46,40 +46,51 @@ export function useApiTokenActivity(tokenId: ActivityScope) {
   const failed = ref(false);
   const hasMore = ref(false);
   let controller: AbortController | undefined;
+  const abort = () => controller?.abort();
+  function requestArgs(before?: ActivityRequest) {
+    const cursor = before
+      ? { p_before_at: before.occurred_at, p_before_id: before.id }
+      : { p_before_at: null, p_before_id: null };
+    return {
+      p_range: range.value,
+      p_token_id: tokenId() ?? null,
+      p_endpoint: endpoint.value,
+      p_client: client.value,
+      p_throttle_only: throttleOnly.value,
+      p_kind: kind.value === 'all' ? null : kind.value,
+      ...cursor,
+    };
+  }
+  async function fetchActivity(signal: AbortSignal, before?: ActivityRequest) {
+    try {
+      const { data, error } = await $supabase.client
+        .rpc('get_api_request_activity', requestArgs(before))
+        .abortSignal(signal);
+      return error ? null : (data as Activity | null);
+    } catch {
+      return null;
+    }
+  }
+  function applyActivity(result: Activity, before?: ActivityRequest) {
+    if (!before) activity.value = result;
+    requests.value = [...requests.value, ...result.requests.slice(0, PAGE_SIZE)];
+    hasMore.value = result.requests.length > PAGE_SIZE;
+  }
   async function load(before?: ActivityRequest) {
-    controller?.abort();
+    abort();
     const request = new AbortController();
     controller = request;
     loading.value = true;
     failed.value = false;
     if (!before) requests.value = [];
-    try {
-      const { data, error } = await $supabase.client
-        .rpc('get_api_request_activity', {
-          p_range: range.value,
-          p_token_id: tokenId() ?? null,
-          p_endpoint: endpoint.value,
-          p_client: client.value,
-          p_before_at: before?.occurred_at ?? null,
-          p_before_id: before?.id ?? null,
-          p_throttle_only: throttleOnly.value,
-          p_kind: kind.value === 'all' ? null : kind.value,
-        })
-        .abortSignal(request.signal);
-      if (request.signal.aborted) return;
-      if (error || !data) throw error;
-      const result = data as Activity;
-      if (!before) activity.value = result;
-      requests.value = [...requests.value, ...result.requests.slice(0, PAGE_SIZE)];
-      hasMore.value = result.requests.length > PAGE_SIZE;
-    } catch {
-      if (!request.signal.aborted) failed.value = true;
-    } finally {
-      if (!request.signal.aborted) loading.value = false;
-    }
+    const result = await fetchActivity(request.signal, before);
+    if (request.signal.aborted) return;
+    loading.value = false;
+    failed.value = result === null;
+    if (result) applyActivity(result, before);
   }
   watch([range, endpoint, client, throttleOnly, kind], () => void load(), { immediate: true });
-  onScopeDispose(() => controller?.abort());
+  onScopeDispose(abort);
   return {
     range,
     endpoint,

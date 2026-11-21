@@ -11,7 +11,6 @@
       </a>
       <div class="flex flex-wrap gap-2">
         <UButton
-          v-if="userLoggedIn"
           color="neutral"
           variant="soft"
           icon="i-mdi-chart-timeline-variant"
@@ -32,13 +31,11 @@
         </UButton>
       </div>
     </div>
-    <div id="api-token-activity">
-      <ApiTokenActivity
-        v-if="activityScope === 'account'"
-        :key="activityScope"
-        :title="t('page.settings.card.apitokens.activity.account')"
-      />
-    </div>
+    <ApiTokenActivityDisclosure
+      id="api-token-activity"
+      :open="activityScope === 'account'"
+      :title="t('page.settings.card.apitokens.activity.account')"
+    />
     <div class="space-y-3">
       <UAlert
         v-if="!supportsRawTokens"
@@ -171,10 +168,7 @@
                 </span>
                 <span>
                   {{ t('page.settings.card.apitokens.list.last_used') }}:
-                  <time v-if="token.lastUsedAt" :datetime="token.lastUsedAt">
-                    {{ formatDate(token.lastUsedAt) }}
-                  </time>
-                  <template v-else>{{ t('page.settings.card.apitokens.list.never') }}</template>
+                  {{ formatLastUsed(token.lastUsedAt) }}
                 </span>
               </div>
             </div>
@@ -206,14 +200,12 @@
               </UButton>
             </div>
           </div>
-          <div :id="`api-activity-${token.id}`" :hidden="activityScope !== token.id">
-            <ApiTokenActivity
-              v-if="activityScope === token.id"
-              :key="token.id"
-              :token-id="token.id"
-              :title="token.note || t('page.settings.card.apitokens.default_note')"
-            />
-          </div>
+          <ApiTokenActivityDisclosure
+            :id="`api-activity-${token.id}`"
+            :open="activityScope === token.id"
+            :token-id="token.id"
+            :title="activityTitle(token)"
+          />
         </UCard>
       </div>
     </div>
@@ -339,7 +331,7 @@
   import GameModeBadge from '@/components/GameModeBadge.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
-  import ApiTokenActivity from '@/features/settings/ApiTokenActivity.vue';
+  import ApiTokenActivityDisclosure from '@/features/settings/ApiTokenActivityDisclosure.vue';
   import ApiTokenNameEditor from '@/features/settings/ApiTokenNameEditor.vue';
   import {
     API_PERMISSIONS,
@@ -429,6 +421,10 @@
   const toggleActivity = (scope: string) => {
     activityScope.value = activityScope.value === scope ? null : scope;
   };
+  const formatLastUsed = (date: string | null) =>
+    formatDate(date) || t('page.settings.card.apitokens.list.never');
+  const activityTitle = (token: TokenRow) =>
+    token.note || t('page.settings.card.apitokens.default_note');
   const formatGameMode = (mode: GameMode) => {
     const option = GAME_MODE_OPTIONS.find((entry) => entry.value === mode);
     return option
