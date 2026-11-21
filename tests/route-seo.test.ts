@@ -9,12 +9,16 @@ import {
   resolveRouteSeo,
 } from '@/utils/routeSeo';
 describe('route SEO registry', () => {
-  it('uses the chosen compact previews for tasks, supporter, and combined Kappa/Lightkeeper', () => {
+  it('uses compact previews for tasks, supporter, and the retired Kappa and Lightkeeper tracker', () => {
     expect(resolveRouteSeo('/tasks').title).toBe('Tarkov Quest Tracker · TarkovTracker.org');
     expect(resolveRouteSeo('/supporter').description).toBe(
       'Help fund hosting and development. Explore supporter tiers and ways to contribute.'
     );
-    expect(resolveRouteSeo('/kappa').title).toBe('Kappa & Lightkeeper Tracker · TarkovTracker.org');
+    expect(resolveRouteSeo('/kappa')).toMatchObject({
+      title: 'Kappa & Lightkeeper Tracker Retired · TarkovTracker.org',
+      description:
+        'The standalone Kappa and Lightkeeper checklist has been retired. Find quests in Tasks and required items in Needed Items.',
+    });
   });
   it('keeps browser titles while avoiding a repeated brand in social titles', () => {
     const head = createRouteSeoHead('/tasks');
