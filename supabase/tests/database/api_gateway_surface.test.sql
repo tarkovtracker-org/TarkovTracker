@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(23);
+SELECT plan(25);
 
 -- The public API Worker (tarkovtracker-org/TarkovTracker-API) calls these objects through
 -- PostgREST with the service_role key. Its supabase-surface.json is the source list and its own
@@ -54,6 +54,12 @@ INSERT INTO api_gateway_function_contract VALUES
   ('public.get_progress_task_id_aliases()', ARRAY[]::TEXT[], 'jsonb'),
   ('public.get_active_season_number()', ARRAY[]::TEXT[], 'smallint'),
   ('public.increment_token_usage(uuid)', ARRAY['p_token_id'], 'void'),
+  (
+    'public.record_api_request_activity(uuid, uuid, timestamptz, text, text, integer, text, text, integer, integer, bigint)',
+    ARRAY['p_user_id', 'p_token_id', 'p_occurred_at', 'p_endpoint', 'p_client', 'p_status',
+      'p_kind', 'p_outcome', 'p_limit', 'p_remaining', 'p_reset_at_ms'],
+    'void'
+  ),
   (
     'public.merge_progress_data(uuid, text, jsonb, jsonb, jsonb)',
     ARRAY['p_user_id', 'p_field', 'p_task_completions', 'p_task_objectives', 'p_set'],
