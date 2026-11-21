@@ -2188,10 +2188,10 @@
       "no_suggestion": "No additions get closer to zero. Try swapping or removing a pick.",
       "impossible": "{name} would take net cost to {attempted}. Even all remaining drawbacks would leave {minimum}. Remove a perk to make room.",
       "search": "Search modifiers",
-      "all_categories": "All categories",
+      "all_categories": "All groups",
       "filter_category": "Filter by category",
       "sort": "Modifier order",
-      "order_category": "By category",
+      "order_category": "Category",
       "order_low": "Points · Low to high",
       "order_high": "Points · High to low",
       "selected": "Selected ({count})",
@@ -2212,9 +2212,11 @@
         "movement_stamina": "Movement & Stamina",
         "health_provisions": "Health & Provisions",
         "traders_economy": "Traders & Economy",
-        "gear_goals": "Starting Gear & Goals"
+        "gear_goals": "Starting Gear & Goals",
+        "general": "General"
       },
-      "catalog_pending": "The Season 2 modifier catalog is not available yet.",
+      "catalog_pending": "The Season 2 modifier catalog is temporarily unavailable.",
+      "catalog_loading": "Loading provisional Season 2 modifiers…",
       "perks_short": "Perks",
       "drawbacks_short": "Drawbacks"
     }

@@ -6,6 +6,7 @@ export const modifierCategories = [
   'health_provisions',
   'traders_economy',
   'gear_goals',
+  'general',
 ] as const;
 export type ModifierCategory = (typeof modifierCategories)[number];
 export interface Modifier {
@@ -23,8 +24,8 @@ export const netCostOf = (items: readonly Modifier[]) =>
 export function lowestNetCost(total: number, available: readonly Modifier[]): number {
   return total + netCostOf(available.filter((item) => item.netCost < 0));
 }
-function collectBalances(available: readonly Modifier[]): Map<number, Modifier[]> {
-  const changes = new Map<number, Modifier[]>([[0, []]]);
+function collectBalances<T extends Modifier>(available: readonly T[]): Map<number, T[]> {
+  const changes = new Map<number, T[]>([[0, []]]);
   for (const item of available) {
     for (const [change, picks] of [...changes]) {
       const next = change + item.netCost;
@@ -35,9 +36,9 @@ function collectBalances(available: readonly Modifier[]): Map<number, Modifier[]
   }
   return changes;
 }
-export function suggestBalance(total: number, available: readonly Modifier[]) {
+export function suggestBalance<T extends Modifier>(total: number, available: readonly T[]) {
   let closest = total <= 0 ? total : -Infinity;
-  let additions: Modifier[] = [];
+  let additions: T[] = [];
   if (total === 0) return { closest, additions };
   for (const [change, picks] of collectBalances(available)) {
     const result = total + change;

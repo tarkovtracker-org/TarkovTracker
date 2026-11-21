@@ -25,7 +25,11 @@
       color="neutral"
       variant="soft"
       icon="i-mdi-information-outline"
-      :title="t('page.seasonal_modifiers.catalog_pending')"
+      :title="
+        isLoading
+          ? t('page.seasonal_modifiers.catalog_loading')
+          : t('page.seasonal_modifiers.catalog_pending')
+      "
     />
     <template v-else>
       <details
@@ -65,7 +69,7 @@
       <div class="grid grid-cols-2 gap-2 lg:flex">
         <UInput
           v-model="query"
-          class="col-span-2 min-w-0 lg:flex-1"
+          class="col-span-2 w-full min-w-0 lg:w-auto lg:flex-1"
           type="search"
           icon="i-mdi-magnify"
           :aria-label="t('page.seasonal_modifiers.search')"
@@ -73,11 +77,13 @@
         />
         <USelect
           v-model="category"
+          class="w-full min-w-0 lg:w-44 lg:shrink-0"
           :items="categoryOptions"
           :aria-label="t('page.seasonal_modifiers.filter_category')"
         />
         <USelect
           v-model="order"
+          class="w-full min-w-0 lg:w-48 lg:shrink-0"
           :items="orderOptions"
           :aria-label="t('page.seasonal_modifiers.sort')"
         />
@@ -122,28 +128,23 @@
   import ModifierBoards from '@/features/seasonal-modifiers/ModifierBoards.vue';
   import ModifierBudget from '@/features/seasonal-modifiers/ModifierBudget.vue';
   import { modifierCategories, type ModifierOrder } from '@/features/seasonal-modifiers/planner';
-  import { posterUrl, seasonModifiers, seasonRules } from '@/features/seasonal-modifiers/seasonTwo';
+  import { previewModifiers, previewRules } from '@/features/seasonal-modifiers/seasonTwo';
   import { useModifierPlanner } from '@/features/seasonal-modifiers/useModifierPlanner';
+  import { UNTAR_CONTROL_POSTER_URL as posterUrl } from '@/types/seasonPreview';
+  import type { SeasonPreview } from '@/types/seasonPreview';
   const { t, locale } = useI18n({ useScope: 'global' });
   definePageMeta({ layout: 'default' });
   const query = ref('');
   const category = ref('all');
   const order = ref<ModifierOrder>('category');
   const onlySelected = ref(false);
-  const items = computed(() =>
-    seasonModifiers.map((item) => ({
-      ...item,
-      name: t(`page.seasonal_modifiers.entries.${item.id}.name`),
-      effect: t(`page.seasonal_modifiers.entries.${item.id}.effect`),
-    }))
+  const { data: preview, status } = await useLazyFetch<SeasonPreview>(
+    '/api/tarkov/season-preview',
+    { server: false }
   );
-  const rules = computed(() =>
-    seasonRules.map((id) => ({
-      id,
-      name: t(`page.seasonal_modifiers.entries.${id}.name`),
-      effect: t(`page.seasonal_modifiers.entries.${id}.effect`),
-    }))
-  );
+  const items = computed(() => (preview.value ? previewModifiers(preview.value) : []));
+  const rules = computed(() => (preview.value ? previewRules(preview.value) : []));
+  const isLoading = computed(() => status.value === 'idle' || status.value === 'pending');
   const {
     selected,
     spent,

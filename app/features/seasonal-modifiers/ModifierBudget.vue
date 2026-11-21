@@ -65,12 +65,12 @@
   </section>
 </template>
 <script setup lang="ts">
-  import type { Modifier } from '@/features/seasonal-modifiers/planner';
+  import type { ModifierDisplay } from '@/features/seasonal-modifiers/planner';
   const props = defineProps<{
     spent: number;
     earned: number;
     net: number;
-    suggestion: { closest: number; additions: Modifier[] };
+    suggestion: { closest: number; additions: ModifierDisplay[] };
   }>();
   const emit = defineEmits<{ apply: [] }>();
   const { t, locale } = useI18n({ useScope: 'global' });
@@ -85,7 +85,7 @@
   const suggestedNames = computed(() =>
     props.suggestion.additions.map((pick) =>
       t('page.seasonal_modifiers.suggestion_item', {
-        name: t(`page.seasonal_modifiers.entries.${pick.id}.name`),
+        name: pick.name,
         points: signed(pick.netCost),
       })
     )
