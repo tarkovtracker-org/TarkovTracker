@@ -107,6 +107,7 @@ const createWrapper = async () => {
   return mount(ApiTokens, {
     global: {
       stubs: {
+        ApiTokenActivity: { template: '<div data-testid="activity-panel" />' },
         UAlert: {
           props: ['title', 'description'],
           template:
@@ -250,6 +251,29 @@ describe('ApiTokens', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('Token B');
     expect(wrapper.text()).not.toContain('Token A');
+  });
+  it('toggles token activity, switches scope, and closes account activity when the account changes', async () => {
+    const wrapper = await createWrapper();
+    await flushPromises();
+    resolveLoad('user-a', 'Token A');
+    await flushPromises();
+    const tokenButton = wrapper.get('button[aria-controls="api-activity-user-a-token"]');
+    const accountButton = wrapper.get('button[aria-controls="api-token-activity"]');
+    await tokenButton.trigger('click');
+    expect(wrapper.find('#api-activity-user-a-token [data-testid="activity-panel"]').exists()).toBe(
+      true
+    );
+    await tokenButton.trigger('click');
+    expect(wrapper.find('[data-testid="activity-panel"]').exists()).toBe(false);
+    await tokenButton.trigger('click');
+    await accountButton.trigger('click');
+    expect(tokenButton.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('#api-token-activity [data-testid="activity-panel"]').exists()).toBe(true);
+    mockSupabaseUser.id = 'user-b';
+    await flushPromises();
+    expect(accountButton.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('[data-testid="activity-panel"]').exists()).toBe(false);
+    wrapper.unmount();
   });
   it('ignores stale token creates after an account switch', async () => {
     const wrapper = await createWrapper();

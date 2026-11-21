@@ -25,12 +25,12 @@
             <UIcon :name="dataStatus.icon" :class="dataStatus.color" class="size-4" />
           </span>
         </AppTooltip>
-        <ProgressSaveStatusIndicator />
       </div>
       <AppSearch :shortcut-parts="omnibarShortcutParts" :key-shortcuts="omnibarAriaKeyshortcuts" />
       <div
         class="col-start-3 flex max-w-full min-w-0 items-center gap-0.5 justify-self-end @min-[561px]:gap-1"
       >
+        <ProgressSaveStatusIndicator />
         <AppTooltip v-if="showThemeAndHelp" :text="themeToggleLabel">
           <UButton
             color="neutral"

@@ -8,6 +8,7 @@ import { logger } from '@/utils/logger';
 /** Bounded automatic cloud-save retries; afterwards changes stay pending for manual retry. */
 export const CLOUD_SAVE_RETRY_DELAYS_MS = [5000, 15000, 60000] as const;
 export type CloudSaveState = 'idle' | 'pending' | 'saving' | 'retry_scheduled' | 'failed';
+export type CloudSaveRetryResult = boolean | 'deferred';
 type LocalSaveState = 'unknown' | 'pending' | 'saved' | 'failed';
 export type CloudSaveFailure =
   'offline' | 'rate_limited' | 'auth' | 'payload_too_large' | 'unknown';
@@ -36,7 +37,7 @@ const status = reactive<ProgressSaveStatusState>({
   localFailure: null,
   localSavedAt: null,
 });
-let cloudRetryHandler: (() => Promise<boolean>) | null = null;
+let cloudRetryHandler: (() => Promise<CloudSaveRetryResult>) | null = null;
 let unacknowledgedLocalFailure = false;
 let pendingLocalCloudHeld = false;
 export const progressSaveStatus: Readonly<ProgressSaveStatusState> = readonly(status);
@@ -66,13 +67,15 @@ export const recordLocalSave = (
   if (succeeded) status.localSavedAt = Date.now();
 };
 /** The retry handler belongs to one sync controller; stale owners cannot clear a newer one. */
-export const registerCloudRetryHandler = (handler: () => Promise<boolean>): (() => void) => {
+export const registerCloudRetryHandler = (
+  handler: () => Promise<CloudSaveRetryResult>
+): (() => void) => {
   cloudRetryHandler = handler;
   return () => {
     if (cloudRetryHandler === handler) cloudRetryHandler = null;
   };
 };
-export const retryCloudSave = async (): Promise<boolean> => {
+export const retryCloudSave = async (): Promise<CloudSaveRetryResult> => {
   if (!cloudRetryHandler) return false;
   try {
     return await cloudRetryHandler();

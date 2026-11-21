@@ -544,6 +544,20 @@ limits, shared profile limits, Auth limits, and DB hard caps live in a separate 
 
 Progress API requests (`api.tarkovtracker.org`) are subject to tiered daily quotas keyed by user account (not per token). Daily quotas reset at 00:00 UTC and count authenticated requests admitted for processing.
 
+In **Settings → API**, open **Account activity & quota** to see the latest recorded limiter decision
+for reads and writes across the account. **Today** covers the current UTC quota window and
+**Last 24 hours** is a rolling activity view. Each token also has its own activity view. Filter by
+endpoint, client, or daily quota throttles and copy the displayed request evidence to report
+unexpected polling. A client name is self-reported. The account owner can see up to 30 days of
+history from the start of collection, including revoked tokens' requests in account activity.
+Only requests that reach the quota check can appear. Each quota snapshot comes from a recorded
+limiter decision and can be absent or stale if collection misses an event.
+
+The hourly `api-request-activity-cleanup` job permanently expires this telemetry after 30 days.
+To pause cleanup during an incident, disable that named job through an approved forward migration
+and restore the hourly schedule after recovery. Use authorized database point-in-time recovery into
+an isolated instance if investigation requires a deleted row and the backup window covers it.
+
 | Tier      | Reads/day | Writes/day |
 | --------- | --------- | ---------- |
 | Free      | 1,000     | 100        |

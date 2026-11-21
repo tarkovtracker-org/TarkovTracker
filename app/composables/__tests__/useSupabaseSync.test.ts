@@ -499,6 +499,26 @@ describe('useSupabaseSync', () => {
       expect(sync.hasPendingChanges!()).toBe(false);
       sync.cleanup();
     });
+    it.each(['before retry', 'during reconciliation'])(
+      'defers a manual retry when sync pauses %s and saves on resume',
+      async (pauseAt) => {
+        const reconcile = vi.fn(async () => {
+          if (pauseAt === 'during reconciliation') sync.pause();
+        });
+        const { store, sync } = await createRetryingSync(vi.fn(), reconcile);
+        store.$state.count = 4;
+        store.notifySubscriber();
+        if (pauseAt === 'before retry') sync.pause();
+        await expect(sync.retryNow()).resolves.toBe('deferred');
+        expect(upsert).not.toHaveBeenCalled();
+        expect(sync.saveStatus.value.state).toBe('pending');
+        sync.resume();
+        await flushSync(5);
+        expect(upsert).toHaveBeenCalledExactlyOnceWith({ count: 4, user_id: 'user-1' });
+        expect(sync.saveStatus.value.state).toBe('idle');
+        sync.cleanup();
+      }
+    );
     it('restarts the retry budget after a manual retry fails again', async () => {
       upsert.mockResolvedValue({ error: { message: 'boom' } });
       const { store, sync } = await createRetryingSync();
