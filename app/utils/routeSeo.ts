@@ -68,7 +68,7 @@ const readEnglishKey = (key: string): string => {
 };
 const normalizePath = (path: string): string => path.split(/[?#]/)[0]!.replace(/\/+$/, '') || '/';
 const isProfilePath = (path: string) =>
-  path === '/profile' || path.startsWith('/profile/') || path.startsWith('/u/');
+  path === '/profile' || path.startsWith('/profile/') || path.startsWith('/@');
 const fallbackKey = (path: string): SeoCopyKey =>
   CLIENT_PAGE_KEYS[path as keyof typeof CLIENT_PAGE_KEYS] ??
   (isProfilePath(path) ? 'profile' : 'not_found');

@@ -22,8 +22,8 @@ whether a candidate account or private mode exists. Owners can still view their 
 ### Profile links
 
 Players can claim a permanent handle in **Settings → Account → Profile Sharing**.
-The short `/u/<handle>` link chooses public PvP, then public PvE, then the public
-active Seasonal profile. Use `/u/<handle>/<mode>` to link to a specific mode.
+The short `/@<handle>` link chooses public PvP, then public PvE, then the public
+active Seasonal profile. Use `/@<handle>/<mode>` to link to a specific mode.
 Existing `/profile/<uuid>/<mode>` links keep their current access rules. Claims
 do not change visibility. Handle links require public mode visibility and are
 disabled while Streamer Mode is enabled. Deleted accounts leave their former

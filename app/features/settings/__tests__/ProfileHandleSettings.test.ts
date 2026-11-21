@@ -82,7 +82,7 @@ describe('profile handle settings', () => {
     expect(wrapper.find('a').exists()).toBe(false);
     await wrapper.setProps({ hasPublicMode: true });
     const url = wrapper.get('a').attributes('href');
-    expect(new URL(url!).pathname).toBe('/u/rat_one');
+    expect(new URL(url!).pathname).toBe('/@rat_one');
     await wrapper.get('button').trigger('click');
     expect(copyToClipboard).toHaveBeenCalledWith(url);
     preferences.getStreamerMode = true;
@@ -144,7 +144,7 @@ describe('profile handle settings', () => {
     await flushPromises();
     const getPaths = () =>
       wrapper.findAll('a').map((link) => new URL(link.attributes('href')!).pathname);
-    expect(getPaths()).toEqual(['/u/rat_one', '/u/rat_one/pve']);
+    expect(getPaths()).toEqual(['/@rat_one', '/@rat_one/pve']);
     preferences.getStreamerMode = true;
     await flushPromises();
     expect(getPaths()).toEqual(['/profile/account-one/pve']);

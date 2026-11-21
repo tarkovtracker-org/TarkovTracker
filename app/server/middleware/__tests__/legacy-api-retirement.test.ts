@@ -271,7 +271,7 @@ describe('legacy API retirement HTTP boundary', () => {
     // Both Nitro routing and the compiled-output hook route APIs to the handler.
     // Health continues using the existing static Pages 404 instead of invoking Nitro.
     expect(
-      config.match(/include: \['\/api\/\*', '\/overlay\/\*', '\/profile\/\*', '\/u\/\*'\]/g)
+      config.match(/include: \['\/api\/\*', '\/overlay\/\*', '\/profile\/\*', '\/@\*'\]/g)
     ).toHaveLength(2);
   });
 });

@@ -81,7 +81,7 @@ after(async () => {
 test('compiled Pages routing retains its existing Function boundary and static 404 document', () => {
   assert.deepEqual(routes, {
     version: 1,
-    include: ['/api/*', '/overlay/*', '/profile/*', '/u/*'],
+    include: ['/api/*', '/overlay/*', '/profile/*', '/@*'],
     exclude: [],
   });
   assert.ok(readFileSync(join(root, 'dist', '404.html'), 'utf8').length > 0);
