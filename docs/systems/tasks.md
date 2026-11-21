@@ -79,7 +79,8 @@ with a click, tap, or keyboard, to see links to named quests in the selected mod
 choices, quests that fail when this one is completed, and quests whose completion fails this one.
 It also shows follow-up quests and previous quests according to the corresponding card settings.
 Previous quests already linked in the visible Requirements are omitted from the popover.
-Downstream impact is available inside Quest links when a relationship is listed.
+Downstream impact appears inside Quest links when a relationship is listed, or in the header when
+there is impact without a visible relationship.
 
 ## Hidden tasks
 
@@ -298,7 +299,7 @@ failed branches, faction, trader unlocks, prestige and unsupported data. `usePro
 is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
 card builds its requirement views with `useTaskRequirements`. A collapsed locked card shows
 blockers as chips (three, then an inline "+N more"). An expanded card shows the Requirements
-list by default, with blockers first and each level, trader, quest, and server-side requirement
+list with blockers first and each level, trader, quest, and server-side requirement
 marked met or unmet. Cards carry no separate level or trader requirement badges. Comparisons use
 the plain-language formatter in `requirement-format.ts` (`15+`, `exactly 1`); the dashboard's
 `useTaskBlockerText` sentences use the same formatter. Shared/non-current profile

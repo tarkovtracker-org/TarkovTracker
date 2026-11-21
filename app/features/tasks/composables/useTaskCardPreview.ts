@@ -13,6 +13,7 @@ export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
   function setOpen(next: boolean) {
     cancelHoverClose();
     if (next) manageFocus = true;
+    else keyboardFocused = false;
     open.value = next;
   }
   function showPreview() {
@@ -25,9 +26,10 @@ export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
     if (event.pointerType === 'mouse') showPreview();
   }
   function openOnFocus(event: FocusEvent) {
+    if (restoringFocus) return;
     const trigger = event.currentTarget as HTMLElement;
     keyboardFocused = trigger.matches(':focus-visible');
-    if (keyboardFocused && !restoringFocus) showPreview();
+    if (keyboardFocused) showPreview();
   }
   function scheduleHoverClose() {
     if (open.value && !manageFocus && !keyboardFocused) startHoverClose();

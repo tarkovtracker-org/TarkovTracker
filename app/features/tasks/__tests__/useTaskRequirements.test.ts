@@ -48,7 +48,7 @@ vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
     tasks: [],
     storyChapters: [],
-    getTaskById: (id: string) => (id === 'unlock-quest' ? { id, name: 'Unlock quest' } : undefined),
+    getTaskById: (id: string) => (id === 'unlock-quest' ? { id } : undefined),
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({

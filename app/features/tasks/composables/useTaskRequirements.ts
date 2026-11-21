@@ -101,7 +101,7 @@ export const useTaskRequirements = (task: () => Task) => {
     progress: you(formatTraderValue(kind, blocker.current)),
   });
   const linkedTask = (id?: string) =>
-    id && metadataStore.getTaskById(id)?.name ? `/tasks?task=${id}` : undefined;
+    id && metadataStore.getTaskById(id) ? `/tasks?task=${id}` : undefined;
   const blockerLink = (blocker: TaskBlocker) => {
     const chapterId = blocker.chapterIds?.[0];
     if (chapterId && blocker.objective) return storyObjectiveLink(chapterId, blocker.objective.id);

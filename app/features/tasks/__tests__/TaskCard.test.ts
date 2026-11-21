@@ -4,6 +4,7 @@ import { DOMWrapper, flushPromises } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
+import TaskCardAlternatives from '@/features/tasks/TaskCardAlternatives.vue';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
@@ -524,7 +525,9 @@ describe('TaskCard appearance and expansion controls', () => {
     wrapper.unmount();
   });
   it('puts follow-up and remaining previous links in Quest links and respects their preferences', async () => {
-    metadataStoreMock.getTaskById.mockImplementation((id) => ({ id, name: id }));
+    metadataStoreMock.getTaskById.mockImplementation((id) =>
+      id === 'follow-up' ? { id } : { id, name: id }
+    );
     const wrapper = await mountTaskCard({
       parents: ['visible-prerequisite', 'other-previous'],
       children: ['follow-up'],
@@ -547,6 +550,16 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(panel.findAll('a').map((link) => link.text())).toEqual(['follow-up']);
     preferencesState.showNext = false;
     await nextTick();
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('shows downstream impact without adding a quest-links control when links are hidden', async () => {
+    preferencesState.showNext = false;
+    const wrapper = await mountSuspended(TaskCardAlternatives, {
+      props: { taskId: 'task-1', impactCount: 3, nextTasks: [{ id: 'next' }], previousTasks: [] },
+      global: { stubs: { AppTooltip: AppTooltipStub, UIcon: true } },
+    });
+    expect(wrapper.text()).toContain('Impact: 3');
     expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
     wrapper.unmount();
   });

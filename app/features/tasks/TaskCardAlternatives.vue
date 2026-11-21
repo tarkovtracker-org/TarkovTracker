@@ -61,7 +61,7 @@
                   class="text-link hover:text-link-hover hover:bg-surface-800 focus-visible:ring-primary-500 flex min-h-8 items-center justify-between gap-2 rounded-sm py-1.5 ps-5 pe-1 text-start font-medium focus-visible:ring-2 focus-visible:ring-inset pointer-coarse:min-h-11"
                   @click="closeAfterLink"
                 >
-                  <span class="min-w-0 wrap-anywhere">{{ quest.name }}</span>
+                  <span class="min-w-0 wrap-anywhere">{{ quest.name || quest.id }}</span>
                   <UIcon
                     name="i-mdi-chevron-right"
                     class="text-surface-300 size-3.5 shrink-0 rtl:rotate-180"
@@ -80,6 +80,15 @@
       </div>
     </template>
   </UPopover>
+  <AppTooltip v-else-if="impactCount" :text="t('page.tasks.questcard.impact_tooltip')">
+    <span
+      tabindex="0"
+      class="text-surface-400 border-surface-600 inline-flex shrink-0 cursor-help items-center gap-1 border-b border-dotted text-[11px]"
+    >
+      <UIcon name="i-mdi-sitemap" class="size-3 shrink-0" aria-hidden="true" />
+      {{ t('common.impact') }}: {{ impactCount }}
+    </span>
+  </AppTooltip>
 </template>
 <script setup lang="ts">
   import { useTaskCardPreview } from '@/features/tasks/composables/useTaskCardPreview';
