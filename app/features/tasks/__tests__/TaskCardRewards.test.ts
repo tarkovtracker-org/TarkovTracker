@@ -70,4 +70,74 @@ describe('TaskCardRewards', () => {
       preferences.showExperience = true;
     }
   });
+  it('groups a mixed reward list and keeps full purchase names available in previews', async () => {
+    const shotgun = {
+      id: 'shotgun',
+      name: 'MP-155 12ga semi-automatic shotgun Ultima',
+      shortName: 'MP-155 Ultima',
+    };
+    const trader = { id: 'skier', name: 'Skier' };
+    const wrapper = await mountSuspended(TaskCardRewards, {
+      props: {
+        ...emptyRewards,
+        experience: 65000,
+        skillRewards: [{ name: 'Shotgun', level: 4 }],
+        itemRewards: [{ item: shotgun, count: 1 }],
+        offerUnlockRewards: [
+          { id: 'shotgun-offer', item: shotgun, trader, level: 4 },
+          { id: 'sword-offer', item: { id: 'sword', name: 'Tactical sword' }, trader, level: 4 },
+        ],
+      },
+    });
+    const footer = wrapper.get('[data-testid="task-card-rewards"]');
+    expect(footer.text()).toContain('Progression');
+    expect(footer.text()).toContain('Items & cash');
+    expect(footer.text().match(/Purchase unlock/gi)).toEqual(['Purchase unlock']);
+    expect(footer.findAll('button').map((chip) => chip.text())).toEqual([
+      'MP-155 Ultima ×1',
+      'MP-155 Ultima',
+      'Tactical sword',
+    ]);
+    await footer.findAll('button')[1]!.trigger('click');
+    await flushPromises();
+    const preview = new DOMWrapper(document.body).get(
+      '[role="dialog"][aria-label="MP-155 12ga semi-automatic shotgun Ultima"]'
+    );
+    expect(preview.text()).toContain('Skier LL4');
+    wrapper.unmount();
+  });
+  it('uses full names when different items share a short name within an unlock group', async () => {
+    const trader = { id: 'peacekeeper', name: 'Peacekeeper' };
+    const wrapper = await mountSuspended(TaskCardRewards, {
+      props: {
+        ...emptyRewards,
+        offerUnlockRewards: ['Urban', 'Forest'].map((variant) => ({
+          id: variant,
+          item: { id: variant, name: `ACS sight (${variant})`, shortName: 'ACS' },
+          trader,
+          level: 4,
+        })),
+      },
+    });
+    expect(wrapper.findAll('[data-testid="task-reward-item"]').map((chip) => chip.text())).toEqual([
+      'ACS sight (Urban)',
+      'ACS sight (Forest)',
+    ]);
+    wrapper.unmount();
+  });
+  it('shows all fifteen skill gains without adding empty reward groups', async () => {
+    const skillRewards = Array.from({ length: 15 }, (_, index) => ({
+      name: `Skill ${index + 1}`,
+      level: index + 1,
+    }));
+    const wrapper = await mountSuspended(TaskCardRewards, {
+      props: { ...emptyRewards, skillRewards },
+    });
+    const footer = wrapper.get('[data-testid="task-card-rewards"]');
+    expect(footer.text()).toContain('Progression');
+    expect(footer.text().match(/Skill \d+/g)).toHaveLength(15);
+    expect(footer.text()).not.toMatch(/Items & cash|Purchase unlocks/);
+    expect(footer.find('button').exists()).toBe(false);
+    wrapper.unmount();
+  });
 });

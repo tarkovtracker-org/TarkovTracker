@@ -1,77 +1,95 @@
 <template>
   <div
-    v-if="hasRewards"
-    class="border-surface-700/20 bg-surface-900/20 text-surface-400 flex min-h-7 w-full flex-wrap items-center gap-1.5 rounded-b-md border-t px-3 py-1 text-xs sm:gap-2"
+    v-if="rewardCount"
+    class="border-surface-700/20 bg-surface-900/20 text-surface-400 @container min-h-7 w-full rounded-b-md border-t px-3 text-xs"
+    :class="grouped ? 'grid gap-1.5 py-2' : 'flex flex-wrap items-center gap-1.5 py-1 sm:gap-2'"
     data-testid="task-card-rewards"
   >
     <span class="text-surface-400 text-[10px] leading-none font-bold tracking-wider uppercase">
       {{ t('page.tasks.questcard.rewards') }}
     </span>
-    <div
-      v-for="standing in traderStandingRewards"
-      :key="`standing-${standing.trader.id}`"
-      class="bg-surface-800 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
+    <TaskRewardGroup
+      v-if="progressionCount"
+      :grouped="grouped"
+      :label="t('page.tasks.questcard.reward_progression')"
     >
-      <UIcon
-        name="i-mdi-handshake"
-        aria-hidden="true"
-        class="text-surface-400 h-3.5 w-3.5 shrink-0"
-      />
-      <span
-        class="leading-none font-medium"
-        :class="standing.standing >= 0 ? 'text-success-400' : 'text-error-400'"
+      <div
+        v-if="hasExperience"
+        class="bg-warning-900 light:bg-warning-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
       >
-        {{ standing.standing >= 0 ? '+' : '' }}{{ standing.standing.toFixed(2) }}
-      </span>
-      <span class="text-surface-100 leading-none">{{ standing.trader.name }}</span>
-    </div>
-    <div
-      v-for="skill in skillRewards"
-      :key="`skill-${skill.name}`"
-      class="inline-flex items-center gap-1 leading-none"
+        <UIcon name="i-mdi-star" aria-hidden="true" class="text-warning-400 h-3.5 w-3.5 shrink-0" />
+        <span class="text-warning-300 leading-none font-medium">
+          {{ formatNumber(experienceValue) }} XP
+        </span>
+      </div>
+      <div
+        v-for="standing in traderStandingRewards"
+        :key="`standing-${standing.trader.id}`"
+        class="bg-surface-800 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
+      >
+        <UIcon
+          name="i-mdi-handshake"
+          aria-hidden="true"
+          class="text-surface-400 h-3.5 w-3.5 shrink-0"
+        />
+        <span
+          class="leading-none font-medium"
+          :class="standing.standing >= 0 ? 'text-success-400' : 'text-error-400'"
+        >
+          {{ standing.standing >= 0 ? '+' : '' }}{{ standing.standing.toFixed(2) }}
+        </span>
+        <span class="text-surface-100 leading-none">{{ standing.trader.name }}</span>
+      </div>
+      <div
+        v-for="skill in skillRewards"
+        :key="`skill-${skill.name}`"
+        class="inline-flex items-center gap-1 leading-none"
+      >
+        <UIcon
+          v-if="!grouped"
+          name="i-mdi-arm-flex"
+          aria-hidden="true"
+          class="text-secondary-400 h-3.5 w-3.5 shrink-0"
+        />
+        <span class="text-secondary-300 leading-none font-medium">+{{ skill.level }}</span>
+        <span class="leading-none">{{ formatSkillName(skill.name) }}</span>
+      </div>
+      <div
+        v-for="unlock in traderUnlocks"
+        :key="unlock.id"
+        class="bg-warning-900 light:bg-warning-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
+      >
+        <UIcon
+          name="i-mdi-lock-open-variant"
+          aria-hidden="true"
+          class="text-warning-400 h-3.5 w-3.5 shrink-0"
+        />
+        <span class="text-warning-300 leading-none font-medium">
+          {{ unlock.name }}
+        </span>
+      </div>
+    </TaskRewardGroup>
+    <TaskRewardGroup
+      v-for="group in itemGroups"
+      :key="group.label"
+      :grouped="grouped"
+      :label="t(group.label)"
     >
-      <UIcon
-        name="i-mdi-arm-flex"
-        aria-hidden="true"
-        class="text-secondary-400 h-3.5 w-3.5 shrink-0"
+      <TaskRewardItemChip
+        v-for="reward in group.rewards"
+        :key="reward.key"
+        :item="reward.item"
+        :count="reward.count"
+        :offer="reward.offer"
+        :grouped="grouped"
+        :grouped-name="reward.shortName"
+        @item-context-menu="forwardItemContextMenu"
       />
-      <span class="text-secondary-300 leading-none font-medium">+{{ skill.level }}</span>
-      <span class="leading-none">{{ skill.name }}</span>
-    </div>
-    <div
-      v-for="unlock in traderUnlocks"
-      :key="unlock.id"
-      class="bg-warning-900 light:bg-warning-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
-    >
-      <UIcon
-        name="i-mdi-lock-open-variant"
-        aria-hidden="true"
-        class="text-warning-400 h-3.5 w-3.5 shrink-0"
-      />
-      <span class="text-warning-300 leading-none font-medium">
-        {{ unlock.name }}
-      </span>
-    </div>
-    <TaskRewardItemChip
-      v-for="reward in itemChips"
-      :key="reward.key"
-      :item="reward.item"
-      :count="reward.count"
-      :offer="reward.offer"
-      @item-context-menu="forwardItemContextMenu"
-    />
-    <div
-      v-if="hasExperience"
-      class="bg-warning-900 light:bg-warning-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
-    >
-      <UIcon name="i-mdi-star" aria-hidden="true" class="text-warning-400 h-3.5 w-3.5 shrink-0" />
-      <span class="text-warning-300 leading-none font-medium">
-        {{ formatNumber(experienceValue) }} XP
-      </span>
-    </div>
+    </TaskRewardGroup>
   </div>
 </template>
 <script setup lang="ts">
+  import TaskRewardGroup from '@/features/tasks/TaskRewardGroup.vue';
   import TaskRewardItemChip from '@/features/tasks/TaskRewardItemChip.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
@@ -99,32 +117,57 @@
   function forwardItemContextMenu(event: MouseEvent, item: TarkovItem) {
     emit('itemContextMenu', event, item);
   }
+  function formatSkillName(name: string) {
+    return name.replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+  function compactName(item: TarkovItem | undefined, group: { item?: TarkovItem }[]) {
+    const short = item?.shortName?.trim();
+    if (!short) return undefined;
+    const ambiguous = group.some(
+      (other) => other.item?.shortName?.trim() === short && other.item?.name !== item?.name
+    );
+    return ambiguous ? undefined : short;
+  }
   const { t } = useI18n({ useScope: 'global' });
   const formatNumber = useLocaleNumberFormatter();
   const traderUnlocks = computed(() =>
     [props.traderUnlockReward ?? []].flat().filter((trader) => trader.name)
   );
-  const itemChips = computed(() => [
-    ...props.itemRewards.map(({ item, count }, index) => ({
-      key: `item-${index}-${item?.id}`,
-      item,
-      count,
-      offer: undefined,
-    })),
-    ...props.offerUnlockRewards.map((offer) => ({
-      key: `offer-${offer.id}`,
-      item: offer.item,
-      count: undefined,
-      offer,
-    })),
-  ]);
   const experienceValue = computed(() => props.experience ?? 0);
   const hasExperience = computed(() => showExperienceRewards.value && experienceValue.value > 0);
-  const hasRewards = computed(
+  const progressionCount = computed(
     () =>
-      hasExperience.value ||
-      [props.traderStandingRewards, props.skillRewards, traderUnlocks.value, itemChips.value].some(
-        (rewards) => rewards.length > 0
-      )
+      Number(hasExperience.value) +
+      props.traderStandingRewards.length +
+      props.skillRewards.length +
+      traderUnlocks.value.length
+  );
+  const rewardCount = computed(
+    () => progressionCount.value + props.itemRewards.length + props.offerUnlockRewards.length
+  );
+  const grouped = computed(() => rewardCount.value > 6 || props.offerUnlockRewards.length > 1);
+  const itemGroups = computed(() =>
+    [
+      {
+        label: 'page.tasks.questcard.reward_items_and_cash',
+        rewards: props.itemRewards.map(({ item, count }, index) => ({
+          key: `item-${index}-${item?.id}`,
+          item,
+          count,
+          offer: undefined,
+          shortName: compactName(item, props.itemRewards),
+        })),
+      },
+      {
+        label: 'page.tasks.questcard.reward_purchase_unlocks',
+        rewards: props.offerUnlockRewards.map((offer) => ({
+          key: `offer-${offer.id}`,
+          item: offer.item,
+          count: undefined,
+          offer,
+          shortName: compactName(offer.item, props.offerUnlockRewards),
+        })),
+      },
+    ].filter((group) => group.rewards.length)
   );
 </script>

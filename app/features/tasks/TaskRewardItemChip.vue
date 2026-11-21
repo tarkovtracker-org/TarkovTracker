@@ -13,7 +13,7 @@
       @click.capture="keepHoverOpen"
       @contextmenu.prevent.stop="emit('itemContextMenu', $event, item)"
     >
-      <UIcon :name="icon" class="size-3.5 shrink-0" aria-hidden="true" />
+      <UIcon v-if="!grouped" :name="icon" class="size-3.5 shrink-0" aria-hidden="true" />
       <span class="min-w-0 wrap-anywhere">{{ label }}</span>
       <UIcon name="i-mdi-image-outline" class="size-3 shrink-0 opacity-80" aria-hidden="true" />
     </button>
@@ -48,7 +48,7 @@
     </template>
   </UPopover>
   <span v-else :class="chipClass">
-    <UIcon :name="icon" class="size-3.5 shrink-0" aria-hidden="true" />
+    <UIcon v-if="!grouped" :name="icon" class="size-3.5 shrink-0" aria-hidden="true" />
     {{ label }}
   </span>
 </template>
@@ -63,6 +63,8 @@
     item?: TarkovItem;
     count?: number;
     offer?: { trader: { name: string }; level: number };
+    grouped?: boolean;
+    groupedName?: string;
   }>();
   const emit = defineEmits<{
     itemContextMenu: [event: MouseEvent, item: TarkovItem];
@@ -94,15 +96,21 @@
   }));
   const currency = computed(() => getCurrencySymbol(props.item?.id ?? ''));
   const amount = computed(() => formatNumber(props.count ?? 1));
-  const label = computed(() => {
-    if (props.offer) return t('page.tasks.questcard.purchase_unlock_reward', { name: name.value });
-    if (currency.value)
-      return t('page.tasks.questcard.reward_currency', {
-        amount: amount.value,
-        symbol: currency.value,
-      });
-    return t('page.tasks.questcard.reward_quantity', { name: name.value, amount: amount.value });
-  });
+  function itemLabel(itemName: string) {
+    return currency.value
+      ? t('page.tasks.questcard.reward_currency', { amount: amount.value, symbol: currency.value })
+      : t('page.tasks.questcard.reward_quantity', { name: itemName, amount: amount.value });
+  }
+  const fullLabel = computed(() =>
+    props.offer
+      ? t('page.tasks.questcard.purchase_unlock_reward', { name: name.value })
+      : itemLabel(name.value)
+  );
+  function groupedLabel() {
+    const itemName = props.groupedName || name.value;
+    return props.offer ? itemName : itemLabel(itemName);
+  }
+  const label = computed(() => (props.grouped ? groupedLabel() : fullLabel.value));
   const detail = computed(() =>
     props.offer
       ? t('page.tasks.questcard.purchase_unlock_trader', {
@@ -114,6 +122,7 @@
   const icon = computed(() => (props.offer ? 'i-mdi-cart-check' : 'i-mdi-package-variant'));
   const chipClass = computed(() => [
     'inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 leading-snug font-medium pointer-coarse:min-h-9',
+    props.grouped && '@md:max-w-64',
     props.offer
       ? 'bg-info-900 text-info-300 light:bg-info-100 light:text-info-900'
       : 'bg-success-900 text-success-300 light:bg-success-100 light:text-success-900',
