@@ -4,6 +4,7 @@ import { DOMWrapper, flushPromises } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
+import TaskCardAlternatives from '@/features/tasks/TaskCardAlternatives.vue';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
@@ -18,6 +19,8 @@ const taskState = reactive({
 const preferencesState = reactive({
   collapseDefault: false,
   hideRewards: false,
+  showPrevious: true,
+  showNext: true,
   hideCompletedObjectives: false,
   manualFail: false,
   primaryView: 'all',
@@ -94,6 +97,12 @@ vi.mock('@/stores/usePreferences', () => ({
     getHiddenTaskIds: [] as string[],
     getRespectTaskFiltersForImpact: false,
     getShowRequiredLabels: true,
+    get getShowPreviousQuests() {
+      return preferencesState.showPrevious;
+    },
+    get getShowNextQuests() {
+      return preferencesState.showNext;
+    },
     getTaskCollapseDefault: preferencesState.collapseDefault,
     getTaskMapView: 'all',
     getTaskPrimaryView: preferencesState.primaryView,
@@ -219,6 +228,8 @@ describe('TaskCard appearance and expansion controls', () => {
     taskState.failed = false;
     preferencesState.collapseDefault = false;
     preferencesState.hideRewards = false;
+    preferencesState.showPrevious = true;
+    preferencesState.showNext = true;
     preferencesState.hideCompletedObjectives = false;
     preferencesState.manualFail = false;
     preferencesState.primaryView = 'all';
@@ -513,6 +524,79 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(classes).toContain('light:border-error-700');
     wrapper.unmount();
   });
+  it('puts follow-up and remaining previous links in Quest links and respects their preferences', async () => {
+    metadataStoreMock.getTaskById.mockImplementation((id) =>
+      id === 'follow-up' ? { id } : { id, name: id }
+    );
+    const wrapper = await mountTaskCard({
+      parents: ['visible-prerequisite', 'other-previous'],
+      children: ['follow-up'],
+      taskRequirements: [{ task: { id: 'visible-prerequisite' }, status: ['complete'] }],
+    });
+    const chip = wrapper.get('button[aria-label="Quest links"]');
+    await chip.trigger('click');
+    await flushPromises();
+    const panel = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(panel.findAll('h4').map((heading) => heading.text())).toEqual([
+      'Unlocks next',
+      'Previous tasks',
+    ]);
+    expect(panel.findAll('a').map((link) => link.text())).toEqual(['follow-up', 'other-previous']);
+    expect(wrapper.get('[data-testid="task-requirements-summary"] a').text()).toContain(
+      'visible-prerequisite'
+    );
+    preferencesState.showPrevious = false;
+    await nextTick();
+    expect(panel.findAll('a').map((link) => link.text())).toEqual(['follow-up']);
+    preferencesState.showNext = false;
+    await nextTick();
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('keeps downstream impact available by keyboard with or without visible quest links', async () => {
+    preferencesState.showNext = false;
+    const wrapper = await mountSuspended(TaskCardAlternatives, {
+      props: { taskId: 'task-1', impactCount: 3, nextTasks: [{ id: 'next' }], previousTasks: [] },
+      global: { stubs: { AppTooltip: AppTooltipStub, UIcon: true } },
+    });
+    expect(wrapper.get('[tabindex="0"]').text()).toContain('Impact: 3');
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    preferencesState.showNext = true;
+    await nextTick();
+    await wrapper.get('button[aria-label="Quest links"]').trigger('click');
+    await flushPromises();
+    const popup = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(popup.findAll('[tabindex="0"]').some((element) => element.text() === 'Impact: 3')).toBe(
+      true
+    );
+    wrapper.unmount();
+  });
+  it('keeps previous links available while hidden behind the compact blocker limit', async () => {
+    preferencesState.collapseDefault = true;
+    const ids = ['first', 'second', 'third', 'fourth'];
+    const taskRequirements = ids.map((id) => ({ task: { id }, status: ['complete'] }));
+    metadataStoreMock.getTaskById.mockImplementation((id) => ({ id, name: id }));
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [{ type: 'prerequisite', requirements: taskRequirements }],
+        },
+      },
+    };
+    const wrapper = await mountTaskCard({ parents: ids, taskRequirements });
+    const compact = wrapper.get('[data-testid="task-requirements-blocking"]');
+    expect(compact.findAll('a')).toHaveLength(3);
+    await wrapper.get('button[aria-label="Quest links"]').trigger('click');
+    await flushPromises();
+    const links = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(links.findAll('a').map((link) => link.text())).toEqual(['fourth']);
+    await compact.get('button').trigger('click');
+    expect(compact.findAll('a')).toHaveLength(4);
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('keeps a locked card usable before its evaluation snapshot is available', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     const wrapper = await mountTaskCard();
@@ -551,6 +635,14 @@ describe('TaskCard appearance and expansion controls', () => {
         },
       ],
     });
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    expect(summary.findAll('li').map((row) => row.text())).toEqual([
+      expect.stringContaining('Level 20+'),
+      expect.stringContaining('Prapor reputation 0.50+'),
+    ]);
+    expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
+    await wrapper.get('button[aria-label="Collapse task"]').trigger('click');
+    expect(wrapper.find('[data-testid="task-requirements-summary"]').exists()).toBe(false);
     const chips = wrapper
       .findAll('[data-testid="task-requirement-chip"]')
       .map((chip) => chip.text());
@@ -586,7 +678,6 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
     expect(summary.text()).toContain('1 of 1 met');
-    await summary.get('button').trigger('click');
     expect(summary.text()).toContain('Level 20+');
     tarkovStoreMock.playerLevel.mockReturnValue(1);
     wrapper.unmount();
@@ -599,7 +690,6 @@ describe('TaskCard appearance and expansion controls', () => {
       taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
     });
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
-    await summary.get('button').trigger('click');
     return { wrapper, rows: summary.findAll('li').map((item) => item.text()) };
   };
   it.each([
@@ -646,12 +736,11 @@ describe('TaskCard appearance and expansion controls', () => {
       ],
     });
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
-    await summary.get('button').trigger('click');
     const rows = summary.findAll('li').map((item) => item.text());
     expect(rows).toEqual([
+      expect.stringMatching(/^Not met:\s*Requires an in-game trader conversation/),
       expect.stringMatching(/^Met:\s*Story objective: Goal \(Chapter\)/),
       expect.stringMatching(/^Met:\s*Additional in-game progression required/),
-      expect.stringMatching(/^Not met:\s*Requires an in-game trader conversation/),
     ]);
     wrapper.unmount();
   });
@@ -670,7 +759,7 @@ describe('TaskCard appearance and expansion controls', () => {
         { type: 'globalVariable', id: 'scalar', variableId: 'v', compareMethod: '>=', value: 3 },
       ],
     });
-    expect(wrapper.get('[data-testid="task-requirement-chip"]').text()).toContain(
+    expect(wrapper.get('[data-testid="task-requirements-summary"]').text()).toContain(
       'Use Mark available only if this task is available in-game.'
     );
     wrapper.unmount();
@@ -704,7 +793,7 @@ describe('TaskCard appearance and expansion controls', () => {
       ],
     });
     expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
-    expect(wrapper.get('[data-testid="task-requirements-blocking"]').text()).toContain(
+    expect(wrapper.get('[data-testid="task-requirements-summary"]').text()).toContain(
       'If this task is already available in-game, use Mark available.'
     );
     wrapper.unmount();
@@ -743,11 +832,10 @@ describe('TaskCard appearance and expansion controls', () => {
     await wrapper.get('button[aria-label="Collapse task"]').trigger('click');
     await wrapper.get('button[aria-label="Expand task"]').trigger('click');
     expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
-    await wrapper.get('[data-testid="task-requirement-chip"] button').trigger('click');
+    await wrapper
+      .get('button[aria-controls="task-requirements-task-1-pool-gate"]')
+      .trigger('click');
     expect(wrapper.get('[data-testid="task-pool-details"]').text()).toContain('Contributor task');
-    expect(
-      wrapper.get('[data-testid="task-requirements-summary"] button').attributes('aria-expanded')
-    ).toBe('true');
     wrapper.unmount();
   });
   it('renders a dedicated toggle button in compact mode without making the header interactive', async () => {

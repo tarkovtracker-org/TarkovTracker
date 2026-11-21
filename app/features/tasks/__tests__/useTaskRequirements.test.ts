@@ -45,7 +45,11 @@ vi.mock('@/stores/useProgress', () => ({
   }),
 }));
 vi.mock('@/stores/useMetadata', () => ({
-  useMetadataStore: () => ({ tasks: [], storyChapters: [] }),
+  useMetadataStore: () => ({
+    tasks: [],
+    storyChapters: [],
+    getTaskById: (id: string) => (id === 'unlock-quest' ? { id } : undefined),
+  }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
@@ -56,6 +60,12 @@ describe('task requirement summary server gates', () => {
     state.missing = false;
     state.blockers = undefined;
     state.data = { completions: {}, faction: 'USEC', level: 50, mode: 'pvp', traders: {} };
+  });
+  it('links a trader unlock blocker to its known unlock quest', () => {
+    state.blockers = [{ type: 'trader_unlock', taskId: 'unlock-quest' }];
+    const { blocking, summary } = useTaskRequirements(() => ({ id: 'target' }));
+    expect(blocking.value[0]?.to).toBe('/tasks?task=unlock-quest');
+    expect(summary.value[0]?.to).toBe('/tasks?task=unlock-quest');
   });
   it.each(['complete', 'failed', 'missing'] as const)(
     'evaluates gates independently of %s availability',

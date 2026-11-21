@@ -39,7 +39,12 @@
               @copy-link="copyTaskLink"
             >
               <template #alternatives>
-                <TaskCardAlternatives :task-id="task.id" />
+                <TaskCardAlternatives
+                  :task-id="task.id"
+                  :previous-tasks="linkedPreviousTasks"
+                  :next-tasks="childTasks"
+                  :impact-count="impactCount"
+                />
               </template>
               <template #actions>
                 <TaskCardActions
@@ -78,7 +83,8 @@
         </div>
         <!-- Extra Info Strips (padded area) -->
         <TaskRequirementChips
-          v-if="isLocked"
+          v-if="showCompactRequirements"
+          v-model:expanded="showAllCompactRequirements"
           :rows="blockingRequirements"
           @show-pool="showRequirementPool"
         />
@@ -177,7 +183,7 @@
         >
           <TaskRequirementSummary
             :id="task.id"
-            :rows="requirementSummary"
+            :rows="expandedRequirements"
             :requested-pool="requestedPool"
           >
             <template #actions>
@@ -264,11 +270,7 @@
         :trader-unlock-reward="traderUnlockReward"
         :item-rewards="itemRewards"
         :offer-unlock-rewards="offerUnlockRewards"
-        :parent-tasks="parentTasks"
-        :child-tasks="childTasks"
         :experience="task.experience"
-        :unlocks-next-count="unlocksNextCount"
-        :impact-count="impactCount"
         @item-context-menu="openItemContextMenu"
       />
     </template>
@@ -354,6 +356,7 @@
   import { formatExpectedStatuses } from '@/features/tasks/requirement-format';
   import { impactEligibleTaskIdsKey } from '@/features/tasks/task-context';
   import {
+    COMPACT_REQUIREMENT_LIMIT,
     getRequiredTaskStatuses,
     type RequirementExpectedStatus,
   } from '@/features/tasks/task-requirement-helpers';
@@ -383,6 +386,7 @@
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
   import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
+  import type { TaskRequirementRow } from '@/features/tasks/composables/useTaskRequirements';
   import type { ActionButtonState } from '@/features/tasks/types';
   import type { GameEdition, Task } from '@/types/tarkov';
   type ContextMenuRef = { open: (event: MouseEvent) => void };
@@ -531,6 +535,16 @@
   const { blocking: blockingRequirements, summary: requirementSummary } = useTaskRequirements(
     () => props.task
   );
+  const requirementKey = (row: TaskRequirementRow) => JSON.stringify([row.kind, row.to, row.label]);
+  const expandedRequirements = computed(() => {
+    const summary = requirementSummary.value;
+    if (!isLocked.value) return summary;
+    const summaryKeys = new Set(summary.map(requirementKey));
+    return [
+      ...summary,
+      ...blockingRequirements.value.filter((row) => !summaryKeys.has(requirementKey(row))),
+    ];
+  });
   const locationTooltip = computed(() => {
     if (isGlobalTask.value) {
       return t('page.tasks.questcard.global_task_tooltip');
@@ -696,7 +710,6 @@
       .map((id) => metadataStore.getTaskById(id))
       .filter((task): task is Task => task !== undefined);
   });
-  const unlocksNextCount = computed(() => childTasks.value.length);
   const impactCount = computed(() => lockedBehind.value);
   const traderStandingRewards = computed(() => props.task.finishRewards?.traderStanding ?? []);
   const skillRewards = computed(() => props.task.finishRewards?.skillLevelReward ?? []);
@@ -733,6 +746,24 @@
     collapseByDefault: () => preferencesStore.getTaskCollapseDefault,
     hideTaskRewards: () => preferencesStore.getHideTaskRewards,
     routeTaskId: () => getQueryString(route.query.task),
+  });
+  const showCompactRequirements = computed(() => isLocked.value && !taskExpanded.value);
+  const showAllCompactRequirements = ref(false);
+  watch(showCompactRequirements, (show) => {
+    if (!show) showAllCompactRequirements.value = false;
+  });
+  const compactRequirements = computed(() => {
+    if (!showCompactRequirements.value) return [];
+    return showAllCompactRequirements.value
+      ? blockingRequirements.value
+      : blockingRequirements.value.slice(0, COMPACT_REQUIREMENT_LIMIT);
+  });
+  const linkedPreviousTasks = computed(() => {
+    const shownRequirements = taskExpanded.value
+      ? expandedRequirements.value
+      : compactRequirements.value;
+    const shownLinks = new Set(shownRequirements.map((row) => row.to));
+    return parentTasks.value.filter((task) => !shownLinks.has(`/tasks?task=${task.id}`));
   });
   const selectedMapIds = computed(() => {
     return resolveSelectedMapIds(

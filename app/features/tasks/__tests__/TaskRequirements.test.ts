@@ -78,7 +78,7 @@ describe('task requirement components', () => {
     await wrapper.get('button').trigger('click');
     expect(hints()).toEqual(['Visible conflict']);
   });
-  it('lists every requirement with its met state once expanded', async () => {
+  it('shows every requirement and puts unmet ones first without a disclosure', () => {
     const wrapper = mountRequirements(
       [
         row('Level 15+', true, { progress: 'you: 20' }),
@@ -86,14 +86,11 @@ describe('task requirement components', () => {
       ],
       'summary'
     );
-    const toggle = wrapper.get('button');
-    expect(toggle.text()).toContain('"met":1,"total":2');
-    expect(wrapper.find('ul').exists()).toBe(false);
-    await toggle.trigger('click');
-    expect(toggle.attributes('aria-controls')).toBe('task-requirements-task-1');
+    expect(wrapper.text()).toContain('"met":1,"total":2');
+    expect(wrapper.find('button').exists()).toBe(false);
     const items = wrapper.findAll('li').map((item) => item.text());
-    expect(items[0]).toMatch(/^page\.tasks\.requirements\.met:\s*Level 15\+$/);
-    expect(items[1]).toMatch(/^page\.tasks\.requirements\.unmet:\s*Debut\s*· not started$/);
+    expect(items[0]).toMatch(/^page\.tasks\.requirements\.unmet:\s*Debut\s*· not started$/);
+    expect(items[1]).toMatch(/^page\.tasks\.requirements\.met:\s*Level 15\+$/);
   });
   const poolRow = (): TaskRequirementRow =>
     row('Mechanic LL2 tasks', true, {
@@ -133,7 +130,7 @@ describe('task requirement components', () => {
     expect(wrapper.get('[data-testid="task-pool-details"] a').attributes('href')).toBe(
       '/tasks?task=a'
     );
-    const toggle = wrapper.findAll('button')[1]!;
+    const toggle = wrapper.get('button');
     expect(toggle.attributes('aria-controls')).toBe('task-requirements-target-pool');
     await toggle.trigger('click');
     expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);

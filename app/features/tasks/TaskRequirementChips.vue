@@ -6,7 +6,7 @@
   >
     <div class="flex flex-wrap items-center gap-1.5">
       <span class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
-        {{ t('common.requires') }}
+        {{ t('page.tasks.requirements.title') }}
       </span>
       <component
         :is="chip.tag"
@@ -53,6 +53,7 @@
 </template>
 <script setup lang="ts">
   import { RouterLink } from 'vue-router';
+  import { COMPACT_REQUIREMENT_LIMIT } from '@/features/tasks/task-requirement-helpers';
   import type {
     TaskRequirementKind,
     TaskRequirementRow,
@@ -60,7 +61,6 @@
   const props = defineProps<{ rows: TaskRequirementRow[] }>();
   const emit = defineEmits<{ showPool: [id: string] }>();
   const { t } = useI18n({ useScope: 'global' });
-  const MAX_VISIBLE = 3;
   const KIND_ICONS: Record<TaskRequirementKind, string> = {
     player_level: 'i-mdi-account-star',
     trader_level: 'i-mdi-handshake',
@@ -70,18 +70,20 @@
     other: 'i-mdi-lock-outline',
   };
   const LINK_CLASS = 'hover:bg-surface-700 underline-offset-2 hover:underline';
-  const expanded = ref(false);
-  const hiddenCount = computed(() => Math.max(0, props.rows.length - MAX_VISIBLE));
+  const expanded = defineModel<boolean>('expanded', { default: false });
+  const hiddenCount = computed(() => Math.max(0, props.rows.length - COMPACT_REQUIREMENT_LIMIT));
   const chips = computed(() =>
-    (expanded.value ? props.rows : props.rows.slice(0, MAX_VISIBLE)).map((row, index) => ({
-      ...row,
-      key: `${row.kind}-${index}-${row.label}`,
-      tag: row.to ? RouterLink : 'span',
-      wrapperClass: row.to ? LINK_CLASS : '',
-      contentClass: row.pool ? 'flex-wrap' : '',
-      labelClass: row.pool ? 'break-words' : 'truncate',
-      icon: KIND_ICONS[row.kind],
-    }))
+    (expanded.value ? props.rows : props.rows.slice(0, COMPACT_REQUIREMENT_LIMIT)).map(
+      (row, index) => ({
+        ...row,
+        key: `${row.kind}-${index}-${row.label}`,
+        tag: row.to ? RouterLink : 'span',
+        wrapperClass: row.to ? LINK_CLASS : '',
+        contentClass: row.pool ? 'flex-wrap' : '',
+        labelClass: row.pool ? 'break-words' : 'truncate',
+        icon: KIND_ICONS[row.kind],
+      })
+    )
   );
   const toggleLabel = computed(() => {
     if (expanded.value && hiddenCount.value > 0) return t('page.tasks.requirements.show_less');
