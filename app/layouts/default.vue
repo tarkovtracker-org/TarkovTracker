@@ -10,13 +10,16 @@
     <!-- Navigation Drawer (fixed) -->
     <ClientOnly>
       <NavDrawer />
-      <AppBar class="transition-all duration-300 ease-in-out" :style="{ left: mainMarginLeft }" />
+      <AppBar
+        class="transition-[left] duration-300 ease-in-out"
+        :style="{ left: belowMd ? SHELL_DRAWER_COLLAPSED_WIDTH : mainMarginLeft }"
+      />
     </ClientOnly>
     <!-- Main content area -->
     <main
       id="main-content"
       tabindex="-1"
-      class="relative z-0 flex flex-1 flex-col pt-11 transition-all duration-300 ease-in-out"
+      class="relative z-0 flex flex-1 flex-col pt-(--shell-bar-h) transition-all duration-300 ease-in-out"
       :style="{
         marginLeft: mainMarginLeft,
       }"

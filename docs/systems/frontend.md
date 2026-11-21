@@ -17,10 +17,18 @@ undo callbacks are synchronous. The store guards callback invocation and subsequ
 bookkeeping; future asynchronous callbacks must independently guard their own writes after each
 await against context invalidation.
 
+## App bar
+
+`app/shell/AppBar.vue` centers the search in the space between the sidebar and a right gutter.
+The gutter grows with the app area up to the current sidebar width. Search grows with the available
+space and opens across the bar on narrow screens. Activity, theme, help, and language move between
+direct controls and More as space changes. Discord and GitHub are in More at every width.
+App bar dropdowns are non-modal so opening the account or utility menus leaves page scrolling intact.
+
 ## Language selection
 
-The app bar uses a compact translation icon with native language names and a checked current
-language; phones retain the language submenu in More. The same menu is available under Settings >
+The app bar shows native language names and marks the current language. The selector appears as a
+direct icon on wide layouts and as a submenu in More at narrower widths. The same menu is available under Settings >
 Preferences > App Preferences. `useLocaleSwitch` shares pending, cooldown, and error feedback
 across these controls. One shared cache watcher and countdown timer remain active until the last selector
 unmounts. All menu entries are disabled during a switch.
