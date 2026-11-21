@@ -31,7 +31,7 @@ and have an agent verify the answer against the code.
 | [`teams.md`](./teams.md)                                   | Mode-scoped teams, team channel, team events and atomic leave/kick                |
 | [`imports.md`](./imports.md)                               | Tarkov.dev profile import, EFT log import                                         |
 | [`tasks.md`](./tasks.md)                                   | Canonical task progression, map objectives, task list and Needed Items            |
-| [`frontend.md`](./frontend.md)                             | Promoted Twitch configuration, boot-time asset-failure recovery, light/dark theme |
+| [`frontend.md`](./frontend.md)                             | Responsive app bar, locale, promoted Twitch, boot recovery, and light/dark themes |
 | [`prod-db-observer.md`](./prod-db-observer.md)             | Read-only production database observer                                            |
 | [`ci-and-release.md`](./ci-and-release.md)                 | Test execution, CI validation selection, Fallow snapshots, release publication    |
 | [`previews.md`](./previews.md)                             | Actions-owned Cloudflare previews and the `Preview Result` gate                   |

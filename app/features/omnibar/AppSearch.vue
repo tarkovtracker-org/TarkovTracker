@@ -1,8 +1,10 @@
 <template>
   <div
-    class="relative min-w-0 sm:w-full sm:max-w-sm lg:max-w-md"
+    class="relative w-full min-w-0"
     :class="
-      isFocused ? 'max-sm:absolute max-sm:inset-x-2 max-sm:top-1.5 max-sm:z-50' : 'max-sm:w-8'
+      isFocused
+        ? '@max-[560px]:absolute @max-[560px]:inset-x-2 @max-[560px]:top-1/2 @max-[560px]:z-50 @max-[560px]:w-auto @max-[560px]:-translate-y-1/2'
+        : '@max-[560px]:w-10'
     "
     data-testid="app-search"
     @focusout="onFocusOut"
@@ -14,7 +16,7 @@
       aria-autocomplete="list"
       autocomplete="off"
       enterkeyhint="search"
-      icon="i-heroicons-magnifying-glass"
+      icon="i-lucide-search"
       size="sm"
       class="w-full"
       :placeholder="t('omnibar.placeholder')"
@@ -24,8 +26,11 @@
       :aria-activedescendant="activeOption?.domId"
       :aria-keyshortcuts="props.keyShortcuts"
       :ui="{
-        base: isFocused ? 'h-8' : 'h-8 max-sm:text-transparent max-sm:placeholder:text-transparent',
-        trailing: isFocused ? 'pe-1' : 'pe-1 max-sm:hidden',
+        base: isFocused
+          ? 'h-10'
+          : 'h-10 @max-[560px]:pe-0 @max-[560px]:text-transparent @max-[560px]:placeholder:text-transparent',
+        leading: 'pointer-events-none',
+        trailing: isFocused ? 'pe-1.5' : 'pe-1.5 @max-[560px]:hidden',
       }"
       data-testid="app-search-input"
       @focus="onFocus"
@@ -38,12 +43,12 @@
           color="neutral"
           variant="link"
           size="xs"
-          icon="i-mdi-close-circle"
+          icon="i-lucide-circle-x"
           :aria-label="t('common.clear_search')"
           @mousedown.prevent
           @click="clearDraft"
         />
-        <span v-else class="hidden items-center gap-0.5 lg:flex" aria-hidden="true">
+        <span v-else class="hidden items-center gap-0.5 @min-[900px]:flex" aria-hidden="true">
           <template v-for="(part, index) in props.shortcutParts" :key="index">
             <span v-if="index > 0" class="text-surface-500 text-[10px]">+</span>
             <UKbd size="sm">{{ part }}</UKbd>
@@ -53,7 +58,7 @@
     </UInput>
     <span
       v-if="draft && !isFocused"
-      class="bg-primary-500 pointer-events-none absolute top-1 right-1 size-1.5 rounded-full sm:hidden"
+      class="bg-primary-500 pointer-events-none absolute top-1 right-1 hidden size-1.5 rounded-full @max-[560px]:block"
       aria-hidden="true"
     />
     <AppSearchResults

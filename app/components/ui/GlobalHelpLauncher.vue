@@ -1,118 +1,114 @@
 <template>
-  <div class="flex items-center">
-    <AppTooltip :text="helpCommunityAriaLabel" :disabled="isMenuOpen">
-      <UPopover
-        v-model:open="isMenuOpen"
-        :content="{ align: 'center', side: 'bottom', sideOffset: 10 }"
-      >
-        <UButton
-          :id="buttonId"
-          color="neutral"
-          variant="ghost"
-          size="md"
-          icon="i-mdi-help-circle-outline"
-          :aria-label="helpCommunityAriaLabel"
-          :class="buttonToneClass"
-          class="h-8 min-w-8 justify-center px-2 sm:px-2.5"
-          trailing-icon="i-mdi-chevron-down"
-          :ui="{ trailingIcon: 'hidden size-3.5 sm:inline-flex' }"
-        >
-          <span class="hidden text-[13px] leading-none font-medium md:inline">
-            {{ helpButtonLabel }}
-          </span>
-        </UButton>
-        <template #content>
-          <div class="w-[min(19rem,calc(100vw-1.5rem))] space-y-3 p-3">
-            <div class="space-y-1">
-              <div class="text-surface-50 text-sm font-semibold">
-                {{ launcherTitle }}
-              </div>
-              <p class="text-surface-400 text-[11px] leading-5">
-                {{ launcherSummary }}
-              </p>
+  <div :class="showTrigger ? 'flex items-center' : 'contents'">
+    <UPopover
+      v-model:open="isMenuOpen"
+      :reference="showTrigger ? undefined : reference"
+      :content="helpPopoverContent"
+    >
+      <template v-if="showTrigger" #default>
+        <AppTooltip :text="helpCommunityAriaLabel" :disabled="isMenuOpen">
+          <UButton
+            :id="buttonId"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-circle-help"
+            :aria-label="helpCommunityAriaLabel"
+            :class="buttonToneClass"
+            class="size-10 justify-center"
+          />
+        </AppTooltip>
+      </template>
+      <template #content>
+        <div class="w-[min(19rem,calc(100vw-1.5rem))] space-y-3 p-3">
+          <div class="space-y-1">
+            <div class="text-surface-50 text-sm font-semibold">
+              {{ launcherTitle }}
             </div>
-            <div class="space-y-2">
-              <button
-                type="button"
-                class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-55"
-                :disabled="!currentPageHelpKey"
-                @click="openPageGuide"
-              >
-                <span
-                  class="bg-primary-500/12 border-primary-500/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
-                >
-                  <UIcon name="i-mdi-crosshairs-question" class="text-primary-300 h-4 w-4" />
-                </span>
-                <span class="min-w-0 flex-1">
-                  <span class="text-surface-50 block text-sm font-semibold">
-                    {{ pageGuideLabel }}
-                  </span>
-                  <span class="text-surface-300 line-clamp-2 block text-xs leading-5">
-                    {{ pageGuideDescription }}
-                  </span>
-                </span>
-                <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-4 w-4 shrink-0" />
-              </button>
-              <button
-                type="button"
-                class="border-surface-700/70 bg-surface-950/55 hover:border-info-500/35 hover:bg-surface-800 focus-visible:ring-info-500/50 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition focus-visible:ring-2 focus-visible:outline-none"
-                @click="openOnboarding"
-              >
-                <span
-                  class="bg-info-500/12 border-info-500/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
-                >
-                  <UIcon name="i-mdi-map-marker-path" class="text-info-300 h-4 w-4" />
-                </span>
-                <span class="min-w-0 flex-1">
-                  <span class="text-surface-50 block text-sm font-semibold">
-                    {{ onboardingLabel }}
-                  </span>
-                  <span class="text-surface-300 line-clamp-2 block text-xs leading-5">
-                    {{ onboardingDescription }}
-                  </span>
-                </span>
-                <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-4 w-4 shrink-0" />
-              </button>
-            </div>
-            <div class="space-y-1.5">
-              <button
-                type="button"
-                class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:outline-none"
-                @click="openKeyboardShortcuts"
-              >
-                <span
-                  class="bg-surface-700/40 border-surface-600/60 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border"
-                >
-                  <UIcon name="i-mdi-keyboard-outline" class="text-surface-200 h-3.5 w-3.5" />
-                </span>
-                <span class="text-surface-100 min-w-0 flex-1 text-sm font-medium">
-                  {{ keyboardShortcutsLabel }}
-                </span>
-                <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-3.5 w-3.5 shrink-0" />
-              </button>
-              <a
-                href="https://github.com/tarkovtracker-org/TarkovTracker/issues/new"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:outline-none"
-                :aria-label="reportProblemLabel"
-                @click="closeMenuOnly"
-              >
-                <span
-                  class="bg-surface-700/40 border-surface-600/60 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border"
-                >
-                  <UIcon name="i-mdi-bug-outline" class="text-surface-200 h-3.5 w-3.5" />
-                </span>
-                <span class="text-surface-100 min-w-0 flex-1 text-sm font-medium">
-                  {{ reportProblemLabel }}
-                </span>
-                <UIcon name="i-mdi-open-in-new" class="text-surface-500 h-3.5 w-3.5 shrink-0" />
-              </a>
-            </div>
+            <p class="text-surface-400 text-[11px] leading-5">
+              {{ launcherSummary }}
+            </p>
           </div>
-        </template>
-      </UPopover>
-    </AppTooltip>
+          <div class="space-y-2">
+            <button
+              type="button"
+              class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-55"
+              :disabled="!currentPageHelpKey"
+              @click="openPageGuide"
+            >
+              <span
+                class="bg-primary-500/12 border-primary-500/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
+              >
+                <UIcon name="i-mdi-crosshairs-question" class="text-primary-300 h-4 w-4" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="text-surface-50 block text-sm font-semibold">
+                  {{ pageGuideLabel }}
+                </span>
+                <span class="text-surface-300 line-clamp-2 block text-xs leading-5">
+                  {{ pageGuideDescription }}
+                </span>
+              </span>
+              <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-4 w-4 shrink-0" />
+            </button>
+            <button
+              type="button"
+              class="border-surface-700/70 bg-surface-950/55 hover:border-info-500/35 hover:bg-surface-800 focus-visible:ring-info-500/50 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition focus-visible:ring-2 focus-visible:outline-none"
+              @click="openOnboarding"
+            >
+              <span
+                class="bg-info-500/12 border-info-500/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border"
+              >
+                <UIcon name="i-mdi-map-marker-path" class="text-info-300 h-4 w-4" />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="text-surface-50 block text-sm font-semibold">
+                  {{ onboardingLabel }}
+                </span>
+                <span class="text-surface-300 line-clamp-2 block text-xs leading-5">
+                  {{ onboardingDescription }}
+                </span>
+              </span>
+              <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-4 w-4 shrink-0" />
+            </button>
+          </div>
+          <div class="space-y-1.5">
+            <button
+              type="button"
+              class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:outline-none"
+              @click="openKeyboardShortcuts"
+            >
+              <span
+                class="bg-surface-700/40 border-surface-600/60 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border"
+              >
+                <UIcon name="i-mdi-keyboard-outline" class="text-surface-200 h-3.5 w-3.5" />
+              </span>
+              <span class="text-surface-100 min-w-0 flex-1 text-sm font-medium">
+                {{ keyboardShortcutsLabel }}
+              </span>
+              <UIcon name="i-mdi-chevron-right" class="text-surface-500 h-3.5 w-3.5 shrink-0" />
+            </button>
+            <a
+              href="https://github.com/tarkovtracker-org/TarkovTracker/issues/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="border-surface-700/70 bg-surface-950/55 hover:border-primary-500/35 hover:bg-surface-800 focus-visible:ring-primary-500/50 flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition focus-visible:ring-2 focus-visible:outline-none"
+              :aria-label="reportProblemLabel"
+              @click="closeMenuOnly"
+            >
+              <span
+                class="bg-surface-700/40 border-surface-600/60 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border"
+              >
+                <UIcon name="i-mdi-bug-outline" class="text-surface-200 h-3.5 w-3.5" />
+              </span>
+              <span class="text-surface-100 min-w-0 flex-1 text-sm font-medium">
+                {{ reportProblemLabel }}
+              </span>
+              <UIcon name="i-mdi-open-in-new" class="text-surface-500 h-3.5 w-3.5 shrink-0" />
+            </a>
+          </div>
+        </div>
+      </template>
+    </UPopover>
     <UModal
       v-model:open="isOnboardingOpen"
       :ui="{ content: 'bg-transparent border-0 p-0 shadow-none ring-0 outline-none' }"
@@ -255,7 +251,11 @@
     hideout: usePageHelpState('hideout'),
   };
   const buttonId = `global-help-button-${useId()}`;
-  const isMenuOpen = ref(false);
+  const props = withDefaults(defineProps<{ showTrigger?: boolean; reference?: HTMLElement }>(), {
+    showTrigger: true,
+    reference: undefined,
+  });
+  const isMenuOpen = defineModel<boolean>('open', { default: false });
   const isOnboardingOpen = ref(false);
   const onboardingStepIndex = ref(0);
   const restoreFocusOnOnboardingClose = ref(true);
@@ -273,8 +273,14 @@
     });
   };
   const focusHelpButton = () => {
-    document.getElementById(buttonId)?.focus({ preventScroll: true });
+    const trigger = props.showTrigger
+      ? document.getElementById(buttonId)
+      : props.reference?.querySelector('button');
+    trigger?.focus({ preventScroll: true });
   };
+  function focusOverflowAnchor() {
+    if (!props.showTrigger) focusHelpButton();
+  }
   const currentPageHelpKey = computed(() => resolvePageHelpKey(route.path));
   const currentPageGuide = computed<PageHelpContent | null>(() => {
     if (!currentPageHelpKey.value) return null;
@@ -285,7 +291,6 @@
     return pageHelpStates[currentPageHelpKey.value].isOpen.value;
   });
   const isLoggedIn = computed(() => $supabase.user?.loggedIn ?? false);
-  const helpButtonLabel = computed(() => t('page_help.button'));
   const helpCommunityAriaLabel = computed(() =>
     copy('app_bar.help_community_aria', 'Help & onboarding')
   );
@@ -298,6 +303,12 @@
   const nextLabel = computed(() => t('common.next'));
   const finishLabel = computed(() => t('common.finish'));
   const launcherTitle = computed(() => copy('page_help.launcher.title', 'Help and onboarding'));
+  const helpPopoverContent = computed(() => ({
+    align: 'end' as const,
+    sideOffset: 8,
+    'aria-label': launcherTitle.value,
+    onEscapeKeyDown: focusOverflowAnchor,
+  }));
   const launcherSummary = computed(() =>
     copy(
       'page_help.launcher.summary',
@@ -490,6 +501,7 @@
   };
   const closeMenuOnly = () => {
     isMenuOpen.value = false;
+    focusOverflowAnchor();
   };
   const closeOnboarding = (restoreFocus = true) => {
     restoreFocusOnOnboardingClose.value = restoreFocus;
