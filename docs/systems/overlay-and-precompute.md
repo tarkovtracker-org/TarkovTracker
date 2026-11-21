@@ -349,9 +349,10 @@ failure may serve that last-good copy with `X-Cache-Status: STALE`. Without an
 eligible copy, a missing entry or body returns 503. A stale fallback keeps the UI
 available and cannot pass release verification.
 
-Direct Pages GET requests for strings, item summaries, and full items can stream
-the original gzip bytes when the client accepts gzip and the active release
-matches a fully validated Cache API copy. KV reads and stale fallbacks still use bounded decompression.
+Direct Pages GET requests for strings, item summaries, full items, task objectives,
+and task summaries can stream the original gzip bytes when the client accepts
+gzip and the active release matches a fully validated Cache API copy. KV reads
+and stale fallbacks still use bounded decompression.
 
 The producer and reader share per-dataset uncompressed size limits from
 `catalogDatasets.ts`. The reader checks the declared length, opens the

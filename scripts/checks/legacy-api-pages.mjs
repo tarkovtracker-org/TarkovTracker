@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
+import { fileURLToPath } from 'node:url';
 import { createTestHarness } from 'wrangler';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const tarkovRoutes = readdirSync(new URL('../../app/server/api/tarkov/', import.meta.url), {
@@ -325,7 +325,13 @@ async function waitForLastGoodCatalog(url) {
   assert.equal(response.headers.get('X-Cache-Status'), 'STALE');
   return response;
 }
-for (const route of ['strings?lang=de', 'items-lite?gameMode=regular', 'items?gameMode=pve']) {
+for (const route of [
+  'strings?lang=de',
+  'items-lite?gameMode=regular',
+  'items?gameMode=pve',
+  'tasks-objectives?gameMode=pve',
+  'tasks-core?gameMode=pve',
+]) {
   test(`compiled warm ${route} sends one gzip encoding without changing its release or bytes`, async () => {
     const url = `https://tarkovtracker.org/api/tarkov/${route}`;
     const identity = await harness.fetch(url, {

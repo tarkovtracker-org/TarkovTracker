@@ -58,6 +58,8 @@ describe('warm gzip catalog responses', () => {
     ['strings', 'en'],
     ['items-lite', 'regular'],
     ['items', 'regular'],
+    ['tasks-objectives', 'regular'],
+    ['tasks-core', 'regular'],
   ] as const)(
     'reuses the verified gzip body and strips the internal marker for %s',
     async (dataset, variant) => {
