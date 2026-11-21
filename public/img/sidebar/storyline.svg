@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <mask id="details">
+    <path fill="#fff" d="M0 0h24v24H0z"/>
+    <path fill="#000" d="M5 8h3v1H5zm0 3h4v1H5zm11-3h3v1h-3zm-1 3h4v1h-4z"/>
+  </mask>
+  <g mask="url(#details)">
+    <path fill="#a4a297" d="M3 5h6l2 2v13l-3-2H2V7zm18 0h-6l-2 2v13l3-2h6V7z"/>
+    <path fill="#d7d5c9" d="M3 4h5l3 2v12l-3-2H3zm18 0h-5l-3 2v12l3-2h5z"/>
+    <path fill="#7c7b70" d="M3 17h5l3 2v1l-3-2H3zm18 0h-5l-3 2v1l3-2h5z"/>
+  </g>
+</svg>

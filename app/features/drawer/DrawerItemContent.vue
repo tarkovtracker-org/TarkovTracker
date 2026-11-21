@@ -15,6 +15,7 @@
   >
     <DrawerItemIcon
       :icon="props.icon"
+      :icon-src="props.iconSrc"
       :avatar="props.avatar"
       :color-class="props.colorClass"
       :has-margin="props.hasMargin"
@@ -40,6 +41,7 @@
   >
     <DrawerItemIcon
       :icon="props.icon"
+      :icon-src="props.iconSrc"
       :avatar="props.avatar"
       :color-class="props.colorClass"
       :has-margin="props.hasMargin"
@@ -59,6 +61,7 @@
   >
     <DrawerItemIcon
       :icon="props.icon"
+      :icon-src="props.iconSrc"
       :avatar="props.avatar"
       :color-class="props.colorClass"
       :has-margin="props.hasMargin"
@@ -75,6 +78,7 @@
     disabled?: boolean;
     isCollapsed: boolean;
     icon?: string;
+    iconSrc?: string;
     avatar?: string | null;
     colorClass?: string;
     labelText?: string;
