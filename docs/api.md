@@ -21,7 +21,10 @@ whether a candidate account or private mode exists. Owners can still view their 
 
 ### Profile links
 
-Players can claim a permanent handle in **Settings → Account → Profile Sharing**.
+Players can claim or change a handle in **Settings → Account → Profile Sharing**.
+The first change is available immediately. Further changes have a 30-day cooldown.
+A rename immediately frees the old handle for others to claim. Old links stop
+resolving to the previous owner and may later resolve to a new owner.
 The short `/@<handle>` link chooses public PvP, then public PvE, then the public
 active Seasonal profile. Use `/@<handle>/<mode>` to link to a specific mode.
 Existing `/profile/<uuid>/<mode>` links keep their current access rules. Claims

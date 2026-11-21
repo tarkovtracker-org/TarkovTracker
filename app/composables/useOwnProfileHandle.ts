@@ -39,22 +39,31 @@ export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
     },
     { immediate: true }
   );
-  const claim = async (value: string) => {
+  const save = async (value: string) => {
     const id = userId.value;
     if (!id || !isProfileHandle(value)) return 'invalid';
-    // RLS rejects the claim if the active session changed accounts.
-    const { error } = await $supabase.client
-      .from('profile_handles')
-      .insert({ handle: value, user_id: id });
+    const previous = handle.value;
+    if (value === previous) return 'saved';
+    const handles = $supabase.client.from('profile_handles');
+    const { data, error } = previous
+      ? await handles
+          .update({ handle: value })
+          .eq('user_id', id)
+          .eq('handle', previous)
+          .select('handle')
+          .maybeSingle()
+      : await handles.insert({ handle: value, user_id: id });
     if (userId.value !== id) return 'invalid';
     if (error?.code === '23505') return 'taken';
     if (error?.code === '23514') return 'invalid';
-    if (error) return 'failed';
+    if (error?.code === 'PT429') return 'cooldown';
+    if (previous && !error && !data) loadVersion.value += 1;
+    if (error || (previous && data?.handle !== value)) return 'failed';
     record.value = { userId: id, handle: value };
     return 'saved';
   };
   const retry = () => {
     loadVersion.value += 1;
   };
-  return { handle, loading, failed, claim, retry };
+  return { handle, loading, failed, save, retry };
 };

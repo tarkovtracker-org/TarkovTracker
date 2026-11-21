@@ -5,9 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import ProfileHandleSettings from '@/features/settings/ProfileHandleSettings.vue';
 import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
-const { maybeSingle, insert, copyToClipboard } = vi.hoisted(() => ({
+const { maybeSingle, insert, update, copyToClipboard } = vi.hoisted(() => ({
   maybeSingle: vi.fn(),
   insert: vi.fn(),
+  update: vi.fn(),
   copyToClipboard: vi.fn(),
 }));
 const user = reactive({ id: 'account-one', loggedIn: true });
@@ -18,6 +19,7 @@ mockNuxtImport('useNuxtApp', () => () => ({
     client: {
       from: (table: string) => ({
         insert,
+        update,
         select: () => ({
           eq: () => {
             if (table === 'user_game_mode_progress') {
@@ -66,6 +68,7 @@ describe('profile handle settings', () => {
     preferences.getStreamerMode = false;
     maybeSingle.mockReset().mockResolvedValue({ data: null, error: null });
     insert.mockReset().mockResolvedValue({ error: null });
+    update.mockReset();
     copyToClipboard.mockClear();
   });
   it('suggests a PMC name and only publishes its URL after a mode becomes public', async () => {
@@ -112,6 +115,56 @@ describe('profile handle settings', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('settings.profile_sharing.handle_invalid');
     expect(insert).not.toHaveBeenCalled();
+  });
+  it.each([
+    [null, ''],
+    ['PT429', 'handle_cooldown'],
+    ['23505', 'handle_taken'],
+    ['23514', 'handle_invalid'],
+    ['stale', 'handle_failed'],
+  ])('changes the current handle or preserves it if saving returns %s', async (code, message) => {
+    maybeSingle.mockResolvedValueOnce({ data: { handle: 'rat_one' }, error: null });
+    if (code === 'stale') {
+      maybeSingle.mockResolvedValueOnce({ data: { handle: 'rat_fresh' }, error: null });
+    }
+    const matchesHandle = vi.fn().mockReturnValue({
+      select: () => ({
+        maybeSingle: async () =>
+          code && code !== 'stale'
+            ? { error: { code } }
+            : { data: code === 'stale' ? null : { handle: 'rat_two' }, error: null },
+      }),
+    });
+    const matchesOwner = vi.fn().mockReturnValue({ eq: matchesHandle });
+    update.mockReturnValue({ eq: matchesOwner });
+    const wrapper = createWrapper();
+    await wrapper.setProps({ hasPublicMode: true });
+    await flushPromises();
+    const editButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().endsWith('handle_change'))!;
+    await editButton.trigger('click');
+    expect(wrapper.get('input').element.value).toBe('rat_one');
+    await wrapper.get('input').setValue('RAT_TWO');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(insert).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith({ handle: 'rat_two' });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(matchesOwner).toHaveBeenCalledWith('user_id', 'account-one');
+    expect(matchesHandle).toHaveBeenCalledWith('handle', 'rat_one');
+    if (message) {
+      expect(wrapper.text()).toContain(`settings.profile_sharing.${message}`);
+      expect(wrapper.get('input').element.value).toBe('RAT_TWO');
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'common.cancel')!
+        .trigger('click');
+    }
+    expect(wrapper.find('form').exists()).toBe(false);
+    expect(new URL(wrapper.get('a').attributes('href')!).pathname).toBe(
+      code === 'stale' ? '/@rat_fresh' : code ? '/@rat_one' : '/@rat_two'
+    );
   });
   it('retries a failed read and reloads the claim when the account changes', async () => {
     maybeSingle
