@@ -580,6 +580,16 @@ describe('AppBar responsive layout', () => {
     expect(wrapper.get('[data-menu-item="Chad"]').attributes('data-to')).toBe('/supporter');
     wrapper.unmount();
   });
+  it('groups the cloud save indicator with the utilities after search', async () => {
+    const wrapper = await mountAppBar();
+    const search = wrapper.get('[data-testid="app-search"]').element;
+    const status = wrapper.get('progress-save-status-indicator-stub').element;
+    const more = wrapper.get('button[aria-label="common.more"]').element;
+    expect(search.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(status.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(status.parentElement?.contains(more)).toBe(true);
+    wrapper.unmount();
+  });
   it('renders the inline app search with the configured shortcut', async () => {
     const wrapper = await mountAppBar();
     const search = wrapper.find('[data-testid="app-search"]');
