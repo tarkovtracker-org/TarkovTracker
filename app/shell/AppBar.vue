@@ -44,7 +44,7 @@
         <UPopover
           v-model:open="activityOpen"
           :reference="activityAnchor"
-          :content="{ align: 'end', sideOffset: 8, onEscapeKeyDown: focusActivityAnchor }"
+          :content="activityPopoverContent"
         >
           <template v-if="showActivity" #default>
             <AppTooltip :text="t('common.activity_log')">
@@ -216,6 +216,12 @@
   const showThemeAndHelp = computed(() => barWidth.value >= 1280);
   const showLocale = computed(() => barWidth.value >= 1620);
   const activityOpen = ref(false);
+  const activityPopoverContent = computed(() => ({
+    align: 'end' as const,
+    sideOffset: 8,
+    'aria-label': t('common.activity_log'),
+    onEscapeKeyDown: focusActivityAnchor,
+  }));
   const activityAnchor = computed(() =>
     showActivity.value ? undefined : (overflowAnchor.value ?? undefined)
   );

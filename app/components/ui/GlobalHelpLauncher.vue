@@ -3,7 +3,7 @@
     <UPopover
       v-model:open="isMenuOpen"
       :reference="showTrigger ? undefined : reference"
-      :content="{ align: 'end', sideOffset: 8, onEscapeKeyDown: focusOverflowAnchor }"
+      :content="helpPopoverContent"
     >
       <template v-if="showTrigger" #default>
         <AppTooltip :text="helpCommunityAriaLabel" :disabled="isMenuOpen">
@@ -303,6 +303,12 @@
   const nextLabel = computed(() => t('common.next'));
   const finishLabel = computed(() => t('common.finish'));
   const launcherTitle = computed(() => copy('page_help.launcher.title', 'Help and onboarding'));
+  const helpPopoverContent = computed(() => ({
+    align: 'end' as const,
+    sideOffset: 8,
+    'aria-label': launcherTitle.value,
+    onEscapeKeyDown: focusOverflowAnchor,
+  }));
   const launcherSummary = computed(() =>
     copy(
       'page_help.launcher.summary',
@@ -495,6 +501,7 @@
   };
   const closeMenuOnly = () => {
     isMenuOpen.value = false;
+    focusOverflowAnchor();
   };
   const closeOnboarding = (restoreFocus = true) => {
     restoreFocusOnOnboardingClose.value = restoreFocus;

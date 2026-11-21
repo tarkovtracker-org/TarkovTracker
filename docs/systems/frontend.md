@@ -20,8 +20,9 @@ await against context invalidation.
 ## App bar
 
 `app/shell/AppBar.vue` centers the search in the space between the sidebar and a right gutter.
-The gutter grows with the app area up to the current sidebar width. Search grows with the available
-space and opens across the bar on narrow screens. Activity, theme, help, and language move between
+On wide layouts the gutter grows with the app area up to the current sidebar width. Compact
+layouts use 12 px of edge padding at app bar widths below 760 px and 8 px below 560 px. Search grows
+with the available space and opens across the bar on narrow screens. Activity, theme, help, and language move between
 direct controls and More as space changes. Discord and GitHub are in More at every width.
 App bar dropdowns are non-modal so opening the account or utility menus leaves page scrolling intact.
 
