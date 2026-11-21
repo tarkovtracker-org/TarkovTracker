@@ -1356,20 +1356,82 @@ test('successful publication records exact receipt while final refreshed finding
     assert.equal(changed.statuses.at(-1).state, 'failure');
   });
 });
-test('publisher cannot turn failed/missing evidence upload into success', async () => {
+test('publisher waits for the exact uploaded receipt to appear', async () => {
   await withReceiptDirectory(async () => {
     const f = publishingFixture();
     await evaluateAdmission({ github: f.github, context: f.context, number: 1, source: base });
     f.context.payload = { pull_request: { number: 1 } };
-    f.f.artifacts = [];
     f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
-    await assert.rejects(
-      publishReviewAdmission({ github: f.github, context: f.context, sha: head })
+    const unrelated = { name: `review-admission-${queued}`, expired: false };
+    const receipt = { name: `review-admission-${head}`, expired: false };
+    const delays = [];
+    let reads = 0;
+    const paginate = f.github.paginate;
+    f.github.paginate = async (endpoint, params) => {
+      if (endpoint !== 'artifacts') return paginate(endpoint, params);
+      assert.equal(params.run_id, Number(f.context.runId));
+      return ++reads === 1 ? [unrelated] : [unrelated, receipt];
+    };
+    await publishReviewAdmission({
+      github: f.github,
+      context: f.context,
+      sha: head,
+      wait: async (delay) => delays.push(delay),
+    });
+    assert.deepEqual(delays, [1000]);
+    assert.equal(reads, 2);
+    assert.deepEqual(
+      f.statuses.map(({ state }) => state),
+      ['pending', 'success']
     );
-    assert.equal(f.statuses.at(-1).state, 'failure');
-    assert.ok(!f.statuses.some((status) => status.state === 'success'));
   });
 });
+const publishedArtifact = { name: `review-admission-${head}`, expired: false };
+for (const { kind, artifacts, delays, error } of [
+  {
+    kind: 'missing',
+    artifacts: [],
+    delays: [1000, 2000, 4000, 8000],
+    error: /missing or ambiguous/,
+  },
+  {
+    kind: 'duplicate',
+    artifacts: [publishedArtifact, publishedArtifact],
+    delays: [],
+    error: /missing or ambiguous/,
+  },
+  {
+    kind: 'expired',
+    artifacts: [{ ...publishedArtifact, expired: true }],
+    delays: [],
+    error: /expired/,
+  },
+]) {
+  test(`publisher fails closed when the uploaded receipt is ${kind}`, async () => {
+    await withReceiptDirectory(async () => {
+      const f = publishingFixture();
+      await evaluateAdmission({ github: f.github, context: f.context, number: 1, source: base });
+      f.context.payload = { pull_request: { number: 1 } };
+      f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+      f.f.artifacts = artifacts;
+      const waits = [];
+      await assert.rejects(
+        publishReviewAdmission({
+          github: f.github,
+          context: f.context,
+          sha: head,
+          wait: async (delay) => waits.push(delay),
+        }),
+        error
+      );
+      assert.deepEqual(waits, delays);
+      assert.deepEqual(
+        f.statuses.map(({ state }) => state),
+        ['pending', 'failure']
+      );
+    });
+  });
+}
 function promotionPublishingFixture(kind) {
   const f = publishingFixture();
   f.f.pr.user = { id: 41898282, type: 'Bot' };

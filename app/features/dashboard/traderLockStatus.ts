@@ -13,7 +13,9 @@ type LockTask = Pick<Task, 'id' | 'name' | 'trader' | 'finishRewards' | 'otherRe
 type LockChapter = TraderUnlockChapter;
 export type LockTrader = Pick<Trader, 'id' | 'normalizedName'>;
 export type TraderUnlockRequirement =
-  | { kind: 'task'; task: { id: string; name: string } | null }
+  | { kind: 'pending' }
+  | { kind: 'unknown' }
+  | { kind: 'task'; task: { id: string; name: string } }
   | {
       kind: 'story';
       chapter: { id: string; name: string };
@@ -21,6 +23,7 @@ export type TraderUnlockRequirement =
     };
 export interface TraderLockStatusDeps {
   tasks: LockTask[] | null | undefined;
+  taskUnlockDataReady?: boolean;
   isTaskComplete: (taskId: string) => boolean;
   gameMode?: GameMode;
   storyChapters?: readonly LockChapter[] | null;
@@ -52,8 +55,9 @@ const taskRequirement = (
   const configured = configuredUnlockTaskIds(trader, deps);
   if (hasCompletedUnlockTask(trader, deps)) return null;
   const [first] = unlockTasksFor(trader, deps, configured);
-  if (!first) return configured.length ? { kind: 'task', task: null } : null;
-  return { kind: 'task', task: { id: first.id, name: first.name ?? '' } };
+  if (first) return { kind: 'task', task: { id: first.id, name: first.name ?? '' } };
+  if (!configured.length) return null;
+  return { kind: deps.taskUnlockDataReady === false ? 'pending' : 'unknown' };
 };
 const unlockChaptersFor = (trader: LockTrader, deps: TraderLockStatusDeps) =>
   new Map(

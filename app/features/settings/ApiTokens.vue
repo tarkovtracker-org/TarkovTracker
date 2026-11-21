@@ -206,7 +206,14 @@
                 item: 'rounded-lg border border-surface-700 bg-surface-800/50 px-3 py-3 data-[state=checked]:border-primary-500 data-[state=checked]:bg-primary-500/10',
                 label: 'text-sm font-medium text-white light:text-surface-50',
               }"
-            />
+            >
+              <template #label="{ item }">
+                <span class="inline-flex items-center gap-1">
+                  <GameModeBadge :mode="item.value" class="-my-2" />
+                  {{ item.label }}
+                </span>
+              </template>
+            </URadioGroup>
           </UFormField>
           <div class="space-y-2">
             <p class="text-surface-200 text-sm font-semibold">
@@ -292,6 +299,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
   import ApiTokenNameEditor from '@/features/settings/ApiTokenNameEditor.vue';

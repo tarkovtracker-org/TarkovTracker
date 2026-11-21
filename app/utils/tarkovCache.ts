@@ -14,7 +14,7 @@ import { perfEnabled, perfEnd, perfStart } from './perf';
 // Cache configuration
 export const CACHE_CONFIG = {
   DB_NAME: 'tarkov-tracker-cache',
-  DB_VERSION: 8,
+  DB_VERSION: 9,
   STORE_NAME: 'tarkov-data',
   // 12 hours in milliseconds
   DEFAULT_TTL: 12 * 60 * 60 * 1000,
@@ -23,6 +23,7 @@ export const CACHE_CONFIG = {
 } as const;
 const DB_OPEN_BLOCKED_TIMEOUT_MS = 3000;
 export type CacheType =
+  | 'strings'
   | 'bootstrap'
   | 'tasks-core'
   | 'tasks-objectives'
@@ -330,7 +331,7 @@ export async function getCachedData<T>(
 ): Promise<T | null> {
   try {
     const cacheKey = generateCacheKey(type, gameMode, lang);
-    return executeDatabaseTransaction<CachedData<T> | undefined>(
+    return await executeDatabaseTransaction<CachedData<T> | undefined>(
       'readonly',
       (store) => store.get(cacheKey),
       `get ${type}`
@@ -367,8 +368,10 @@ export async function setCachedData<T>(
   gameMode: string,
   lang: string,
   data: T,
-  ttl: number = CACHE_CONFIG.DEFAULT_TTL
+  ttl: number = CACHE_CONFIG.DEFAULT_TTL,
+  isCurrent: () => boolean = () => true
 ): Promise<void> {
+  if (!isCurrent()) return;
   try {
     const cacheKey = generateCacheKey(type, gameMode, lang);
     // Compute accurate byte size only when perf logging is enabled
@@ -387,12 +390,16 @@ export async function setCachedData<T>(
       version: CACHE_CONFIG.DB_VERSION,
       sizeBytes,
     };
+    let stored = false;
     await executeDatabaseTransaction<undefined>(
       'readwrite',
-      (store) => store.put(cacheEntry),
+      (store) => {
+        stored = isCurrent();
+        return stored ? store.put(cacheEntry) : store.getKey(cacheKey);
+      },
       `set ${type}`
     );
-    logger.debug(`[TarkovCache] Cache STORED: ${cacheKey}`);
+    if (stored) logger.debug(`[TarkovCache] Cache STORED: ${cacheKey}`);
   } catch (error) {
     logger.error('[TarkovCache] Error storing cached data:', error);
     throw error;

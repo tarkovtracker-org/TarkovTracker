@@ -61,7 +61,7 @@
                 :class="pvpToggleClass"
                 @click="selectedMode = GAME_MODES.PVP"
               >
-                <UIcon name="i-mdi-sword-cross" class="h-3.5 w-3.5 shrink-0" />
+                <GameModeBadge :mode="GAME_MODES.PVP" class="-my-1" />
                 <span class="leading-none">{{ t('common.pvp', 'PvP') }}</span>
               </button>
               <button
@@ -71,7 +71,7 @@
                 :class="pveToggleClass"
                 @click="selectedMode = GAME_MODES.PVE"
               >
-                <UIcon name="i-mdi-account-group" class="h-3.5 w-3.5 shrink-0" />
+                <GameModeBadge :mode="GAME_MODES.PVE" class="-my-1" />
                 <span class="leading-none">{{ t('common.pve', 'PvE') }}</span>
               </button>
               <button
@@ -81,7 +81,7 @@
                 :class="seasonalToggleClass"
                 @click="selectedMode = GAME_MODES.SEASONAL"
               >
-                <UIcon name="i-mdi-calendar-star" class="h-3.5 w-3.5 shrink-0" />
+                <GameModeBadge :mode="GAME_MODES.SEASONAL" class="-my-1" />
                 <span class="leading-none">
                   {{ t('profile.season_short', { season: ACTIVE_SEASON_NUMBER }, 'S{season}') }}
                 </span>
@@ -240,6 +240,7 @@
 </template>
 <script setup lang="ts">
   import { computeInvalidProgress } from '@tarkovtracker/progress-contracts/progressInvalidation';
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import { useProfileTaskMetadata } from '@/composables/useProfileTaskMetadata';
   import {
     computeConfidence,

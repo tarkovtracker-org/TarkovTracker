@@ -1,4 +1,6 @@
-import { assertEquals } from 'jsr:@std/assert';
+import { assertEquals } from 'jsr:@std/assert@1.0.19';
+import { LOCALE_TO_API_MAPPING } from '../../../app/utils/constants.ts';
+import { SUPPORTED_LOCALES } from '../../../app/utils/locales.ts';
 import { buildTarkovCacheUrls } from './cache-targets.ts';
 const languages = [
   'cs',
@@ -29,36 +31,39 @@ Deno.test('purges the public extract requirements URL once for each cache origin
   );
   assertEquals(buildTarkovCacheUrls([]), []);
 });
-Deno.test('current non-task purge targets match live handler key scopes', async () => {
-  const urls = buildTarkovCacheUrls(origins);
-  const targets = new Set(urls);
-  assertEquals(targets.size, urls.length);
-  for (const route of ['bootstrap', 'hideout', 'items', 'items-lite', 'map-spawns', 'prestige']) {
-    const source = await Deno.readTextFile(
-      new URL(`../../../app/server/api/tarkov/${route}.get.ts`, import.meta.url)
+Deno.test(
+  'purges all neutral catalog scopes for both origins and selectable languages',
+  async () => {
+    const routeDirectory = new URL('../../../app/server/api/tarkov/', import.meta.url);
+    const datasets: string[] = [];
+    for await (const entry of Deno.readDir(routeDirectory)) {
+      if (!entry.name.endsWith('.get.ts')) continue;
+      const source = await Deno.readTextFile(new URL(entry.name, routeDirectory));
+      const dataset = source.match(/catalogHandler\('([^']+)'\)/)?.[1];
+      if (dataset && dataset !== 'strings') datasets.push(dataset);
+    }
+    const catalogLanguages = [
+      ...new Set(SUPPORTED_LOCALES.map((locale) => LOCALE_TO_API_MAPPING[locale] ?? locale)),
+    ];
+    assertEquals(datasets.length, 10);
+    assertEquals(catalogLanguages.length, 13);
+    const expected = origins.flatMap((origin) => [
+      ...datasets.flatMap((dataset) =>
+        modes.map((mode) => `${origin}/__neutral-catalog-v1/${dataset}/${mode}`)
+      ),
+      ...modes.map((mode) => `${origin}/__neutral-catalog-v1/tasks-objectives/${mode}/counts`),
+      ...catalogLanguages.map((lang) => `${origin}/__neutral-catalog-v1/strings/${lang}`),
+    ]);
+    const urls = buildTarkovCacheUrls(origins);
+    const neutral = urls.filter((url) =>
+      new URL(url).pathname.startsWith('/__neutral-catalog-v1/')
     );
-    const version = source.match(/const \w+_CACHE_VERSION = '([^']+)'/)?.[1];
-    const template = source.match(
-      /`((?:bootstrap|hideout|items|items-lite|map-spawns|prestige)-[^`]+)`/
-    )?.[1];
-    assertEquals(typeof template, 'string', `Missing cache key in ${route} handler`);
-    const keyTemplate = template!.replace(/\$\{\w+_CACHE_VERSION\}/, version ?? '');
-    const expected = new Set<string>();
-    for (const origin of origins)
-      for (const mode of modes)
-        for (const lang of languages) {
-          const key = keyTemplate.replace('${lang}', lang).replace('${gameMode}', mode);
-          expected.add(`${origin}/__edge-cache/tarkov/${key}`);
-          assertEquals(targets.has(`${origin}/__edge-cache/tarkov/${key}`), true, key);
-        }
-    const prefix = keyTemplate.split('${')[0];
-    const currentTargets = urls.filter((url) =>
-      origins.some((origin) => url.startsWith(`${origin}/__edge-cache/tarkov/${prefix}`))
-    );
-    assertEquals(currentTargets.sort(), [...expected].sort(), route);
+    assertEquals(neutral.sort(), expected.sort());
+    assertEquals(neutral.length, 92);
+    assertEquals(new Set(urls).size, urls.length);
   }
-});
-Deno.test('purges current and retired objective catalogs for every language and mode', () => {
+);
+Deno.test('retains historical objective catalogs for every language and mode', () => {
   const targets = new Set(buildTarkovCacheUrls(['https://tarkovtracker.org']));
   for (const lang of languages)
     for (const mode of modes) {
@@ -73,6 +78,29 @@ Deno.test('purges current and retired objective catalogs for every language and 
         );
       }
     }
+});
+Deno.test('preserves every retired versioned non-task purge target and its old scope', () => {
+  const all = buildTarkovCacheUrls(origins);
+  const keys = [
+    'bootstrap-json-v2',
+    'hideout-json-v5',
+    'items-json-v2',
+    'items-lite-json-v2',
+    'map-spawns-json-v1',
+    'prestige-json-v3',
+  ];
+  for (const key of keys) {
+    const prefixes = origins.map((origin) => `${origin}/__edge-cache/tarkov/${key}-`);
+    const expected = prefixes.flatMap((prefix) =>
+      modes.flatMap((mode) =>
+        key === 'bootstrap-json-v2'
+          ? [prefix + mode]
+          : languages.map((lang) => `${prefix}${lang}-${mode}`)
+      )
+    );
+    const found = all.filter((url) => prefixes.some((prefix) => url.startsWith(prefix)));
+    assertEquals(found.sort(), expected.sort(), key);
+  }
 });
 Deno.test('retains existing non-task targets and covers both authorized cache origins', () => {
   const targets = buildTarkovCacheUrls([
@@ -89,10 +117,9 @@ Deno.test('retains existing non-task targets and covers both authorized cache or
   );
   assertEquals(uniqueTargets.size, targets.length);
 });
-Deno.test('purges the exact current task-rewards scope and retains retired targets', () => {
+Deno.test('retains the exact historical task-rewards scopes', () => {
   const origins = ['https://tarkovtracker.org', 'https://www.tarkovtracker.org'];
   const targets = buildTarkovCacheUrls(origins);
-  // Matches tasks-rewards.get.ts: TASK_REWARDS_CACHE_VERSION = 'json-v2', lang and gameMode.
   const expected = origins.flatMap((origin) =>
     languages.flatMap((lang) =>
       modes.map((mode) => `${origin}/__edge-cache/tarkov/tasks-rewards-json-v2-${lang}-${mode}`)

@@ -53,7 +53,7 @@ describe('neutral catalog publication', () => {
     const build = builders();
     const manifest = await publishCatalogRelease(kv, build, 'sha');
     expect(Object.keys(manifest.entries)).toHaveLength(
-      3 * CATALOG_DATASETS.length + CATALOG_LANGUAGES.length
+      3 * (CATALOG_DATASETS.length + 1) + CATALOG_LANGUAGES.length
     );
     expect(build.buildNeutralCatalog.mock.calls).toEqual(
       ['regular', 'pve', 'pvp-season'].flatMap((mode) =>
@@ -73,6 +73,54 @@ describe('neutral catalog publication', () => {
     for (const { key, bytes } of Object.values(manifest.entries)) {
       expect(gunzipSync(staged.get(key)!).byteLength).toBe(bytes);
     }
+  });
+  it('publishes ordered comparison inputs without unrelated objective fields', async () => {
+    const kv = memoryStore();
+    const build = builders();
+    const tasks = [
+      { id: 'first', objectives: { a: { id: 'shared', count: 0, description: ref }, b: null } },
+      { id: 'second', objectives: [{ id: 'shared', count: 4 }, { id: 'unspecified' }] },
+    ];
+    const manifest = await publishCatalogRelease(
+      kv,
+      {
+        ...build,
+        buildNeutralCatalog: async (dataset, mode) => {
+          const payload = await build.buildNeutralCatalog(dataset, mode);
+          return dataset === 'tasks-objectives' ? { ...payload, data: { tasks } } : payload;
+        },
+      },
+      'sha'
+    );
+    const entry = manifest.entries['tasks-objectives/pve/counts']!;
+    expect(JSON.parse(gunzipSync(await kv.read(entry.key)).toString())).toEqual({
+      data: {
+        tasks: [
+          { id: 'first', objectives: [{ id: 'shared', count: 0 }] },
+          { id: 'second', objectives: [{ id: 'shared', count: 4 }, { id: 'unspecified' }] },
+        ],
+      },
+      dataOverlay: { sha256: 'sha', version: 'v1' },
+    });
+  });
+  it('rejects oversized uncompressed catalog data before any KV write', async () => {
+    const kv = memoryStore();
+    const build = builders();
+    const oversized = { ...data, playerLevels: Array.from({ length: 18000 }, (_, i) => i) };
+    await expect(
+      publishCatalogRelease(
+        kv,
+        {
+          ...build,
+          buildNeutralCatalog: async () => ({
+            data: oversized,
+            dataOverlay: { sha256: 'sha', version: 'v1' },
+          }),
+        },
+        'sha'
+      )
+    ).rejects.toThrow('Uncompressed catalog exceeds limit for bootstrap/regular');
+    expect(kv.put).not.toHaveBeenCalled();
   });
   it('preserves the prior release when a locale is incomplete', async () => {
     const kv = memoryStore();

@@ -20,6 +20,8 @@ vi.mock('h3', () => ({
   createError: (input: { statusCode?: number; message?: string }) =>
     Object.assign(new Error(input.message ?? 'error'), input),
   defineEventHandler: (handler: unknown) => handler,
+  getRequestURL: (event: { search?: string }) =>
+    new URL(`https://tarkovtracker.org/api/twitch/config${event.search ?? ''}`),
   setResponseHeaders: setResponseHeadersMock,
 }));
 vi.mock('@/server/utils/logger', () => ({
@@ -33,6 +35,7 @@ const loadHandler = async () => {
   ) => Promise<{ channel: string; displayName: string; enabled: boolean; version: number }>;
 };
 describe('/api/twitch/config', () => {
+  const noStore = { 'cache-control': 'no-store', 'cloudflare-cdn-cache-control': 'no-store' };
   beforeEach(() => {
     adminSupabaseFetchMock.mockReset();
     setResponseHeadersMock.mockReset();
@@ -110,7 +113,7 @@ describe('/api/twitch/config', () => {
       version: 0,
     });
     expect(adminSupabaseFetchMock).not.toHaveBeenCalled();
-    expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'cache-control': 'no-store' });
+    expect(setResponseHeadersMock).toHaveBeenCalledWith({}, noStore);
   });
   it('falls back to env defaults when the database read fails', async () => {
     adminSupabaseFetchMock.mockRejectedValue(new Error('network down'));
@@ -121,7 +124,15 @@ describe('/api/twitch/config', () => {
       enabled: true,
       version: 0,
     });
-    expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'cache-control': 'no-store' });
+    expect(setResponseHeadersMock).toHaveBeenCalledWith({}, noStore);
+  });
+  it('reads through to Supabase and prohibits caching the admin refresh', async () => {
+    adminSupabaseFetchMock.mockResolvedValue([{ value: { enabled: false }, version: 9 }]);
+    const handler = await loadHandler();
+    const event = { search: '?fresh=1' };
+    await expect(handler(event)).resolves.toMatchObject({ enabled: false, version: 9 });
+    expect(adminSupabaseFetchMock).toHaveBeenCalledOnce();
+    expect(setResponseHeadersMock).toHaveBeenCalledWith(event, noStore);
   });
   it('reads the database on each handler execution', async () => {
     adminSupabaseFetchMock
@@ -191,7 +202,7 @@ describe('/api/twitch/config', () => {
         version: 0,
       });
       expect(adminSupabaseFetchMock).not.toHaveBeenCalled();
-      expect(setResponseHeadersMock).toHaveBeenCalledWith({}, { 'cache-control': 'no-store' });
+      expect(setResponseHeadersMock).toHaveBeenCalledWith({}, noStore);
     }
   );
 });

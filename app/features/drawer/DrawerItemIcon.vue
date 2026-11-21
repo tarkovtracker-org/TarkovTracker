@@ -8,6 +8,14 @@
       width="24"
       height="24"
     />
+    <img
+      v-else-if="iconSrc"
+      :src="iconSrc"
+      alt=""
+      width="24"
+      height="24"
+      class="light:invert size-6 object-contain"
+    />
     <UIcon
       v-else-if="icon?.startsWith('i-')"
       :name="icon"
@@ -20,6 +28,7 @@
 <script setup lang="ts">
   const props = defineProps<{
     icon?: string;
+    iconSrc?: string;
     avatar?: string | null;
     avatarAlt?: string;
     colorClass?: string;

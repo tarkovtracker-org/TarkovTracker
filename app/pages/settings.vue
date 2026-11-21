@@ -69,7 +69,6 @@
               :aria-label="$t('settings.tabs.progression')"
             >
               <DisplayNameCard />
-              <PlayerLevelCard />
               <SkillsCard />
               <ResetProgressCard />
             </section>
@@ -91,8 +90,7 @@
               role="tabpanel"
               :aria-label="$t('common.preferences')"
             >
-              <AppearanceCard />
-              <GeneralPreferencesCard />
+              <AppPreferencesCard />
               <TaskDisplayCard />
               <MapSettingsCard />
               <div id="keybinds" class="scroll-mt-24">
@@ -171,14 +169,13 @@
   import PageHeader from '@/components/ui/PageHeader.vue';
   import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
   import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
+  import AppPreferencesCard from '@/features/settings/AppPreferencesCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
   import DeviceDataCard from '@/features/settings/DeviceDataCard.vue';
   import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
-  import GeneralPreferencesCard from '@/features/settings/GeneralPreferencesCard.vue';
   import KeybindsCard from '@/features/settings/KeybindsCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
-  import PlayerLevelCard from '@/features/settings/PlayerLevelCard.vue';
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';
   import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
   import ResetProgressCard from '@/features/settings/ResetProgressCard.vue';

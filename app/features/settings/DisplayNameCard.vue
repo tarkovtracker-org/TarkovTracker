@@ -107,15 +107,40 @@
             </template>
           </SelectMenuFixed>
         </section>
+        <div class="h-px bg-white/6" />
+        <section aria-labelledby="settings-active-mode" class="space-y-3">
+          <h3
+            id="settings-active-mode"
+            class="text-surface-200 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold"
+          >
+            {{ $t('settings.active_mode') }}
+            <span class="text-surface-400 text-xs font-normal">
+              {{ $t(getGameModeLabel(currentGameMode)) }}
+            </span>
+          </h3>
+          <div class="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+            <div class="space-y-2">
+              <p class="text-surface-200 text-sm font-medium">
+                {{ $t('settings.faction.title', 'Faction') }}
+              </p>
+              <FactionPicker v-model="faction" :disabled="dataLoading" class="max-w-50" />
+            </div>
+            <PlayerLevelField />
+          </div>
+        </section>
       </div>
     </template>
   </GenericCard>
 </template>
 <script setup lang="ts">
+  import FactionPicker from '@/components/FactionPicker.vue';
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import { useCurrentFaction } from '@/composables/useCurrentFaction';
+  import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
+  import PlayerLevelField from '@/features/settings/PlayerLevelField.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODE_UI, GAME_MODES, type GameMode } from '@/utils/constants';
+  import { GAME_MODE_UI, GAME_MODES, getGameModeLabel, type GameMode } from '@/utils/constants';
   import { LIMITS } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const DISPLAY_NAME_MODES = [
@@ -132,6 +157,8 @@
   const DISPLAY_NAME_MAX_LENGTH = LIMITS.DISPLAY_NAME_MAX_LENGTH;
   const gameEditionInputId = 'settings-game-edition-input';
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode() || GAME_MODES.PVP);
+  const faction = useCurrentFaction();
+  const { dataLoading } = useGameModeSwitch();
   const localDisplayNames = reactive<Record<DisplayNameMode, string>>({
     [GAME_MODES.PVP]: '',
     [GAME_MODES.PVE]: '',

@@ -64,37 +64,61 @@ test verifies the committed safeguards, not the live environment policy or secre
 
 ## Overlay corrections
 
-**Summary.** `json.tarkov.dev` is community-maintained and sometimes wrong (e.g. a task's
-`minPlayerLevel` is off). The `tarkov-data-overlay` repo publishes a small JSON of corrections.
-TarkovTracker fetches that overlay on the server, deep-merges it onto the upstream data, and
-attaches overlay metadata to the response headers so we can tell which version was applied.
+The overlay corrects community-maintained game data and adds missing entities. The
+producer reads the versioned `overlay-neutral.json` sidecar, applies global and mode
+corrections to adapted neutral data, and publishes independent language tables.
+English import snapshots continue to use the matching `overlay.json` artifact.
+Both artifacts carry their own content digest, and the sidecar's `$source` binds
+it to the legacy artifact's identity.
 
 ### Flow
 
 ```mermaid
-sequenceDiagram
-    participant Handler
-    participant Overlay as overlay.ts
-    participant GitHub as raw.githubusercontent.com<br/>tarkov-data-overlay
-    Handler->>Overlay: applyOverlay(basePayload, { gameMode, bypassCache, locale })
-    Overlay->>Overlay: check module cache (1h TTL)
-    alt cache fresh
-        Overlay-->>Overlay: use cached overlay
-    else stale or missing
-        Overlay->>GitHub: GET dist/overlay.json (5s timeout)
-        GitHub-->>Overlay: overlay JSON + $meta
-        Note over Overlay: on fetch error, fall back to last good overlay
-    end
-    Overlay->>Overlay: deepMerge(base, mode-specific + global corrections)
-    Overlay->>Overlay: inferFoundInRaid / inferObjectiveType / normalizeObjectiveList
-    Overlay-->>Handler: corrected payload + dataOverlay meta
+flowchart LR
+    Source["Overlay JSON5 sources"] --> Legacy["overlay.json with identity"]
+    Source --> Neutral["overlay-neutral.json schemaVersion 1"]
+    Neutral --> Builder["Neutral catalogs and referenced strings"]
+    Legacy --> Imports["Whole English import snapshots"]
+    Builder --> KV["Verified KV objects and complete manifest"]
+    Imports --> KV
+    KV --> Reader["Snapshot-only production readers"]
 ```
+
+### Neutral strings and corrections
+
+The sidecar replaces display fields with `@tt:overlay:/...` keys. Its `$strings`
+contains English defaults and sparse language overrides. `$localeTargets` binds
+locale-only corrections to their entity fields while retaining the original
+mode-specific upstream reference as fallback. The bundle builder resolves
+requested-language, English-overlay, and upstream-English fallbacks before
+publication. Localized wiki links follow this field table and pass the existing
+trusted-link validation before rendering.
+
+Overlay additions supply their own stable keys and English defaults. Task and item
+additions share their entity key namespaces, mode-specific defaults include the
+mode, and objective arrays use their IDs for stable paths. Machine identifiers,
+normalized names, mechanical extract names, and exit-status discriminators retain
+their original values. Unsupported or non-string locale leaves stop publication.
+
+To add a correction, edit the overlay repository's ID-keyed JSON5 override or
+addition. Put a canonical English correction in the shared or mode source and a
+locale-only correction in the [overlay locale source directory](https://github.com/tarkovtracker-org/tarkov-data-overlay/tree/main/src/overrides/locales). Include the
+entity name, previous value, and supporting evidence. Run overlay validation,
+tests, typecheck, and build. Submit sources and let the overlay release workflow
+publish both generated artifacts. The complete producer contract is in the overlay
+repository's [neutral overlay guide](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/NEUTRAL_OVERLAY.md). `OVERLAY_URL` and
+`NEUTRAL_OVERLAY_URL` can select the matching legacy and neutral artifacts. Pin
+both to the same immutable release or source revision when overriding defaults.
 
 ### Behavior details
 
-- Module-level cache (`cachedOverlay`, `cacheTimestamp`) with a 1-hour TTL
-  (`OVERLAY_CACHE_TTL = 3600000`).
-- The configured overlay URL must use HTTPS. Invalid URLs and non-HTTPS schemes fall back to the
+The following merge rules are shared by neutral production and the legacy English
+import builder. Legacy fetch caching details apply to `overlay.ts`, while neutral
+catalog generation uses `neutralOverlay.ts` and publishes immutable results.
+
+- The legacy loader has a module-level 1-hour overlay cache. The neutral loader also
+  caches verified sidecar snapshots for one hour and shares concurrent refreshes.
+- The legacy configured overlay URL must use HTTPS. Invalid URLs and non-HTTPS schemes fall back to the
   trusted `raw.githubusercontent.com` source so corrections cannot be modified in transit.
 - Redirects are followed manually (`redirect: 'manual'`) for at most `MAX_OVERLAY_REDIRECTS = 3`
   hops, and every hop must also be HTTPS. A redirect to a non-HTTPS target, a redirect without a
@@ -117,12 +141,19 @@ sequenceDiagram
   overlay keeps an id-less `{ name, prestigeLevel }` reference verbatim, so it is not a loss and gets
   no diagnostic; only a declared gate the normalization had to drop becomes a
   `requirementDiagnostics` entry ([canonical task progression](./tasks.md#canonical-task-progression)).
-- On fetch failure, serves the last good overlay (stale) rather than failing the request.
+- The legacy loader can retain its last-good overlay after a fetch failure. Failure before the neutral
+  manifest is written leaves the previous release active. A failed readback after
+  the write leaves the new pointer potentially active. Verify its release identity
+  and served objects before retrying or promoting a reader.
 - Overlay supports mode-specific corrections under `modes[gameMode]` plus global corrections.
-- Per-locale corrections under `locales[locale]` patch `tasks`, `items`, `traders` and `maps`
-  (locale-sensitive fields such as name, wikiLink, and objective descriptions) and are applied last
-  so they take precedence over global and mode-specific corrections. The locale defaults to `en`
-  when a handler does not pass one.
+- Objective adaptation preserves weapon lists and grouped weapon modifications and clothing.
+  Legacy scalar and flat references retain their shape. Explicit empty lists remain empty,
+  malformed leaves remain `{ id: '' }`, and unknown nonempty IDs are retained.
+  Hydration preserves the groups. Task and map item previews flatten equipment for display.
+  A complete precompute run from the updated producer publishes the corrected references.
+- In the legacy artifact, `locales[locale]` patches fields after shared and mode
+  corrections. The neutral sidecar compiles those corrections into key overrides
+  and field-target bindings with the same precedence.
 - `tasksAdd` lets the overlay inject entirely new tasks not present upstream.
   Omitted `failConditions` become an empty list; explicitly malformed values remain unchanged
   so import snapshot validation can reject them.
@@ -130,41 +161,28 @@ sequenceDiagram
   `foundInRaid` flags so the client does not have to guess.
 - `bypassCache: true` (from `shouldBypassCache`) forces an awaited overlay refresh — used after
   publishing a correction.
-- A hideout request with an expired module-cached overlay serves the stale correction immediately
-  and registers one coalesced refresh with the Cloudflare execution context. Background task
-  rejections are logged and contained. A failed deferred refresh backs off for one minute before
-  another hideout request may retry it. Cold requests still await the initial overlay fetch, whose
-  five-second timeout covers both response headers and body parsing.
-- Hideout applies the overlay after reading its versioned base-data edge entry, so its correction
-  freshness is bounded by the overlay module's one-hour cache and browser cache TTL rather than the
-  hideout edge TTL. Seasonal editions also apply effect patches after reading their validated,
-  localized upstream season metadata cache. Other
-  overlay-enabled routes cache their final corrected payload; publishing new overlay data requires
-  a Tarkov data cache purge so those entries and the browser cache-purge marker are invalidated.
+  Production catalog readers use the activated neutral snapshots for hideout,
+  objectives, editions, and the other hot datasets. Publishing a correction requires
+  a complete precompute run and browser purge-marker invalidation. A purge clears
+  browser metadata and strings. It does not rebuild or replace the neutral manifest.
+  Precompute must finish before the purge so clients reload the intended complete
+  release. Failed staging keeps the previous manifest available until its retention
+  expires. Reader-side KV failures can serve an eligible compressed last-good Cache
+  API response marked `STALE`. Missing snapshots without such a copy return 503.
 
-The objective endpoint requires nonempty overlay version/SHA before caching a generated response.
-Objective cache version `json-v5` starts a new HTTP URL and local metadata-store cache namespace.
-The per-colo Worker cache also keys final catalogs by language, game mode, and the latest
-successful Tarkov purge timestamp. Each isolate checks the audit log at most once a minute.
-HTTP responses use `no-store` so the CDN and browser HTTP caches cannot bypass the Worker check.
-Objective hydration waits for any in-flight browser purge check before using local data. The
-client keys its local objective entries and count memo by the observed purge timestamp, which it
-keeps in memory even when persisting the marker fails.
-It only applies or persists a network catalog whose overlay was fetched for the active purge
-generation. When a warm Worker still sends an older catalog, the browser makes one retry after
-the Worker's one-minute marker check interval. After a scoped Tarkov data purge, the next
-generation uses a purge-specific upstream overlay URL with HTTP caching disabled. The request
-can use up to five seconds for overlay refresh and returns 503 if it cannot refresh. Older
-generations expire on their existing retention schedule. A background refresh failure retains a
-good stale entry in the current generation.
-Other objective consumers may omit the query version and still use the current Worker key.
-Core KV release keys and objective precompute are unaffected.
+Historical releases used `json-v5` objective/hideout caches with per-colo live
+refreshes. Those request-path semantics describe earlier deployments. The neutral
+reader streams precomputed snapshots and has no live upstream fallback.
 
 The raw overlay JSON and `OVERLAY_TOKEN` remain server-side. The browser consumes corrected
 task/objective data and overlay identity metadata; applied corrections are therefore visible in
 those catalogs. `/overlay/kappa/**` serves the streamer UI, not the private source JSON.
 
 ### Endpoint ownership and precedence
+
+The table describes build-time catalog ownership. Production hot routes read the
+resulting snapshots. The English import and extract-rule paths retain their
+separate overlay readers.
 
 Every collection merges shared records by ID, then the matching upstream mode (`regular`, `pve`,
 `pvp-season`), then supported locale patches. `overlayValidation.ts` validates known collection
@@ -181,16 +199,16 @@ entries. Active aliases require the complete consumer rollout tracked in
 [#1302](https://github.com/tarkovtracker-org/TarkovTracker/issues/1302); this compatibility check
 does not activate progress migration or change catalog identities.
 
-| Sections                               | Consumer and identity rules                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tasks`, `tasksAdd`, `traders`, `maps` | Task routes; existing task IDs win over synthetic additions; maps support locale patches. A map's `extractsAdd` appends well-formed extracts (non-empty `id`/`name`, known or null faction, finite position) whose ID or name is not already present, then is removed from the response; the client applies the same rule to `app/data/maps.json` `extractsAdd`, whose `nameKey` resolves the label through i18n and is copied onto a matching upstream extract that lacks one.                                                                              |
-| `items`, `itemsAdd`                    | Both item routes; adapt additions only when an ID is absent upstream, then apply explicit patches and locales.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `hideout`, `craftsAdd`                 | Hideout; attach adapted crafts to station ID/level and deduplicate craft IDs globally. Null/absent task unlocks stay `unlockState: unknown`.                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `prestige`                             | Prestige route; patch/append raw conditions by ID before adaptation resolves tasks from upstream plus missing, enabled `tasksAdd` IDs. Array condition patches replace arrays. Locale task/prestige corrections apply before resolution.                                                                                                                                                                                                                                                                                                                     |
-| `storyChapters`                        | Editions route and task story unlock projection share chapter identities. Chapter/objective locales supply prestige story requirement names. Stored story progress is evaluated from explicit requirements, never chapter order or hardcoded chapter-name lists. Chapter `endings`, `mutuallyExclusiveQuestPairs`, `referenceCoverage`, and objective `sourceQuestId`/`endingId` survive projection and normalization; the storyline view reads them when a chapter carries them and falls back to objective-level exclusivity and objective text otherwise. |
-| `editions`                             | Editions route and metadata store own the mode-scoped edition catalog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `seasonalPerks`                        | Editions route exposes metadata only for `pvp-season`; the store's `resolvedSeasonalPerks` hydrates item/category references as items load, retaining missing IDs with null values. No perk selection/progress persistence is introduced.                                                                                                                                                                                                                                                                                                                    |
-| `extractRequirements`, `extractCues`   | Extract-requirements route serves both root sections together for every mode; `data` is null until both are valid, and the map shows unknown requirements until then. Each is recognized only when it passes the shared `app/utils/extractRuleData.ts` checks, so a malformed section stays unconsumed and precompute refuses to publish, like `progressionCounters`. Mode- or locale-scoped copies are unconsumed.                                                                                                                                          |
+| Sections                               | Consumer and identity rules                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tasks`, `tasksAdd`, `traders`, `maps` | Task catalog builders; existing task IDs win over synthetic additions; maps support locale patches. A map's `extractsAdd` appends well-formed extracts (non-empty `id`/`name`, known or null faction, finite position) whose ID or name is not already present, then is removed from the response; the client applies the same rule to `app/data/maps.json` `extractsAdd`, whose `nameKey` resolves the label through i18n and is copied onto a matching upstream extract that lacks one.                                                                      |
+| `items`, `itemsAdd`                    | Both item catalog builders; adapt additions only when an ID is absent upstream, then apply explicit patches and locales.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `hideout`, `craftsAdd`                 | Hideout; attach adapted crafts to station ID/level and deduplicate craft IDs globally. Null/absent task unlocks stay `unlockState: unknown`.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `prestige`                             | Prestige builder; patch/append raw conditions by ID before adaptation resolves tasks from upstream plus missing, enabled `tasksAdd` IDs. Array condition patches replace arrays. Locale task/prestige corrections apply before resolution.                                                                                                                                                                                                                                                                                                                     |
+| `storyChapters`                        | Editions builder and task story unlock projection share chapter identities. Chapter/objective locales supply prestige story requirement names. Stored story progress is evaluated from explicit requirements, never chapter order or hardcoded chapter-name lists. Chapter `endings`, `mutuallyExclusiveQuestPairs`, `referenceCoverage`, and objective `sourceQuestId`/`endingId` survive projection and normalization; the storyline view reads them when a chapter carries them and falls back to objective-level exclusivity and objective text otherwise. |
+| `editions`                             | Editions builder and metadata store own the mode-scoped edition catalog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `seasonalPerks`                        | Editions catalog exposes metadata only for `pvp-season`; the store's `resolvedSeasonalPerks` hydrates item/category references as items load, retaining missing IDs with null values. No perk selection/progress persistence is introduced.                                                                                                                                                                                                                                                                                                                    |
+| `extractRequirements`, `extractCues`   | Extract-requirements route serves both root sections together for every mode; `data` is null until both are valid, and the map shows unknown requirements until then. Each is recognized only when it passes the shared `app/utils/extractRuleData.ts` checks, so a malformed section stays unconsumed and precompute refuses to publish, like `progressionCounters`. Mode- or locale-scoped copies are unconsumed.                                                                                                                                            |
 
 Story objective `unlocks` survive projection and normalization and determine step placement
 directly. Unplaced map/trader unlocks and chapter reward summaries remain chapter-level;
@@ -207,32 +225,24 @@ optionals keep their original positions. Each objective retains its own checkbox
 unlocks and completion state; layout parents never imply completion, prerequisites or item-supply
 relationships. Older overlays without this field keep the standalone layout.
 
-Prestige fetches the requested upstream mode; regular corrections cannot leak into PvE or Seasonal.
-An empty upstream prestige collection stays empty. Client prestige and edition catalogs are keyed
-by mode and language (`json-v3` and `overlay-v3`), and stale responses cannot replace another scope.
-The item contract advances to `json-v2`, hideout to `json-v5`, tasks-core to `json-v3`, and IndexedDB
-schema 8 clears incompatible browser payloads. The combined progression/overlay release skips the
-standalone progression deployment: v3 always uses envelope format 2 with overlay provenance.
-The superseded progression-only writer must never publish to these keys; rollback uses v2.
-Story references must name own chapter entries, never inherited object properties. Seasonal perk
-overlay exclusion lists may be omitted; when present, every entry must be a string.
+Prestige fetches the requested upstream mode, preserving mode-specific gates and
+metadata. Most neutral catalogs use `neutral-v1` mode scopes. Objectives use `neutral-v2`
+to retire browser snapshots with incomplete equipment. String tables use `strings-v1`
+language scopes. IndexedDB schema 9 clears the older
+localized payload layout. Superseded scope responses cannot replace the active
+mode's data. Story references name own chapter entries, and seasonal perk exclusion
+lists contain only string IDs.
 
-Seasonal perks use the localized `/pvp-season/season` JSON envelope. Its `perks` groups supply the
-type; each record supplies the name, description, points, and `exclusiveToPerks` IDs (adapted to
-`mutuallyExclusiveSeasonalPerkIds`). Upstream owns catalog membership and metadata. The effects-only
-overlay compatibility is validated before metadata enters the cache, then effects augment existing
-IDs after the cache read; the overlay cannot overwrite metadata or introduce a perk. Upstream perks
-without an effect patch keep an empty effects list. Duplicate or
-missing upstream IDs, invalid groups/metadata/exclusions, unresolved translation keys, and unknown
-overlay IDs fail closed. Upstream transport/schema failures use the existing edge-cache stale
-refresh path; an incompatible refresh also preserves last-good metadata. A cold schema failure
-returns `502`, while incompatible overlay IDs return `503`, including on cache hits. Failed editions
-responses override any metadata cache policy with `Cache-Control: no-store`; successful responses
-use `no-cache` so the internal TTL cannot hide overlay changes. Metadata keys include the overlay
-SHA to fetch current upstream data when the overlay changes. Declared season translation paths and
-keys must resolve through the requested-language/English dictionaries; unresolved keys fail before
-adaptation regardless of their spelling. The browser
-editions cache advances to `overlay-v3` so earlier effects-only catalogs are not reused.
+Seasonal perk membership and metadata come from `pvp-season/season`. The neutral
+builder retains references for names and descriptions, validates the upstream
+schema and exclusions, and applies effects only to existing IDs. Missing,
+duplicate, or incompatible upstream identities stop publication. The string
+builder resolves every declared season key using the requested language and
+English fallback. Failed generation leaves the previous complete release active.
+
+The older progression/overlay rollout used `json-v3` task core, `json-v5` hideout,
+`overlay-v3` editions, envelope format 2, and IndexedDB schema 8. Those versions are
+historical release contracts and stay separate from neutral catalog keys.
 
 Story chapter branches follow the overlay's own evidence. Objective-level `mutuallyExclusiveWith`
 blocks the opposing objective; chapter-level `mutuallyExclusiveQuestPairs` constrains only whole
@@ -255,7 +265,7 @@ for re-checking on the viewer's own progress only, never remapped on a guess.
 Saved story objective marks are reconciled against the published catalog by
 `app/utils/storyProgressMigration.ts`, on every chapter-catalog load and after a realtime merge,
 which unions both sides' objective IDs and can reintroduce a retired one. Only the mode the loaded
-catalog belongs to is reconciled: chapters are fetched per mode and language and the overlay may scope
+catalog belongs to is reconciled: neutral chapters are fetched per mode and the overlay may scope
 a chapter to one mode, so a catalog is evidence about its own mode only. A merge naming another mode is
 deferred to that mode's own catalog load, which a mode switch or the next start performs. The pass is idempotent and acts
 only on proof: a mark moves when `STORY_OBJECTIVE_ID_ALIASES` records a re-key the published data
@@ -284,252 +294,174 @@ retirement, and a future retirement needs the overlay to declare the replacement
 
 ### Invariants
 
-- The overlay must never block the request path on a fresh fetch for more than
-  `FETCH_TIMEOUT_MS = 5000`. On timeout, fall back to the cached overlay.
-- Generic task/item/hideout consumers return the base payload with `X-Overlay-Status: missing`
-  when no valid overlay is available. Prestige and edition/story/perk catalogs require an overlay
-  and fail when no last-good overlay exists, preserving client caches rather than publishing
-  incomplete authoritative eligibility data. Task objectives also require overlay provenance: a
-  miss without one returns 503 rather than caching an uncorrected entry, so local runs need
-  `OVERLAY_TOKEN` for objective data.
-- The overlay repository is private. Set `OVERLAY_TOKEN` (a fine-grained, read-only Contents token
-  scoped to `tarkov-data-overlay`) in every runtime that fetches it: production, previews, the
-  precompute workflow, and local/operator runs such as `pnpm run verify:overlay`. Supply the token
-  through the process environment or a secret store. `overlayAuthHeaders` attaches it only to
-  `raw.githubusercontent.com` and
-  `api.github.com` over HTTPS, never to redirect targets elsewhere, and it must never be logged.
-- Overlay data must only be fetched over HTTPS on every server path. A non-HTTPS `OVERLAY_URL` must
-  resolve to the trusted default, and no redirect hop may downgrade the transport — the fetch must
-  fail rather than read a payload served over plaintext. `applyOverlay` follows HTTPS redirects
-  manually; the streamer Kappa editions fetch in
-  `app/server/api/streamer/[userId]/[mode]/kappa.get.ts` uses `redirect: 'error'` because its URL is
-  a hardcoded constant that never redirects. Any new server-side overlay consumer must do one or the
-  other.
-- Overlay metadata (`status`, `version`, `generated`, `sha256`) must be propagated to response
-  headers so we can debug which correction was applied. Routes that apply an overlay after
-  `edgeCache()` must call `setOverlayResponseHeaders()` before returning.
+- Neutral publication requires a valid sidecar with a verified digest, supported
+  schema, consumed sections, and matching source-overlay identity. A missing
+  overlay cannot be promoted as authoritative eligibility data.
+- The private overlay and its read-only `OVERLAY_TOKEN` stay server-side. Auth
+  headers attach only to trusted GitHub HTTPS hosts and never appear in logs.
+- Overlay URLs and every redirect hop use HTTPS. The neutral loader rejects an
+  insecure URL or redirect and bounds redirects and request timeouts.
+- Overlay identity is preserved in the manifest, payload, and response headers.
+  Upstream-only bootstrap and map-spawns remain exempt from payload overlay metadata.
+- English import snapshots preserve their independent scope, age, task/objective,
+  and provenance validation. Language switching cannot alter imported IDs.
 
 ## Precompute workflow
 
-**Summary.** `tasks-core` is the single largest, hottest, and most expensive payload — adapting it
-inside a request on a cold, low-traffic Cloudflare colo used to exceed the Workers Free tier CPU
-limit and trigger Error 1102. The fix: compute the final payload **off the request path** in a
-scheduled GitHub Actions workflow, write it to the `TARKOV_DATA` KV namespace, and have the request
-handler read it back through `edgeCache({ precomputed: true })`.
+The GitHub Actions producer performs upstream fetch, adaptation, overlay merging,
+reference collection, and language fallback off the Pages request path. It runs
+on the 12-hour schedule and through the existing manual dispatch. A full release
+contains ten neutral datasets for each of the three modes and one bundle for each
+of the 13 selectable API languages. The three whole English import snapshots are
+produced and validated separately by the same trusted runner.
 
-### Why GitHub Actions and not a scheduled Worker?
+### Key and activation contract
 
-The original request-path pipeline exceeded the Workers Free CPU limit. Keeping bulk adaptation
-in GitHub Actions also avoids charging that repeated work to request CPU on a paid plan. The
-scheduled workflow on `pnpm` can reuse the
-exact same `app/server/utils` pipeline via `tsx` with the repo's tsconfig paths, so the precompute
-output is byte-identical to what the request handler would have produced.
+- The KV binding name is `TARKOV_DATA`. Every neutral object uses
+  `neutral-catalog-v1/<dataset>/<mode>/<digest>`,
+  `neutral-catalog-v1/tasks-objectives/<mode>/counts/<digest>`, or
+  `neutral-catalog-v1/strings/<language>/<digest>`.
+- The digest is SHA256 of the uncompressed UTF-8 JSON. The producer stores gzip
+  bytes, enforces the KV object-size limit, and reads the compressed object back
+  byte-for-byte before including it in the release.
+- `neutral-catalog-v1-manifest` records `completedAt`, `overlaySha`, and exactly
+  46 entries, including three objective count views. Each entry records its
+  immutable key, uncompressed byte length, and overlay response headers.
+- The manifest is replaced only after all required objects and references pass.
+  Failed staging preserves the previous manifest. Readers use one complete release
+  pointer, with the usual KV replication behavior. Old immutable objects remain
+  readable within their seven-day retention.
+- Whole English imports keep `tasks-import-json-v1-en-<mode>` keys and their
+  existing envelope validation. A complete neutral manifest alone does not certify
+  that all three import snapshots are ready.
+- Filtered maintenance runs do not activate a neutral manifest. Initial migration
+  releases also refreshed the earlier localized fleet while old readers were live.
+  Those 48 legacy entries are outside the neutral release's 46-scope contract.
 
-### Flow
+### Reader behavior
 
-```mermaid
-flowchart LR
-    Schedule["GitHub Actions schedule<br/>.github/workflows/precompute-tarkov-data.yml"] --> Run["scripts/precompute/run.ts"]
-    Run --> Pipeline["Reuses app/server/utils<br/>fetch → adapt → overlay"]
-    Pipeline --> Envelopes["buildPrecomputedEnvelope(payload)<br/>for each (lang, gameMode) combo"]
-    Envelopes --> KV["KV REST API<br/>PUT /accounts/.../values/:key"]
-    KV --> Namespace["TARKOV_DATA KV namespace<br/>(globally replicated)"]
-    Request["Request to /api/tarkov/tasks-core"] --> ReadKV["edgeCache precomputed path<br/>reads TARKOV_DATA binding"]
-    ReadKV --> Namespace
-```
+`serveCatalog.ts` reads the manifest on each request, finds the exact dataset/mode
+or strings/language scope, and streams the referenced object. Responses use
+`no-store`, `X-Cache-Status: PRECOMPUTE`, and the manifest's `X-Catalog-Release`
+timestamp. A compressed per-colo Cache API copy can
+be reused after the active manifest confirms its immutable key and release. KV
+failure may serve that last-good copy with `X-Cache-Status: STALE`. Without an
+eligible copy, a missing entry or body returns 503. A stale fallback keeps the UI
+available and cannot pass release verification.
 
-### Key contract
+Direct Pages GET requests for strings, item summaries, and full items can stream
+the original gzip bytes when the client accepts gzip and the active release
+matches a fully validated Cache API copy. KV reads and stale fallbacks still use bounded decompression.
 
-- The KV binding name is `TARKOV_DATA` (`PRECOMPUTED_KV_BINDING`).
-- The envelope shape is `{ payload, overlay: { version, sha256 }, storedAt, version }` with
-  `PRECOMPUTED_ENVELOPE_VERSION = 2`.
-- The cache key for `tasks-core` is built by `buildTasksCorePrecomputedKey(lang, gameMode)` and is
-  `tasks-core-json-v3-<lang>-<gameMode>`. Both the precompute script and the request handler import
-  this function from `precomputedTarkov.ts`, so the keys can never drift.
-- EFT import has exactly three additional English keys, built by `buildTaskImportKey(mode)`:
-  `tasks-import-json-v1-en-regular`, `tasks-import-json-v1-en-pve`, and
-  `tasks-import-json-v1-en-pvp-season`. The existing runner fetches one task/hideout/trader set per
-  mode, combines the existing core and objective adapters before one overlay pass, validates the
-  whole payload, and writes it with the same seven-day retention. A failed mode retains its old
-  key. These writes are per mode and are not atomic across the three modes or the core fleet.
-  Non-English filtered runs skip import snapshots; an English mode filter refreshes only that mode.
-  Raw task registries must be nonempty with valid objective arrays before adaptation; overlay
-  additions cannot turn an empty or malformed upstream response into a publishable small catalog.
-  `/api/tarkov/tasks-import` directly reads and validates this whole envelope, checks its mode and
-  age, and returns `no-store`. Missing or invalid import data returns 503 without runtime generation.
-- Writes go through the Cloudflare REST API (one PUT per key) because the bulk endpoint's request
-  size ceiling cannot hold all ~4.2MB envelopes in one call, and per-key writes isolate failures per
-  `(lang, gameMode)` combo. Each write retries transport failures, HTTP 429/5xx, and Cloudflare
-  error 7009 up to three total attempts, waiting one then two seconds with a fresh 30-second
-  request timeout per attempt. Retries reuse the same key, payload and TTL; permanent API errors
-  fail immediately, and exhausted retries retain the existing per-combination failure handling.
+The producer and reader share per-dataset uncompressed size limits from
+`catalogDatasets.ts`. The reader checks the declared length, opens the
+decompressed stream before sending headers, and counts bytes as it streams.
+A first-read error can use a last-good copy. An interruption after response
+bytes have been sent terminates the stream; callers can retry the request.
 
-### Consumer precedence and response reuse
+Bootstrap and map-spawns have no overlay body identity. Every other neutral scope
+and every strings bundle carries the release's source-overlay identity. The
+public API gateway in TarkovTracker-API retains its independently owned upstream
+catalog cache and does not read these Pages catalog objects.
 
-| Dataset / consumer                                       | Primary source                                                                    | Missing or failed source                                                                            |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Pages `/api/tarkov/tasks-core`                           | Validated final KV envelope for the exact language/mode                           | Per-colo Cache API, then live fetch/adapt/overlay; stale-cache background refresh remains unchanged |
-| Pages `/api/tarkov/tasks-import`                         | Valid, correctly scoped, age-bounded English KV snapshot                          | 503; no runtime generation or borrowing another mode                                                |
-| Pages items, items-lite, tasks-objectives, tasks-rewards | Per-colo final-response cache                                                     | Live fetch/adapt/overlay, with existing provenance requirements and stale retention                 |
-| Pages hideout / editions                                 | Cached base data or seasonal metadata plus request-time overlay projection        | Existing upstream/overlay error and last-good rules; the core KV envelope is not interchangeable    |
-| Pages bootstrap / map-spawns                             | Per-colo adapted-response cache                                                   | `json.tarkov.dev`; no core KV reuse                                                                 |
-| Pages prestige                                           | Per-colo corrected-response cache                                                 | Upstream plus required overlay; missing corrections fail closed                                     |
-| Public `api-gateway` Worker in TarkovTracker-API         | Its own normalized public catalog memory cache, then versioned Cache API snapshot | `json.tarkov.dev`; unavailable required rule catalogs fail closed                                   |
+### Release order
 
-The public Worker's cache is owned by the [API progress spec](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/5829b8946ab2ea91ddf8d46178675d24ea1b06dd/docs/progress-api.md#flow)
-and its [normalized snapshot loader](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/5829b8946ab2ea91ddf8d46178675d24ea1b06dd/src/services/catalog-cache.ts), not this Pages KV producer.
+1. Merge and release the overlay producer that publishes `overlay-neutral.json`
+   alongside the existing artifact. Verify both digests and their shared source
+   identity. Keep the old artifact available for imports and the deployed reader.
+2. Merge a reviewed Tracker producer that writes the new keys while the deployed
+   consumer still reads its existing contract. During this migration the runner
+   writes both the legacy fleet and neutral release.
+3. Dispatch **Precompute Tarkov Data** on `main` with `expectedOverlaySha` set to
+   the intended legacy-overlay digest and both filters empty. Production
+   credentials remain inside the `production-precompute` environment.
+4. Inspect `precompute-manifest.json` from the run. Require the intended
+   `catalogRelease.overlaySha`, all 46 scopes (30 mode catalogs, 3 counts views, and 13 language bundles),
+   successful immutable-object readbacks, and all three successful English imports.
+5. Promote the Tracker reader only after those objects are available in the
+   production namespace. Run `pnpm run verify:overlay` against production and
+   require all 46 scopes and three imports to be current.
+6. Allow at least 90 seconds after the producer confirms the active pointer write
+   before purging browser metadata. This covers the default 60-second KV read cache
+   in other colos. Recheck the intended manifest immediately before the Tarkov data
+   purge. If publication changed, verify the new release and restart the wait.
+   Measure a first switch into an uncached language and a return to a fresh cached
+   language. Require one strings request and zero game-data requests respectively,
+   with mode-specific objective text and stable IDs in each mode.
+7. Retire the legacy localized producer after consumer promotion and verification.
+   Retain the English import snapshot producer and the legacy overlay artifact it
+   consumes. Close the issue with the exact release, precompute, and browser evidence.
 
-Only tasks-core and the three whole import catalogs are generated by this workflow. The 48-row
-core manifest does not certify import writes; inspect the runner's separate `imports` results.
-Production and preview `TARKOV_DATA` namespaces are distinct. A production manifest cannot prove
-that preview keys exist, and an ordinary preview can legitimately use its runtime fallback. A filtered
-English-only preview seed covers all three import keys and three English core keys, while other
-core locales retain the fallback path. Such a partial seed does not publish the 48-row fleet
-manifest: a missing preview manifest alone does not prove that its core/import keys are missing.
-The workflow does not automatically maintain a complete production-sized preview fleet.
-
-For final response consumers, `precomputedResponse.ts` reads KV as text on **every request**. An
-isolate can reuse a validated serialized body only when the binding object, cache namespace,
-complete key and full source text match its one retained entry. Changed source is parsed and
-validated immediately. Missing, invalid or failed reads never substitute the retained body:
-they use the existing edge-cache fallback. This adds no application TTL and does not change KV's
-own eventual consistency or cache settings. Object consumers, including the age-sensitive import
-validator, retain their existing JSON path and do not share this memo.
-
-The retained source, body, key, namespace and overlay-header strings share a 16 MiB budget,
-conservatively counting UTF-16 code units; oversized entries are served normally without retention and replace any previous memo.
-Only public strings and fixed metadata are retained, never mutable payload objects, request state,
-Responses or streams. Each caller receives its own Response. Concurrent KV reads remain independent,
-so a slow earlier read cannot supply another request's body or hide a newer value returned by KV.
-
-`edgeCacheResponse.test.ts` covers the H3 response/header, bypass, provenance and fallback contracts;
-`precomputedResponse.test.ts` covers equality reuse, updates, isolation, size limits and concurrent
-reads. To compare the original JSON path with the actual helper in local workerd, save an ordinary
-public tasks-core response outside the repository and run:
-
-```sh
-node scripts/checks/precomputed-response-benchmark.mjs /path/to/public-tasks.json
-```
-
-The benchmark uses only local KV and imports the production helper. It checks identical body hashes
-and reports baseline, warm and cold V8 profiles plus elapsed time. A separate multi-fetch control
-verifies unchanged native KV binding identity reuses validation across distinct invocations. Sampled active V8 time excludes
-idle samples; elapsed time includes local KV/IPC. Neither equals billed production CPU or proves
-account-wide savings. Measure production route mix and warm/cold frequency before projecting
-allowance headroom. The benchmark does not dispatch refreshes, contact production KV or load test.
+New incompatible snapshot contracts follow the same producer-before-consumer
+order. Production Pages deploys `main` automatically. Hold a consumer PR in draft
+until the reviewed producer has seeded its keys, and do not treat a successful
+older producer or a release run from another namespace as readiness evidence.
 
 ### Release verification
 
-A run pins the first validated overlay SHA, or `EXPECTED_OVERLAY_SHA` supplied by a manual dispatch.
-Missing provenance, a different SHA, invalid task payloads or unconsumed sections fail that
-combination before its KV write. Previous entries survive failed combinations. Each successful
-entry records language, mode, storage time and overlay identity; envelope validation requires its
-identity to agree with `payload.dataOverlay`. Writes remain per-key, not atomic across the fleet. A verifier exit code of zero can include `propagating` rows within the 14-hour window; post-deployment confirmation requires all 48 rows to be `current`, while pre-deployment approval requires the complete matching precompute manifest.
-Task-core pool descriptions are optional additions to the existing `json-v3` payload, so this
-feature retains current cache keys. Older cached payloads that retain the gate continue to show
-generic progression instructions; a payload that discarded the gate needs a refreshed catalog.
-Registry `pool` metadata is informational; unresolved mappings never become derived counters.
+`pnpm run verify:overlay` uses `https://tarkovtracker.org` by default. An explicitly
+configured HTTPS `TARKOV_OPERATIONS_ORIGIN` can select the authorized operations
+host. Paired Access service credentials require that explicit origin. Redirects
+are forbidden and credentials are sent only to that selected origin. The overlay
+source still needs its read-only `OVERLAY_TOKEN` when private.
 
-A root `progressionCounters` registry that passes `validProgressionCounters` is consumed (see
-[canonical task progression](./tasks.md#canonical-task-progression)). A malformed or mode-nested registry
-remains unconsumed and blocks precompute; it is applied nowhere.
-A root `traderTaskGroups` registry (mode, then task id, then `0` Essential Tasks or `1`-`4`
-Loyalty Level N) that passes `validTraderTaskGroups` is consumed the same way and attached last as
-each task's `traderTaskGroup`, with no cross-mode fallback. The trader task view uses it only to
-section the list; it is never a gate. It is another optional `json-v3` field, so it follows the pool
-release order below: ship this consumer before the overlay publishes the section.
-Only a complete, unfiltered, failure-free run updates `overlay-precompute-manifest-json-v3`.
-The workflow uploads `precompute-manifest.json` even for partial failures, so operators can see
-which entries changed. `/api/tarkov/overlay-status` returns the last complete manifest without caching.
+The verifier requires a fresh published-overlay read, a current complete manifest, and its intended overlay
+SHA with the exact expected scope set derived from application constants. It reads
+every response as bytes and checks the immutable-key digest, byte length,
+precompute source, no-store policy, release timestamp, and overlay headers and body
+identity. The release must be at most 14 hours old, covering the 12-hour schedule
+plus operational allowance. Every scope must pass. There is no propagating-success
+state for release certification.
 
-For pool descriptions, use this release order:
+The checker reads the manifest again after its checks. If publication changed it,
+it retries the complete observation once. A second change fails certification.
+All three whole English imports are checked independently for their whole-catalog
+shape, English/mode scope, matching overlay, precompute source, and headers. Their
+endpoint also enforces the bounded stored snapshot age.
 
-1. Deploy the compatible tracker consumer while the overlay still omits `pool`. No new KV keys need
-   preseeding, and current cached payloads remain usable.
-2. Publish the reviewed overlay with pool identities only after that consumer is live. Older strict
-   consumers reject the new registry fields.
-3. Dispatch `precompute-tarkov-data.yml` on `main` with `expectedOverlaySha` set to the published SHA
-   and no language/mode filters. Verify all 48 refreshed core entries and the matching complete
-   manifest, then use the existing cache-purge marker/operator workflow for browser and edge caches.
-4. Run `pnpm run verify:overlay` after refresh and require all 48 rows to report current provenance.
-   This command checks provenance, not pool content. Separately inspect the served task-core payload
-   in each mode: require a known mapped global-variable gate to carry `taskPool.traderId`,
-   `taskPool.loyaltyLevel`, and its candidate derivation. For example, inspect Scout’s Mechanic LL2
-   gate. Confirm that verified, complete entries also retain `counter`, while unresolved entries
-   omit it. After cache purge, open the task in the deployed UI and verify its named instruction
-   and contributor disclosure before claiming the feature is live.
+The command writes a unique private temporary `report.json` with keys, digests,
+lengths, statuses, and failure reasons, then prints its path and aggregate counts.
+It records every scope and import failure while omitting raw private overlay and
+catalog payloads. Missing data, fetch errors, stale releases, or partial reads
+produce a nonzero exit code.
 
-To roll back to a tracker revision whose registry validator rejects `pool`, first publish an overlay
-without the optional identities while the compatible consumer remains deployed. Refresh and verify
-the same payloads and caches, then roll back the consumer. A frontend-only display fix can keep the
-compatible validator and current metadata. Do not roll back the strict validator while the published
-registry still carries `pool`.
+### Local and preview data
 
-For incompatible consumer contract changes, split producer and consumer changes into separate
-releases whenever preseeding is required: land a compatible producer first, seed the new versioned
-keys, then promote the consumer. Old app revisions keep reading their old keys.
-For import-contract changes, the reviewed runner must seed all three new import keys before promoting a consumer that uses
-them; a successful older core-only run or its 48-row manifest does not establish import readiness.
-Inspect the runner's `imports` results as well as the core manifest. Missing core keys still have
-the existing live fallback, but that is not proof of production readiness for cold colos. Missing
-import keys fail closed, so promotion requires explicit successful seeding.
+A Nuxt development server without KV uses the same builders through `devCatalog`.
+Supply `OVERLAY_TOKEN` locally. A first strings build inventories all neutral
+catalogs and modes, which can be expensive on a cold development server. Local
+live building is limited to development and does not establish production
+precompute readiness.
 
-For changes introducing a new whole-import snapshot contract, hold the consumer PR in draft until an approved `workflow_dispatch` on `main` succeeds with
-`lang=en`, no mode filter, and `expectedOverlaySha` set to the verified overlay SHA. That dispatch
-runs the reviewed producer already on `main` and writes three English core keys and three whole
-import keys. Read back each import envelope from the existing production namespace and verify its
-version, scope, fresh storage age, task/objective validity and matching overlay identity before
-making the consumer PR ready or merging it. Production Pages deploys `main` automatically, so a
-producer release must remain compatible with the existing consumer and must not enable the new
-consumer before its snapshots are verified. A runbook warning or an unrelated successful CI build
-is not a deploy gate. This process does not add build-time KV credentials or change Pages settings.
-
-Actions previews use a separate, expendable `TARKOV_DATA` namespace containing only merged public
-game catalogs. The snapshot-only import endpoint returns 503 until the preview namespace is seeded;
-ordinary public metadata routes retain their live fallback. Preview build/UI checks cannot establish
-production import readiness. Preview refreshes must never reuse the production binding, copy private
-overlay payloads or credentials, or execute untrusted candidate code with deployment credentials.
-
-Run `pnpm run verify:overlay` after promotion. It targets the fixed production origin and prints the path to a report in a
-new private temporary directory. The command writes
-an artifact comparing the published SHA, last complete precompute and served tasks-core for all
-48 language/mode combinations and all three whole English import snapshots against the published release.
-Missing provenance, malformed task/objective arrays, duplicate IDs, invalid counts or wrong import
-scope fail verification even when all core KV rows are current. The verifier does not join the
-independent UI projections or certify them as coherent. Import release verification requires one valid
-whole snapshot per mode with the published identity; this operator gate is stricter than bounded
-runtime retention. The report contains import task counts, overlay SHA values, core cache sources
-and verification statuses, never raw overlay/catalog payloads. A failing import read retains the
-successful core provenance in the report.
-Missing evidence is `unverified`; a core provenance mismatch is `propagating` for
-at most 14 hours from the producer generation timestamp (12-hour schedule plus a 2-hour operational
-target), then `drift`. Drift/unverified exits nonzero. This is a detection target, not a guarantee
-that caches expire within 14 hours. Browser IndexedDB has a separate maximum 24-hour TTL and must
-be invalidated through the purge marker for prompt client convergence. Retained seven-day KV
-fallbacks are intentionally reported as drift after a failed release, never as a current fleet.
+Production and preview namespaces are separate. The preview namespace needs its
+own complete 46-object release and all three English imports from a reviewed
+producer before catalog-dependent UI verification. An English-only legacy seed
+cannot satisfy neutral readers. Use an approved broker writer or authorized
+operator workflow with the preview namespace selected explicitly. Keep production
+credentials out of preview builds and candidate code. Refresh the preview release
+before expiry and recheck its identity because all preview branches share that
+expendable namespace. See [Pull-request previews](./previews.md).
 
 ### Files
 
-- `scripts/precompute/precompute.ts` — pipeline orchestration and `KvWriter` interface.
-- `scripts/precompute/run.ts` — entry point invoked by the workflow.
-- `scripts/precompute/import-snapshots.ts` - three English import snapshots, validation before write.
-- `scripts/precompute/kv.ts` — Cloudflare KV REST writer.
-- `scripts/precompute/nuxt-imports.ts` — bridges Nuxt auto-imports for `tsx`.
-- `.github/workflows/precompute-tarkov-data.yml` — schedule and secrets.
-- `app/server/utils/precomputedResponse.ts` — bounded validated final-response reuse with a fresh KV read.
-- `app/server/utils/precomputedTarkov.ts` — shared contract (binding name, envelope, key builder).
-- `app/server/utils/taskImportSnapshot.ts` and `app/utils/taskImportCatalog.ts` - import key,
-  envelope age/scope, and whole catalog validation shared by producer, route and client.
+- `scripts/precompute/catalog-release.ts` stages and reads back immutable objects,
+  then activates the complete manifest.
+- `scripts/precompute/run.ts` is the trusted scheduled/manual entry point.
+- `scripts/precompute/import-snapshots.ts` preserves whole English import snapshots.
+- `scripts/precompute/kv.ts` owns KV REST reads and writes.
+- `scripts/precompute/check-overlay.ts` checks the complete served release.
+- `scripts/precompute/verify-catalog-release.ts` verifies scope, freshness, headers,
+  raw response bytes, and overlay identity.
+- `app/utils/catalogDatasets.ts` defines release scopes and manifest types.
+- `app/server/utils/serveCatalog.ts` streams the activated catalog release.
+- `.github/workflows/precompute-tarkov-data.yml` owns schedule, dispatch, and the
+  production credential boundary.
 
 ### Invariants
 
-- The precompute script and the request handler must build the cache key with the same function
-  (`buildTasksCorePrecomputedKey`). Never hard-code the key on either side.
-- The envelope version must be bumped any time the envelope shape changes; old envelopes must be
-  rejected by `isPrecomputedEnvelope()` and fall through to the edge cache.
-- A missing or corrupt core KV entry falls through to the edge cache path. Import snapshots are
-  intentionally snapshot-only: unavailable data returns 503 before any progress can be applied.
-- The precompute pipeline must reuse `app/server/utils` — it must not re-implement the adapt/overlay
-  logic or the outputs will diverge from what the request handler would produce.
-
-If the complete-fleet manifest write fails after payload writes succeed, precompute returns those 48 identities alongside the manifest failure. The CLI writes the diagnostic artifact and exits unsuccessfully so the release remains blocked without losing the record of changed entries.
+A full release uses one source-overlay SHA. Neutral dataset edges fetch base
+upstream envelopes only, and language dictionaries are built separately. All
+referenced keys resolve before activation. The browser's mode data and language
+tables have separate cache namespaces. Whole imports preserve progress-critical
+IDs and remain independently validated. Verifier failures leave diagnostic
+evidence and block release certification.

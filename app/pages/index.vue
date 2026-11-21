@@ -156,18 +156,23 @@
       tarkovStore.getTraderReputation
     );
   });
+  const traderGameMode = computed(() => tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP);
+  const hasCurrentTraderTasks = computed(
+    () => metadataStore.tasksCoreGameMode === traderGameMode.value
+  );
   const traderStoryCatalog = computed(() =>
     storyCatalogForMode(
       metadataStore.storyChapters ?? [],
       metadataStore.storyChaptersGameMode,
-      tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP
+      traderGameMode.value
     )
   );
   const traderStoryUnlocks = computed(() => storylineTraderUnlocks(traderStoryCatalog.value));
   const traderLockDeps = computed(() => ({
-    tasks: metadataStore.tasks,
+    tasks: hasCurrentTraderTasks.value ? metadataStore.tasks : undefined,
+    taskUnlockDataReady: hasCurrentTraderTasks.value && metadataStore.tasksRewardsHydrated,
     isTaskComplete: (id: string) => tarkovStore.isTaskComplete(id),
-    gameMode: tarkovStore.getCurrentGameMode?.() ?? GAME_MODES.PVP,
+    gameMode: traderGameMode.value,
     storyChapters: traderStoryCatalog.value,
     storyTraderUnlocks: traderStoryUnlocks.value,
     isStoryObjectiveComplete: tarkovStore.isStoryObjectiveComplete,

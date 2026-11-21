@@ -2,6 +2,7 @@
 // resolve that transitive package subpath. Typecheck and the compiled-workerd test verify it.
 // fallow-ignore-next-line unresolved-import
 import nitroWorker from 'nitropack/presets/cloudflare/runtime/cloudflare-pages';
+import { sendCatalogGzip } from '@/server/utils/catalogEncoding';
 import { boundedClientLogRequest } from '@/server/utils/clientLogBody';
 import { legacyApiRetirementResponse } from '@/server/utils/legacyApiRetirement';
 // Nitro's Pages adapter buffers request bodies before middleware. Retired addresses must
@@ -14,6 +15,6 @@ export default {
     const request = await boundedClientLogRequest(args[0]);
     if (request instanceof Response) return request;
     args[0] = request;
-    return nitroWorker.fetch(...args);
+    return sendCatalogGzip(await nitroWorker.fetch(...args));
   },
 };

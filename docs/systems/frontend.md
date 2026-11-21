@@ -20,9 +20,9 @@ await against context invalidation.
 ## Language selection
 
 The app bar uses a compact translation icon with native language names and a checked current
-language; phones retain the language submenu in More. Settings > Preferences > Appearance provides
-the same language menu. `useLocaleSwitch` shares pending, cooldown, and error feedback across
-these controls. One shared cache watcher and countdown timer remain active until the last selector
+language; phones retain the language submenu in More. The same menu is available under Settings >
+Preferences > App Preferences. `useLocaleSwitch` shares pending, cooldown, and error feedback
+across these controls. One shared cache watcher and countdown timer remain active until the last selector
 unmounts. All menu entries are disabled during a switch.
 
 A locale switch passes an `AbortSignal` through metadata loading to the Tarkov proxy requests.
@@ -99,6 +99,8 @@ flowchart LR
    sent with `no-store` so a transient outage never pins the env-default fallback at the edge.
    Missing or invalid Supabase credentials are treated as the same uncacheable failure. Successful
    responses include the settings version.
+   The admin read uses `?fresh=1`, which always reads Supabase and returns `no-store` for both
+   browsers and Cloudflare. Query strings are excluded from the public cache rule.
 5. `PromotedTwitchEmbed` fetches config on mount and at most once every five minutes while visible.
    Tab returns reuse fresh results instead of issuing extra requests. Shared client state still applies
    admin saves immediately; fetched configs older than the latest shared version are ignored.
@@ -126,6 +128,40 @@ added 720 requests regardless of dismissal. Browser cache hits may reduce actual
 These budgets are client call counts, not claims about the historical traffic spike or billing savings.
 See [Cloudflare's cache execution order](https://developers.cloudflare.com/workers/reference/how-the-cache-works/)
 and [Pages Function billing](https://developers.cloudflare.com/pages/functions/pricing/).
+
+### Cloudflare cache rule
+
+Verify that the Pages deployment with the admin `?fresh=1` read is live before applying the rule.
+Create a zone Cache Rule for this public route on `tarkovtracker.org`. Use the default cache key
+and set cache eligibility to **Eligible for cache**. For Edge TTL, use the origin cache-control
+header and bypass caching when the header is missing. Leave Browser TTL governed by the origin.
+Keep existing rules in place.
+
+```text
+(http.host in {"tarkovtracker.org" "www.tarkovtracker.org"}
+ and http.request.uri.path eq "/api/twitch/config"
+ and http.request.uri.query eq ""
+ and (http.request.method eq "PURGE"
+      or (http.request.method eq "GET"
+          and not http.request.headers.truncated
+          and not any(lower(http.request.headers.names[*])[*] in {
+            "authorization" "cache-control" "origin" "forwarded" "x-forwarded-host"
+            "x-forwarded-scheme" "x-host" "x-original-url" "x-rewrite-url"
+            "x-http-method" "x-http-method-override" "x-method-override"
+          }))))
+```
+
+After rollout, send two ordinary GETs from the same location and check for `CF-Cache-Status: HIT`
+on the warm response. Check that `?fresh=1` returns the current version with `Cache-Control: no-store`
+and never returns `HIT`. GETs carrying headers that vary the
+[default cache key](https://developers.cloudflare.com/cache/how-to/cache-keys/) stay outside the rule
+so that a URL-only purge can clear the cached variant.
+The rule checks header names case-insensitively and skips GETs whose header list is truncated.
+GETs carrying `Cache-Control` also stay outside the rule, including explicit bypass requests from
+older admin tabs. The existing admin save purges the tag with a fallback to the two exact public URLs.
+The separate `PURGE` branch supports the internal method used by
+[Cloudflare's single-file purge API](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/#cache-rules-that-match-on-request-properties).
+Disable this rule to roll back edge caching.
 
 ### Files
 
@@ -276,7 +312,7 @@ First paint
       → pre-hydration skeleton style block matches the light canvas (no dark flash)
 App boot
   → useTheme() restores the client-persisted mode and re-applies it idempotently
-  → toggle (AppBar sun/moon button or Settings > Appearance card)
+  → toggle (AppBar sun/moon button or Settings > Preferences > App Preferences)
       → setThemeMode persists tt_theme + sets data-theme + colorScheme atomically
 ```
 
@@ -307,7 +343,7 @@ App boot
    It also pins `colorMode.preference/fallback` to `dark` so Nuxt UI's `.dark` alias block stays
    deterministic; those aliases resolve through the flipped `surface` palette.
 4. `app/composables/useTheme.ts` exposes the singleton `themeMode` state and
-   `setThemeMode`/`toggleThemeMode` used by the AppBar toggle and the Settings AppearanceCard.
+   `setThemeMode`/`toggleThemeMode` used by the AppBar toggle and the App Preferences card.
 
 ### Invariants
 
@@ -338,7 +374,7 @@ App boot
 - Fixed-dark item action overlays and map tiles retain light foregrounds in light mode instead
   of inheriting inverted neutral ink. Floating map toolbars use theme-aware surfaces, not the tile
   palette: enabled visibility toggles and open popover buttons share `MAP_BUTTON_ACTIVE_CLASS`
-  with a dark light-mode foreground. The selected Appearance option has a contrasting inset ring;
+  with a dark light-mode foreground. The selected theme option has a contrasting inset ring;
   keyboard focus uses a separate offset outline so focusing never replaces the selection boundary.
 - Interactive card content uses native controls: trader navigation lives on the named header
   button and skill editing on its labelled input, not redundant clickable containers. Objective
@@ -357,6 +393,6 @@ App boot
 - `app/assets/css/tailwind.css` — `@custom-variant light` and the `[data-theme='light']` token block
 - `app/utils/theme.ts` — ThemeMode, normalization, storage, apply, `THEME_BOOT_SCRIPT`
 - `app/composables/useTheme.ts` — singleton state + set/toggle
-- `app/features/settings/AppearanceCard.vue` — Settings > Preferences theme selector
+- `app/features/settings/AppPreferencesCard.vue` — theme, language, Privacy Mode, and wiki-link preference
 - `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
 - `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`

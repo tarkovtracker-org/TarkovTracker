@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { promotionBranch } from '../release/release-promotion.mjs';
 import { approvalCommandPrefix, currentAdminAttestation } from './review-admission-attestation.mjs';
@@ -153,12 +154,21 @@ async function checkedAdmission({ github, context, pr, group, source, statusSha 
   );
   return result;
 }
-async function uploadedReceipt(github, context, sha) {
-  const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
-    ...context.repo,
-    run_id: Number(context.runId),
-  });
-  const matches = artifacts.filter((artifact) => artifact.name === `review-admission-${sha}`);
+async function uploadedReceipt(github, context, sha, wait) {
+  async function listMatches() {
+    const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
+      ...context.repo,
+      run_id: Number(context.runId),
+    });
+    return artifacts.filter((artifact) => artifact.name === `review-admission-${sha}`);
+  }
+  let matches = await listMatches();
+  // A successful upload can take time to appear in the artifact listing.
+  for (const retryDelay of [1000, 2000, 4000, 8000]) {
+    if (matches.length > 0) break;
+    await wait(retryDelay);
+    matches = await listMatches();
+  }
   requireEvidence(matches.length === 1, 'Uploaded admission receipt is missing or ambiguous.');
   requireEvidence(!matches[0].expired, 'Uploaded admission receipt expired.');
   const result = JSON.parse(await readFile(`review-admission-evidence/${sha}.json`, 'utf8'));
@@ -221,10 +231,10 @@ function admissionSummary(decision) {
     `Verified ${decision.review.provider} review; ${decision.risk} risk admission approved.`
   );
 }
-export async function publishReviewAdmission({ github, context, sha }) {
+export async function publishReviewAdmission({ github, context, sha, wait = delay }) {
   requireEvidence(SHA.test(sha), 'Publication requires exact admission SHA.');
   try {
-    const result = await uploadedReceipt(github, context, sha);
+    const result = await uploadedReceipt(github, context, sha, wait);
     const { decision, pr } = await currentReceiptDecision(github, context, result);
     requireSameDecision(result, decision);
     await status(github, context, sha, 'success', admissionSummary(decision));

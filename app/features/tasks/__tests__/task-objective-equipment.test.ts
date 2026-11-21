@@ -12,6 +12,19 @@ const createObjective = (input: Partial<TaskObjective>): TaskObjective =>
     ...input,
   }) as TaskObjective;
 describe('task-objective-equipment', () => {
+  it('shows grouped equipment once and excludes negative gear and bring-only callers', () => {
+    const weapon = createItem('weapon');
+    const mod = createItem('mod');
+    const gear = createItem('gear');
+    const objective = createObjective({
+      usingWeapon: [weapon],
+      usingWeaponMods: [[mod], [mod, { id: '' }]],
+      wearing: [[gear]],
+      notWearing: [[createItem('excluded')]],
+    });
+    expect(getObjectiveEquipmentItems(objective)).toEqual([weapon, mod, gear]);
+    expect(getObjectiveEquipmentItems(objective, 'bring')).toEqual([]);
+  });
   it('includes useAny items when size is at or below the render cap', () => {
     const useAny = Array.from({ length: MAX_RENDERED_OBJECTIVE_ITEMS }, (_, index) =>
       createItem(`item-${index}`)

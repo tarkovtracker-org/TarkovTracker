@@ -227,6 +227,8 @@ export interface TaskObjective {
   markerItem?: TarkovItem;
   /** Item that counts for quest completion/requirements */
   questItem?: TarkovItem;
+  /** Verified quest-inventory item with no confirmed objective-to-template mapping. */
+  questInventoryOnly?: boolean;
   count?: number;
   type?: string;
   foundInRaid?: boolean;
@@ -242,17 +244,21 @@ export interface TaskObjective {
   status?: string[];
   /** All items that must be contained */
   containsAll?: TarkovItem[];
+  /** Item categories that a weapon build must include. */
+  containsCategory?: string[];
   /** Any of these items can be used */
   useAny?: TarkovItem[];
-  /** Weapon that must be used */
-  usingWeapon?: TarkovItem;
+  /** Accepted weapons; legacy catalogs may supply a scalar reference. */
+  usingWeapon?: ObjectiveEquipment;
   /** Weapon mods that must be equipped */
-  usingWeaponMods?: TarkovItem[];
+  usingWeaponMods?: ObjectiveEquipment;
   /** Items that must be worn */
-  wearing?: TarkovItem[];
+  wearing?: ObjectiveEquipment;
   /** Items that must not be worn */
-  notWearing?: TarkovItem[];
+  notWearing?: ObjectiveEquipment;
 }
+/** Source equipment lists/groups, also accepting legacy scalar references. Keep group boundaries. */
+export type ObjectiveEquipment = TarkovItem | (TarkovItem | TarkovItem[])[];
 export interface TaskRequirement {
   task: { id: string; name?: string };
   status?: string[];

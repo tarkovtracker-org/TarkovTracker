@@ -72,6 +72,14 @@ keeping upstream order within each group, so it has no sort setting. Maxed cards
 own collapse toggle. The drawer holds only the availability requirements. The legacy
 `hideout_sort_ready_first` and `hideout_collapse_completed` columns are no longer read or written.
 
+## Quest links
+
+The Quest links chip is available on collapsed quest cards. Hover over it, or activate it with a
+click, tap, or keyboard, to see links to named quests. The links use the selected mode's quest
+catalog and the completion-failure relationships derived from Tarkov.dev failure conditions.
+The popover shows the total and one quest per row. It groups mutual choices separately from quests
+that fail when this one is completed and quests whose completion fails this one.
+
 ## Hidden tasks
 
 The eye button in a task card's header (or its right-click menu) hides the task from task lists (`useTaskHiding`, stored in the
@@ -303,6 +311,9 @@ editions, falling back to the active catalog while unavailable. Missing core/obj
 remain fatal.
 Explicit objective `unlocks` with `type: 'trader'` supply trader gates shared by dashboard cards
 and every pending task owned by that trader, including tasks without their own story requirements.
+Once the selected mode's task and reward catalogs load, the dashboard shows an unlinked warning
+for a configured unlock only if neither its task ID nor any task's trader rewards match. It shows
+a neutral status while the necessary catalog data is unavailable.
 Only a unique objective placement is authoritative; an omitted trader ID resolves only through a
 unique same-name chapter trader reference. Chapter summaries and objective wording never imply a
 gate. Exact objective completion (including the producer-declared tutorial baseline) opens the
@@ -578,11 +589,13 @@ Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`
 1, and a tarkov.dev link. A details panel names the action with its chip and shows the objective
 description, the item involved (the MS2000 Marker for a mark, the quest item for a quest pickup or
 stash, otherwise the first accepted item plus how many alternatives exist, or, when no item is
-accepted, the weapon or gear an elimination must use) with its icon, count and
-a FIR badge, each required key group (`A / B` when any one works), and a progress bar when the
-objective counts more than one. The footer has a labeled **Mark complete** / **Completed** toggle,
-a **Task list** button that scrolls to and highlights the objective, and the show-only and hide
-quest buttons. Compact tooltip density keeps the layout and makes the footer buttons icon-only.
+accepted, the weapon or gear an elimination must use) with its icon, item quantity when applicable
+and a FIR badge. The panel lists each required key group (`A / B` when any one works) and shows a
+progress bar when the objective counts more than one. Weapon and clothing labels omit the
+elimination count.
+The footer has a labeled **Mark complete** / **Completed** toggle, a **Task list** button that
+scrolls to and highlights the objective, and the show-only and hide quest buttons. Compact tooltip
+density keeps the layout and makes the footer buttons icon-only.
 Read-only popups omit the toggle and progress. The stacked list shows each entry's trader
 portrait with the action chip on it.
 
@@ -748,6 +761,10 @@ name and paged through without changing progress. Single-item sales still show t
 Cycling pauses for completed objectives and completed or failed parent tasks, while browsing stays
 available.
 
+Shoot objectives with multiple weapons in a flat alternatives list use the same display and
+popover. Required weapon mods and gear remain visible in the equipment strip. Single weapons
+and grouped weapon requirements stay in that strip.
+
 Weapon-build task objectives show their base weapon and explicit `containsAll` parts beneath the
 objective statement. `TaskWeaponBuildItems.vue` consumes the same `neededItemTaskObjectives`
 records and `useNeededItemProgress` helper as Needed Items: the base keeps the objective ID,
@@ -829,7 +846,11 @@ database column for older clients; this UI change requires no column removal or 
 
 Collapse-by-default and hide-rewards remain independent preferences, both off by default.
 Collapse-by-default applies to list cards; map cards start expanded. Matching deep links expand
-their card. The dedicated chevron controls card expansion in both views. Hide-rewards applies
+their card. If a linked quest is absent from the current mode's catalog, the Tasks page explains
+why and offers to switch to any mode where the quest ID matches. The link stays active until
+the quest opens or the player dismisses the notice.
+
+The dedicated chevron controls card expansion in both views. Hide-rewards applies
 to both list and map cards. Missing database columns use the existing preference-sync fallback,
 so new settings remain local until the compact-list preference migration is deployed.
 
@@ -859,6 +880,10 @@ the current account and game mode; Undo survives a filtered-out card and rejects
 The optional _See where it’s needed_ action opens per-need details and the existing Smart Fill
 replacement flow. The source badges count requirements in both modes; the result summary
 always states its units and also counts unique items when the switch is enabled.
+A checked handover displays its full quantity on the quest and moves to Completed in Needed
+Items, even while the quest is still open. A pending teammate's requirement can still appear in
+Needs. Unchecking restores the player's saved count.
+
 With Hide owned enabled, grouped counters and their source breakdown retain the full matching
 requirements, keeping tracked quantities and denominators stable as allocations fill. The
 remaining count determines whether an item is still needed; fully collected items disappear.

@@ -177,7 +177,9 @@ missing exact-head review, unresolved findings or changes requested, missing sen
 notice, so a denial does not create a failed run for every review event. Integrity, identity,
 publisher and API errors still fail the run. A hold found after a receipt output was recorded also
 fails the run, so no receipt can be uploaded or published. Consumers still require a `success`
-status, a successful run and an approving receipt.
+status, a successful run and an approving receipt. The publisher retries an empty exact-receipt
+lookup after 1, 2, 4 and 8 seconds to allow for delayed artifact visibility. It rejects duplicate
+or expired receipts immediately and rechecks live admission evidence before publishing success.
 
 Ordinary changes, translations and verified safe dependency/version metadata changes may
 enter after bot review. Ordinary paths include `app/{components,pages,features,layouts,assets}/`,

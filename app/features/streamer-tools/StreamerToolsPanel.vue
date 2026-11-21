@@ -93,7 +93,7 @@
                   type="button"
                   role="radio"
                   :aria-checked="selectedMode === GAME_MODES.PVP"
-                  class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
+                  class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded px-1.5 py-2 text-sm font-semibold transition-colors sm:flex-row sm:gap-1"
                   :class="
                     selectedMode === GAME_MODES.PVP
                       ? 'bg-pvp-800 text-pvp-100'
@@ -101,13 +101,18 @@
                   "
                   @click="selectedMode = GAME_MODES.PVP"
                 >
-                  {{ t('common.pvp', 'PvP') }}
+                  <GameModeBadge :mode="GAME_MODES.PVP" class="-my-1" />
+                  <span
+                    class="flex min-h-8 min-w-0 items-center text-center leading-tight wrap-anywhere sm:min-h-0"
+                  >
+                    {{ t('common.pvp', 'PvP') }}
+                  </span>
                 </button>
                 <button
                   type="button"
                   role="radio"
                   :aria-checked="selectedMode === GAME_MODES.PVE"
-                  class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
+                  class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded px-1.5 py-2 text-sm font-semibold transition-colors sm:flex-row sm:gap-1"
                   :class="
                     selectedMode === GAME_MODES.PVE
                       ? 'bg-pve-700 text-pve-100'
@@ -115,13 +120,18 @@
                   "
                   @click="selectedMode = GAME_MODES.PVE"
                 >
-                  {{ t('common.pve', 'PvE') }}
+                  <GameModeBadge :mode="GAME_MODES.PVE" class="-my-1" />
+                  <span
+                    class="flex min-h-8 min-w-0 items-center text-center leading-tight wrap-anywhere sm:min-h-0"
+                  >
+                    {{ t('common.pve', 'PvE') }}
+                  </span>
                 </button>
                 <button
                   type="button"
                   role="radio"
                   :aria-checked="selectedMode === GAME_MODES.SEASONAL"
-                  class="flex-1 rounded px-3 py-2 text-sm font-semibold transition-colors"
+                  class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded px-1.5 py-2 text-sm font-semibold transition-colors sm:flex-row sm:gap-1"
                   :class="
                     selectedMode === GAME_MODES.SEASONAL
                       ? 'bg-warning-700 text-warning-50'
@@ -129,7 +139,12 @@
                   "
                   @click="selectedMode = GAME_MODES.SEASONAL"
                 >
-                  {{ t('common.seasonal_pvp', 'Seasonal PvP') }}
+                  <GameModeBadge :mode="GAME_MODES.SEASONAL" class="-my-1" />
+                  <span
+                    class="flex min-h-8 min-w-0 items-center text-center leading-tight wrap-anywhere sm:min-h-0"
+                  >
+                    {{ t('common.seasonal_pvp', 'Seasonal PvP') }}
+                  </span>
                 </button>
               </div>
             </article>
@@ -840,6 +855,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import { useStreamerToolsOverlay } from '@/features/streamer-tools/composables/useStreamerToolsOverlay';
   import { logger } from '@/utils/logger';

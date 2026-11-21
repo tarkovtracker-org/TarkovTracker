@@ -1,4 +1,4 @@
-import { defineEventHandler, setResponseHeaders } from 'h3';
+import { defineEventHandler, getRequestURL, setResponseHeaders } from 'h3';
 import { useRuntimeConfig } from '#imports';
 import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
@@ -11,7 +11,10 @@ const CACHE_HEADERS = {
   'cache-tag': CACHE_TAG,
   vary: 'Origin',
 };
-const NO_STORE_HEADERS = { 'cache-control': 'no-store' };
+const NO_STORE_HEADERS = {
+  'cache-control': 'no-store',
+  'cloudflare-cdn-cache-control': 'no-store',
+};
 const SETTING_KEY = 'promoted_twitch';
 const DEFAULT_CHANNEL = 'honeyxxo';
 const CHANNEL_REGEX = /^[a-z0-9_]{1,25}$/;
@@ -106,7 +109,8 @@ export default defineEventHandler(async (event): Promise<TwitchConfig> => {
   const fallback = readFallback(runtime);
   const override = await readOverride(runtime);
   const config = resolveConfig(fallback, override.value);
-  setResponseHeaders(event, override.failed ? NO_STORE_HEADERS : CACHE_HEADERS);
+  const cacheable = !override.failed && !getRequestURL(event).search;
+  setResponseHeaders(event, cacheable ? CACHE_HEADERS : NO_STORE_HEADERS);
   return {
     ...config,
     version: Number.isSafeInteger(override.version) ? (override.version as number) : 0,

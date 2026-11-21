@@ -38,6 +38,9 @@
               @toggle-hide="toggleHidden"
               @copy-link="copyTaskLink"
             >
+              <template #alternatives>
+                <TaskCardAlternatives :task-id="task.id" />
+              </template>
               <template #actions>
                 <TaskCardActions
                   :state="actionButtonState"
@@ -355,6 +358,7 @@
     type RequirementExpectedStatus,
   } from '@/features/tasks/task-requirement-helpers';
   import TaskCardActions from '@/features/tasks/TaskCardActions.vue';
+  import TaskCardAlternatives from '@/features/tasks/TaskCardAlternatives.vue';
   import TaskCardBackground from '@/features/tasks/TaskCardBackground.vue';
   import TaskCardBadges from '@/features/tasks/TaskCardBadges.vue';
   import TaskCardHeader from '@/features/tasks/TaskCardHeader.vue';

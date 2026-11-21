@@ -1,6 +1,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
 const {
   mockState,
@@ -29,12 +30,14 @@ mockNuxtImport('useProductAnalytics', () => () => ({
 }));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
+    loading: ref(false),
     editions: [{ value: 1, title: 'Standard' }],
   }),
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getCurrentGameMode: () => mockState.currentMode,
+    getPMCFaction: () => 'USEC',
     getModeDisplayName: (mode: 'pvp' | 'pve') =>
       mode === 'pve' ? mockState.pveDisplayName : mockState.pvpDisplayName,
     setModeDisplayName: setModeDisplayNameMock,
@@ -84,6 +87,7 @@ describe('DisplayNameCard', () => {
           $t: (key: string) => key,
         },
         stubs: {
+          PlayerLevelField: true,
           GenericCard: {
             template: '<div><slot name="content" /></div>',
           },

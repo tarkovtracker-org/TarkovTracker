@@ -1,4 +1,5 @@
-import type { TarkovItem, TaskObjective } from '@/types/tarkov';
+import { mapObjectiveEquipment } from '@/utils/objectiveEquipment';
+import type { ObjectiveEquipment, TarkovItem, TaskObjective } from '@/types/tarkov';
 export type ObjectiveWithItems = TaskObjective & {
   item?: TarkovItem;
   items?: TarkovItem[];
@@ -7,10 +8,6 @@ export type ObjectiveWithItems = TaskObjective & {
   requiredKeys?: TarkovItem[][];
   containsAll?: TarkovItem[];
   useAny?: TarkovItem[];
-  usingWeapon?: TarkovItem;
-  usingWeaponMods?: TarkovItem[];
-  wearing?: TarkovItem[];
-  notWearing?: TarkovItem[];
 };
 export function createItemPicker(itemsById: Map<string, TarkovItem>) {
   const pickItemLite = (item?: TarkovItem | null): TarkovItem | undefined => {
@@ -35,5 +32,9 @@ export function createItemPicker(itemsById: Map<string, TarkovItem>) {
     if (!Array.isArray(items)) return items ?? undefined;
     return items.map((group) => pickItemArray(group) ?? []);
   };
-  return { pickItemLite, pickItemArray, pickItemMatrix };
+  const pickEquipment = (value?: ObjectiveEquipment): ObjectiveEquipment | undefined =>
+    value === undefined
+      ? undefined
+      : mapObjectiveEquipment(value, (item) => pickItemLite(item) ?? item);
+  return { pickItemLite, pickItemArray, pickItemMatrix, pickEquipment };
 }
