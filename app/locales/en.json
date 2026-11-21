@@ -1812,6 +1812,7 @@
       "share_private_enabled": "This mode is private.",
       "mode_toggle_label": "Select profile mode",
       "copy_snapshot": "Copy Snapshot",
+      "copy_profile_link": "Copy profile link",
       "view_tasks": "Open Tasks",
       "story_no_tasks": "Waiting for task metadata to build your story.",
       "story_start": "{mode} profile is just getting started.",
@@ -2343,6 +2344,15 @@
       "game_edition_with_value": "Edition {edition}"
     },
     "profile_sharing": {
+      "handle_label": "Profile handle",
+      "handle_placeholder": "your_handle",
+      "handle_help": "Choose 3–24 letters, numbers, or underscores, including at least one letter. Claiming a permanent handle keeps your current sharing settings.",
+      "handle_claim": "Claim handle",
+      "handle_use_pmc": "Use PMC name: {handle}",
+      "handle_invalid": "Choose a different handle. This one is invalid or reserved.",
+      "handle_taken": "This handle or account already has a claim. Refresh before trying again.",
+      "handle_failed": "Unable to load or save your profile handle. Try again later.",
+      "handle_streamer": "Handle links are unavailable while Streamer Mode is on.",
       "title": "Profile Sharing",
       "description": "Control which game mode profiles can be viewed from a shared link.",
       "public": "Public",

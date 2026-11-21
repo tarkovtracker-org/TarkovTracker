@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isPublicProfileShellPath } from '@/utils/profileShell';
+import { isHandleProfileShellPath, isPublicProfileShellPath } from '@/utils/profileShell';
 import type { H3Event } from 'h3';
 const { headers, fetchAsset } = vi.hoisted(() => ({
   headers: vi.fn(),
@@ -16,9 +16,24 @@ vi.mock('h3', () => ({
 mockNuxtImport('useRuntimeConfig', () => () => ({ public: {} }));
 const uuid = '11111111-1111-4111-8111-111111111111';
 const profilePath = `/profile/${uuid}/pvp`;
-const event = (path: string, binding: unknown = { fetch: fetchAsset }) =>
-  ({ path, context: { cloudflare: { env: { ASSETS: binding } } } }) as unknown as H3Event;
+const event = (path: string, binding: unknown = { fetch: fetchAsset }, method = 'GET') =>
+  ({ path, method, context: { cloudflare: { env: { ASSETS: binding } } } }) as unknown as H3Event;
 describe('profile shell paths', () => {
+  it.each(['/@rat_one', '/@rat_one/pve', '/@rat_one/seasonal'])('accepts %s', (path) => {
+    expect(isHandleProfileShellPath(path)).toBe(true);
+  });
+  it.each([
+    '/@',
+    '/@123',
+    '/@RAT',
+    '/@rat/',
+    '/@rat%2fpvp',
+    '/@rat/pve/x',
+    '/@rat/pvp-season',
+    '/@rat\n',
+  ])('rejects malformed handle URL %s', (path) =>
+    expect(isHandleProfileShellPath(path)).toBe(false)
+  );
   it.each(['pvp', 'pve', 'seasonal'])('accepts %s profiles', (mode) => {
     expect(isPublicProfileShellPath(`/profile/${uuid}/${mode}`)).toBe(true);
   });
@@ -59,6 +74,41 @@ describe('profile shell handler', () => {
   it('serves the finite profile entry shell at its trailing-slash asset URL', async () => {
     const { default: handler } = await import('@/server/routes/profile/[...path].get');
     await expect(handler(event('/profile/'))).resolves.toBe('<html>shell</html>');
+  });
+  it('leaves unrelated paths and methods to other handlers', async () => {
+    const { default: handler } = await import('@/server/middleware/profile-handle-shell');
+    expect(handler(event('/tasks'))).toBeUndefined();
+    expect(handler(event('/@rat_one', undefined, 'POST'))).toBeUndefined();
+    expect(fetchAsset).not.toHaveBeenCalled();
+  });
+  it.each(['GET', 'HEAD'])(
+    'serves handle %s through the fixed no-store profile shell',
+    async (method) => {
+      const { default: handler } = await import('@/server/middleware/profile-handle-shell');
+      await expect(handler(event('/@rat_one/pve?user=ignored', undefined, method))).resolves.toBe(
+        '<html>shell</html>'
+      );
+      expect(fetchAsset.mock.calls[0]?.[0].url).toBe('https://assets.local/profile');
+      expect(headers).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          'Cache-Control': 'no-store',
+          'X-Robots-Tag': 'noindex, nofollow',
+        })
+      );
+    }
+  );
+  it.each(['fetch', 'body'])('returns 503 when the shell %s fails', async (stage) => {
+    const failure = new Error('asset unavailable');
+    if (stage === 'fetch') fetchAsset.mockRejectedValueOnce(failure);
+    else
+      fetchAsset.mockResolvedValueOnce({
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'text/html' }),
+        text: vi.fn().mockRejectedValue(failure),
+      });
+    const { default: handler } = await import('@/server/middleware/profile-handle-shell');
+    await expect(handler(event('/@rat_one'))).rejects.toMatchObject({ statusCode: 503 });
   });
   it('registers the same bounded handler for HEAD requests', async () => {
     const { default: getHandler } = await import('@/server/routes/profile/[...path].get');
