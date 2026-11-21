@@ -19,6 +19,16 @@ For nonowners, missing and nonpublic profiles return the same generic `404 Profi
 response. Streamer/overlay consumers preserve that response so sharing endpoints do not expose
 whether a candidate account or private mode exists. Owners can still view their private progress.
 
+### Profile links
+
+Players can claim a permanent handle in **Settings → Account → Profile Sharing**.
+The short `/@<handle>` link chooses public PvP, then public PvE, then the public
+active Seasonal profile. Use `/@<handle>/<mode>` to link to a specific mode.
+Existing `/profile/<uuid>/<mode>` links keep their current access rules. Claims
+do not change visibility. Handle links require public mode visibility and are
+disabled while Streamer Mode is enabled. Deleted accounts leave their former
+addresses reserved so old links cannot be reassigned to a different player.
+
 > **Upstream data source.** TarkovTracker consumes the static JSON endpoints at `json.tarkov.dev`.
 > The endpoint catalog lives at `https://json.tarkov.dev/endpoints`. The older `api.tarkov.dev`
 > GraphQL playground is deprecated and unstable; do not use it for game data or external tooling.

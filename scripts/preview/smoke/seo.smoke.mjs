@@ -189,6 +189,30 @@ test('legacy aliases remain HTTP 301 redirects', async ({ request }) => {
     expect(response.status()).toBe(301);
   }
 });
+test('handle links use the private profile shell and load the public mode', async ({
+  page,
+  request,
+}) => {
+  const mode = await previewGet(request, `${origin}/@preview_player/pve`, origin);
+  expect(mode.status()).toBe(200);
+  const invalid = await previewGet(request, `${origin}/@preview_player/unknown`, origin);
+  expect(invalid.status()).toBe(404);
+  await page.route('**/api/profile/@preview_player/default', (route) =>
+    route.fulfill({
+      json: {
+        data: { displayName: 'Preview Player', level: 24 },
+        mode: 'pve',
+        visibility: 'public',
+      },
+    })
+  );
+  const response = await page.goto(`${origin}/@preview_player`);
+  expect(response?.status()).toBe(200);
+  expect(await response?.headerValue('cache-control')).toBe('no-store');
+  expect(await response?.headerValue('x-robots-tag')).toBe('noindex, nofollow');
+  await expect(page.getByRole('heading', { name: 'Preview Player' })).toBeVisible();
+  await expect(page.getByText(`${origin}/@preview_player`, { exact: true })).toBeVisible();
+});
 test('public to private to public navigation restores metadata', async ({ page }) => {
   await page.goto(`${origin}/resources/tarkovmonitor`, { waitUntil: 'networkidle' });
   await page.locator('footer a[href="/tasks"]').click();
