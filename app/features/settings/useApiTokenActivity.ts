@@ -36,6 +36,7 @@ const PAGE_SIZE = 50;
 export function useApiTokenActivity(tokenId: ActivityScope) {
   const { $supabase } = useNuxtApp();
   const range = ref<ActivityRange>('today');
+  const displayRange = ref(range.value);
   const endpoint = ref<string | null>(null);
   const client = ref<string | null>(null);
   const throttleOnly = ref(false);
@@ -71,9 +72,17 @@ export function useApiTokenActivity(tokenId: ActivityScope) {
       return null;
     }
   }
-  function applyActivity(result: Activity, before?: ActivityRequest) {
-    if (!before) activity.value = result;
-    requests.value = [...requests.value, ...result.requests.slice(0, PAGE_SIZE)];
+  function applyActivity(
+    result: Activity,
+    requestedRange: ActivityRange,
+    before?: ActivityRequest
+  ) {
+    if (!before) {
+      activity.value = result;
+      displayRange.value = requestedRange;
+    }
+    const page = result.requests.slice(0, PAGE_SIZE);
+    requests.value = before ? [...requests.value, ...page] : page;
     hasMore.value = result.requests.length > PAGE_SIZE;
   }
   async function load(before?: ActivityRequest) {
@@ -82,17 +91,18 @@ export function useApiTokenActivity(tokenId: ActivityScope) {
     controller = request;
     loading.value = true;
     failed.value = false;
-    if (!before) requests.value = [];
+    const requestedRange = range.value;
     const result = await fetchActivity(request.signal, before);
     if (request.signal.aborted) return;
     loading.value = false;
     failed.value = result === null;
-    if (result) applyActivity(result, before);
+    if (result) applyActivity(result, requestedRange, before);
   }
   watch([range, endpoint, client, throttleOnly, kind], () => void load(), { immediate: true });
   onScopeDispose(abort);
   return {
     range,
+    displayRange,
     endpoint,
     client,
     throttleOnly,

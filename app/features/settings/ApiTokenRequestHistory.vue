@@ -4,7 +4,7 @@
       <h4 class="font-semibold">{{ text('history') }}</h4>
       <UButton
         v-if="requests.length"
-        :disabled="loading"
+        :disabled="stale"
         color="neutral"
         variant="soft"
         size="xs"
@@ -72,6 +72,7 @@
     <UButton
       v-if="hasMore"
       :loading="loading"
+      :disabled="stale"
       color="neutral"
       variant="soft"
       size="sm"
@@ -84,7 +85,12 @@
 <script setup lang="ts">
   import { useApiActivityLabels } from '@/features/settings/useApiActivityLabels';
   import type { ActivityRequest } from '@/features/settings/useApiTokenActivity';
-  defineProps<{ requests: ActivityRequest[]; hasMore: boolean; loading: boolean }>();
+  defineProps<{
+    requests: ActivityRequest[];
+    hasMore: boolean;
+    loading: boolean;
+    stale: boolean;
+  }>();
   const emit = defineEmits<{
     'copy-evidence': [];
     'select-client': [client: string];

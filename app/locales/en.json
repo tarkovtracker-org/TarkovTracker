@@ -1622,6 +1622,7 @@
           "token_cap_reached": "Token limit reached",
           "token_cap_reached_desc": "You can have at most 3 active API tokens. Revoke an existing token to create a new one.",
           "revoke_button": "Revoke",
+          "revoke_named": "Revoke {name}",
           "report": {
             "load_failed": "API token load failed",
             "create_failed": "API token creation failed",
@@ -1632,6 +1633,13 @@
             "created": "Created",
             "last_used": "Last used",
             "never": "Never",
+            "unknown_date": "Unknown",
+            "lifetime_requests": "Lifetime requests",
+            "token_value": "Token value",
+            "no_permissions": "No permissions",
+            "permission_personal_read": "Read personal progress",
+            "permission_team_read": "Read team progress",
+            "permission_write": "Update personal progress",
             "usage_count": "{count} lifetime requests",
             "revoked": "Revoked"
           },
@@ -1640,6 +1648,8 @@
             "account": "Account activity & quota",
             "view": "View activity",
             "view_named": "View activity for {name}",
+            "hide": "Hide activity",
+            "hide_named": "Hide activity for {name}",
             "refresh": "Refresh",
             "quota": "Today's account quota",
             "quota_description": "Shared by all tokens. Resets at 00:00 UTC. Values update after a quota decision is recorded.",
@@ -1685,6 +1695,8 @@
             "quota_result": "Quota result",
             "load_more": "Load older requests",
             "loading": "Loading activity…",
+            "updating": "Updating results…",
+            "stale_results": "Couldn’t update activity. Showing previous results.",
             "load_error": "Couldn't load API activity. Try refreshing.",
             "copy_evidence": "Copy displayed evidence",
             "copied": "Request evidence copied",
@@ -1693,6 +1705,7 @@
           "form": {
             "gamemode_title": "Game mode",
             "permissions_title": "Permissions",
+            "permissions_help": "To change permissions later, create a replacement token and revoke the old one.",
             "note_label": "Label or note",
             "note_placeholder": "e.g. streamer overlay, clan bot, personal app"
           }
