@@ -77,11 +77,10 @@
   /** Retrying never signs out; a successful save only removes the need to confirm. */
   const handleRetry = async () => {
     retrying.value = true;
-    try {
-      await retryCloudSave();
-    } finally {
+    const result = await retryCloudSave().finally(() => {
       retrying.value = false;
-    }
+    });
+    if (result === 'deferred') return;
     const saved = !hasUnsavedProgressChanges();
     if (saved) confirmOpen.value = false;
     toast.add({

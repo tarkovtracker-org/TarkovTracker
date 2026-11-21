@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <a
         href="https://api.tarkovtracker.org"
         target="_blank"
@@ -9,16 +9,33 @@
       >
         {{ t('page.settings.card.apitokens.open_api_documentation') }}
       </a>
-      <UButton
-        color="primary"
-        variant="soft"
-        icon="i-mdi-key-plus"
-        :disabled="!userLoggedIn || creating || tokenCapReached"
-        @click="showCreateDialog = true"
-      >
-        {{ t('page.settings.card.apitokens.new_token_expand') }}
-      </UButton>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          color="neutral"
+          variant="soft"
+          icon="i-mdi-chart-timeline-variant"
+          aria-controls="api-token-activity"
+          :aria-expanded="activityScope === 'account'"
+          @click="toggleActivity('account')"
+        >
+          {{ t('page.settings.card.apitokens.activity.account') }}
+        </UButton>
+        <UButton
+          color="primary"
+          variant="soft"
+          icon="i-mdi-key-plus"
+          :disabled="!userLoggedIn || creating || tokenCapReached"
+          @click="showCreateDialog = true"
+        >
+          {{ t('page.settings.card.apitokens.new_token_expand') }}
+        </UButton>
+      </div>
     </div>
+    <ApiTokenActivityDisclosure
+      id="api-token-activity"
+      :open="activityScope === 'account'"
+      :title="t('page.settings.card.apitokens.activity.account')"
+    />
     <div class="space-y-3">
       <UAlert
         v-if="!supportsRawTokens"
@@ -137,7 +154,7 @@
                   />
                 </div>
               </div>
-              <div class="text-surface-400 flex items-center gap-2 text-xs">
+              <div class="text-surface-400 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <span>
                   {{ t('page.settings.card.apitokens.list.created') }}:
                   {{ formatDate(token.createdAt) }}
@@ -149,18 +166,26 @@
                     })
                   }}
                 </span>
-                <UTooltip :text="lastUsedTooltip(token.lastUsedAt)">
-                  <button
-                    type="button"
-                    class="inline-flex items-center justify-center"
-                    :aria-label="lastUsedTooltip(token.lastUsedAt)"
-                  >
-                    <UIcon name="i-mdi-clock-outline" class="text-surface-500 h-3.5 w-3.5" />
-                  </button>
-                </UTooltip>
+                <ApiTokenLastUsed :date="token.lastUsedAt" />
               </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <UButton
+                color="primary"
+                variant="soft"
+                icon="i-mdi-chart-timeline-variant"
+                size="xs"
+                :aria-controls="`api-activity-${token.id}`"
+                :aria-label="
+                  t('page.settings.card.apitokens.activity.view_named', {
+                    name: activityTitle(token),
+                  })
+                "
+                :aria-expanded="activityScope === token.id"
+                @click="toggleActivity(token.id)"
+              >
+                {{ t('page.settings.card.apitokens.activity.view') }}
+              </UButton>
               <UBadge v-if="!token.isActive" color="warning" variant="subtle" size="xs">
                 {{ t('page.settings.card.apitokens.list.revoked') }}
               </UBadge>
@@ -177,6 +202,12 @@
               </UButton>
             </div>
           </div>
+          <ApiTokenActivityDisclosure
+            :id="`api-activity-${token.id}`"
+            :open="activityScope === token.id"
+            :token-id="token.id"
+            :title="activityTitle(token)"
+          />
         </UCard>
       </div>
     </div>
@@ -302,6 +333,8 @@
   import GameModeBadge from '@/components/GameModeBadge.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
+  import ApiTokenActivityDisclosure from '@/features/settings/ApiTokenActivityDisclosure.vue';
+  import ApiTokenLastUsed from '@/features/settings/ApiTokenLastUsed.vue';
   import ApiTokenNameEditor from '@/features/settings/ApiTokenNameEditor.vue';
   import {
     API_PERMISSIONS,
@@ -343,6 +376,7 @@
   const revokingId = ref<string | null>(null);
   const renamingId = ref<string | null>(null);
   const editingTokenId = ref<string | null>(null);
+  const activityScope = ref<string | null>(null);
   const tokens = ref<TokenRow[]>([]);
   const selectedGameMode = ref<GameMode>(GAME_MODES.PVP);
   const selectedPermissions = ref<TokenPermission[]>(['GP']);
@@ -387,12 +421,11 @@
     if (!date) return '';
     return new Date(date).toLocaleString();
   };
-  const lastUsedTooltip = (lastUsedAt: string | null) => {
-    const value = lastUsedAt
-      ? formatDate(lastUsedAt)
-      : t('page.settings.card.apitokens.list.never');
-    return t('page.settings.card.apitokens.list.last_used_tooltip', { value });
+  const toggleActivity = (scope: string) => {
+    activityScope.value = activityScope.value === scope ? null : scope;
   };
+  const activityTitle = (token: TokenRow) =>
+    token.note || t('page.settings.card.apitokens.default_note');
   const formatGameMode = (mode: GameMode) => {
     const option = GAME_MODE_OPTIONS.find((entry) => entry.value === mode);
     return option
@@ -435,6 +468,7 @@
     renameTokenRequestId += 1;
   };
   const resetUserScopedState = () => {
+    activityScope.value = null;
     invalidateTokenCreates();
     invalidateTokenLoads();
     invalidateTokenRenames();
