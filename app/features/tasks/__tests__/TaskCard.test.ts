@@ -553,14 +553,22 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
     wrapper.unmount();
   });
-  it('shows downstream impact without adding a quest-links control when links are hidden', async () => {
+  it('keeps downstream impact available by keyboard with or without visible quest links', async () => {
     preferencesState.showNext = false;
     const wrapper = await mountSuspended(TaskCardAlternatives, {
       props: { taskId: 'task-1', impactCount: 3, nextTasks: [{ id: 'next' }], previousTasks: [] },
       global: { stubs: { AppTooltip: AppTooltipStub, UIcon: true } },
     });
-    expect(wrapper.text()).toContain('Impact: 3');
+    expect(wrapper.get('[tabindex="0"]').text()).toContain('Impact: 3');
     expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    preferencesState.showNext = true;
+    await nextTick();
+    await wrapper.get('button[aria-label="Quest links"]').trigger('click');
+    await flushPromises();
+    const popup = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(popup.findAll('[tabindex="0"]').some((element) => element.text() === 'Impact: 3')).toBe(
+      true
+    );
     wrapper.unmount();
   });
   it('keeps previous links available while hidden behind the compact blocker limit', async () => {

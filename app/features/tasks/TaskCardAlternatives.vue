@@ -73,7 +73,7 @@
           </section>
         </div>
         <AppTooltip v-if="impactCount" :text="t('page.tasks.questcard.impact_tooltip')">
-          <p class="text-surface-300 border-surface-700 border-t px-3 py-2">
+          <p tabindex="0" class="text-surface-300 border-surface-700 border-t px-3 py-2">
             {{ t('common.impact') }}: {{ impactCount }}
           </p>
         </AppTooltip>
