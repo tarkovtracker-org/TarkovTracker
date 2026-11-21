@@ -82,7 +82,8 @@ const mockSupabaseClient = {
   from: mockFrom,
 };
 mockNuxtImport('useI18n', () => () => ({
-  t: (key: string) => key,
+  t: (key: string, params?: { name: string }) =>
+    key.endsWith('.revoke_named') ? `${key} ${params?.name}` : key,
 }));
 mockNuxtImport('useNuxtApp', () => () => ({
   $supabase: {
@@ -456,6 +457,10 @@ describe('ApiTokens', () => {
     const revokeButtons = wrapper
       .findAll('button')
       .filter((button) => button.text() === 'page.settings.card.apitokens.revoke_button');
+    expect(revokeButtons.map((button) => button.attributes('aria-label'))).toEqual([
+      'page.settings.card.apitokens.revoke_named Existing Token',
+      'page.settings.card.apitokens.revoke_named Other Token',
+    ]);
     await revokeButtons[1]!.trigger('click');
     await flushPromises();
     resolveLoadMany('user-a', [
