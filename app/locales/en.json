@@ -2400,8 +2400,12 @@
     "profile_sharing": {
       "handle_label": "Profile handle",
       "handle_placeholder": "your_handle",
-      "handle_help": "Choose 3–24 letters, numbers, or underscores, including at least one letter. Claiming a permanent handle keeps your current sharing settings.",
+      "handle_help": "Choose 3–24 letters, numbers, or underscores, including at least one letter.",
       "handle_claim": "Claim handle",
+      "handle_change": "Change handle",
+      "handle_save": "Save handle",
+      "handle_rename_help": "Changing your handle releases the old name. Anyone can claim it, and old links could lead to their profile. You can change your handle once every 30 days.",
+      "handle_cooldown": "You can change your handle 30 days after your last change.",
       "handle_use_pmc": "Use PMC name: {handle}",
       "handle_invalid": "Choose a different handle. This one is invalid or reserved.",
       "handle_taken": "This handle or account already has a claim. Refresh before trying again.",

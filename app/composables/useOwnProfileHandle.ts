@@ -1,4 +1,26 @@
 import { isProfileHandle } from '@/utils/profileHandle';
+import type { SupabaseClient } from '@supabase/supabase-js';
+const saveErrors: Partial<Record<string, 'taken' | 'invalid' | 'cooldown'>> = {
+  '23505': 'taken',
+  '23514': 'invalid',
+  PT429: 'cooldown',
+};
+const writeProfileHandle = (
+  client: SupabaseClient,
+  id: string,
+  previous: string | null,
+  value: string
+) => {
+  const handles = client.from('profile_handles');
+  return previous
+    ? handles
+        .update({ handle: value })
+        .eq('user_id', id)
+        .eq('handle', previous)
+        .select('handle')
+        .maybeSingle()
+    : handles.insert({ handle: value, user_id: id });
+};
 export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
   const { $supabase } = useNuxtApp();
   const userId = computed(() =>
@@ -9,7 +31,7 @@ export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
   const failed = ref(false);
   const loadVersion = ref(0);
   const handle = computed(() =>
-    record.value?.userId === userId.value ? record.value?.handle : null
+    record.value?.userId === userId.value ? (record.value?.handle ?? null) : null
   );
   watch(
     [userId, loadVersion],
@@ -39,22 +61,22 @@ export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
     },
     { immediate: true }
   );
-  const claim = async (value: string) => {
+  const save = async (value: string) => {
     const id = userId.value;
     if (!id || !isProfileHandle(value)) return 'invalid';
-    // RLS rejects the claim if the active session changed accounts.
-    const { error } = await $supabase.client
-      .from('profile_handles')
-      .insert({ handle: value, user_id: id });
+    const previous = handle.value;
+    const { data, error } = await writeProfileHandle($supabase.client, id, previous, value);
     if (userId.value !== id) return 'invalid';
-    if (error?.code === '23505') return 'taken';
-    if (error?.code === '23514') return 'invalid';
-    if (error) return 'failed';
+    if (error) return saveErrors[error.code] ?? 'failed';
+    if (previous && !data) {
+      loadVersion.value += 1;
+      return 'failed';
+    }
     record.value = { userId: id, handle: value };
     return 'saved';
   };
   const retry = () => {
     loadVersion.value += 1;
   };
-  return { handle, loading, failed, claim, retry };
+  return { handle, loading, failed, save, retry };
 };
