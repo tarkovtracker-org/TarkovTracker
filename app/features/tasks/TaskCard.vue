@@ -84,6 +84,7 @@
         <!-- Extra Info Strips (padded area) -->
         <TaskRequirementChips
           v-if="showCompactRequirements"
+          v-model:expanded="showAllCompactRequirements"
           :rows="blockingRequirements"
           @show-pool="showRequirementPool"
         />
@@ -355,6 +356,7 @@
   import { formatExpectedStatuses } from '@/features/tasks/requirement-format';
   import { impactEligibleTaskIdsKey } from '@/features/tasks/task-context';
   import {
+    COMPACT_REQUIREMENT_LIMIT,
     getRequiredTaskStatuses,
     type RequirementExpectedStatus,
   } from '@/features/tasks/task-requirement-helpers';
@@ -746,6 +748,16 @@
     routeTaskId: () => getQueryString(route.query.task),
   });
   const showCompactRequirements = computed(() => isLocked.value && !taskExpanded.value);
+  const showAllCompactRequirements = ref(false);
+  watch(showCompactRequirements, (show) => {
+    if (!show) showAllCompactRequirements.value = false;
+  });
+  const compactRequirements = computed(() => {
+    if (!showCompactRequirements.value) return [];
+    return showAllCompactRequirements.value
+      ? blockingRequirements.value
+      : blockingRequirements.value.slice(0, COMPACT_REQUIREMENT_LIMIT);
+  });
   const linkedPreviousTasks = computed(() => {
     const shownRequirements = taskExpanded.value
       ? expandedRequirements.value
@@ -753,9 +765,6 @@
     const shownLinks = new Set(shownRequirements.map((row) => row.to));
     return parentTasks.value.filter((task) => !shownLinks.has(`/tasks?task=${task.id}`));
   });
-  const compactRequirements = computed(() =>
-    showCompactRequirements.value ? blockingRequirements.value : []
-  );
   const selectedMapIds = computed(() => {
     return resolveSelectedMapIds(
       preferencesStore.getTaskMapView,

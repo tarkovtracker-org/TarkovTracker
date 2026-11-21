@@ -9,7 +9,7 @@
       @pointerenter="openOnHover"
       @pointerleave="scheduleHoverClose"
       @focus="openOnFocus"
-      @blur="scheduleHoverClose"
+      @blur="closeOnBlur"
       @click.capture="keepHoverOpen"
       @contextmenu.prevent.stop="emit('itemContextMenu', $event, item)"
     >
@@ -26,7 +26,8 @@
         @pointerleave="scheduleHoverClose"
       >
         <img
-          :src="getKeyPreviewSrc(item)"
+          :key="previewSrc"
+          :src="previewSrc"
           alt=""
           class="bg-surface-900/30 mb-2 block h-28 w-full rounded-sm object-contain"
           @error="hideImage"
@@ -74,6 +75,7 @@
     setOpen,
     openOnHover,
     openOnFocus,
+    closeOnBlur,
     scheduleHoverClose,
     cancelHoverClose,
     onOpenAutoFocus,
@@ -82,6 +84,7 @@
     keepHoverOpen,
   } = useTaskCardPreview(panel);
   const name = computed(() => props.item?.name || props.item?.shortName || t('common.item'));
+  const previewSrc = computed(() => (props.item ? getKeyPreviewSrc(props.item) : undefined));
   const contentOptions = computed(() => ({
     'aria-label': name.value,
     side: 'top' as const,

@@ -4,6 +4,7 @@ export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
   const open = ref(false);
   let manageFocus = false;
   let restoringFocus = false;
+  let keyboardFocused = false;
   const { start: startHoverClose, stop: cancelHoverClose } = useTimeoutFn(
     () => setOpen(false),
     200,
@@ -25,17 +26,22 @@ export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
   }
   function openOnFocus(event: FocusEvent) {
     const trigger = event.currentTarget as HTMLElement;
-    if (!restoringFocus && trigger.matches(':focus-visible')) showPreview();
+    keyboardFocused = trigger.matches(':focus-visible');
+    if (keyboardFocused && !restoringFocus) showPreview();
   }
   function scheduleHoverClose() {
-    if (open.value && !manageFocus) startHoverClose();
+    if (open.value && !manageFocus && !keyboardFocused) startHoverClose();
+  }
+  function closeOnBlur() {
+    keyboardFocused = false;
+    scheduleHoverClose();
   }
   function preserveFocus(event: Event) {
     if (!manageFocus) event.preventDefault();
   }
   function onCloseAutoFocus(event: Event) {
     preserveFocus(event);
-    // Reka restores focus to the trigger synchronously after this event.
+    // The non-modal popover focuses the trigger within its close-autofocus handler.
     restoringFocus = true;
     queueMicrotask(() => {
       restoringFocus = false;
@@ -62,6 +68,7 @@ export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
     setOpen,
     openOnHover,
     openOnFocus,
+    closeOnBlur,
     scheduleHoverClose,
     cancelHoverClose,
     onOpenAutoFocus: preserveFocus,

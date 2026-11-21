@@ -48,6 +48,14 @@ describe('TaskCardRewards', () => {
     const preview = new DOMWrapper(document.body).get('[role="dialog"][aria-label="Roubles"]');
     expect(preview.get('img').attributes('src')).toBe(item.image512pxLink);
     expect(preview.get('a').attributes('href')).toBe('https://tarkov.dev/item/' + item.id);
+    await preview.get('img').trigger('error');
+    expect(preview.get('img').attributes('hidden')).toBeDefined();
+    const newSource = 'https://assets.tarkov.dev/updated-roubles.webp';
+    await wrapper.setProps({
+      itemRewards: [{ item: { ...item, image512pxLink: newSource }, count: 85000 }],
+    });
+    expect(preview.get('img').attributes('src')).toBe(newSource);
+    expect(preview.get('img').attributes('hidden')).toBeUndefined();
     wrapper.unmount();
   });
   it('omits the footer when XP is hidden and there are no other rewards', async () => {

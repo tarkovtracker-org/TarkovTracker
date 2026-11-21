@@ -550,6 +550,32 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
     wrapper.unmount();
   });
+  it('keeps previous links available while hidden behind the compact blocker limit', async () => {
+    preferencesState.collapseDefault = true;
+    const ids = ['first', 'second', 'third', 'fourth'];
+    const taskRequirements = ids.map((id) => ({ task: { id }, status: ['complete'] }));
+    metadataStoreMock.getTaskById.mockImplementation((id) => ({ id, name: id }));
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [{ type: 'prerequisite', requirements: taskRequirements }],
+        },
+      },
+    };
+    const wrapper = await mountTaskCard({ parents: ids, taskRequirements });
+    const compact = wrapper.get('[data-testid="task-requirements-blocking"]');
+    expect(compact.findAll('a')).toHaveLength(3);
+    await wrapper.get('button[aria-label="Quest links"]').trigger('click');
+    await flushPromises();
+    const links = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(links.findAll('a').map((link) => link.text())).toEqual(['fourth']);
+    await compact.get('button').trigger('click');
+    expect(compact.findAll('a')).toHaveLength(4);
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('keeps a locked card usable before its evaluation snapshot is available', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     const wrapper = await mountTaskCard();
