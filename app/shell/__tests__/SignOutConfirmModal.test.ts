@@ -106,6 +106,19 @@ describe('SignOutConfirmModal', () => {
       expect.objectContaining({ title: 'progress_save_status.retry_failed', color: 'warning' })
     );
   });
+  it('keeps the warning open without a failure toast while the retry is deferred', async () => {
+    markUnsaved();
+    registerCloudRetryHandler(async () => 'deferred');
+    const wrapper = await mountModal();
+    await useSignOut().requestSignOut();
+    await flushPromises();
+    await wrapper.get('[data-testid="sign-out-retry"]').trigger('click');
+    await flushPromises();
+    expect(useSignOut().confirmOpen.value).toBe(true);
+    expect(signOut).not.toHaveBeenCalled();
+    expect(toastAdd).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
   it('stays open when a retry fails', async () => {
     markUnsaved();
     registerCloudRetryHandler(async () => false);

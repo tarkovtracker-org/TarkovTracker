@@ -4,6 +4,7 @@ import {
   progressSaveStatus,
   retryCloudSave,
   type CloudSaveFailure,
+  type CloudSaveRetryResult,
   type CloudSaveState,
   type LocalSaveFailure,
 } from '@/stores/tarkov/progressSaveStatus';
@@ -68,7 +69,7 @@ export function useProgressSaveStatus() {
   );
   const retryAttempt = computed(() => progressSaveStatus.cloud.retryAttempt);
   const retryTotal = CLOUD_SAVE_RETRY_DELAYS_MS.length;
-  const retry = async (): Promise<boolean> => {
+  const retry = async (): Promise<CloudSaveRetryResult> => {
     retrying.value = true;
     try {
       return await retryCloudSave();

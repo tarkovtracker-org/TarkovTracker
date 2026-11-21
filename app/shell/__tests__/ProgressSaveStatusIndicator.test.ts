@@ -192,6 +192,20 @@ describe('ProgressSaveStatusIndicator', () => {
       expect.objectContaining({ title: 'progress_save_status.retry_failed' })
     );
   });
+  it('keeps the pending indicator without a failure toast for a deferred retry', async () => {
+    cloud('pending');
+    const handler = vi.fn().mockResolvedValue('deferred');
+    registerCloudRetryHandler(handler);
+    const wrapper = await mountIndicator();
+    await wrapper.get('[data-testid="progress-save-retry"]').trigger('click');
+    await flushPromises();
+    expect(handler).toHaveBeenCalledOnce();
+    expect(toastAdd).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="progress-save-status"]').attributes('data-status')).toBe(
+      'cloud_pending'
+    );
+    wrapper.unmount();
+  });
   it('exports current progress and reports export failures', async () => {
     recordLocalSave(false, 'quota');
     exportProgress.mockRejectedValueOnce(new Error('blocked'));
