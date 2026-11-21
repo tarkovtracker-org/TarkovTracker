@@ -24,6 +24,7 @@ On wide layouts the gutter grows with the app area up to the current sidebar wid
 layouts use 12 px of edge padding at app bar widths below 760 px and 8 px below 560 px. Search grows
 with the available space and opens across the bar on narrow screens. Activity, theme, help, and language move between
 direct controls and More as space changes. Discord and GitHub are in More at every width.
+The cloud save indicator sits next to the utilities and account controls.
 App bar dropdowns are non-modal so opening the account or utility menus leaves page scrolling intact.
 
 ## Language selection
