@@ -106,22 +106,30 @@ describe('TaskCardRewards', () => {
     expect(preview.text()).toContain('Skier LL4');
     wrapper.unmount();
   });
-  it('uses full names when different items share a short name within an unlock group', async () => {
+  it('distinguishes variants with shared short names within an unlock group', async () => {
     const trader = { id: 'peacekeeper', name: 'Peacekeeper' };
+    const variants = [
+      ['Urban', 'ACS sight (Urban)', 'ACS'],
+      ['Forest', 'ACS sight (Forest)', 'ACS'],
+      ['First optic', 'First named optic', 'Optic'],
+      ['Second optic', 'Second named optic', 'Optic'],
+    ] as const;
     const wrapper = await mountSuspended(TaskCardRewards, {
       props: {
         ...emptyRewards,
-        offerUnlockRewards: ['Urban', 'Forest'].map((variant) => ({
-          id: variant,
-          item: { id: variant, name: `ACS sight (${variant})`, shortName: 'ACS' },
+        offerUnlockRewards: variants.map(([id, name, shortName]) => ({
+          id,
+          item: { id, name, shortName },
           trader,
           level: 4,
         })),
       },
     });
     expect(wrapper.findAll('[data-testid="task-reward-item"]').map((chip) => chip.text())).toEqual([
-      'ACS sight (Urban)',
-      'ACS sight (Forest)',
+      'ACS (Urban)',
+      'ACS (Forest)',
+      'First named optic',
+      'Second named optic',
     ]);
     wrapper.unmount();
   });

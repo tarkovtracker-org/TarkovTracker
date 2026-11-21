@@ -120,13 +120,29 @@
   function formatSkillName(name: string) {
     return name.replace(/([a-z])([A-Z])/g, '$1 $2');
   }
+  function endingQualifier(name?: string) {
+    return name?.trim().match(/\([^()]+\)$/)?.[0];
+  }
+  function variantLabel(
+    short: string,
+    fullName: string | undefined,
+    variants: { item?: TarkovItem }[]
+  ) {
+    const qualifier = endingQualifier(fullName);
+    if (!qualifier) return undefined;
+    const distinguishable = variants.every(({ item: variant }) => {
+      const otherQualifier = endingQualifier(variant?.name);
+      return otherQualifier && otherQualifier !== qualifier;
+    });
+    return distinguishable ? `${short} ${qualifier}` : undefined;
+  }
   function compactName(item: TarkovItem | undefined, group: { item?: TarkovItem }[]) {
     const short = item?.shortName?.trim();
     if (!short) return undefined;
-    const ambiguous = group.some(
+    const variants = group.filter(
       (other) => other.item?.shortName?.trim() === short && other.item?.name !== item?.name
     );
-    return ambiguous ? undefined : short;
+    return variants.length ? variantLabel(short, item?.name, variants) : short;
   }
   const { t } = useI18n({ useScope: 'global' });
   const formatNumber = useLocaleNumberFormatter();

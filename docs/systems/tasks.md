@@ -855,9 +855,10 @@ the quest opens or the player dismisses the notice.
 The dedicated chevron controls card expansion in both views. When rewards are visible, the footer
 shows individual item quantities and purchase unlocks as chips alongside reputation, skills, trader
 unlocks, and XP. More than six visible rewards or multiple purchase unlocks use labeled rows for
-progression, items and cash, and purchase unlocks. The grouped rows use catalog short names when
-they distinguish the items in the row. Every reward stays visible. Item chips show the full item
-name and image on hover or keyboard focus and open the preview on click or tap.
+progression, items and cash, and purchase unlocks. The grouped rows use catalog short names with
+variant qualifiers where available, and full names when the short labels would be ambiguous.
+Every reward stays visible. Item chips show the full item name and image on hover or keyboard
+focus and open the preview on click or tap.
 The preview links to the item on tarkov.dev. Hide-rewards applies to both list and map cards.
 Missing database columns use the existing preference-sync fallback, so new settings remain local
 until the compact-list preference migration is deployed.
