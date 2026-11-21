@@ -100,6 +100,13 @@ export const useTaskRequirements = (task: () => Task) => {
     }),
     progress: you(formatTraderValue(kind, blocker.current)),
   });
+  const linkedTask = (id?: string) =>
+    id && metadataStore.getTaskById(id)?.name ? `/tasks?task=${id}` : undefined;
+  const blockerLink = (blocker: TaskBlocker) => {
+    const chapterId = blocker.chapterIds?.[0];
+    if (chapterId && blocker.objective) return storyObjectiveLink(chapterId, blocker.objective.id);
+    return blocker.type === 'trader_unlock' ? linkedTask(blocker.taskId) : undefined;
+  };
   const otherRows = (blocker: TaskBlocker): TaskRequirementRow[] => {
     const requirement = normalizeOtherRequirements(task().otherRequirements).find(
       (requirement) =>
@@ -108,16 +115,12 @@ export const useTaskRequirements = (task: () => Task) => {
         (requirement.counter || requirement.taskPool)
     );
     if (requirement?.type === 'globalVariable') return [poolRow(requirement, false, blocker)];
-    const chapterId = blocker.chapterIds?.[0];
     return [
       {
         kind: 'other',
         met: false,
         label: blockerText(blocker),
-        to:
-          chapterId && blocker.objective
-            ? storyObjectiveLink(chapterId, blocker.objective.id)
-            : undefined,
+        to: blockerLink(blocker),
       },
     ];
   };

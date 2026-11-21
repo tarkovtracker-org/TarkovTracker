@@ -6,7 +6,7 @@
   >
     <div class="flex flex-wrap items-center gap-1.5">
       <span class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
-        {{ t('common.requires') }}
+        {{ t('page.tasks.requirements.title') }}
       </span>
       <component
         :is="chip.tag"

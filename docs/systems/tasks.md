@@ -74,11 +74,12 @@ own collapse toggle. The drawer holds only the availability requirements. The le
 
 ## Quest links
 
-The Quest links chip is available on collapsed quest cards. Hover over it, or activate it with a
-click, tap, or keyboard, to see links to named quests. The links use the selected mode's quest
-catalog and the completion-failure relationships derived from Tarkov.dev failure conditions.
-The popover shows the total and one quest per row. It groups mutual choices separately from quests
-that fail when this one is completed and quests whose completion fails this one.
+The Quest links chip works on both collapsed and expanded cards. Hover over it, or activate it
+with a click, tap, or keyboard, to see links to named quests in the selected mode. It groups mutual
+choices, quests that fail when this one is completed, and quests whose completion fails this one.
+It also shows follow-up quests and previous quests according to the corresponding card settings.
+Previous quests already linked in the visible Requirements are omitted from the popover.
+Downstream impact is available inside Quest links when a relationship is listed.
 
 ## Hidden tasks
 
@@ -295,11 +296,11 @@ response cannot replace the core catalog's gates.
 The result carries availability and blockers for levels, loyalty, reputation, quest statuses,
 failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
 is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
-card builds one requirement list with `useTaskRequirements`: while a card is locked, its header
-lists only the unmet requirements as chips (three, then an inline "+N more"), and the expanded body
-has a collapsible Requirements row that marks every level, trader, prerequisite and server-side
-(`otherRequirements`) requirement met or unmet. Cards carry no separate level or trader requirement badges. Comparisons are worded in
-plain language by `requirement-format.ts` (`15+`, `exactly 1`, never `>=`); the dashboard's
+card builds its requirement views with `useTaskRequirements`. A collapsed locked card shows
+blockers as chips (three, then an inline "+N more"). An expanded card shows the Requirements
+list by default, with blockers first and each level, trader, quest, and server-side requirement
+marked met or unmet. Cards carry no separate level or trader requirement badges. Comparisons use
+the plain-language formatter in `requirement-format.ts` (`15+`, `exactly 1`); the dashboard's
 `useTaskBlockerText` sentences use the same formatter. Shared/non-current profile
 views call the same evaluator with their own mode progress. Profile task/objective, prestige and
 story catalogs load for the selected mode without mutating the active metadata store; obsolete
@@ -850,9 +851,12 @@ their card. If a linked quest is absent from the current mode's catalog, the Tas
 why and offers to switch to any mode where the quest ID matches. The link stays active until
 the quest opens or the player dismisses the notice.
 
-The dedicated chevron controls card expansion in both views. Hide-rewards applies
-to both list and map cards. Missing database columns use the existing preference-sync fallback,
-so new settings remain local until the compact-list preference migration is deployed.
+The dedicated chevron controls card expansion in both views. When rewards are visible, the footer
+shows individual item quantities and purchase unlocks as chips alongside reputation, skills, trader
+unlocks, and XP. Item chips show a preview on hover or keyboard focus and open it on click or tap.
+The preview links to the item on tarkov.dev. Hide-rewards applies to both list and map cards.
+Missing database columns use the existing preference-sync fallback, so new settings remain local
+until the compact-list preference migration is deployed.
 
 ### Needed Items views
 
