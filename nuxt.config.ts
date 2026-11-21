@@ -282,11 +282,16 @@ export default defineNuxtConfig({
     baseURL: '/',
     buildAssetsDir: '/_nuxt/',
     head: {
-      link: [{ rel: 'icon', href: '/favicon.ico', sizes: 'any' }],
+      link: [
+        { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+      ],
       style: [
         {
           textContent: [
-            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH}}`,
+            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH};--shell-bar-h:3.5rem}`,
+            '@media(width >= 640px){:root{--shell-bar-h:4rem}}',
             'body{background:var(--color-surface-950,hsl(0 0% 4%))}',
             // Light theme pre-hydration: match the warm-paper surface values from
             // tailwind.css so the skeleton never flashes dark for light-theme users.
@@ -312,7 +317,7 @@ export default defineNuxtConfig({
             'top:0;',
             'left:var(--shell-w);',
             'right:0;',
-            'height:44px;',
+            'height:var(--shell-bar-h);',
             'background:var(--color-surface-900,hsl(0 0% 9%));',
             'border-bottom:1px solid var(--color-surface-700,hsl(0 0% 25%));',
             'z-index:40',
@@ -345,6 +350,7 @@ export default defineNuxtConfig({
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'theme-color', content: '#c8a882' },
+        { name: 'apple-mobile-web-app-title', content: 'TarkovTracker' },
       ],
     },
   },
