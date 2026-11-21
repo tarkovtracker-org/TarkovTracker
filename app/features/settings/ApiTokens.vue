@@ -166,10 +166,7 @@
                     })
                   }}
                 </span>
-                <span>
-                  {{ t('page.settings.card.apitokens.list.last_used') }}:
-                  {{ formatLastUsed(token.lastUsedAt) }}
-                </span>
+                <ApiTokenLastUsed :date="token.lastUsedAt" />
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
@@ -179,6 +176,11 @@
                 icon="i-mdi-chart-timeline-variant"
                 size="xs"
                 :aria-controls="`api-activity-${token.id}`"
+                :aria-label="
+                  t('page.settings.card.apitokens.activity.view_named', {
+                    name: activityTitle(token),
+                  })
+                "
                 :aria-expanded="activityScope === token.id"
                 @click="toggleActivity(token.id)"
               >
@@ -332,6 +334,7 @@
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
   import ApiTokenActivityDisclosure from '@/features/settings/ApiTokenActivityDisclosure.vue';
+  import ApiTokenLastUsed from '@/features/settings/ApiTokenLastUsed.vue';
   import ApiTokenNameEditor from '@/features/settings/ApiTokenNameEditor.vue';
   import {
     API_PERMISSIONS,
@@ -421,8 +424,6 @@
   const toggleActivity = (scope: string) => {
     activityScope.value = activityScope.value === scope ? null : scope;
   };
-  const formatLastUsed = (date: string | null) =>
-    formatDate(date) || t('page.settings.card.apitokens.list.never');
   const activityTitle = (token: TokenRow) =>
     token.note || t('page.settings.card.apitokens.default_note');
   const formatGameMode = (mode: GameMode) => {

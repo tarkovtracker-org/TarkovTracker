@@ -124,7 +124,7 @@
   const groups = computed(() => [
     {
       type: 'endpoint' as const,
-      rows: (activity.value?.endpoints ?? []).slice(0, 5).map((row) => ({
+      rows: (activity.value?.endpoints ?? []).map((row) => ({
         ...row,
         label: endpointName(row.value),
       })),

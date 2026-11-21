@@ -1639,6 +1639,7 @@
             "title": "API activity",
             "account": "Account activity & quota",
             "view": "View activity",
+            "view_named": "View activity for {name}",
             "refresh": "Refresh",
             "quota": "Today's account quota",
             "quota_description": "Shared by all tokens. Resets at 00:00 UTC. Values update after a quota decision is recorded.",
