@@ -16,6 +16,17 @@ route defaults an unrecognized locale to `en`. The 14 UI locales map to 13 API
 languages, with Ukrainian using the English game-data bundle. Both lists derive
 from `SUPPORTED_LOCALES` and `LOCALE_TO_API_MAPPING`.
 
+### Provisional season modifier catalog
+
+`/api/tarkov/season-preview` reads a revision-pinned standalone UNTAR Control
+catalog from the overlay repository for the Seasonal Modifiers planner. The
+artifact mirrors Tarkov.dev's `season` and `season_en` envelopes and carries
+Battlestate's provisional source link. The browser loads it after prerendering.
+This preview remains separate from the active-season `seasonalPerks` in
+`/api/tarkov/editions`. Preview identifiers and unconfirmed exclusions never
+flow into live season metadata. Update the overlay revision in the route when
+the official provisional values change.
+
 ### Supported languages
 
 `cs`, `de`, `en`, `es`, `fr`, `it`, `ja`, `ko`, `pl`, `pt`, `ru`, `tr`, `uk`, and `zh`.

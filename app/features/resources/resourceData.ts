@@ -1,7 +1,7 @@
 type ResourceLinkType = 'website' | 'github' | 'discord' | 'api' | 'download';
 export type ResourceCategory =
   'tarkovtracker_guides' | 'companion_apps' | 'data_and_apis' | 'calculators_and_reference';
-type ResourcePrimaryAction = 'guide' | 'website' | 'api';
+type ResourcePrimaryAction = 'guide' | 'website' | 'api' | 'planner';
 interface ResourceLink {
   type: ResourceLinkType;
   url: string;
@@ -91,6 +91,15 @@ export const RESOURCE_META_ITEMS: Record<ResourceCategory, ResourceMetaItem[]> =
   ],
 };
 export const RESOURCES: Resource[] = [
+  {
+    slug: 'seasonal_modifiers',
+    logo: null,
+    category: 'calculators_and_reference',
+    hasGuide: false,
+    primaryAction: 'planner',
+    keywords: ['season', 'untar', 'perks', 'drawbacks', 'points', 'modifier'],
+    links: [],
+  },
   {
     slug: 'tarkovtracker_org_vs_io',
     logo: '/img/logos/tarkovtrackerlogo-mini.webp',
@@ -266,6 +275,16 @@ const guideAction = (resource: Resource, useSetupLabel = true): ResourceAction =
   };
 };
 export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
+  if (resource.primaryAction === 'planner') {
+    return {
+      kind: 'internal',
+      href: '/resources/seasonal-modifiers',
+      labelKey: 'page.resources.actions.open_planner',
+      labelFallback: 'Open planner',
+      icon: 'i-mdi-calculator-variant-outline',
+      external: false,
+    };
+  }
   if (resource.primaryAction === 'guide' && resource.hasGuide) {
     return guideAction(resource);
   }
