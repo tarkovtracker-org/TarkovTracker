@@ -39,7 +39,7 @@
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
     </ul>
-    <div class="bg-surface-800 mx-3 my-2 h-px" aria-hidden="true"></div>
+    <div class="bg-divider mx-3 my-2 h-px" aria-hidden="true"></div>
     <ul class="flex flex-col gap-0.5 px-1 pb-2">
       <DrawerItem
         icon="i-mdi-compass-outline"
