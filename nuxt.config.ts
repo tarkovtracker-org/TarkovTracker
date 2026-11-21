@@ -239,7 +239,7 @@ export default defineNuxtConfig({
       pages: {
         defaultRoutes: false,
         routes: {
-          include: ['/api/*', '/overlay/*', '/profile/*'],
+          include: ['/api/*', '/overlay/*', '/profile/*', '/u/*'],
           exclude: [],
         },
       },
@@ -449,7 +449,7 @@ export default defineNuxtConfig({
         writeFileSync(
           resolve(nitro.options.output.dir, '_routes.json'),
           JSON.stringify(
-            { version: 1, include: ['/api/*', '/overlay/*', '/profile/*'], exclude: [] },
+            { version: 1, include: ['/api/*', '/overlay/*', '/profile/*', '/u/*'], exclude: [] },
             null,
             2
           )
@@ -458,6 +458,7 @@ export default defineNuxtConfig({
           '/api/*',
           '/overlay/*',
           '/profile/*',
+          '/u/*',
         ]);
         assertPrerenderedDocuments(nitro.options.output.publicDir);
       });

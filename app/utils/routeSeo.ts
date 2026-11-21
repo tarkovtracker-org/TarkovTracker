@@ -67,11 +67,13 @@ const readEnglishKey = (key: string): string => {
   return candidates.find((candidate) => typeof candidate === 'string')!;
 };
 const normalizePath = (path: string): string => path.split(/[?#]/)[0]!.replace(/\/+$/, '') || '/';
+const isProfilePath = (path: string) =>
+  path === '/profile' || path.startsWith('/profile/') || path.startsWith('/u/');
 const fallbackKey = (path: string): SeoCopyKey =>
   CLIENT_PAGE_KEYS[path as keyof typeof CLIENT_PAGE_KEYS] ??
-  (path.startsWith('/profile/') ? 'profile' : 'not_found');
+  (isProfilePath(path) ? 'profile' : 'not_found');
 const canonicalFields = (path: string): Pick<RouteSeo, 'canonical'> =>
-  path === '/profile' || path.startsWith('/profile/') ? {} : { canonical: `${SEO_ORIGIN}${path}` };
+  isProfilePath(path) ? {} : { canonical: `${SEO_ORIGIN}${path}` };
 const resolveCopyKey = (path: string, guideSlug?: string): SeoCopyKey =>
   (PUBLIC_PAGE_KEYS[path as keyof typeof PUBLIC_PAGE_KEYS] ??
     guideSlug ??

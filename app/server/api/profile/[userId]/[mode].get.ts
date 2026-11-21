@@ -8,6 +8,7 @@ import {
   defineEventHandler,
   getRequestHeader,
   getRouterParam,
+  type H3Event,
   setResponseHeader,
 } from 'h3';
 import { normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
@@ -25,8 +26,13 @@ import {
   writeSharedCache,
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
+import {
+  resolveDefaultSharedMode,
+  resolveSharedProfileHandle,
+} from '@/server/utils/sharedProfileHandle';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
+import { isProfileHandle } from '@/utils/profileHandle';
 import {
   isRecord,
   sanitizeDisplayName,
@@ -549,16 +555,97 @@ const resolveRequesterUserId = async (
     return null;
   }
 };
-export default defineEventHandler(async (event) => {
-  setResponseHeader(event, 'Cache-Control', 'no-store, max-age=0');
-  const userId = (getRouterParam(event, 'userId') || '').trim();
-  const mode = normalizeMode(getRouterParam(event, 'mode'));
-  if (!mode) {
+const createProfileRateGuard = (cache: SharedCacheHandle, limit: number) => async (key: string) => {
+  if (isTestEnvironment) return;
+  if (!(await consumeRateLimit(cache, key, limit))) {
+    throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
+  }
+};
+const readProfilePreferences = async (preferencesResponse: Response, userId: string) => {
+  let preferencesRow: PreferencesRow | null = null;
+  if (preferencesResponse.ok) {
+    const preferenceRows = (await preferencesResponse.json()) as PreferencesRow[];
+    preferencesRow = preferenceRows[0] ?? null;
+  } else {
+    logger.warn('Failed to load profile sharing preferences', {
+      status: preferencesResponse.status,
+      userId,
+    });
+  }
+  return preferencesRow;
+};
+const fetchProfileResources = async ({
+  restFetch,
+  abortResources,
+  userId,
+  mode,
+  seasonNumber,
+}: {
+  restFetch: (path: string) => Promise<Response>;
+  abortResources: () => void;
+  userId: string;
+  mode: GameMode;
+  seasonNumber: number;
+}) => {
+  let progressResponse: Response;
+  let modeProgressResponse: Response;
+  let preferencesResponse: Response;
+  const progressSelect = 'user_id,game_edition';
+  try {
+    [progressResponse, modeProgressResponse, preferencesResponse] = await Promise.all([
+      restFetch(`user_progress?select=${progressSelect}&user_id=eq.${userId}&limit=1`),
+      restFetch(
+        `user_game_mode_progress?select=user_id,progress_data,profile_public&user_id=eq.${userId}&game_mode=eq.${mode}&season_number=eq.${seasonNumber}&limit=1`
+      ),
+      restFetch(`user_preferences?select=streamer_mode&user_id=eq.${userId}&limit=1`),
+    ]);
+  } catch (error) {
+    abortResources();
+    if (Object(error).statusCode === 504) throw error;
+    if (isAbortError(error)) {
+      throw createError({
+        statusCode: 504,
+        statusMessage: 'Timed out while loading shared profile data',
+      });
+    }
+    logger.error('Failed to load shared profile resources', { error, userId });
+    throw createError({
+      statusCode: 502,
+      statusMessage: 'Failed to load shared profile data',
+    });
+  }
+  if (!progressResponse.ok || !modeProgressResponse.ok) {
+    throw createError({ statusCode: 500, statusMessage: 'Failed to load profile data' });
+  }
+  const progressRows = (await progressResponse.json()) as ProgressRow[];
+  const progressRow = progressRows[0];
+  if (!progressRow) {
+    throw createError({ statusCode: 404, statusMessage: 'Profile not found' });
+  }
+  const modeProgressRows = (await modeProgressResponse.json()) as ModeProgressRow[];
+  const modeProgressRow = modeProgressRows[0] ?? null;
+  const preferencesRow = await readProfilePreferences(preferencesResponse, userId);
+  return {
+    progressRow,
+    modeProgressRow,
+    preferencesRow,
+    preferencesAvailable: preferencesResponse.ok,
+  };
+};
+const readProfileTarget = (event: H3Event) => {
+  const identifier = (getRouterParam(event, 'userId') || '').trim();
+  const handle = identifier.startsWith('@') ? identifier.slice(1) : null;
+  const rawMode = getRouterParam(event, 'mode');
+  const requestedMode = normalizeMode(rawMode);
+  if (!requestedMode && !(handle && rawMode === 'default')) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid profile mode' });
   }
-  if (!UUID_REGEX.test(userId)) {
+  if (handle === null ? !UUID_REGEX.test(identifier) : !isProfileHandle(handle)) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid profile id' });
   }
+  return { identifier, handle, requestedMode };
+};
+const readProfileRuntime = (event: H3Event) => {
   const typedConfig = useRuntimeConfig(event) as ReturnType<typeof useRuntimeConfig> &
     ApiProtectionConfig;
   const { supabaseAnonKey } = typedConfig;
@@ -590,43 +677,31 @@ export default defineEventHandler(async (event) => {
     getRateLimiterBinding(event)
   );
   const clientIdentifier = getProxyAwareClientIdentifier(event, trustProxy);
-  if (!isTestEnvironment) {
-    const preAuthRateLimitKey = `shared-profile:ip:${clientIdentifier}`;
-    if (
-      !(await consumeRateLimit(
-        sharedCacheHandle,
-        preAuthRateLimitKey,
-        sharedProfileRateLimitPerMinute
-      ))
-    ) {
-      throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
-    }
-  }
-  const authHeader = getRequestHeader(event, 'authorization');
-  const requesterUserId = await resolveRequesterUserId(authHeader, supabaseAnonKey, supabaseUrl);
-  const requesterKey = requesterUserId ?? clientIdentifier;
-  if (!isTestEnvironment) {
-    const requesterRateLimitKey = `shared-profile:requester:${requesterKey}:${userId}:${mode}`;
-    if (
-      !(await consumeRateLimit(
-        sharedCacheHandle,
-        requesterRateLimitKey,
-        sharedProfileRateLimitPerMinute
-      ))
-    ) {
-      throw createError({ statusCode: 429, statusMessage: 'Too many requests' });
-    }
-  }
-  const seasonNumber = await resolveGameModeSeason(mode, { supabaseUrl, supabaseServiceKey });
-  const sharedProfileCacheKey = `${userId}:${mode}:${seasonNumber}:${requesterKey}`;
-  if (!isTestEnvironment) {
-    const cached = await getCachedProfile(sharedCacheHandle, sharedProfileCacheKey);
-    if (cached) {
-      return cached;
-    }
-  }
+  return {
+    supabaseUrl,
+    supabaseAnonKey,
+    supabaseServiceKey,
+    sharedCacheHandle,
+    clientIdentifier,
+    sharedProfileCacheTtlMs,
+    sharedProfileRateLimitPerMinute,
+  };
+};
+const createProfileRestClient = ({
+  supabaseUrl,
+  supabaseAnonKey,
+  supabaseServiceKey,
+  authHeader,
+  isOwner,
+}: {
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  supabaseServiceKey: string;
+  authHeader: string | undefined;
+  isOwner: boolean;
+}) => {
   const hasServiceKey = supabaseServiceKey.length > 0;
-  if (!hasServiceKey && requesterUserId !== userId) {
+  if (!hasServiceKey && !isOwner) {
     throw createError({
       statusCode: 503,
       statusMessage: 'Shared profiles unavailable on this environment',
@@ -653,69 +728,101 @@ export default defineEventHandler(async (event) => {
       REST_FETCH_TIMEOUT_MS,
       'Timed out while loading shared profile data'
     );
-  let progressResponse: Response;
-  let modeProgressResponse: Response;
-  let preferencesResponse: Response;
-  const progressSelect = 'user_id,game_edition';
-  try {
-    [progressResponse, modeProgressResponse, preferencesResponse] = await Promise.all([
-      restFetch(`user_progress?select=${progressSelect}&user_id=eq.${userId}&limit=1`),
-      restFetch(
-        `user_game_mode_progress?select=user_id,progress_data,profile_public&user_id=eq.${userId}&game_mode=eq.${mode}&season_number=eq.${seasonNumber}&limit=1`
-      ),
-      restFetch(`user_preferences?select=streamer_mode&user_id=eq.${userId}&limit=1`),
-    ]);
-  } catch (error) {
-    resourcesController.abort();
-    if (Object(error).statusCode === 504) throw error;
-    if (isAbortError(error)) {
-      throw createError({
-        statusCode: 504,
-        statusMessage: 'Timed out while loading shared profile data',
-      });
-    }
-    logger.error('Failed to load shared profile resources', { error, userId });
-    throw createError({
-      statusCode: 502,
-      statusMessage: 'Failed to load shared profile data',
-    });
-  }
-  if (!progressResponse.ok || !modeProgressResponse.ok) {
-    throw createError({ statusCode: 500, statusMessage: 'Failed to load profile data' });
-  }
-  const progressRows = (await progressResponse.json()) as ProgressRow[];
-  const progressRow = progressRows[0];
-  if (!progressRow) {
-    throw createError({ statusCode: 404, statusMessage: 'Profile not found' });
-  }
-  const modeProgressRows = (await modeProgressResponse.json()) as ModeProgressRow[];
-  const modeProgressRow = modeProgressRows[0] ?? null;
-  let preferencesRow: PreferencesRow | null = null;
-  if (preferencesResponse.ok) {
-    const preferenceRows = (await preferencesResponse.json()) as PreferencesRow[];
-    preferencesRow = preferenceRows[0] ?? null;
-  } else {
-    logger.warn('Failed to load profile sharing preferences', {
-      status: preferencesResponse.status,
-      userId,
-    });
-  }
-  const isOwner = requesterUserId === userId;
-  const isModePublic = modeProgressRow?.profile_public === true;
-  if (!isOwner && !isModePublic) {
+  return { restFetch, abortResources: () => resourcesController.abort() };
+};
+const canViewSharedProgress = (
+  { isOwner, isPublic, isHandle }: { isOwner: boolean; isPublic: boolean; isHandle: boolean },
+  nameIsVisible: boolean
+) => (isHandle ? isPublic && nameIsVisible : isOwner || isPublic);
+const readSharedProgress = ({
+  modeProgressRow,
+  preferencesRow,
+  preferencesAvailable,
+  isOwner,
+  isHandle,
+}: {
+  modeProgressRow: ModeProgressRow | null;
+  preferencesRow: PreferencesRow | null;
+  preferencesAvailable: boolean;
+  isOwner: boolean;
+  isHandle: boolean;
+}) => {
+  const isPublic = modeProgressRow?.profile_public === true;
+  const streamerMode = preferencesRow?.streamer_mode === true;
+  if (
+    !canViewSharedProgress({ isOwner, isPublic, isHandle }, preferencesAvailable && !streamerMode)
+  ) {
     throw createError({ statusCode: 404, statusMessage: 'Profile not found' });
   }
   const profileData = hasMaterializedProgress(modeProgressRow?.progress_data)
     ? modeProgressRow?.progress_data
     : null;
-  const hideDisplayName = !isOwner && preferencesRow?.streamer_mode === true;
-  const sanitizedData = sanitizeProgressPayload(profileData, {
-    includeDisplayName: !hideDisplayName,
+  return sanitizeProgressPayload(profileData, {
+    includeDisplayName: isOwner || !streamerMode,
   });
-  const payload: SharedProfilePayload = {
+};
+export default defineEventHandler(async (event) => {
+  setResponseHeader(event, 'Cache-Control', 'no-store, max-age=0');
+  const { identifier, handle, requestedMode } = readProfileTarget(event);
+  const {
+    supabaseUrl,
+    supabaseAnonKey,
+    supabaseServiceKey,
+    sharedCacheHandle,
+    clientIdentifier,
+    sharedProfileCacheTtlMs,
+    sharedProfileRateLimitPerMinute,
+  } = readProfileRuntime(event);
+  const enforceRateLimit = createProfileRateGuard(
+    sharedCacheHandle,
+    sharedProfileRateLimitPerMinute
+  );
+  await enforceRateLimit(`shared-profile:ip:${clientIdentifier}`);
+  const authHeader = getRequestHeader(event, 'authorization');
+  const requesterUserId = await resolveRequesterUserId(authHeader, supabaseAnonKey, supabaseUrl);
+  const requesterKey = requesterUserId ?? clientIdentifier;
+  await enforceRateLimit(
+    `shared-profile:requester:${requesterKey}:${identifier}:${requestedMode ?? 'default'}`
+  );
+  const { restFetch, abortResources } = createProfileRestClient({
+    supabaseUrl,
+    supabaseAnonKey,
+    supabaseServiceKey,
+    authHeader,
+    isOwner: requesterUserId === identifier,
+  });
+  const userId = handle ? await resolveSharedProfileHandle(restFetch, handle) : identifier;
+  const mode = requestedMode ?? (await resolveDefaultSharedMode(restFetch, userId));
+  const seasonNumber = await resolveGameModeSeason(mode, { supabaseUrl, supabaseServiceKey });
+  const sharedProfileCacheKey = `${userId}:${mode}:${seasonNumber}:${requesterKey}`;
+  if (!isTestEnvironment && !handle) {
+    const cached = await getCachedProfile(sharedCacheHandle, sharedProfileCacheKey);
+    if (cached) return cached;
+  }
+  const { progressRow, modeProgressRow, preferencesRow, preferencesAvailable } =
+    await fetchProfileResources({
+      restFetch,
+      abortResources,
+      userId,
+      mode,
+      seasonNumber,
+    });
+  const isOwner = requesterUserId === userId;
+  const sanitizedData = readSharedProgress({
+    modeProgressRow,
+    preferencesRow,
+    preferencesAvailable,
+    isOwner,
+    isHandle: Boolean(handle),
+  });
+  const publicData = {
     data: await enrichProgressTaskFailures(await enrichStoryProgress(sanitizedData, mode), mode),
     gameEdition: typeof progressRow.game_edition === 'number' ? progressRow.game_edition : 1,
     mode,
+  };
+  if (handle) return { ...publicData, visibility: 'public' as const };
+  const payload: SharedProfilePayload = {
+    ...publicData,
     userId,
     visibility: isOwner ? 'owner' : 'public',
   };

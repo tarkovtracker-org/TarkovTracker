@@ -123,6 +123,39 @@ describe('Shared Profile API', () => {
     await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid profile id');
     expect(mockOverlay).not.toHaveBeenCalled();
   });
+  it('opens the public PvE mode from a short link without returning the account ID', async () => {
+    mockGetRouterParam.mockImplementation((_, key: string) =>
+      key === 'userId' ? '@rat_one' : 'default'
+    );
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(Response.json([{ game_mode: 'pve' }]))
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(modeProgressResponse({ level: 24 }))
+      .mockResolvedValueOnce(preferencesResponse());
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({ mode: 'pve', visibility: 'public' });
+    expect(result).not.toHaveProperty('userId');
+    expect(String(mockFetch.mock.calls[1]?.[0])).toContain('profile_public=is.true');
+    expect(String(mockFetch.mock.calls[3]?.[0])).toContain('game_mode=eq.pve');
+  });
+  it.each([
+    ['private mode', false, preferencesResponse()],
+    ['Streamer Mode', true, preferencesResponse(true)],
+    ['unavailable preferences', true, { ok: false, status: 500 }],
+  ])('does not reveal a handle profile with %s', async (_label, isPublic, preferences) => {
+    mockGetRouterParam.mockImplementation((_, key: string) =>
+      key === 'userId' ? '@rat_one' : 'pvp'
+    );
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(modeProgressResponse({ level: 24 }, isPublic))
+      .mockResolvedValueOnce(preferences);
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 404 });
+  });
   it.each(['pvp', 'pve', 'seasonal'])(
     'returns the %s effective baseline without modifying recorded progress',
     async (mode) => {

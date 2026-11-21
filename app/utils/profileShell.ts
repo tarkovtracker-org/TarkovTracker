@@ -4,3 +4,5 @@ const PUBLIC_PROFILE_PATH =
 export const isPublicProfileShellPath = (pathname: string): boolean => {
   return PUBLIC_PROFILE_PATH.test(pathname);
 };
+export const isHandleProfileShellPath = (pathname: string): boolean =>
+  /^\/u\/(?=[a-z0-9_]*[a-z])[a-z0-9_]{3,24}(?:\/(?:pvp|pve|seasonal))?$(?![\s\S])/.test(pathname);

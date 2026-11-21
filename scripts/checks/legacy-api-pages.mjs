@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -12,11 +13,7 @@ const tarkovRoutes = readdirSync(new URL('../../app/server/api/tarkov/', import.
   .filter((name) => name.endsWith('.get.ts'))
   .map((name) => name.replaceAll('\\', '/').replace('.get.ts', ''));
 assert.ok(tarkovRoutes.includes('access-check'), 'Tarkov GET route discovery must not be empty');
-const routes = JSON.parse(
-  // Generated build output is deliberately absent from Fallow's source-only audit snapshot.
-  // fallow-ignore-next-line unresolved-import
-  readFileSync(new URL('../../dist/_routes.json', import.meta.url), 'utf8')
-);
+const routes = JSON.parse(readFileSync(join(root, 'dist', '_routes.json'), 'utf8'));
 const harness = createTestHarness({
   root,
   workers: [
@@ -84,12 +81,10 @@ after(async () => {
 test('compiled Pages routing retains its existing Function boundary and static 404 document', () => {
   assert.deepEqual(routes, {
     version: 1,
-    include: ['/api/*', '/overlay/*', '/profile/*'],
+    include: ['/api/*', '/overlay/*', '/profile/*', '/u/*'],
     exclude: [],
   });
-  // Generated build output is deliberately absent from Fallow's source-only audit snapshot.
-  // fallow-ignore-next-line unresolved-import
-  assert.ok(readFileSync(new URL('../../dist/404.html', import.meta.url), 'utf8').length > 0);
+  assert.ok(readFileSync(join(root, 'dist', '404.html'), 'utf8').length > 0);
 });
 test('compiled retirement handles every family and method before consuming a body or binding', async () => {
   for (const { url, method } of retirementCases) {

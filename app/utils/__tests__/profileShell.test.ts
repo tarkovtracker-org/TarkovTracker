@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isPublicProfileShellPath } from '@/utils/profileShell';
+import { isHandleProfileShellPath, isPublicProfileShellPath } from '@/utils/profileShell';
 import type { H3Event } from 'h3';
 const { headers, fetchAsset } = vi.hoisted(() => ({
   headers: vi.fn(),
@@ -19,6 +19,21 @@ const profilePath = `/profile/${uuid}/pvp`;
 const event = (path: string, binding: unknown = { fetch: fetchAsset }) =>
   ({ path, context: { cloudflare: { env: { ASSETS: binding } } } }) as unknown as H3Event;
 describe('profile shell paths', () => {
+  it.each(['/u/rat_one', '/u/rat_one/pve', '/u/rat_one/seasonal'])('accepts %s', (path) => {
+    expect(isHandleProfileShellPath(path)).toBe(true);
+  });
+  it.each([
+    '/u/',
+    '/u/123',
+    '/u/RAT',
+    '/u/rat/',
+    '/u/rat%2fpvp',
+    '/u/rat/pve/x',
+    '/u/rat/pvp-season',
+    '/u/rat\n',
+  ])('rejects malformed handle URL %s', (path) =>
+    expect(isHandleProfileShellPath(path)).toBe(false)
+  );
   it.each(['pvp', 'pve', 'seasonal'])('accepts %s profiles', (mode) => {
     expect(isPublicProfileShellPath(`/profile/${uuid}/${mode}`)).toBe(true);
   });
@@ -59,6 +74,20 @@ describe('profile shell handler', () => {
   it('serves the finite profile entry shell at its trailing-slash asset URL', async () => {
     const { default: handler } = await import('@/server/routes/profile/[...path].get');
     await expect(handler(event('/profile/'))).resolves.toBe('<html>shell</html>');
+  });
+  it('serves handle URLs through the fixed no-store profile shell', async () => {
+    const { default: handler } = await import('@/server/routes/u/[...path].get');
+    const { default: head } = await import('@/server/routes/u/[...path].head');
+    expect(head).toBe(handler);
+    await expect(handler(event('/u/rat_one/pve?user=ignored'))).resolves.toBe('<html>shell</html>');
+    expect(fetchAsset.mock.calls[0]?.[0].url).toBe('https://assets.local/profile');
+    expect(headers).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        'Cache-Control': 'no-store',
+        'X-Robots-Tag': 'noindex, nofollow',
+      })
+    );
   });
   it('registers the same bounded handler for HEAD requests', async () => {
     const { default: getHandler } = await import('@/server/routes/profile/[...path].get');
