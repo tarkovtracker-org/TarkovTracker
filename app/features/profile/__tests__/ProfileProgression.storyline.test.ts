@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref, type Ref } from 'vue';
@@ -214,6 +214,23 @@ const expectNoStoryStoreWrites = () => {
   expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
 };
 describe('ProfileProgression storyline chapter toggle', () => {
+  it('retries an explicit handle mode after a temporary failure', async () => {
+    routeState.params = { handle: 'rat_one', mode: 'pve' };
+    vi.stubGlobal('$fetch', sharedProfileFetch);
+    sharedProfileFetch
+      .mockRejectedValueOnce({ statusCode: 503 })
+      .mockResolvedValueOnce({ data: createProgressData({ displayName: 'Rat One' }), mode: 'pve' });
+    const wrapper = await createWrapper();
+    await flushPromises();
+    expect(sharedProfileFetch).toHaveBeenCalledTimes(1);
+    await wrapper.get('button[aria-pressed="true"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('Rat One');
+    expect(sharedProfileFetch).toHaveBeenNthCalledWith(2, '/api/profile/@rat_one/pve', {
+      headers: undefined,
+    });
+    wrapper.unmount();
+  });
   it.each([false, true])(
     'uses isolated shared-profile objective completion=%s for trader gates',
     async (complete) => {

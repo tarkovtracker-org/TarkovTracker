@@ -523,13 +523,16 @@
     });
   });
   const selectProfileMode = (mode: GameMode) => {
-    if (sharedHandle.value) {
-      if (selectedMode.value !== mode || sharedProfileError.value) {
-        void router.replace(profileHandlePath(sharedHandle.value, mode));
-      }
+    const handle = sharedHandle.value;
+    if (!handle) {
+      selectedMode.value = mode;
       return;
     }
-    selectedMode.value = mode;
+    if (route.params.mode === mode && sharedProfileError.value) {
+      void loadSharedProfile(`@${handle}`, mode);
+    } else if (selectedMode.value !== mode || sharedProfileError.value) {
+      void router.replace(profileHandlePath(handle, mode));
+    }
   };
   const sharedProfileLoading = ref(false);
   const sharedProfileError = ref<string | null>(null);
