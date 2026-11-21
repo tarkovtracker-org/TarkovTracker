@@ -129,6 +129,7 @@ type SharedProfilePayload = {
   data: SanitizedProgressData | null;
   gameEdition: number;
   mode: GameMode;
+  profilePublic?: boolean;
   userId: string;
   visibility: 'owner' | 'public';
 };
@@ -734,6 +735,11 @@ const canViewSharedProgress = (
   { isOwner, isPublic, isHandle }: { isOwner: boolean; isPublic: boolean; isHandle: boolean },
   nameIsVisible: boolean
 ) => (isHandle ? isPublic && nameIsVisible : isOwner || isPublic);
+const assertProfilePreferencesAvailable = (isHandle: boolean, preferencesAvailable: boolean) => {
+  if (isHandle && !preferencesAvailable) {
+    throw createError({ statusCode: 503, statusMessage: 'Shared profiles unavailable' });
+  }
+};
 const readSharedProgress = ({
   modeProgressRow,
   preferencesRow,
@@ -749,11 +755,10 @@ const readSharedProgress = ({
 }) => {
   const isPublic = modeProgressRow?.profile_public === true;
   const streamerMode = preferencesRow?.streamer_mode === true;
-  if (
-    !canViewSharedProgress({ isOwner, isPublic, isHandle }, preferencesAvailable && !streamerMode)
-  ) {
+  if (!canViewSharedProgress({ isOwner, isPublic, isHandle }, !streamerMode)) {
     throw createError({ statusCode: 404, statusMessage: 'Profile not found' });
   }
+  assertProfilePreferencesAvailable(isHandle, preferencesAvailable);
   const profileData = hasMaterializedProgress(modeProgressRow?.progress_data)
     ? modeProgressRow?.progress_data
     : null;
@@ -823,6 +828,7 @@ export default defineEventHandler(async (event) => {
   if (handle) return { ...publicData, visibility: 'public' as const };
   const payload: SharedProfilePayload = {
     ...publicData,
+    ...(isOwner ? { profilePublic: modeProgressRow?.profile_public === true } : {}),
     userId,
     visibility: isOwner ? 'owner' : 'public',
   };

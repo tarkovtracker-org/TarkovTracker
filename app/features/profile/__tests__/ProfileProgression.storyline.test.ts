@@ -214,6 +214,26 @@ const expectNoStoryStoreWrites = () => {
   expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
 };
 describe('ProfileProgression storyline chapter toggle', () => {
+  it.each([false, true])(
+    'honors owner UUID visibility (%s) when sharing',
+    async (profilePublic) => {
+      routeState.params = { userId: '11111111-1111-4111-8111-111111111111', mode: 'pve' };
+      vi.stubGlobal('$fetch', sharedProfileFetch);
+      sharedProfileFetch.mockResolvedValueOnce({
+        data: createProgressData({ displayName: 'Rat One' }),
+        mode: 'pve',
+        profilePublic,
+        visibility: 'owner',
+      });
+      const wrapper = await createWrapper();
+      await flushPromises();
+      expect(wrapper.text()).toContain('Rat One');
+      expect(
+        wrapper.findComponent({ name: 'ProfileSharingActions' }).props('canShareProfile')
+      ).toBe(profilePublic);
+      wrapper.unmount();
+    }
+  );
   it('retries an explicit handle mode after a temporary failure', async () => {
     routeState.params = { handle: 'rat_one', mode: 'pve' };
     vi.stubGlobal('$fetch', sharedProfileFetch);

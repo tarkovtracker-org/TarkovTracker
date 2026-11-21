@@ -163,21 +163,25 @@ describe('Shared Profile API', () => {
     await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode });
   });
   it.each([
-    ['private mode', false, preferencesResponse()],
-    ['Streamer Mode', true, preferencesResponse(true)],
-    ['unavailable preferences', true, { ok: false, status: 500 }],
-  ])('does not reveal a handle profile with %s', async (_label, isPublic, preferences) => {
-    mockGetRouterParam.mockImplementation((_, key: string) =>
-      key === 'userId' ? '@rat_one' : 'pvp'
-    );
-    mockFetch
-      .mockResolvedValueOnce(progressResponse())
-      .mockResolvedValueOnce(progressResponse())
-      .mockResolvedValueOnce(modeProgressResponse({ level: 24 }, isPublic))
-      .mockResolvedValueOnce(preferences);
-    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 404 });
-  });
+    ['private mode', false, preferencesResponse(), 404],
+    ['Streamer Mode', true, preferencesResponse(true), 404],
+    ['public mode with unavailable preferences', true, { ok: false, status: 500 }, 503],
+    ['private mode with unavailable preferences', false, { ok: false, status: 500 }, 404],
+  ])(
+    'does not reveal a handle profile with %s',
+    async (_label, isPublic, preferences, statusCode) => {
+      mockGetRouterParam.mockImplementation((_, key: string) =>
+        key === 'userId' ? '@rat_one' : 'pvp'
+      );
+      mockFetch
+        .mockResolvedValueOnce(progressResponse())
+        .mockResolvedValueOnce(progressResponse())
+        .mockResolvedValueOnce(modeProgressResponse({ level: 24 }, isPublic))
+        .mockResolvedValueOnce(preferences);
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode });
+    }
+  );
   it.each(['pvp', 'pve', 'seasonal'])(
     'returns the %s effective baseline without modifying recorded progress',
     async (mode) => {
@@ -719,6 +723,7 @@ describe('Shared Profile API', () => {
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
     expect(result.visibility).toBe('owner');
+    expect(result).toHaveProperty('profilePublic', false);
     expect(result.data).toEqual({ level: 12 });
   });
   it('returns unavailable when service key is missing for non-owner view', async () => {

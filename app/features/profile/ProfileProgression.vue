@@ -290,6 +290,7 @@
     data: unknown;
     gameEdition: number | null;
     mode: GameMode;
+    profilePublic?: boolean;
     visibility: 'owner' | 'public';
   }
   interface StatCard {
@@ -535,6 +536,7 @@
     }
   };
   const sharedProfileLoading = ref(false);
+  const sharedProfilePublic = ref(false);
   const sharedProfileError = ref<string | null>(null);
   const sharedProfileEdition = ref<number | null>(null);
   const sharedProfileData = ref<UserProgressData | null>(null);
@@ -569,6 +571,7 @@
   const loadSharedProfile = async (userId: string, mode: GameMode | 'default') => {
     const requestId = ++sharedProfileRequestId;
     sharedProfileLoading.value = true;
+    sharedProfilePublic.value = false;
     sharedProfileError.value = null;
     sharedProfileData.value = null;
     sharedProfileEdition.value = null;
@@ -581,6 +584,8 @@
         return;
       }
       sharedProfileData.value = normalizeSharedProgressData(response.data, DEFAULT_PROGRESS_DATA);
+      sharedProfilePublic.value =
+        response.visibility === 'public' || response.profilePublic === true;
       if (mode === 'default') selectedMode.value = response.mode;
       sharedProfileEdition.value =
         typeof response.gameEdition === 'number' ? response.gameEdition : 1;
@@ -614,6 +619,7 @@
       if (!nextSharedUserId) {
         sharedProfileRequestId += 1;
         sharedProfileLoading.value = false;
+        sharedProfilePublic.value = false;
         sharedProfileError.value = null;
         sharedProfileData.value = null;
         sharedProfileEdition.value = null;
@@ -1483,7 +1489,7 @@
   });
   const shareIsPrivate = computed(() => {
     if (isViewingSharedProfile.value) {
-      return false;
+      return Boolean(sharedProfileData.value) && !sharedProfilePublic.value;
     }
     const modeIsPublic = profileVisibility[selectedMode.value];
     return !modeIsPublic;
