@@ -43,12 +43,6 @@
         to="/team"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
-      <DrawerItem
-        icon="i-mdi-trophy"
-        locale-key="common.kappa_lightkeeper"
-        to="/kappa"
-        :is-collapsed="props.isCollapsed"
-      ></DrawerItem>
     </ul>
   </div>
 </template>

@@ -88,7 +88,6 @@ Ranking causes and improvements must be measured separately from these rendering
 │   │   ├── dashboard/       # Main dashboard
 │   │   ├── drawer/          # Side-drawer and help UI
 │   │   ├── hideout/         # Hideout tracking
-│   │   ├── kappa/           # Kappa completion tracker
 │   │   ├── maps/            # Interactive maps
 │   │   ├── neededitems/     # Required items tracker
 │   │   ├── omnibar/         # Inline app-bar search and jump results

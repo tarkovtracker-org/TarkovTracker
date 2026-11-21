@@ -14,7 +14,7 @@ Authentication-required areas include `/account`, `/profile`, `/team`, `/setting
 - [Tarkov Quest Tracker · TarkovTracker.org](https://tarkovtracker.org/tasks): Track Tarkov quests, objectives, rewards, and prerequisites across PvP, PvE, and Seasonal.
 - [Escape from Tarkov Hideout Tracker](https://tarkovtracker.org/hideout): Plan hideout upgrades and track module requirements and construction progress.
 - [Escape from Tarkov Needed Items](https://tarkovtracker.org/needed-items): Find the items you still need for quests and hideout upgrades in one list.
-- [Kappa & Lightkeeper Tracker · TarkovTracker.org](https://tarkovtracker.org/kappa): Track Kappa and Lightkeeper quest requirements and your remaining progression.
+- [Kappa & Lightkeeper Tracker Retired · TarkovTracker.org](https://tarkovtracker.org/kappa): Retirement notice with links to Tasks and Needed Items.
 - [Escape from Tarkov Storyline Tracker](https://tarkovtracker.org/storyline): Follow Escape from Tarkov storyline quests and track your progression.
 - [Escape from Tarkov Tools and Guides](https://tarkovtracker.org/resources): Explore community tools and guides for TarkovTracker, TarkovMonitor, RatScanner, and Tarkov.dev.
 - [About TarkovTracker](https://tarkovtracker.org/about): Learn about TarkovTracker and its community project for tracking Escape from Tarkov progression.
