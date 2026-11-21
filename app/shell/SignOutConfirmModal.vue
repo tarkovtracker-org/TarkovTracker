@@ -80,8 +80,8 @@
     const result = await retryCloudSave().finally(() => {
       retrying.value = false;
     });
+    if (result === 'deferred') return;
     const saved = !hasUnsavedProgressChanges();
-    if (!saved && result === 'deferred') return;
     if (saved) confirmOpen.value = false;
     toast.add({
       title: t(saved ? 'sign_out_confirm.retry_succeeded' : 'progress_save_status.retry_failed'),
