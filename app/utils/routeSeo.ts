@@ -9,6 +9,7 @@ const PUBLIC_PAGE_KEYS = {
   '/kappa': 'kappa',
   '/storyline': 'storyline',
   '/resources': 'resources',
+  '/resources/seasonal-modifiers': 'seasonal_modifiers',
   '/about': 'about',
   '/credits': 'credits',
   '/changelog': 'changelog',

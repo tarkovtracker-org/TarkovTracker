@@ -1976,7 +1976,8 @@
         "open_calculator": "Open calculator",
         "view_changes": "View changes",
         "open_tool": "Open tool",
-        "download_release": "Download latest release"
+        "download_release": "Download latest release",
+        "open_planner": "Open planner"
       },
       "back_to_hub": "Back to Resources",
       "breadcrumb": "Breadcrumb",
@@ -2030,6 +2031,10 @@
         "tarkovchanges": {
           "name": "Tarkov Changes",
           "description": "Review item, quest, and gameplay changes between Tarkov updates."
+        },
+        "seasonal_modifiers": {
+          "name": "Seasonal Modifiers",
+          "description": "Plan a provisional UNTAR Control build and check the point budget."
         }
       },
       "guides": {
@@ -2162,6 +2167,56 @@
       "perk_summary": "Protection from routine inactivity deletion under the account-retention rules in Section 7.3, including one-time contributors and previous subscribers",
       "liability": "Any exclusion or limitation of liability for data loss or privacy-related incidents applies only to the extent permitted by applicable law. Nothing in this Policy excludes or limits rights or remedies that cannot lawfully be excluded or limited.",
       "liability_label": "Limits permitted by law:"
+    },
+    "seasonal_modifiers": {
+      "title": "Seasonal Modifiers",
+      "season": "Season 2 · UNTAR Control",
+      "provisional": "Provisional",
+      "notice": "Battlestate may adjust these values and effects before Season 2 launches.",
+      "source": "Season 2 poster",
+      "global_rules": "Global rules",
+      "spent": "Perks cost",
+      "net_cost": "Net cost",
+      "earned": "Drawbacks grant",
+      "balanced": "Balanced at zero",
+      "over_budget": "Over budget by {count} point | Over budget by {count} points",
+      "spare": "{count} point to spare | {count} points to spare",
+      "suggestion": "Add {names} to reach {total}.",
+      "suggestion_item": "{name} ({points})",
+      "add_suggestions": "Add suggested picks",
+      "review_suggestions": "{count} suggested picks reach {total}",
+      "no_suggestion": "No additions get closer to zero. Try swapping or removing a pick.",
+      "impossible": "{name} would take net cost to {attempted}. Even all remaining drawbacks would leave {minimum}. Remove a perk to make room.",
+      "search": "Search modifiers",
+      "all_categories": "All categories",
+      "filter_category": "Filter by category",
+      "sort": "Modifier order",
+      "order_category": "By category",
+      "order_low": "Points · Low to high",
+      "order_high": "Points · High to low",
+      "selected": "Selected ({count})",
+      "clear_all": "Clear all",
+      "drawbacks": "Negative modifiers",
+      "perks": "Positive modifiers",
+      "drawbacks_hint": "Drawbacks lower net cost",
+      "perks_hint": "Perks raise net cost",
+      "drawbacks_points": "Grants {count} point | Grants {count} points",
+      "perks_points": "Costs {count} point | Costs {count} points",
+      "empty": "No matching modifiers.",
+      "sign_note": "Net cost is points spent minus points earned. Zero or lower is within budget.",
+      "point_rules": "Official point rules",
+      "categories": {
+        "skills": "Skills",
+        "hideout": "Hideout",
+        "raid_combat": "Raid & Combat",
+        "movement_stamina": "Movement & Stamina",
+        "health_provisions": "Health & Provisions",
+        "traders_economy": "Traders & Economy",
+        "gear_goals": "Starting Gear & Goals"
+      },
+      "catalog_pending": "The Season 2 modifier catalog is not available yet.",
+      "perks_short": "Perks",
+      "drawbacks_short": "Drawbacks"
     }
   },
   "footer": {
@@ -2196,7 +2251,8 @@
     "level_display_editable": "Level {level}, click or press Enter to edit",
     "increment_level": "Increase level",
     "decrement_level": "Decrease level",
-    "level_input": "Current level, {min} to {max}"
+    "level_input": "Current level, {min} to {max}",
+    "resources_overview": "Resources overview"
   },
   "profile": {
     "season_short": "S{season}"
@@ -3205,6 +3261,10 @@
       "not_found": {
         "title": "Page Not Found",
         "description": "The requested TarkovTracker page could not be found."
+      },
+      "seasonal_modifiers": {
+        "title": "Seasonal Modifiers Planner",
+        "description": "Plan a Season 2 UNTAR Control build with provisional perks, drawbacks, and a live point calculator."
       }
     }
   }
