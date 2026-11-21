@@ -1378,7 +1378,6 @@
         "reward_purchase_unlocks": "Purchase unlocks",
         "reward_quantity": "{name} ×{amount}",
         "reward_currency": "{amount} {symbol}",
-        "purchase_unlock_reward": "Purchase unlock · {name}",
         "purchase_unlock_trader": "{trader} LL{level}",
         "blocked_tooltip": "This task is permanently blocked and can never be completed due to choices made in other tasks",
         "edition_exclusive_tooltip": "This task is only available to players with {editions} edition",

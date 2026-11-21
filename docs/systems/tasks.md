@@ -853,9 +853,8 @@ why and offers to switch to any mode where the quest ID matches. The link stays 
 the quest opens or the player dismisses the notice.
 
 The dedicated chevron controls card expansion in both views. When rewards are visible, the footer
-shows individual item quantities and purchase unlocks as chips alongside reputation, skills, trader
-unlocks, and XP. More than six visible rewards or multiple purchase unlocks use labeled rows for
-progression, items and cash, and purchase unlocks. The grouped rows use catalog short names with
+shows rewards in labeled rows for progression, items and cash, and purchase unlocks. Only
+categories with rewards appear. Item chips use catalog short names with
 variant qualifiers where available, and full names when the short labels would be ambiguous.
 Every reward stays visible. Item chips show the full item name and image on hover or keyboard
 focus and open the preview on click or tap.

@@ -1,18 +1,12 @@
 <template>
   <div
-    v-if="rewardCount"
-    class="border-surface-700/20 bg-surface-900/20 text-surface-400 @container min-h-7 w-full rounded-b-md border-t px-3 text-xs"
-    :class="grouped ? 'grid gap-1.5 py-2' : 'flex flex-wrap items-center gap-1.5 py-1 sm:gap-2'"
+    v-if="hasRewards"
+    class="border-surface-700/20 bg-surface-900/20 text-surface-400 @container grid w-full gap-1.5 rounded-b-md border-t px-3 py-2 text-xs"
+    role="group"
+    :aria-label="t('page.tasks.questcard.rewards')"
     data-testid="task-card-rewards"
   >
-    <span class="text-surface-400 text-[10px] leading-none font-bold tracking-wider uppercase">
-      {{ t('page.tasks.questcard.rewards') }}
-    </span>
-    <TaskRewardGroup
-      v-if="progressionCount"
-      :grouped="grouped"
-      :label="t('page.tasks.questcard.reward_progression')"
-    >
+    <TaskRewardGroup v-if="hasProgression" :label="t('page.tasks.questcard.reward_progression')">
       <div
         v-if="hasExperience"
         class="bg-warning-900 light:bg-warning-100 inline-flex items-center gap-1 rounded px-1.5 py-0.5 leading-none"
@@ -45,12 +39,6 @@
         :key="`skill-${skill.name}`"
         class="inline-flex items-center gap-1 leading-none"
       >
-        <UIcon
-          v-if="!grouped"
-          name="i-mdi-arm-flex"
-          aria-hidden="true"
-          class="text-secondary-400 h-3.5 w-3.5 shrink-0"
-        />
         <span class="text-secondary-300 leading-none font-medium">+{{ skill.level }}</span>
         <span class="leading-none">{{ formatSkillName(skill.name) }}</span>
       </div>
@@ -69,20 +57,14 @@
         </span>
       </div>
     </TaskRewardGroup>
-    <TaskRewardGroup
-      v-for="group in itemGroups"
-      :key="group.label"
-      :grouped="grouped"
-      :label="t(group.label)"
-    >
+    <TaskRewardGroup v-for="group in itemGroups" :key="group.label" :label="t(group.label)">
       <TaskRewardItemChip
         v-for="reward in group.rewards"
         :key="reward.key"
         :item="reward.item"
         :count="reward.count"
         :offer="reward.offer"
-        :grouped="grouped"
-        :grouped-name="reward.shortName"
+        :short-label="reward.shortName"
         @item-context-menu="forwardItemContextMenu"
       />
     </TaskRewardGroup>
@@ -151,17 +133,14 @@
   );
   const experienceValue = computed(() => props.experience ?? 0);
   const hasExperience = computed(() => showExperienceRewards.value && experienceValue.value > 0);
-  const progressionCount = computed(
+  const hasProgression = computed(
     () =>
-      Number(hasExperience.value) +
-      props.traderStandingRewards.length +
-      props.skillRewards.length +
-      traderUnlocks.value.length
+      hasExperience.value ||
+      [props.traderStandingRewards, props.skillRewards, traderUnlocks.value].some(
+        (rewards) => rewards.length > 0
+      )
   );
-  const rewardCount = computed(
-    () => progressionCount.value + props.itemRewards.length + props.offerUnlockRewards.length
-  );
-  const grouped = computed(() => rewardCount.value > 6 || props.offerUnlockRewards.length > 1);
+  const hasRewards = computed(() => hasProgression.value || itemGroups.value.length > 0);
   const itemGroups = computed(() =>
     [
       {

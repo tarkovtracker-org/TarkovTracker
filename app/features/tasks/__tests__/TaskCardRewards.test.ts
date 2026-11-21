@@ -13,7 +13,7 @@ describe('TaskCardRewards', () => {
     itemRewards: [],
     offerUnlockRewards: [],
   };
-  it('shows individual item quantities and distinguishes purchase unlocks in the footer', async () => {
+  it('labels a short reward list by category without a visible Rewards heading', async () => {
     const item = {
       id: '5449016a4bdc2d6f028b456f',
       name: 'Roubles',
@@ -37,10 +37,15 @@ describe('TaskCardRewards', () => {
     expect(chips.map((chip) => chip.text())).toEqual([
       '85,000 ₽',
       'Old house room key ×1',
-      'Purchase unlock · Old house room key',
+      'Old house room key',
     ]);
-    expect(wrapper.get('[data-testid="task-card-rewards"]').attributes('role')).toBeUndefined();
-    expect(wrapper.text()).toContain('16,000 XP');
+    const footer = wrapper.get('[data-testid="task-card-rewards"]');
+    expect(footer.attributes('aria-label')).toBe('Rewards');
+    expect(footer.text()).not.toContain('Rewards');
+    expect(footer.findAll('[role="group"]').map((group) => group.attributes('aria-label'))).toEqual(
+      ['Progression', 'Items & cash', 'Purchase unlocks']
+    );
+    expect(footer.text()).toContain('16,000 XP');
     await chips[0]!.trigger('contextmenu');
     expect(wrapper.emitted('itemContextMenu')?.[0]?.[1]).toEqual(item);
     await chips[0]!.trigger('click');
@@ -147,7 +152,9 @@ describe('TaskCardRewards', () => {
         ],
       },
     });
-    expect(wrapper.text()).toMatch(/Purchase unlock · Unknown offer.*Skier LL4/);
+    const group = wrapper.get('[role="group"][aria-label="Purchase unlocks"]');
+    expect(group.text()).toMatch(/Unknown offer.*Skier LL4/);
+    expect(wrapper.findAll('[data-testid="task-card-rewards"] [role="group"]')).toHaveLength(1);
     expect(wrapper.find('button').exists()).toBe(false);
     wrapper.unmount();
   });
