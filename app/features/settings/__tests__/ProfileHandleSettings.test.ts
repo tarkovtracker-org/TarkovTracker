@@ -145,17 +145,18 @@ describe('profile handle settings', () => {
       .find((button) => button.text().endsWith('handle_change'))!;
     await editButton.trigger('click');
     expect(wrapper.get('input').element.value).toBe('rat_one');
-    await wrapper.get('input').setValue('RAT_TWO');
+    const draft = code === 'stale' ? 'RAT_ONE' : 'RAT_TWO';
+    await wrapper.get('input').setValue(draft);
     await wrapper.get('form').trigger('submit');
     await flushPromises();
     expect(insert).not.toHaveBeenCalled();
-    expect(update).toHaveBeenCalledWith({ handle: 'rat_two' });
+    expect(update).toHaveBeenCalledWith({ handle: draft.toLowerCase() });
     expect(update).toHaveBeenCalledTimes(1);
     expect(matchesOwner).toHaveBeenCalledWith('user_id', 'account-one');
     expect(matchesHandle).toHaveBeenCalledWith('handle', 'rat_one');
     if (message) {
       expect(wrapper.text()).toContain(`settings.profile_sharing.${message}`);
-      expect(wrapper.get('input').element.value).toBe('RAT_TWO');
+      expect(wrapper.get('input').element.value).toBe(draft);
       await wrapper
         .findAll('button')
         .find((button) => button.text() === 'common.cancel')!

@@ -1,4 +1,26 @@
 import { isProfileHandle } from '@/utils/profileHandle';
+import type { SupabaseClient } from '@supabase/supabase-js';
+const saveErrors: Partial<Record<string, 'taken' | 'invalid' | 'cooldown'>> = {
+  '23505': 'taken',
+  '23514': 'invalid',
+  PT429: 'cooldown',
+};
+const writeProfileHandle = (
+  client: SupabaseClient,
+  id: string,
+  previous: string | null,
+  value: string
+) => {
+  const handles = client.from('profile_handles');
+  return previous
+    ? handles
+        .update({ handle: value })
+        .eq('user_id', id)
+        .eq('handle', previous)
+        .select('handle')
+        .maybeSingle()
+    : handles.insert({ handle: value, user_id: id });
+};
 export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
   const { $supabase } = useNuxtApp();
   const userId = computed(() =>
@@ -9,7 +31,7 @@ export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
   const failed = ref(false);
   const loadVersion = ref(0);
   const handle = computed(() =>
-    record.value?.userId === userId.value ? record.value?.handle : null
+    record.value?.userId === userId.value ? (record.value?.handle ?? null) : null
   );
   watch(
     [userId, loadVersion],
@@ -43,22 +65,13 @@ export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
     const id = userId.value;
     if (!id || !isProfileHandle(value)) return 'invalid';
     const previous = handle.value;
-    if (value === previous) return 'saved';
-    const handles = $supabase.client.from('profile_handles');
-    const { data, error } = previous
-      ? await handles
-          .update({ handle: value })
-          .eq('user_id', id)
-          .eq('handle', previous)
-          .select('handle')
-          .maybeSingle()
-      : await handles.insert({ handle: value, user_id: id });
+    const { data, error } = await writeProfileHandle($supabase.client, id, previous, value);
     if (userId.value !== id) return 'invalid';
-    if (error?.code === '23505') return 'taken';
-    if (error?.code === '23514') return 'invalid';
-    if (error?.code === 'PT429') return 'cooldown';
-    if (previous && !error && !data) loadVersion.value += 1;
-    if (error || (previous && data?.handle !== value)) return 'failed';
+    if (error) return saveErrors[error.code] ?? 'failed';
+    if (previous && !data) {
+      loadVersion.value += 1;
+      return 'failed';
+    }
     record.value = { userId: id, handle: value };
     return 'saved';
   };
