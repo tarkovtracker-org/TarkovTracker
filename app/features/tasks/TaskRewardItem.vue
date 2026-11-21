@@ -27,10 +27,7 @@
       </button>
       <template #content>
         <div
-          ref="panel"
-          tabindex="-1"
-          class="w-36 max-w-full p-2 text-xs outline-none"
-          @focusin="activatePanel"
+          class="w-36 max-w-full p-2 text-xs"
           @pointerenter="cancelHoverClose"
           @pointerleave="scheduleHoverClose"
           @contextmenu="openItemMenu"
@@ -67,7 +64,6 @@
   const emit = defineEmits<{ itemContextMenu: [event: MouseEvent, item: TarkovItem] }>();
   const { t } = useI18n({ useScope: 'global' });
   const formatNumber = useLocaleNumberFormatter();
-  const panel = useTemplateRef<HTMLElement>('panel');
   const {
     open,
     setOpen,
@@ -78,9 +74,8 @@
     cancelHoverClose,
     onOpenAutoFocus,
     onCloseAutoFocus,
-    activatePanel,
     keepHoverOpen,
-  } = useTaskCardPreview(panel);
+  } = useTaskCardPreview();
   const linkedItem = computed(() => (props.item?.id ? props.item : undefined));
   const name = computed(() => props.item?.name || props.item?.shortName || t('common.item'));
   const iconSrc = computed(() => (linkedItem.value ? getKeyIconSrc(linkedItem.value) : undefined));

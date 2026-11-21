@@ -1,6 +1,6 @@
 import { useTimeoutFn } from '@vueuse/core';
 import type { Ref } from '#imports';
-export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
+export function useTaskCardPreview(panel?: Ref<HTMLElement | null>) {
   const open = ref(false);
   let manageFocus = false;
   let restoringFocus = false;
@@ -36,10 +36,12 @@ export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
   }
   function closeOnBlur() {
     keyboardFocused = false;
-    scheduleHoverClose();
+    if (!panel && manageFocus) setOpen(false);
+    else scheduleHoverClose();
   }
   function preserveFocus(event: Event) {
-    if (!manageFocus) event.preventDefault();
+    // Image-only previews keep focus on the trigger and inline links.
+    if (!panel || !manageFocus) event.preventDefault();
   }
   function onCloseAutoFocus(event: Event) {
     preserveFocus(event);
@@ -58,8 +60,7 @@ export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
     // Activate a hover preview on the first click instead of closing it.
     event.stopImmediatePropagation();
     activatePanel();
-    const focusTarget = panel.value?.querySelector('a') ?? panel.value;
-    focusTarget?.focus();
+    panel?.value?.querySelector('a')?.focus();
   }
   function closeAfterLink() {
     // Let navigation handle focus after using a quest link.
