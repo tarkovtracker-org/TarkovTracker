@@ -1,7 +1,9 @@
+// @vitest-environment happy-dom
+import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
-import AppearanceCard from '@/features/settings/AppearanceCard.vue';
+import AppPreferencesCard from '@/features/settings/AppPreferencesCard.vue';
 import type { ThemeMode } from '@/utils/theme';
 const { mockState, setters } = vi.hoisted(() => ({
   mockState: {
@@ -9,7 +11,27 @@ const { mockState, setters } = vi.hoisted(() => ({
   },
   setters: {
     setThemeMode: vi.fn(),
+    setStreamerMode: vi.fn(),
+    setWikiUseAntifandom: vi.fn(),
   },
+}));
+const loggedIn = ref(false);
+mockNuxtImport('useNuxtApp', () => () => ({
+  $supabase: {
+    user: {
+      get loggedIn() {
+        return loggedIn.value;
+      },
+    },
+  },
+}));
+vi.mock('@/stores/usePreferences', () => ({
+  usePreferencesStore: () => ({
+    getStreamerMode: false,
+    getWikiUseAntifandom: true,
+    setStreamerMode: setters.setStreamerMode,
+    setWikiUseAntifandom: setters.setWikiUseAntifandom,
+  }),
 }));
 vi.mock('@/composables/useTheme', () => ({
   useTheme: () => ({
@@ -44,9 +66,15 @@ const stubs = {
     props: ['title', 'icon', 'iconColor', 'highlightColor', 'fillHeight', 'titleClasses'],
   },
   UIcon: { template: '<span />', props: ['name'] },
+  USeparator: true,
+  USwitch: {
+    template: `<button type="button" role="switch" :aria-checked="modelValue" :disabled="disabled" @click="$emit('update:modelValue', !modelValue)" />`,
+    props: ['modelValue', 'disabled'],
+    emits: ['update:modelValue'],
+  },
 };
 const mountCard = () =>
-  mount(AppearanceCard, {
+  mount(AppPreferencesCard, {
     global: {
       stubs,
       mocks: {
@@ -54,13 +82,54 @@ const mountCard = () =>
       },
     },
   });
-describe('AppearanceCard', () => {
+describe('AppPreferencesCard', () => {
   beforeEach(() => {
     mockState.themeMode = 'dark';
-    setters.setThemeMode.mockClear();
+    vi.clearAllMocks();
+    loggedIn.value = false;
     pending.value = false;
     status.value = '';
-    selectLocale.mockClear();
+  });
+  it('renders the theme, language, and both switches inside App Preferences', () => {
+    const wrapper = mountCard();
+    const card = wrapper.get('section');
+    expect(card.get('h2').text()).toBe('settings.app_preferences.title');
+    expect(card.find('fieldset').exists()).toBe(true);
+    expect(card.find('select').exists()).toBe(true);
+    expect(card.findAll('[role="switch"]')).toHaveLength(2);
+  });
+  it('keeps privacy mode disabled for guests and lets them change the wiki preference', async () => {
+    const wrapper = mountCard();
+    const privacy = wrapper.get<HTMLButtonElement>(
+      'button[aria-labelledby="settings-privacy-mode-label"]'
+    );
+    const wiki = wrapper.get<HTMLButtonElement>(
+      'button[aria-labelledby="settings-antifandom-label"]'
+    );
+    expect(privacy.element.disabled).toBe(true);
+    await wiki.trigger('click');
+    expect(setters.setWikiUseAntifandom).toHaveBeenCalledWith(false);
+  });
+  it('lets signed-in users toggle privacy mode and preserves the cooldown', async () => {
+    loggedIn.value = true;
+    const wrapper = mountCard();
+    try {
+      vi.useFakeTimers();
+      const privacy = wrapper.get<HTMLButtonElement>(
+        'button[aria-labelledby="settings-privacy-mode-label"]'
+      );
+      expect(privacy.element.disabled).toBe(false);
+      await privacy.trigger('click');
+      expect(setters.setStreamerMode).toHaveBeenCalledWith(true);
+      expect(privacy.element.disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(499);
+      expect(privacy.element.disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(privacy.element.disabled).toBe(false);
+    } finally {
+      wrapper.unmount();
+      vi.useRealTimers();
+    }
   });
   it('renders dark and light options in a fieldset', () => {
     const wrapper = mountCard();

@@ -87,6 +87,7 @@ describe('DisplayNameCard', () => {
           $t: (key: string) => key,
         },
         stubs: {
+          PlayerLevelField: true,
           GenericCard: {
             template: '<div><slot name="content" /></div>',
           },
