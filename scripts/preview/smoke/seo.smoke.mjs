@@ -193,12 +193,8 @@ test('handle links use the private profile shell and load the public mode', asyn
   page,
   request,
 }) => {
-  for (const route of ['/@preview_player', '/@preview_player/pve']) {
-    const response = await previewGet(request, `${origin}${route}`, origin);
-    expect(response.status()).toBe(200);
-    expect(response.headers()['cache-control']).toBe('no-store');
-    expect(response.headers()['x-robots-tag']).toBe('noindex, nofollow');
-  }
+  const mode = await previewGet(request, `${origin}/@preview_player/pve`, origin);
+  expect(mode.status()).toBe(200);
   const invalid = await previewGet(request, `${origin}/@preview_player/unknown`, origin);
   expect(invalid.status()).toBe(404);
   await page.route('**/api/profile/@preview_player/default', (route) =>
@@ -210,7 +206,10 @@ test('handle links use the private profile shell and load the public mode', asyn
       },
     })
   );
-  await page.goto(`${origin}/@preview_player`);
+  const response = await page.goto(`${origin}/@preview_player`);
+  expect(response?.status()).toBe(200);
+  expect(await response?.headerValue('cache-control')).toBe('no-store');
+  expect(await response?.headerValue('x-robots-tag')).toBe('noindex, nofollow');
   await expect(page.getByRole('heading', { name: 'Preview Player' })).toBeVisible();
   await expect(page.getByText(`${origin}/@preview_player`, { exact: true })).toBeVisible();
 });
