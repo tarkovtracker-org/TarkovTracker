@@ -59,7 +59,7 @@
                 :aria-pressed="selectedMode === GAME_MODES.PVP"
                 class="focus:ring-pvp-400 flex min-h-8 flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
                 :class="pvpToggleClass"
-                @click="selectedMode = GAME_MODES.PVP"
+                @click="selectProfileMode(GAME_MODES.PVP)"
               >
                 <GameModeBadge :mode="GAME_MODES.PVP" class="-my-1" />
                 <span class="leading-none">{{ t('common.pvp', 'PvP') }}</span>
@@ -69,7 +69,7 @@
                 :aria-pressed="selectedMode === GAME_MODES.PVE"
                 class="focus:ring-pve-400 flex min-h-8 flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
                 :class="pveToggleClass"
-                @click="selectedMode = GAME_MODES.PVE"
+                @click="selectProfileMode(GAME_MODES.PVE)"
               >
                 <GameModeBadge :mode="GAME_MODES.PVE" class="-my-1" />
                 <span class="leading-none">{{ t('common.pve', 'PvE') }}</span>
@@ -79,7 +79,7 @@
                 :aria-pressed="selectedMode === GAME_MODES.SEASONAL"
                 class="focus:ring-warning-400 flex min-h-8 flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:outline-none"
                 :class="seasonalToggleClass"
-                @click="selectedMode = GAME_MODES.SEASONAL"
+                @click="selectProfileMode(GAME_MODES.SEASONAL)"
               >
                 <GameModeBadge :mode="GAME_MODES.SEASONAL" class="-my-1" />
                 <span class="leading-none">
@@ -87,47 +87,17 @@
                 </span>
               </button>
             </div>
-            <div class="flex flex-wrap gap-2">
-              <UButton
-                icon="i-mdi-content-copy"
-                color="primary"
-                variant="solid"
-                size="sm"
-                class="flex-1 sm:flex-none"
-                @click="copyProfileSnapshot"
-              >
-                {{ t('page.profile.copy_snapshot', 'Copy Snapshot') }}
-              </UButton>
-              <UButton
-                v-if="!isViewingSharedProfile"
-                icon="i-mdi-clipboard-text-search-outline"
-                color="neutral"
-                variant="soft"
-                size="sm"
-                class="flex-1 sm:flex-none"
-                @click="router.push('/tasks')"
-              >
-                {{ t('page.profile.view_tasks', 'Open Tasks') }}
-              </UButton>
-            </div>
-            <p class="text-surface-500 truncate text-[11px]">{{ shareUrl }}</p>
-            <p class="text-surface-400 text-[11px]">
-              <template v-if="shareIsPrivate">
-                {{
-                  t('page.profile.share_private_intro', 'This mode is private. Enable sharing in ')
-                }}
-                <NuxtLink
-                  to="/account"
-                  class="text-primary-300 hover:text-primary-200 light:text-primary-700 light:hover:text-primary-800 underline underline-offset-2"
-                >
-                  {{ t('page.profile.account_settings_link', 'Account Settings') }}
-                </NuxtLink>
-                {{ t('page.profile.share_private_outro', ' to make this link public.') }}
-              </template>
-              <template v-else>
-                {{ shareAccessLabel }}
-              </template>
-            </p>
+            <ProfileSharingActions
+              :can-share-profile="canShareProfile"
+              :can-copy-snapshot="canRenderProfileContent"
+              :is-viewing-shared-profile="isViewingSharedProfile"
+              :share-url="shareUrl"
+              :share-is-private="shareIsPrivate"
+              :share-access-label="shareAccessLabel"
+              @copy-link="copyToClipboard(shareUrl)"
+              @copy-snapshot="copyProfileSnapshot"
+              @open-tasks="router.push('/tasks')"
+            />
           </div>
         </div>
       </section>
@@ -257,6 +227,7 @@
     normalizeTimestamp,
     normalizeUserId,
   } from '@/features/profile/profileProgressionHelpers';
+  import ProfileSharingActions from '@/features/profile/ProfileSharingActions.vue';
   import {
     buildHideoutModuleCompletionState,
     getCountedTasks,
@@ -273,6 +244,7 @@
   import { calculatePercentageNum, useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { buildPrestigeTaskMap } from '@/utils/prestige';
+  import { isProfileHandle, profileHandlePath } from '@/utils/profileHandle';
   import {
     createProfileVisibility,
     fetchProfileVisibilityRows,
@@ -318,7 +290,7 @@
     data: unknown;
     gameEdition: number | null;
     mode: GameMode;
-    userId: string;
+    profilePublic?: boolean;
     visibility: 'owner' | 'public';
   }
   interface StatCard {
@@ -435,7 +407,15 @@
   const formatNumber = useLocaleNumberFormatter();
   const routeSharedUserId = computed(() => normalizeUserId(route.params.userId));
   const querySharedUserId = computed(() => normalizeUserId(route.query.user));
-  const sharedUserId = computed(() => routeSharedUserId.value ?? querySharedUserId.value);
+  const sharedHandle = computed(() =>
+    isProfileHandle(route.params.handle) ? route.params.handle : null
+  );
+  const sharedUserId = computed(() =>
+    sharedHandle.value
+      ? `@${sharedHandle.value}`
+      : (routeSharedUserId.value ?? querySharedUserId.value)
+  );
+  const { handle: ownHandle } = useOwnProfileHandle(computed(() => !sharedUserId.value));
   const selectedMode = ref<GameMode>(
     normalizeMode(route.params.mode) ??
       normalizeMode(route.query.mode) ??
@@ -515,6 +495,7 @@
     }
   );
   watch(selectedMode, (mode) => {
+    if (sharedHandle.value) return;
     const sharedId = sharedUserId.value;
     if (sharedId) {
       const currentMode = normalizeMode(route.params.mode);
@@ -542,12 +523,26 @@
       },
     });
   });
+  const selectProfileMode = (mode: GameMode) => {
+    const handle = sharedHandle.value;
+    if (!handle) {
+      selectedMode.value = mode;
+      return;
+    }
+    if (route.params.mode === mode && sharedProfileError.value) {
+      void loadSharedProfile(`@${handle}`, mode);
+    } else if (selectedMode.value !== mode || sharedProfileError.value) {
+      void router.replace(profileHandlePath(handle, mode));
+    }
+  };
   const sharedProfileLoading = ref(false);
+  const sharedProfilePublic = ref(false);
   const sharedProfileError = ref<string | null>(null);
   const sharedProfileEdition = ref<number | null>(null);
   const sharedProfileData = ref<UserProgressData | null>(null);
   let sharedProfileRequestId = 0;
-  const getAuthHeader = async (): Promise<string | null> => {
+  const getAuthHeader = async (profileId: string): Promise<string | null> => {
+    if (profileId.startsWith('@')) return null;
     try {
       const sessionResult = await $supabase.client.auth.getSession();
       const accessToken = sessionResult.data?.session?.access_token;
@@ -560,14 +555,28 @@
       return null;
     }
   };
-  const loadSharedProfile = async (userId: string, mode: GameMode) => {
+  const sharedProfileErrorMessage = (statusCode: number | undefined) => {
+    if (statusCode === 403) {
+      return t('page.profile.shared_private', 'This player has set this mode to private.');
+    }
+    if (statusCode === 404) {
+      return t('page.profile.shared_not_found', 'Shared profile not found.');
+    }
+    if (statusCode === 503) {
+      return t('page.profile.shared_unavailable', 'Shared profiles are temporarily unavailable.');
+    } else {
+      return t('page.profile.shared_load_failed', 'Unable to load shared profile right now.');
+    }
+  };
+  const loadSharedProfile = async (userId: string, mode: GameMode | 'default') => {
     const requestId = ++sharedProfileRequestId;
     sharedProfileLoading.value = true;
+    sharedProfilePublic.value = false;
     sharedProfileError.value = null;
     sharedProfileData.value = null;
     sharedProfileEdition.value = null;
     try {
-      const authHeader = await getAuthHeader();
+      const authHeader = await getAuthHeader(userId);
       const response = await $fetch<SharedProfileResponse>(`/api/profile/${userId}/${mode}`, {
         headers: authHeader ? { Authorization: authHeader } : undefined,
       });
@@ -575,6 +584,9 @@
         return;
       }
       sharedProfileData.value = normalizeSharedProgressData(response.data, DEFAULT_PROGRESS_DATA);
+      sharedProfilePublic.value =
+        response.visibility === 'public' || response.profilePublic === true;
+      if (mode === 'default') selectedMode.value = response.mode;
       sharedProfileEdition.value =
         typeof response.gameEdition === 'number' ? response.gameEdition : 1;
     } catch (error) {
@@ -585,24 +597,7 @@
         (error as { statusCode?: number }).statusCode ??
         (error as { status?: number }).status ??
         (error as { response?: { status?: number } }).response?.status;
-      if (statusCode === 403) {
-        sharedProfileError.value = t(
-          'page.profile.shared_private',
-          'This player has set this mode to private.'
-        );
-      } else if (statusCode === 404) {
-        sharedProfileError.value = t('page.profile.shared_not_found', 'Shared profile not found.');
-      } else if (statusCode === 503) {
-        sharedProfileError.value = t(
-          'page.profile.shared_unavailable',
-          'Shared profiles are temporarily unavailable.'
-        );
-      } else {
-        sharedProfileError.value = t(
-          'page.profile.shared_load_failed',
-          'Unable to load shared profile right now.'
-        );
-      }
+      sharedProfileError.value = sharedProfileErrorMessage(statusCode);
       logger.warn('[Profile] Shared profile request failed:', {
         error,
         mode,
@@ -615,11 +610,16 @@
       }
     }
   };
+  const sharedMode = computed(() =>
+    sharedHandle.value ? (normalizeMode(route.params.mode) ?? 'default') : selectedMode.value
+  );
   watch(
-    [sharedUserId, selectedMode],
+    [sharedUserId, sharedMode],
     ([nextSharedUserId, nextMode]) => {
       if (!nextSharedUserId) {
+        sharedProfileRequestId += 1;
         sharedProfileLoading.value = false;
+        sharedProfilePublic.value = false;
         sharedProfileError.value = null;
         sharedProfileData.value = null;
         sharedProfileEdition.value = null;
@@ -1470,6 +1470,12 @@
     () => sharedUserId.value ?? normalizeUserId($supabase.user?.id ?? null)
   );
   const sharePath = computed(() => {
+    if (sharedHandle.value) {
+      return profileHandlePath(sharedHandle.value, normalizeMode(route.params.mode) ?? undefined);
+    }
+    if (!sharedUserId.value && ownHandle.value && !preferencesStore.getStreamerMode) {
+      return profileHandlePath(ownHandle.value, selectedMode.value);
+    }
     if (profileShareUserId.value) {
       return `/profile/${profileShareUserId.value}/${selectedMode.value}`;
     }
@@ -1483,11 +1489,12 @@
   });
   const shareIsPrivate = computed(() => {
     if (isViewingSharedProfile.value) {
-      return false;
+      return Boolean(sharedProfileData.value) && !sharedProfilePublic.value;
     }
     const modeIsPublic = profileVisibility[selectedMode.value];
     return !modeIsPublic;
   });
+  const canShareProfile = computed(() => canRenderProfileContent.value && !shareIsPrivate.value);
   const shareAccessLabel = computed(() => {
     if (isViewingSharedProfile.value) {
       return t('page.profile.shared_mode_notice', 'Viewing shared progression for this mode.');
@@ -1514,7 +1521,7 @@
         : kappaProjection.value.state === 'completed'
           ? 'Kappa ETA: Complete'
           : 'Kappa ETA: Insufficient history',
-      `Profile link: ${shareUrl.value}`,
+      ...(canShareProfile.value ? [`Profile link: ${shareUrl.value}`] : []),
     ];
     return lines.join('\n');
   });

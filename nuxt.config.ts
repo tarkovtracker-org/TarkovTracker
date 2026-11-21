@@ -239,7 +239,7 @@ export default defineNuxtConfig({
       pages: {
         defaultRoutes: false,
         routes: {
-          include: ['/api/*', '/overlay/*', '/profile/*'],
+          include: ['/api/*', '/overlay/*', '/profile/*', '/@*'],
           exclude: [],
         },
       },
@@ -290,7 +290,8 @@ export default defineNuxtConfig({
       style: [
         {
           textContent: [
-            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH}}`,
+            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH};--shell-bar-h:3.5rem}`,
+            '@media(width >= 640px){:root{--shell-bar-h:4rem}}',
             'body{background:var(--color-surface-950,hsl(0 0% 4%))}',
             // Light theme pre-hydration: match the warm-paper surface values from
             // tailwind.css so the skeleton never flashes dark for light-theme users.
@@ -316,7 +317,7 @@ export default defineNuxtConfig({
             'top:0;',
             'left:var(--shell-w);',
             'right:0;',
-            'height:44px;',
+            'height:var(--shell-bar-h);',
             'background:var(--color-surface-900,hsl(0 0% 9%));',
             'border-bottom:1px solid var(--color-surface-700,hsl(0 0% 25%));',
             'z-index:40',
@@ -454,7 +455,7 @@ export default defineNuxtConfig({
         writeFileSync(
           resolve(nitro.options.output.dir, '_routes.json'),
           JSON.stringify(
-            { version: 1, include: ['/api/*', '/overlay/*', '/profile/*'], exclude: [] },
+            { version: 1, include: ['/api/*', '/overlay/*', '/profile/*', '/@*'], exclude: [] },
             null,
             2
           )
@@ -463,6 +464,7 @@ export default defineNuxtConfig({
           '/api/*',
           '/overlay/*',
           '/profile/*',
+          '/@*',
         ]);
         assertPrerenderedDocuments(nitro.options.output.publicDir);
       });
