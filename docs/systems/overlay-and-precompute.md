@@ -350,7 +350,7 @@ eligible copy, a missing entry or body returns 503. A stale fallback keeps the U
 available and cannot pass release verification.
 
 Direct Pages GET requests for strings, item summaries, full items, task objectives,
-and task summaries can stream the original gzip bytes when the client accepts
+and task core payloads can stream the original gzip bytes when the client accepts
 gzip and the active release matches a fully validated Cache API copy. KV reads
 and stale fallbacks still use bounded decompression.
 
