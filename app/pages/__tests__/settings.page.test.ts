@@ -3,6 +3,7 @@ import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
+import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
 import SettingsPage from '@/pages/settings.vue';
 import type { PMCFaction } from '@/utils/constants';
 const currentFaction = ref<PMCFaction>('USEC');
@@ -78,6 +79,7 @@ vi.mock('@/stores/useTarkov', () => ({
     setPMCFaction: (faction: PMCFaction) => {
       currentFaction.value = faction;
     },
+    getModeDisplayName: () => '',
     getGameEdition: () => mockState.gameEdition,
     setGameEdition: mockFns.setGameEdition,
     getPvPProgressData: () => ({ prestigeLevel: mockState.prestigeLevel }),
@@ -263,11 +265,18 @@ describe('settings page', () => {
     expect(wrapper.find('[data-testid="experience-card"]').exists()).toBe(false);
     expect(wrapper.find('#progression').exists()).toBe(true);
   });
-  it('sets the active faction from the compact progression picker', async () => {
-    const wrapper = await mountSuspended(SettingsPage, { global: globalConfig });
+  it('sets the active faction from the Game Settings card', async () => {
+    const wrapper = await mountSuspended(SettingsPage, {
+      global: {
+        ...globalConfig,
+        stubs: { ...defaultGlobalStubs, DisplayNameCard: false },
+      },
+    });
     const progression = wrapper.get('#progression');
-    expect(progression.text()).toContain('Faction');
-    const group = progression.get('[role="group"][aria-label="Select faction"]');
+    const gameSettings = progression.getComponent(DisplayNameCard);
+    expect(gameSettings.text()).toContain('Faction');
+    const group = gameSettings.get('[role="group"][aria-label="Select faction"]');
+    expect(progression.findAll('[role="group"][aria-label="Select faction"]')).toHaveLength(1);
     const buttons = group.findAll('button');
     expect(buttons.map((button) => button.text())).toEqual(['BEAR', 'USEC']);
     expect(group.get('[aria-pressed="true"]').text()).toBe('USEC');

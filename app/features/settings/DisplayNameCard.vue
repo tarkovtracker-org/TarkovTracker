@@ -76,46 +76,62 @@
           </div>
         </section>
         <div class="h-px bg-white/6" />
-        <section class="max-w-sm space-y-2">
-          <div class="flex items-center gap-2">
-            <label
-              :for="gameEditionInputId"
-              class="text-surface-200 block cursor-pointer text-sm font-semibold"
+        <div class="grid grid-cols-1 items-start gap-5 md:grid-cols-2">
+          <section class="max-w-sm space-y-2">
+            <div class="flex items-center gap-2">
+              <label
+                :for="gameEditionInputId"
+                class="text-surface-200 block cursor-pointer text-sm font-semibold"
+              >
+                {{ $t('common.game_edition') }}
+              </label>
+              <UTooltip
+                :text="
+                  $t(
+                    'settings.display_name.game_edition_hint',
+                    'Select the game edition you own so tracking matches your available content.'
+                  )
+                "
+              >
+                <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
+              </UTooltip>
+            </div>
+            <SelectMenuFixed
+              :id="gameEditionInputId"
+              v-model="selectedGameEdition"
+              :items="gameEditionOptions"
+              value-key="value"
+              class="w-full"
             >
-              {{ $t('common.game_edition') }}
-            </label>
-            <UTooltip
-              :text="
-                $t(
-                  'settings.display_name.game_edition_hint',
-                  'Select the game edition you own so tracking matches your available content.'
-                )
-              "
-            >
-              <UIcon name="i-mdi-information" class="text-surface-400 h-4 w-4" />
-            </UTooltip>
-          </div>
-          <SelectMenuFixed
-            :id="gameEditionInputId"
-            v-model="selectedGameEdition"
-            :items="gameEditionOptions"
-            value-key="value"
-            class="w-full"
-          >
-            <template #leading>
-              <UIcon name="i-mdi-gift-open" class="text-surface-300 h-4 w-4" />
-            </template>
-          </SelectMenuFixed>
-        </section>
+              <template #leading>
+                <UIcon name="i-mdi-gift-open" class="text-surface-300 h-4 w-4" />
+              </template>
+            </SelectMenuFixed>
+          </section>
+          <section class="space-y-2">
+            <div class="flex flex-wrap items-baseline gap-x-2">
+              <p class="text-surface-200 text-sm font-semibold">
+                {{ $t('settings.faction.title', 'Faction') }}
+              </p>
+              <span class="text-surface-400 text-xs">
+                {{ $t(getGameModeLabel(currentGameMode)) }}
+              </span>
+            </div>
+            <FactionPicker v-model="faction" :disabled="dataLoading" class="max-w-50" />
+          </section>
+        </div>
       </div>
     </template>
   </GenericCard>
 </template>
 <script setup lang="ts">
+  import FactionPicker from '@/components/FactionPicker.vue';
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import { useCurrentFaction } from '@/composables/useCurrentFaction';
+  import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { GAME_MODE_UI, GAME_MODES, type GameMode } from '@/utils/constants';
+  import { GAME_MODE_UI, GAME_MODES, getGameModeLabel, type GameMode } from '@/utils/constants';
   import { LIMITS } from '@/utils/constants';
   import { logger } from '@/utils/logger';
   const DISPLAY_NAME_MODES = [
@@ -132,6 +148,8 @@
   const DISPLAY_NAME_MAX_LENGTH = LIMITS.DISPLAY_NAME_MAX_LENGTH;
   const gameEditionInputId = 'settings-game-edition-input';
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode() || GAME_MODES.PVP);
+  const faction = useCurrentFaction();
+  const { dataLoading } = useGameModeSwitch();
   const localDisplayNames = reactive<Record<DisplayNameMode, string>>({
     [GAME_MODES.PVP]: '',
     [GAME_MODES.PVE]: '',
