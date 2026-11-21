@@ -854,11 +854,13 @@ the quest opens or the player dismisses the notice.
 
 The dedicated chevron controls card expansion in both views. When rewards are visible, the footer
 shows rewards in labeled rows for progression, items and cash, and purchase unlocks. Only
-categories with rewards appear. Item chips use catalog short names with
-variant qualifiers where available, and full names when the short labels would be ambiguous.
-Every reward stays visible. Item chips show the full item name and image on hover or keyboard
-focus and open the preview on click or tap.
-The preview links to the item on tarkov.dev. Hide-rewards applies to both list and map cards.
+categories with rewards appear. Items use the same thumbnail and links as objective items.
+Short labels use catalog names with variant qualifiers where available, and full names when
+the short labels would be ambiguous.
+Every reward stays visible. Thumbnails show the full item name and larger image on hover, keyboard
+focus, or tap. The Wiki and tarkov.dev links sit next to the image. Currency rewards use the same
+thumbnails and links with a localized amount and currency symbol. Hide-rewards applies to both list
+and map cards.
 Missing database columns use the existing preference-sync fallback, so new settings remain local
 until the compact-list preference migration is deployed.
 

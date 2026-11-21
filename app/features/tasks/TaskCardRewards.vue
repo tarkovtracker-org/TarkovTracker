@@ -58,7 +58,7 @@
       </div>
     </TaskRewardGroup>
     <TaskRewardGroup v-for="group in itemGroups" :key="group.label" :label="t(group.label)">
-      <TaskRewardItemChip
+      <TaskRewardItem
         v-for="reward in group.rewards"
         :key="reward.key"
         :item="reward.item"
@@ -72,7 +72,7 @@
 </template>
 <script setup lang="ts">
   import TaskRewardGroup from '@/features/tasks/TaskRewardGroup.vue';
-  import TaskRewardItemChip from '@/features/tasks/TaskRewardItemChip.vue';
+  import TaskRewardItem from '@/features/tasks/TaskRewardItem.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import type {

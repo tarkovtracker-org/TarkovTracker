@@ -58,7 +58,8 @@ export function useTaskCardPreview(panel: Ref<HTMLElement | null>) {
     // Activate a hover preview on the first click instead of closing it.
     event.stopImmediatePropagation();
     activatePanel();
-    panel.value?.querySelector('a')?.focus();
+    const focusTarget = panel.value?.querySelector('a') ?? panel.value;
+    focusTarget?.focus();
   }
   function closeAfterLink() {
     // Let navigation handle focus after using a quest link.

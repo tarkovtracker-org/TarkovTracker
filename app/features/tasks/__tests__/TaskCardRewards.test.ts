@@ -6,6 +6,7 @@ const preferences = vi.hoisted(() => ({ showExperience: true }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({ getShowExperienceRewards: preferences.showExperience }),
 }));
+const tooltipStubs = { stubs: { AppTooltip: { template: '<span><slot /></span>' } } };
 describe('TaskCardRewards', () => {
   const emptyRewards = {
     traderStandingRewards: [],
@@ -19,8 +20,15 @@ describe('TaskCardRewards', () => {
       name: 'Roubles',
       image512pxLink: 'https://assets.tarkov.dev/roubles.webp',
     };
-    const key = { id: 'key', name: 'Old house room key' };
+    const key = {
+      id: 'key',
+      name: 'Old house room key',
+      iconLink: 'https://assets.tarkov.dev/key-icon.webp',
+      image512pxLink: 'https://assets.tarkov.dev/key-512.webp',
+      wikiLink: 'https://escapefromtarkov.fandom.com/wiki/Old_house_room_key',
+    };
     const wrapper = await mountSuspended(TaskCardRewards, {
+      global: tooltipStubs,
       props: {
         ...emptyRewards,
         itemRewards: [
@@ -33,8 +41,8 @@ describe('TaskCardRewards', () => {
         experience: 16000,
       },
     });
-    const chips = wrapper.findAll('[data-testid="task-reward-item"]');
-    expect(chips.map((chip) => chip.text())).toEqual([
+    const rewards = wrapper.findAll('[data-testid="task-reward-item"]');
+    expect(rewards.map((reward) => reward.text())).toEqual([
       '85,000 ₽',
       'Old house room key ×1',
       'Old house room key',
@@ -46,27 +54,69 @@ describe('TaskCardRewards', () => {
       ['Progression', 'Items & cash', 'Purchase unlocks']
     );
     expect(footer.text()).toContain('16,000 XP');
-    await chips[0]!.trigger('contextmenu');
-    expect(wrapper.emitted('itemContextMenu')?.[0]?.[1]).toEqual(item);
-    await chips[0]!.trigger('click');
+    const reward = rewards[1]!;
+    expect(reward.findAll('a').map((link) => link.attributes('href'))).toEqual([
+      key.wikiLink,
+      'https://tarkov.dev/item/key',
+    ]);
+    const thumbnail = reward.get('button');
+    expect(thumbnail.get('img').attributes('src')).toBe(key.iconLink);
+    await thumbnail.trigger('contextmenu');
+    expect(wrapper.emitted('itemContextMenu')?.[0]?.[1]).toEqual(key);
+    await thumbnail.trigger('click');
     await flushPromises();
-    const preview = new DOMWrapper(document.body).get('[role="dialog"][aria-label="Roubles"]');
-    expect(preview.get('img').attributes('src')).toBe(item.image512pxLink);
-    expect(preview.get('a').attributes('href')).toBe('https://tarkov.dev/item/' + item.id);
+    const preview = new DOMWrapper(document.body).get(
+      '[role="dialog"][aria-label="Old house room key"]'
+    );
+    expect(preview.get('img').attributes('src')).toBe(key.image512pxLink);
     await preview.get('img').trigger('error');
     expect(preview.get('img').attributes('hidden')).toBeDefined();
-    const newSource = 'https://assets.tarkov.dev/updated-roubles.webp';
+    const newSource = 'https://assets.tarkov.dev/updated-key.webp';
     await wrapper.setProps({
-      itemRewards: [{ item: { ...item, image512pxLink: newSource }, count: 85000 }],
+      itemRewards: [
+        { item, count: 85000 },
+        { item: { ...key, image512pxLink: newSource }, count: 1 },
+      ],
     });
     expect(preview.get('img').attributes('src')).toBe(newSource);
     expect(preview.get('img').attributes('hidden')).toBeUndefined();
+    wrapper.unmount();
+  });
+  it.each([
+    ['5449016a4bdc2d6f028b456f', 'Roubles', '₽'],
+    ['5696686a4bdc2da3298b456a', 'Dollars', '$'],
+    ['569668774bdc2da2298b4568', 'Euros', '€'],
+  ])('uses the standard reward item display for %s', async (id, name, symbol) => {
+    const item = {
+      id,
+      name,
+      iconLink: `https://assets.tarkov.dev/${id}-icon.webp`,
+      image512pxLink: `https://assets.tarkov.dev/${id}-512.webp`,
+      wikiLink: `https://escapefromtarkov.fandom.com/wiki/${name}`,
+    };
+    const wrapper = await mountSuspended(TaskCardRewards, {
+      global: tooltipStubs,
+      props: { ...emptyRewards, itemRewards: [{ item, count: 1250 }] },
+    });
+    const reward = wrapper.get('[data-testid="task-reward-item"]');
+    expect(reward.text()).toBe(`1,250 ${symbol}`);
+    expect(reward.findAll('a').map((link) => link.attributes('href'))).toEqual([
+      item.wikiLink,
+      `https://tarkov.dev/item/${id}`,
+    ]);
+    const thumbnail = reward.get('button');
+    expect(thumbnail.get('img').attributes('src')).toBe(item.iconLink);
+    await thumbnail.trigger('click');
+    await flushPromises();
+    const preview = new DOMWrapper(document.body).get(`[role="dialog"][aria-label="${name}"]`);
+    expect(preview.get('img').attributes('src')).toBe(item.image512pxLink);
     wrapper.unmount();
   });
   it('omits the footer when XP is hidden and there are no other rewards', async () => {
     preferences.showExperience = false;
     try {
       const wrapper = await mountSuspended(TaskCardRewards, {
+        global: tooltipStubs,
         props: { ...emptyRewards, experience: 16000 },
       });
       expect(wrapper.find('[data-testid="task-card-rewards"]').exists()).toBe(false);
@@ -83,6 +133,7 @@ describe('TaskCardRewards', () => {
     };
     const trader = { id: 'skier', name: 'Skier' };
     const wrapper = await mountSuspended(TaskCardRewards, {
+      global: tooltipStubs,
       props: {
         ...emptyRewards,
         experience: 65000,
@@ -98,11 +149,9 @@ describe('TaskCardRewards', () => {
     expect(footer.text()).toContain('Progression');
     expect(footer.text()).toContain('Items & cash');
     expect(footer.text().match(/Purchase unlock/gi)).toEqual(['Purchase unlock']);
-    expect(footer.findAll('button').map((chip) => chip.text())).toEqual([
-      'MP-155 Ultima ×1',
-      'MP-155 Ultima',
-      'Tactical sword',
-    ]);
+    expect(
+      footer.findAll('[data-testid="task-reward-item"]').map((reward) => reward.text())
+    ).toEqual(['MP-155 Ultima ×1', 'MP-155 Ultima', 'Tactical sword']);
     await footer.findAll('button')[1]!.trigger('click');
     await flushPromises();
     const preview = new DOMWrapper(document.body).get(
@@ -120,6 +169,7 @@ describe('TaskCardRewards', () => {
       ['Second optic', 'Second named optic', 'Optic'],
     ] as const;
     const wrapper = await mountSuspended(TaskCardRewards, {
+      global: tooltipStubs,
       props: {
         ...emptyRewards,
         offerUnlockRewards: variants.map(([id, name, shortName]) => ({
@@ -140,6 +190,7 @@ describe('TaskCardRewards', () => {
   });
   it('retains the trader level when an unlock lacks an item preview', async () => {
     const wrapper = await mountSuspended(TaskCardRewards, {
+      global: tooltipStubs,
       props: {
         ...emptyRewards,
         offerUnlockRewards: [
@@ -164,6 +215,7 @@ describe('TaskCardRewards', () => {
       level: index + 1,
     }));
     const wrapper = await mountSuspended(TaskCardRewards, {
+      global: tooltipStubs,
       props: { ...emptyRewards, skillRewards },
     });
     const footer = wrapper.get('[data-testid="task-card-rewards"]');
