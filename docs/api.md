@@ -6,14 +6,6 @@ Internal routes: /api/tarkov/* (cached game-data proxy, NOT a public integration
 Team routes: /api/team/* (Supabase JWT auth).
 Profile routes: /api/profile/* (public, rate-limited — no auth for shared profiles).
 
-Players can claim a permanent handle in **Settings → Account → Profile Sharing**.
-The short `/u/<handle>` link chooses public PvP, then public PvE, then the public
-active Seasonal profile. Use `/u/<handle>/<mode>` to link to a specific mode.
-Existing `/profile/<uuid>/<mode>` links keep their current access rules. Claims
-do not change visibility. Handle links require public mode visibility and are
-disabled while Streamer Mode is enabled. Deleted accounts leave their former
-addresses reserved so old links cannot be reassigned to a different player.
-
 Game modes in API: regular (pvp), pve, pvp-season (seasonal).
 Rate limits: §Rate Limits. OpenAPI spec: [API source](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/v0.1.2/src/openapi.ts).
 -->
@@ -26,6 +18,16 @@ Set `NUXT_TARKOV_JSON_BASE_URL` to point static game-data requests at a compatib
 For nonowners, missing and nonpublic profiles return the same generic `404 Profile not found`
 response. Streamer/overlay consumers preserve that response so sharing endpoints do not expose
 whether a candidate account or private mode exists. Owners can still view their private progress.
+
+### Profile links
+
+Players can claim a permanent handle in **Settings → Account → Profile Sharing**.
+The short `/u/<handle>` link chooses public PvP, then public PvE, then the public
+active Seasonal profile. Use `/u/<handle>/<mode>` to link to a specific mode.
+Existing `/profile/<uuid>/<mode>` links keep their current access rules. Claims
+do not change visibility. Handle links require public mode visibility and are
+disabled while Streamer Mode is enabled. Deleted accounts leave their former
+addresses reserved so old links cannot be reassigned to a different player.
 
 > **Upstream data source.** TarkovTracker consumes the static JSON endpoints at `json.tarkov.dev`.
 > The endpoint catalog lives at `https://json.tarkov.dev/endpoints`. The older `api.tarkov.dev`

@@ -12,9 +12,10 @@
       {{ t('page.profile.copy_profile_link') }}
     </UButton>
   </div>
-  <p v-else-if="handleFailed" class="text-surface-400 text-sm">
-    {{ t('settings.profile_sharing.handle_failed') }}
-  </p>
+  <div v-else-if="handleFailed" class="space-y-2">
+    <p class="text-surface-400 text-sm">{{ t('settings.profile_sharing.handle_failed') }}</p>
+    <UButton size="xs" variant="soft" @click="retry">{{ t('common.retry') }}</UButton>
+  </div>
   <form v-else-if="!handleLoading" class="space-y-2" @submit.prevent="saveHandle">
     <UFormField
       :label="t('settings.profile_sharing.handle_label')"
@@ -28,7 +29,7 @@
           autocapitalize="none"
           :spellcheck="false"
           :maxlength="24"
-          placeholder="your_handle"
+          :placeholder="t('settings.profile_sharing.handle_placeholder')"
           @update:model-value="handleError = ''"
         />
         <UButton type="submit" :loading="claimingHandle">
@@ -54,7 +55,13 @@
   const streamerMode = computed(() => preferencesStore.getStreamerMode);
   const { $supabase } = useNuxtApp();
   const tarkovStore = useTarkovStore();
-  const { handle, loading: handleLoading, failed: handleFailed, claim } = useOwnProfileHandle();
+  const {
+    handle,
+    loading: handleLoading,
+    failed: handleFailed,
+    claim,
+    retry,
+  } = useOwnProfileHandle();
   const publicHandle = defineModel<string | null>({ required: true });
   const props = defineProps<{ hasPublicMode: boolean }>();
   const hasPublicMode = computed(() => props.hasPublicMode);

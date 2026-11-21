@@ -89,6 +89,18 @@ describe('profile shell handler', () => {
       })
     );
   });
+  it.each(['fetch', 'body'])('returns 503 when the shell %s fails', async (stage) => {
+    const failure = new Error('asset unavailable');
+    if (stage === 'fetch') fetchAsset.mockRejectedValueOnce(failure);
+    else
+      fetchAsset.mockResolvedValueOnce({
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'text/html' }),
+        text: vi.fn().mockRejectedValue(failure),
+      });
+    const { default: handler } = await import('@/server/routes/u/[...path].get');
+    await expect(handler(event('/u/rat_one'))).rejects.toMatchObject({ statusCode: 503 });
+  });
   it('registers the same bounded handler for HEAD requests', async () => {
     const { default: getHandler } = await import('@/server/routes/profile/[...path].get');
     const { default: headHandler } = await import('@/server/routes/profile/[...path].head');

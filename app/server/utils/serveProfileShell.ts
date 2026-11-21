@@ -7,11 +7,15 @@ const fetchProfileShell = async (assets: AssetBinding | undefined): Promise<stri
     throw createError({ statusCode: 503, message: 'Profile shell unavailable' });
   }
   // ASSETS bypasses the Function router. The URL has no user path, query, or headers.
-  const shell = await assets.fetch(new Request('https://assets.local/profile'));
-  if (shell.status !== 200 || !shell.headers.get('content-type')?.startsWith('text/html')) {
+  try {
+    const shell = await assets.fetch(new Request('https://assets.local/profile'));
+    if (shell.status !== 200 || !shell.headers.get('content-type')?.startsWith('text/html')) {
+      throw new Error('Invalid profile shell response');
+    }
+    return await shell.text();
+  } catch {
     throw createError({ statusCode: 503, message: 'Profile shell unavailable' });
   }
-  return await shell.text();
 };
 export const serveProfileShell = async (event: H3Event, accepts: (pathname: string) => boolean) => {
   const config = useRuntimeConfig(event).public;

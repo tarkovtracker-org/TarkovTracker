@@ -7,12 +7,13 @@ export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
   const record = ref<{ userId: string; handle: string | null }>();
   const loading = ref(false);
   const failed = ref(false);
+  const loadVersion = ref(0);
   const handle = computed(() =>
     record.value?.userId === userId.value ? record.value?.handle : null
   );
   watch(
-    userId,
-    async (id, _previous, onCleanup) => {
+    [userId, loadVersion],
+    async ([id], _previous, onCleanup) => {
       let current = true;
       onCleanup(() => {
         current = false;
@@ -52,5 +53,8 @@ export const useOwnProfileHandle = (enabled: Ref<boolean> = ref(true)) => {
     record.value = { userId: id, handle: value };
     return 'saved';
   };
-  return { handle, loading, failed, claim };
+  const retry = () => {
+    loadVersion.value += 1;
+  };
+  return { handle, loading, failed, claim, retry };
 };

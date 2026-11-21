@@ -2346,6 +2346,7 @@
     },
     "profile_sharing": {
       "handle_label": "Profile handle",
+      "handle_placeholder": "your_handle",
       "handle_help": "Choose 3–24 letters, numbers, or underscores, including at least one letter. Claiming a permanent handle keeps your current sharing settings.",
       "handle_claim": "Claim handle",
       "handle_use_pmc": "Use PMC name: {handle}",

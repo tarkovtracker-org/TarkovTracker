@@ -137,8 +137,30 @@ describe('Shared Profile API', () => {
     const result = await handler(mockEvent as H3Event);
     expect(result).toMatchObject({ mode: 'pve', visibility: 'public' });
     expect(result).not.toHaveProperty('userId');
+    expect(String(mockFetch.mock.calls[0]?.[0])).toContain(
+      '/rest/v1/profile_handles?select=user_id&handle=eq.rat_one&limit=1'
+    );
     expect(String(mockFetch.mock.calls[1]?.[0])).toContain('profile_public=is.true');
     expect(String(mockFetch.mock.calls[3]?.[0])).toContain('game_mode=eq.pve');
+  });
+  it.each([
+    ['handle lookup disconnect', 'pve', [], new Error('network error'), 503],
+    [
+      'default-mode lookup disconnect',
+      'default',
+      [progressResponse()],
+      new Error('network error'),
+      503,
+    ],
+    ['lookup timeout', 'pve', [], { statusCode: 504 }, 504],
+  ])('normalizes a %s', async (_label, mode, earlierResponses, failure, statusCode) => {
+    mockGetRouterParam.mockImplementation((_, key: string) =>
+      key === 'userId' ? '@rat_one' : mode
+    );
+    for (const response of earlierResponses) mockFetch.mockResolvedValueOnce(response);
+    mockFetch.mockRejectedValueOnce(failure);
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode });
   });
   it.each([
     ['private mode', false, preferencesResponse()],
