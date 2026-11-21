@@ -20,9 +20,9 @@ await against context invalidation.
 ## Language selection
 
 The app bar uses a compact translation icon with native language names and a checked current
-language; phones retain the language submenu in More. Settings > Preferences > Appearance provides
-the same language menu. `useLocaleSwitch` shares pending, cooldown, and error feedback across
-these controls. One shared cache watcher and countdown timer remain active until the last selector
+language; phones retain the language submenu in More. The same menu is available under Settings >
+Preferences > App Preferences. `useLocaleSwitch` shares pending, cooldown, and error feedback
+across these controls. One shared cache watcher and countdown timer remain active until the last selector
 unmounts. All menu entries are disabled during a switch.
 
 A locale switch passes an `AbortSignal` through metadata loading to the Tarkov proxy requests.
@@ -374,7 +374,7 @@ App boot
 - Fixed-dark item action overlays and map tiles retain light foregrounds in light mode instead
   of inheriting inverted neutral ink. Floating map toolbars use theme-aware surfaces, not the tile
   palette: enabled visibility toggles and open popover buttons share `MAP_BUTTON_ACTIVE_CLASS`
-  with a dark light-mode foreground. The selected Appearance option has a contrasting inset ring;
+  with a dark light-mode foreground. The selected theme option has a contrasting inset ring;
   keyboard focus uses a separate offset outline so focusing never replaces the selection boundary.
 - Interactive card content uses native controls: trader navigation lives on the named header
   button and skill editing on its labelled input, not redundant clickable containers. Objective
@@ -393,6 +393,6 @@ App boot
 - `app/assets/css/tailwind.css` — `@custom-variant light` and the `[data-theme='light']` token block
 - `app/utils/theme.ts` — ThemeMode, normalization, storage, apply, `THEME_BOOT_SCRIPT`
 - `app/composables/useTheme.ts` — singleton state + set/toggle
-- `app/features/settings/AppPreferencesCard.vue` — Settings > Preferences theme selector
+- `app/features/settings/AppPreferencesCard.vue` — theme, language, Privacy Mode, and wiki-link preference
 - `app/shell/AppBar.vue` — sun/moon toggle in the utilities group (collapses into More menu on mobile)
 - `nuxt.config.ts` — boot script, light skeleton fallbacks, pinned `colorMode`

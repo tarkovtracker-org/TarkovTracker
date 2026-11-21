@@ -113,14 +113,23 @@ describe('AppPreferencesCard', () => {
   it('lets signed-in users toggle privacy mode and preserves the cooldown', async () => {
     loggedIn.value = true;
     const wrapper = mountCard();
-    const privacy = wrapper.get<HTMLButtonElement>(
-      'button[aria-labelledby="settings-privacy-mode-label"]'
-    );
-    expect(privacy.element.disabled).toBe(false);
-    await privacy.trigger('click');
-    expect(setters.setStreamerMode).toHaveBeenCalledWith(true);
-    expect(privacy.element.disabled).toBe(true);
-    wrapper.unmount();
+    try {
+      vi.useFakeTimers();
+      const privacy = wrapper.get<HTMLButtonElement>(
+        'button[aria-labelledby="settings-privacy-mode-label"]'
+      );
+      expect(privacy.element.disabled).toBe(false);
+      await privacy.trigger('click');
+      expect(setters.setStreamerMode).toHaveBeenCalledWith(true);
+      expect(privacy.element.disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(499);
+      expect(privacy.element.disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(privacy.element.disabled).toBe(false);
+    } finally {
+      wrapper.unmount();
+      vi.useRealTimers();
+    }
   });
   it('renders dark and light options in a fieldset', () => {
     const wrapper = mountCard();
