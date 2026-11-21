@@ -2298,8 +2298,11 @@
     "account": {
       "begin_deletion": "Begin Account Deletion"
     },
+    "active_mode": "Active mode",
+    "app_preferences": {
+      "title": "App Preferences"
+    },
     "general": {
-      "title": "General Preferences",
       "privacy_mode": "Privacy Mode",
       "privacy_mode_hint": "Hides sensitive information while you're streaming."
     },
@@ -2668,9 +2671,7 @@
       "title": "Faction"
     },
     "player_level": {
-      "title": "Current Level",
-      "label": "Current level",
-      "description": "Your current {mode} level. Completing tasks does not change it; the drawer shows the same value.",
+      "label": "Player Level",
       "range_hint": "Enter a whole number from {min} to {max}.",
       "range_hint_fallback": "Enter a whole number from {min} to {max}. Using the default range until level data loads.",
       "saved_title": "Level Updated",

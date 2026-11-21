@@ -103,7 +103,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const defaultGlobalStubs = {
-  AppearanceCard: { template: '<div data-testid="appearance-card" />' },
+  AppPreferencesCard: { template: '<div data-testid="app-preferences-card" />' },
   AccountDeletionCard: { template: '<div data-testid="account-deletion-card" />' },
   ApiTokensCard: { template: '<div data-testid="api-tokens-card" />' },
   DataManagementCard: {
@@ -130,10 +130,9 @@ const defaultGlobalStubs = {
   },
   'i18n-t': { template: '<span><slot /><slot name="word" /></span>' },
   ExperienceCard: { template: '<div data-testid="experience-card" />' },
-  GeneralPreferencesCard: { template: '<div data-testid="general-preferences-card" />' },
   KeybindsCard: { template: '<div data-testid="keybinds-card" />' },
   MapSettingsCard: { template: '<div data-testid="map-settings-card" />' },
-  PlayerLevelCard: { template: '<div data-testid="player-level-card" />' },
+  PlayerLevelField: { template: '<div data-testid="player-level-field" />' },
   PrestigeCard: { template: '<div data-testid="prestige-card" />' },
   ProfileSharingCard: { template: '<div data-testid="profile-sharing-card" />' },
   ResetProgressCard: { template: '<div data-testid="reset-progress-card" />' },
@@ -261,11 +260,10 @@ describe('settings page', () => {
       global: globalConfig,
     });
     expect(wrapper.find('[data-testid="display-name-card"]').exists()).toBe(true);
-    expect(wrapper.find('#progression [data-testid="player-level-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="experience-card"]').exists()).toBe(false);
     expect(wrapper.find('#progression').exists()).toBe(true);
   });
-  it('sets the active faction from the Game Settings card', async () => {
+  it('groups the faction and level in Game Settings and sets the active faction', async () => {
     const wrapper = await mountSuspended(SettingsPage, {
       global: {
         ...globalConfig,
@@ -274,8 +272,10 @@ describe('settings page', () => {
     });
     const progression = wrapper.get('#progression');
     const gameSettings = progression.getComponent(DisplayNameCard);
-    expect(gameSettings.text()).toContain('Faction');
-    const group = gameSettings.get('[role="group"][aria-label="Select faction"]');
+    const activeMode = gameSettings.get('section[aria-labelledby="settings-active-mode"]');
+    expect(activeMode.find('[data-testid="player-level-field"]').exists()).toBe(true);
+    expect(progression.findAll('[data-testid="player-level-field"]')).toHaveLength(1);
+    const group = activeMode.get('[role="group"][aria-label="Select faction"]');
     expect(progression.findAll('[role="group"][aria-label="Select faction"]')).toHaveLength(1);
     const buttons = group.findAll('button');
     expect(buttons.map((button) => button.text())).toEqual(['BEAR', 'USEC']);
@@ -342,7 +342,7 @@ describe('settings page', () => {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('[data-testid="general-preferences-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="app-preferences-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="task-display-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="keybinds-card"]').exists()).toBe(true);
       expect(wrapper.find('#progression').exists()).toBe(false);
@@ -386,13 +386,13 @@ describe('settings page', () => {
       expect(wrapper.find('[data-testid="api-tokens-card"]').exists()).toBe(true);
       expect(wrapper.find('#progression').exists()).toBe(false);
     });
-    it('renders streamer mode on the preferences tab', async () => {
+    it('renders App Preferences on the preferences tab', async () => {
       configureMockState({ routeHash: '#preferences' });
       const wrapper = await mountSuspended(SettingsPage, {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('[data-testid="general-preferences-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="app-preferences-card"]').exists()).toBe(true);
     });
     it('opens the account tab from the route hash without remounting', async () => {
       configureMockState({ routeHash: '#account' });
