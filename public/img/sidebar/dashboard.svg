@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <mask id="details">
+    <path fill="#fff" d="M0 0h24v24H0z"/>
+    <path fill="#000" d="M5 8h3v1H5zm11 0h3v1h-3zm0 9h2v1h-2z"/>
+  </mask>
+  <g mask="url(#details)">
+    <path fill="#d7d5c9" d="M3 3h8v8H2V4zM13 3h8l1 1v7h-9z"/>
+    <path fill="#a4a297" d="M2 13h9v8H3l-1-1zM13 13h9v7l-1 1h-8z"/>
+  </g>
+</svg>

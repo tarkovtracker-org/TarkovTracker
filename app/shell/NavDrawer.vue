@@ -62,34 +62,11 @@
       </template>
       <div class="bg-surface-800 mx-3 my-2 h-px shrink-0" />
       <DrawerLinks :is-collapsed="isCollapsed" />
-      <div class="mt-auto shrink-0">
-        <div class="bg-surface-800 mx-3 my-2 h-px" />
-        <div v-if="!isCollapsed" class="px-4 py-1">
-          <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-            {{ t('common.more') }}
-          </h3>
-        </div>
-        <ul class="flex flex-col gap-0.5 px-1 pb-2">
-          <DrawerItem
-            icon="i-mdi-compass-outline"
-            locale-key="navigation_drawer.resources"
-            to="/resources"
-            :is-collapsed="isCollapsed"
-          />
-          <DrawerItem
-            icon="i-mdi-cog-outline"
-            locale-key="common.settings"
-            to="/settings"
-            :is-collapsed="isCollapsed"
-          />
-        </ul>
-      </div>
     </div>
   </nav>
 </template>
 <script setup lang="ts">
   import DrawerGameSettings from '@/features/drawer/DrawerGameSettings.vue';
-  import DrawerItem from '@/features/drawer/DrawerItem.vue';
   import DrawerLevel from '@/features/drawer/DrawerLevel.vue';
   import DrawerLinks from '@/features/drawer/DrawerLinks.vue';
   import { useAppStore } from '@/stores/useApp';

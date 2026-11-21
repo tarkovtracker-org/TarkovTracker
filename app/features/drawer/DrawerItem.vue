@@ -6,6 +6,7 @@
         :href="props.href"
         :is-collapsed="props.isCollapsed"
         :icon="props.icon"
+        :icon-src="props.iconSrc"
         :avatar="props.avatar"
         :color-class="iconClasses"
         :label-text="labelText"
@@ -18,6 +19,7 @@
         :href="props.href"
         :is-collapsed="props.isCollapsed"
         :icon="props.icon"
+        :icon-src="props.iconSrc"
         :avatar="props.avatar"
         :color-class="iconClasses"
         :label-text="labelText"
@@ -33,6 +35,7 @@
   const route = useRoute();
   const props = defineProps<{
     icon?: string;
+    iconSrc?: string;
     avatar?: string | null;
     localeKey?: string | null;
     text?: string | null;
