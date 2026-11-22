@@ -553,6 +553,26 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
     wrapper.unmount();
   });
+  it('keeps met prerequisites in Quest links while the Requirements list is collapsed', async () => {
+    metadataStoreMock.getTaskById.mockImplementation((id) => ({ id, name: id }));
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: { prior: { complete: true, timestamp: 1 } },
+    });
+    const wrapper = await mountTaskCard({
+      parents: ['prior'],
+      taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+    });
+    const header = wrapper.get('[data-testid="task-requirements-header"] button');
+    expect(header.attributes('aria-expanded')).toBe('false');
+    await wrapper.get('button[aria-label="Quest links"]').trigger('click');
+    await flushPromises();
+    const panel = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(panel.findAll('a').map((link) => link.text())).toEqual(['prior']);
+    await header.trigger('click');
+    expect(wrapper.get('[data-testid="task-requirements-summary"] a').text()).toContain('prior');
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
   it('keeps downstream impact available by keyboard with or without visible quest links', async () => {
     preferencesState.showNext = false;
     const wrapper = await mountSuspended(TaskCardAlternatives, {
@@ -748,9 +768,9 @@ describe('TaskCard appearance and expansion controls', () => {
     ]);
     const details = summary.findAll('[data-testid="task-requirement-detail"]');
     expect(details.map((detail) => detail.attributes('aria-label'))).toEqual([
-      expect.stringContaining('Requires an in-game trader conversation'),
       'Story chapter: Chapter',
     ]);
+    expect(summary.get('p').text()).toContain('Use Mark available');
     wrapper.unmount();
   });
   it('retains the confirmation warning for an unmapped unknown scalar gate', async () => {
@@ -770,9 +790,7 @@ describe('TaskCard appearance and expansion controls', () => {
     });
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
     expect(summary.text()).toContain('Additional in-game progression');
-    expect(
-      summary.get('[data-testid="task-requirement-detail"]').attributes('aria-label')
-    ).toContain('Use Mark available only if this task is available in-game.');
+    expect(summary.text()).toContain('Use Mark available once the task is available in-game.');
     wrapper.unmount();
   });
   it('shows unresolved-pool confirmation guidance before opening contributors', async () => {

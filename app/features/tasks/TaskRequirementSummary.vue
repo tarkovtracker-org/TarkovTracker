@@ -50,11 +50,15 @@
   const listId = computed(() => `task-requirements-${props.id}`);
   const metCount = computed(() => props.rows.filter((row) => row.met).length);
   const allMet = computed(() => metCount.value === props.rows.length);
+  const expanded = defineModel<boolean>('expanded', { default: false });
   // Open while something blocks the task; fold away once everything is met.
-  const expanded = ref(!allMet.value);
-  watch(allMet, (met) => {
-    expanded.value = !met;
-  });
+  watch(
+    allMet,
+    (met) => {
+      expanded.value = !met;
+    },
+    { immediate: true }
+  );
   watch(
     () => props.requestedPool,
     (request) => {

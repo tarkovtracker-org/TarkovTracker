@@ -51,6 +51,8 @@ type KnownTraderRequirement = Exclude<NormalizedTraderRequirement, { requirement
 type StatusLists = Array<string[] | undefined>;
 type KnownOtherRequirement = Exclude<TaskOtherRequirement, { type: 'unknown' }>;
 const TERMINAL_BLOCKERS = new Set<TaskBlocker['type']>(['complete', 'failed']);
+// Gates the tracker cannot observe; the user confirms them with Mark available.
+const CONFIRMATION_BLOCKERS = new Set<TaskBlocker['type']>(['dialogue', 'global_variable_unknown']);
 const SUMMARY_FROM_TASK_DATA = new Set<TaskBlocker['type']>([
   'complete',
   'failed',
@@ -114,21 +116,32 @@ export const useTaskRequirements = (task: () => Task) => {
     if (chapterId && blocker.objective) return storyObjectiveLink(chapterId, blocker.objective.id);
     return blocker.type === 'trader_unlock' ? linkedTask(blocker.taskId) : undefined;
   };
-  type ShortLabel = { label: string; progress?: string };
+  // detail keeps the full blocker sentence on demand when the short label drops information.
+  type ShortLabel = { label: string; progress?: string; detail?: boolean };
+  const traderUnlockLabel = (blocker: TaskBlocker): ShortLabel | undefined => {
+    const trader = blocker.trader?.name;
+    if (!trader) return undefined;
+    if (blocker.objective)
+      return { label: t('page.tasks.requirements.trader_unlock', { trader }), detail: true };
+    const task = blocker.taskId && metadataStore.getTaskById(blocker.taskId)?.name;
+    return task
+      ? { label: t('page.tasks.requirements.trader_unlock_task', { trader, task }) }
+      : undefined;
+  };
   const shortLabels: Partial<
     Record<TaskBlocker['type'], (blocker: TaskBlocker) => ShortLabel | undefined>
   > = {
     dialogue: () => ({ label: t('page.tasks.requirements.dialogue') }),
-    trader_unlock: (blocker) =>
-      blocker.trader?.name
-        ? { label: t('page.tasks.requirements.trader_unlock', { trader: blocker.trader.name }) }
-        : undefined,
+    trader_unlock: traderUnlockLabel,
     story_objective: (blocker) =>
       blocker.objective?.name
-        ? { label: t('page.tasks.requirements.story', { objective: blocker.objective.name }) }
+        ? {
+            label: t('page.tasks.requirements.story', { objective: blocker.objective.name }),
+            detail: true,
+          }
         : undefined,
-    global_variable: () => ({ label: t('page.tasks.requirements.global_variable') }),
-    global_variable_unknown: () => ({ label: t('page.tasks.requirements.global_variable') }),
+    global_variable: () => ({ label: t('page.tasks.requirements.in_game_progression') }),
+    global_variable_unknown: () => ({ label: t('page.tasks.requirements.in_game_progression') }),
     faction: (blocker) =>
       blocker.reason
         ? { label: t('page.tasks.requirements.faction', { faction: blocker.reason }) }
@@ -141,8 +154,8 @@ export const useTaskRequirements = (task: () => Task) => {
       blocker.taskId
         ? { label: t('page.tasks.requirements.failed_branch', { task: taskName(blocker.taskId) }) }
         : undefined,
-    unknown: () => ({ label: t('page.tasks.requirements.unknown') }),
-    cycle: () => ({ label: t('page.tasks.requirements.cycle') }),
+    unknown: () => ({ label: t('page.tasks.requirements.unknown'), detail: true }),
+    cycle: () => ({ label: t('page.tasks.requirements.cycle'), detail: true }),
   };
   const shortBlockerLabel = (blocker: TaskBlocker) => shortLabels[blocker.type]?.(blocker);
   const otherRows = (blocker: TaskBlocker): TaskRequirementRow[] => {
@@ -161,7 +174,10 @@ export const useTaskRequirements = (task: () => Task) => {
         met: false,
         label: short?.label ?? text,
         progress: short?.progress,
-        detail: short && short.label !== text ? text : undefined,
+        hint: CONFIRMATION_BLOCKERS.has(blocker.type)
+          ? t('page.tasks.requirements.availability_hint')
+          : undefined,
+        detail: short?.detail ? text : undefined,
         to: blockerLink(blocker),
       },
     ];
@@ -346,7 +362,7 @@ export const useTaskRequirements = (task: () => Task) => {
       t('page.tasks.requirements.story', {
         objective: requirement.objective.name ?? requirement.objective.id,
       }),
-    globalVariable: () => t('page.tasks.requirements.global_variable'),
+    globalVariable: () => t('page.tasks.requirements.in_game_progression'),
   };
   const otherRequirementLabel = (requirement: KnownOtherRequirement): string =>
     (otherRequirementLabels[requirement.type] as (value: KnownOtherRequirement) => string)(

@@ -48,7 +48,13 @@ vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
     tasks: [],
     storyChapters: [],
-    getTaskById: (id: string) => (id === 'unlock-quest' ? { id } : undefined),
+    getTaskById: (id: string) =>
+      (
+        ({ 'unlock-quest': { id }, 'named-quest': { id, name: 'Named quest' } }) as Record<
+          string,
+          { id: string; name?: string }
+        >
+      )[id],
   }),
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -132,7 +138,7 @@ describe('task requirement summary server gates', () => {
       links
     );
   });
-  it('uses short labels for long blockers and keeps the full text as detail', () => {
+  it('uses short labels for long blockers and keeps dropped details on demand', () => {
     const trader = { id: 'trader', name: 'Mechanic' };
     state.blockers = [
       { type: 'dialogue', requirementId: 'dialogue' },
@@ -142,14 +148,23 @@ describe('task requirement summary server gates', () => {
         chapterIds: ['tour'],
         objective: { id: 'hand-over', name: 'Hand over any 5 building materials' },
       },
+      { type: 'trader_unlock', trader, taskId: 'named-quest' },
+      { type: 'prestige', current: 0, required: 1 },
     ];
     const rows = useTaskRequirements(() => ({ id: 'target' })).blocking.value;
-    expect(rows.map(({ label, detail }) => ({ label, detail }))).toEqual([
-      { label: 'page.tasks.requirements.dialogue', detail: 'page.tasks.blockers.dialogue' },
+    expect(rows.map(({ label, detail, hint }) => ({ label, detail, hint }))).toEqual([
+      {
+        label: 'page.tasks.requirements.dialogue',
+        detail: undefined,
+        hint: 'page.tasks.requirements.availability_hint',
+      },
       {
         label: 'page.tasks.requirements.trader_unlock',
         detail: 'page.tasks.blockers.trader_story_unlock',
+        hint: undefined,
       },
+      { label: 'page.tasks.requirements.trader_unlock_task', detail: undefined, hint: undefined },
+      { label: 'page.tasks.requirements.prestige', detail: undefined, hint: undefined },
     ]);
   });
   it('merges trader rows that share a requirement and current value', () => {
@@ -172,6 +187,23 @@ describe('task requirement summary server gates', () => {
       'page.tasks.requirements.trader_level_group:Therapist, Skier',
       'page.tasks.requirements.dialogue',
       'page.tasks.requirements.trader_level',
+    ]);
+  });
+  it('merges met reputation rows separately from unmet ones', () => {
+    const rep = (id: string, current: number): TaskBlocker => ({
+      type: 'trader_reputation',
+      trader: { id, name: id },
+      current,
+      required: 0.2,
+      compareMethod: '>=',
+    });
+    const { blocking, groupTraderRows } = useTaskRequirements(() => ({ id: 'target' }));
+    state.blockers = [rep('Fence', 0), rep('Lightkeeper', 0)];
+    const unmet = blocking.value;
+    const met = unmet.map((row) => ({ ...row, met: true }));
+    expect(groupTraderRows([...unmet, ...met]).map((row) => [row.label, row.met])).toEqual([
+      ['page.tasks.requirements.trader_reputation_group:Fence, Lightkeeper', false],
+      ['page.tasks.requirements.trader_reputation_group:Fence, Lightkeeper', true],
     ]);
   });
 });

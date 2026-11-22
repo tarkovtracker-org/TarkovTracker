@@ -1,7 +1,9 @@
-import { mount } from '@vue/test-utils';
+import { mountSuspended } from '@nuxt/test-utils/runtime';
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import TaskPoolDetails from '@/features/tasks/TaskPoolDetails.vue';
 import TaskRequirementChips from '@/features/tasks/TaskRequirementChips.vue';
+import TaskRequirementDetail from '@/features/tasks/TaskRequirementDetail.vue';
 import TaskRequirementSummary from '@/features/tasks/TaskRequirementSummary.vue';
 import type { TaskRequirementRow } from '@/features/tasks/composables/useTaskRequirements';
 vi.mock('vue-i18n', async (importOriginal) => ({
@@ -16,7 +18,6 @@ const row = (label: string, met = false, extra: Partial<TaskRequirementRow> = {}
 const global = {
   stubs: {
     UIcon: true,
-    AppTooltip: { template: '<slot />' },
     RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
   },
 };
@@ -121,6 +122,17 @@ describe('task requirement components', () => {
         detail
       );
     }
+  });
+  it('opens requirement details on a tap or click', async () => {
+    const text = 'Hand over any 5 building materials (Tour)';
+    const wrapper = await mountSuspended(TaskRequirementDetail, { props: { text } });
+    await wrapper.get('button').trigger('click');
+    await flushPromises();
+    const popover = new DOMWrapper(document.body).get(
+      '[data-testid="task-requirement-detail-text"]'
+    );
+    expect(popover.text()).toBe(text);
+    wrapper.unmount();
   });
   it('keeps the info button outside a linked chip label', () => {
     const wrapper = mountRequirements(

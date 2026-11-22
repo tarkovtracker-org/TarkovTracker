@@ -303,8 +303,10 @@ list with blockers first and each level, trader, quest, and server-side requirem
 marked met or unmet. The list starts open while any requirement is unmet and collapsed once all
 are met; its header toggles it like Objectives. Trader rows with the same requirement, status,
 and current value merge into one row (`Loyalty 3+: Therapist, Skier`). Server-side and trader
-unlock rows use short labels (`Trader conversation`, `Unlock Mechanic`), and the full
-`useTaskBlockerText` sentence moves to an info tooltip. Cards carry no separate level or trader
+unlock rows use short labels (`Trader conversation`, `Unlock Mechanic`). When the label drops
+detail, such as a story unlock objective, the full `useTaskBlockerText` sentence opens from an
+info button on hover, focus, or tap. Gates the tracker cannot observe keep a visible Mark available
+hint. Quest links skips only prerequisite links that the open Requirements list shows. Cards carry no separate level or trader
 requirement badges. Comparisons use the plain-language formatter in `requirement-format.ts`
 (`15+`, `exactly 1`); the dashboard's `useTaskBlockerText` sentences use the same formatter. Shared/non-current profile
 views call the same evaluator with their own mode progress. Profile task/objective, prestige and

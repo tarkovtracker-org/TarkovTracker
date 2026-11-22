@@ -183,6 +183,7 @@
         >
           <TaskRequirementSummary
             :id="task.id"
+            v-model:expanded="requirementsExpanded"
             :rows="expandedRequirements"
             :requested-pool="requestedPool"
           >
@@ -761,11 +762,13 @@
       ? blockingRequirements.value
       : blockingRequirements.value.slice(0, COMPACT_REQUIREMENT_LIMIT);
   });
+  const requirementsExpanded = ref(false);
+  const shownRequirements = computed(() => {
+    if (!taskExpanded.value) return compactRequirements.value;
+    return requirementsExpanded.value ? expandedRequirements.value : [];
+  });
   const linkedPreviousTasks = computed(() => {
-    const shownRequirements = taskExpanded.value
-      ? expandedRequirements.value
-      : compactRequirements.value;
-    const shownLinks = new Set(shownRequirements.map((row) => row.to));
+    const shownLinks = new Set(shownRequirements.value.map((row) => row.to));
     return parentTasks.value.filter((task) => !shownLinks.has(`/tasks?task=${task.id}`));
   });
   const selectedMapIds = computed(() => {
