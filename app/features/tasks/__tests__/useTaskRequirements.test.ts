@@ -53,7 +53,10 @@ vi.mock('@/stores/useMetadata', () => ({
 }));
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({
+    t: (key: string, values?: { traders?: string }) =>
+      values?.traders ? `${key}:${values.traders}` : key,
+  }),
 }));
 describe('task requirement summary server gates', () => {
   beforeEach(() => {
@@ -85,7 +88,7 @@ describe('task requirement summary server gates', () => {
       state.data.confirmations = {};
       const storyOnly = useTaskRequirements(() => task).summary.value;
       expect(storyOnly.map((row) => row.met)).toEqual([true, false]);
-      expect(storyOnly[0]?.label).toBe('page.tasks.requirements.story_objective');
+      expect(storyOnly[0]?.label).toBe('page.tasks.requirements.story');
       state.data.confirmations = {
         target: { requirements: otherRequirementsSignature(task)!, timestamp: 2 },
       };
@@ -128,5 +131,47 @@ describe('task requirement summary server gates', () => {
     expect(requirements.summary.value.filter((row) => !row.met).map((row) => row.to)).toEqual(
       links
     );
+  });
+  it('uses short labels for long blockers and keeps the full text as detail', () => {
+    const trader = { id: 'trader', name: 'Mechanic' };
+    state.blockers = [
+      { type: 'dialogue', requirementId: 'dialogue' },
+      {
+        type: 'trader_unlock',
+        trader,
+        chapterIds: ['tour'],
+        objective: { id: 'hand-over', name: 'Hand over any 5 building materials' },
+      },
+    ];
+    const rows = useTaskRequirements(() => ({ id: 'target' })).blocking.value;
+    expect(rows.map(({ label, detail }) => ({ label, detail }))).toEqual([
+      { label: 'page.tasks.requirements.dialogue', detail: 'page.tasks.blockers.dialogue' },
+      {
+        label: 'page.tasks.requirements.trader_unlock',
+        detail: 'page.tasks.blockers.trader_story_unlock',
+      },
+    ]);
+  });
+  it('merges trader rows that share a requirement and current value', () => {
+    const traderBlocker = (id: string, current: number): TaskBlocker => ({
+      type: 'trader_level',
+      trader: { id, name: id },
+      current,
+      required: 3,
+      compareMethod: '>=',
+    });
+    state.blockers = [
+      traderBlocker('Therapist', 1),
+      { type: 'dialogue', requirementId: 'dialogue' },
+      traderBlocker('Skier', 1),
+      traderBlocker('Jaeger', 2),
+    ];
+    const { blocking, groupTraderRows } = useTaskRequirements(() => ({ id: 'target' }));
+    const rows = groupTraderRows(blocking.value);
+    expect(rows.map((row) => row.label)).toEqual([
+      'page.tasks.requirements.trader_level_group:Therapist, Skier',
+      'page.tasks.requirements.dialogue',
+      'page.tasks.requirements.trader_level',
+    ]);
   });
 });

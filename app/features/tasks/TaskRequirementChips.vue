@@ -8,29 +8,12 @@
       <span class="text-surface-500 text-[10px] font-bold tracking-wider uppercase">
         {{ t('page.tasks.requirements.title') }}
       </span>
-      <component
-        :is="chip.tag"
+      <TaskRequirementChip
         v-for="chip in chips"
         :key="chip.key"
-        :to="chip.to"
-        class="bg-surface-800/80 text-surface-200 inline-flex max-w-full items-center gap-1 rounded px-1.5 py-0.5 leading-tight"
-        :class="chip.wrapperClass"
-        data-testid="task-requirement-chip"
-      >
-        <UIcon :name="chip.icon" aria-hidden="true" class="text-error-400 h-3.5 w-3.5 shrink-0" />
-        <span class="flex min-w-0 items-center gap-1" :class="chip.contentClass">
-          <span class="min-w-0" :class="chip.labelClass">{{ chip.label }}</span>
-          <span v-if="chip.progress" class="text-surface-400 shrink-0">· {{ chip.progress }}</span>
-          <button
-            v-if="chip.pool"
-            type="button"
-            class="text-primary-400 focus-visible:ring-primary-500/40 rounded underline underline-offset-2 focus-visible:ring-2"
-            @click="emit('showPool', chip.pool.id)"
-          >
-            {{ t('page.tasks.requirements.pool_show_tasks') }}
-          </button>
-        </span>
-      </component>
+        :row="chip.row"
+        @show-pool="emit('showPool', $event)"
+      />
       <button
         v-if="toggleLabel"
         type="button"
@@ -52,37 +35,17 @@
   </div>
 </template>
 <script setup lang="ts">
-  import { RouterLink } from 'vue-router';
   import { COMPACT_REQUIREMENT_LIMIT } from '@/features/tasks/task-requirement-helpers';
-  import type {
-    TaskRequirementKind,
-    TaskRequirementRow,
-  } from '@/features/tasks/composables/useTaskRequirements';
+  import TaskRequirementChip from '@/features/tasks/TaskRequirementChip.vue';
+  import type { TaskRequirementRow } from '@/features/tasks/composables/useTaskRequirements';
   const props = defineProps<{ rows: TaskRequirementRow[] }>();
   const emit = defineEmits<{ showPool: [id: string] }>();
   const { t } = useI18n({ useScope: 'global' });
-  const KIND_ICONS: Record<TaskRequirementKind, string> = {
-    player_level: 'i-mdi-account-star',
-    trader_level: 'i-mdi-handshake',
-    trader_reputation: 'i-mdi-handshake',
-    task: 'i-mdi-clipboard-check-outline',
-    task_pool: 'i-mdi-clipboard-list-outline',
-    other: 'i-mdi-lock-outline',
-  };
-  const LINK_CLASS = 'hover:bg-surface-700 underline-offset-2 hover:underline';
   const expanded = defineModel<boolean>('expanded', { default: false });
   const hiddenCount = computed(() => Math.max(0, props.rows.length - COMPACT_REQUIREMENT_LIMIT));
   const chips = computed(() =>
     (expanded.value ? props.rows : props.rows.slice(0, COMPACT_REQUIREMENT_LIMIT)).map(
-      (row, index) => ({
-        ...row,
-        key: `${row.kind}-${index}-${row.label}`,
-        tag: row.to ? RouterLink : 'span',
-        wrapperClass: row.to ? LINK_CLASS : '',
-        contentClass: row.pool ? 'flex-wrap' : '',
-        labelClass: row.pool ? 'break-words' : 'truncate',
-        icon: KIND_ICONS[row.kind],
-      })
+      (row, index) => ({ row, key: `${row.kind}-${index}-${row.label}` })
     )
   );
   const toggleLabel = computed(() => {
@@ -92,6 +55,6 @@
       : '';
   });
   const hints = computed(() => [
-    ...new Set(chips.value.map((row) => row.hint).filter((hint): hint is string => !!hint)),
+    ...new Set(chips.value.flatMap(({ row }) => (row.hint ? [row.hint] : []))),
   ]);
 </script>

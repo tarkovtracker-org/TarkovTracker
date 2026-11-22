@@ -14,7 +14,11 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 const row = (label: string, met = false, extra: Partial<TaskRequirementRow> = {}) =>
   ({ kind: 'task', met, label, ...extra }) satisfies TaskRequirementRow;
 const global = {
-  stubs: { UIcon: true, RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } },
+  stubs: {
+    UIcon: true,
+    AppTooltip: { template: '<slot />' },
+    RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
+  },
 };
 const mountRequirements = (rows: TaskRequirementRow[], variant: 'blocking' | 'summary') =>
   variant === 'blocking'
@@ -78,7 +82,7 @@ describe('task requirement components', () => {
     await wrapper.get('button').trigger('click');
     expect(hints()).toEqual(['Visible conflict']);
   });
-  it('shows every requirement and puts unmet ones first without a disclosure', () => {
+  it('opens unmet requirements with unmet ones first and lets the header collapse them', async () => {
     const wrapper = mountRequirements(
       [
         row('Level 15+', true, { progress: 'you: 20' }),
@@ -87,10 +91,51 @@ describe('task requirement components', () => {
       'summary'
     );
     expect(wrapper.text()).toContain('"met":1,"total":2');
-    expect(wrapper.find('button').exists()).toBe(false);
+    const header = wrapper.get('[data-testid="task-requirements-header"] button');
+    expect(header.attributes('aria-expanded')).toBe('true');
+    expect(header.attributes('aria-controls')).toBe('task-requirements-task-1');
     const items = wrapper.findAll('li').map((item) => item.text());
     expect(items[0]).toMatch(/^page\.tasks\.requirements\.unmet:\s*Debut\s*· not started$/);
     expect(items[1]).toMatch(/^page\.tasks\.requirements\.met:\s*Level 15\+$/);
+    await header.trigger('click');
+    expect(wrapper.find('li').exists()).toBe(false);
+    expect(wrapper.text()).toContain('"met":1,"total":2');
+  });
+  it('starts collapsed when every requirement is met and reopens when one becomes unmet', async () => {
+    const wrapper = mountRequirements([row('Level 15+', true)], 'summary');
+    const header = () => wrapper.get('[data-testid="task-requirements-header"] button');
+    expect(header().attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('li').exists()).toBe(false);
+    await wrapper.setProps({ rows: [row('Level 15+', false)] });
+    expect(header().attributes('aria-expanded')).toBe('true');
+    expect(wrapper.find('li').exists()).toBe(true);
+  });
+  it('keeps requirement details out of the label and exposes them on the info button', () => {
+    const detail = 'Requires an in-game trader conversation.';
+    const rows = [row('Trader conversation', false, { kind: 'other', detail })];
+    for (const variant of ['summary', 'blocking'] as const) {
+      const wrapper = mountRequirements(rows, variant);
+      expect(wrapper.text()).toContain('Trader conversation');
+      expect(wrapper.text()).not.toContain(detail);
+      expect(wrapper.get('[data-testid="task-requirement-detail"]').attributes('aria-label')).toBe(
+        detail
+      );
+    }
+  });
+  it('keeps the info button outside a linked chip label', () => {
+    const wrapper = mountRequirements(
+      [
+        row('Unlock Mechanic', false, {
+          kind: 'other',
+          to: '/storyline',
+          detail: 'Long objective',
+        }),
+      ],
+      'blocking'
+    );
+    const link = wrapper.get('[data-testid="task-requirement-chip"] a');
+    expect(link.text()).toBe('Unlock Mechanic');
+    expect(link.find('[data-testid="task-requirement-detail"]').exists()).toBe(false);
   });
   const poolRow = (): TaskRequirementRow =>
     row('Mechanic LL2 tasks', true, {
@@ -122,7 +167,8 @@ describe('task requirement components', () => {
       props: { id: 'target', rows: [poolRow()], requestedPool: { id: 'pool' } },
       global,
     });
-    expect(wrapper.get('button').attributes('aria-expanded')).toBe('true');
+    const poolToggle = () => wrapper.get('[aria-controls="task-requirements-target-pool"]');
+    expect(poolToggle().attributes('aria-expanded')).toBe('true');
     expect(wrapper.text()).toContain('0/3 tracked');
     expect(wrapper.text()).toContain('page.tasks.requirements.pool_confirmed');
     expect(wrapper.get('[data-testid="task-pool-caveat"]').text()).toContain('pool_caveat');
@@ -130,9 +176,7 @@ describe('task requirement components', () => {
     expect(wrapper.get('[data-testid="task-pool-details"] a').attributes('href')).toBe(
       '/tasks?task=a'
     );
-    const toggle = wrapper.get('button');
-    expect(toggle.attributes('aria-controls')).toBe('task-requirements-target-pool');
-    await toggle.trigger('click');
+    await poolToggle().trigger('click');
     expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
     await wrapper.setProps({ requestedPool: { id: 'pool' } });
     expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(true);

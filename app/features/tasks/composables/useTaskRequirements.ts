@@ -39,8 +39,12 @@ export type TaskRequirementRow = {
   label: string;
   progress?: string;
   hint?: string;
+  /** Full explanation shown on demand so the visible label stays short. */
+  detail?: string;
   to?: string;
   pool?: TaskRequirementPool;
+  /** Trader values used to merge matching trader rows into one line. */
+  trader?: { name: string; requirement: string; current: string };
 };
 type TraderKind = 'trader_level' | 'trader_reputation';
 type KnownTraderRequirement = Exclude<NormalizedTraderRequirement, { requirementType: 'unknown' }>;
@@ -87,19 +91,22 @@ export const useTaskRequirements = (task: () => Task) => {
     }),
     progress: you(blocker.current ?? 0),
   });
-  const traderRow = (kind: TraderKind, blocker: TaskBlocker, met: boolean): TaskRequirementRow => ({
-    kind,
-    met,
-    label: t(`page.tasks.requirements.${kind}`, {
-      trader: blocker.trader?.name ?? '',
-      requirement: formatComparison(
-        t,
-        blocker.compareMethod,
-        formatTraderValue(kind, blocker.required)
-      ),
-    }),
-    progress: you(formatTraderValue(kind, blocker.current)),
-  });
+  const traderRow = (kind: TraderKind, blocker: TaskBlocker, met: boolean): TaskRequirementRow => {
+    const name = blocker.trader?.name ?? '';
+    const requirement = formatComparison(
+      t,
+      blocker.compareMethod,
+      formatTraderValue(kind, blocker.required)
+    );
+    const current = formatTraderValue(kind, blocker.current);
+    return {
+      kind,
+      met,
+      label: t(`page.tasks.requirements.${kind}`, { trader: name, requirement }),
+      progress: you(current),
+      trader: { name, requirement, current },
+    };
+  };
   const linkedTask = (id?: string) =>
     id && metadataStore.getTaskById(id) ? `/tasks?task=${id}` : undefined;
   const blockerLink = (blocker: TaskBlocker) => {
@@ -107,6 +114,37 @@ export const useTaskRequirements = (task: () => Task) => {
     if (chapterId && blocker.objective) return storyObjectiveLink(chapterId, blocker.objective.id);
     return blocker.type === 'trader_unlock' ? linkedTask(blocker.taskId) : undefined;
   };
+  type ShortLabel = { label: string; progress?: string };
+  const shortLabels: Partial<
+    Record<TaskBlocker['type'], (blocker: TaskBlocker) => ShortLabel | undefined>
+  > = {
+    dialogue: () => ({ label: t('page.tasks.requirements.dialogue') }),
+    trader_unlock: (blocker) =>
+      blocker.trader?.name
+        ? { label: t('page.tasks.requirements.trader_unlock', { trader: blocker.trader.name }) }
+        : undefined,
+    story_objective: (blocker) =>
+      blocker.objective?.name
+        ? { label: t('page.tasks.requirements.story', { objective: blocker.objective.name }) }
+        : undefined,
+    global_variable: () => ({ label: t('page.tasks.requirements.global_variable') }),
+    global_variable_unknown: () => ({ label: t('page.tasks.requirements.global_variable') }),
+    faction: (blocker) =>
+      blocker.reason
+        ? { label: t('page.tasks.requirements.faction', { faction: blocker.reason }) }
+        : undefined,
+    prestige: (blocker) => ({
+      label: t('page.tasks.requirements.prestige', { required: blocker.required ?? 0 }),
+      progress: you(blocker.current ?? 0),
+    }),
+    failed_branch: (blocker) =>
+      blocker.taskId
+        ? { label: t('page.tasks.requirements.failed_branch', { task: taskName(blocker.taskId) }) }
+        : undefined,
+    unknown: () => ({ label: t('page.tasks.requirements.unknown') }),
+    cycle: () => ({ label: t('page.tasks.requirements.cycle') }),
+  };
+  const shortBlockerLabel = (blocker: TaskBlocker) => shortLabels[blocker.type]?.(blocker);
   const otherRows = (blocker: TaskBlocker): TaskRequirementRow[] => {
     const requirement = normalizeOtherRequirements(task().otherRequirements).find(
       (requirement) =>
@@ -115,11 +153,15 @@ export const useTaskRequirements = (task: () => Task) => {
         (requirement.counter || requirement.taskPool)
     );
     if (requirement?.type === 'globalVariable') return [poolRow(requirement, false, blocker)];
+    const text = blockerText(blocker);
+    const short = shortBlockerLabel(blocker);
     return [
       {
         kind: 'other',
         met: false,
-        label: blockerText(blocker),
+        label: short?.label ?? text,
+        progress: short?.progress,
+        detail: short && short.label !== text ? text : undefined,
         to: blockerLink(blocker),
       },
     ];
@@ -301,9 +343,8 @@ export const useTaskRequirements = (task: () => Task) => {
   } = {
     dialogue: () => t('page.tasks.requirements.dialogue'),
     storyObjective: (requirement) =>
-      t('page.tasks.requirements.story_objective', {
+      t('page.tasks.requirements.story', {
         objective: requirement.objective.name ?? requirement.objective.id,
-        chapter: requirement.storyChapter.name ?? requirement.storyChapter.id,
       }),
     globalVariable: () => t('page.tasks.requirements.global_variable'),
   };
@@ -324,6 +365,12 @@ export const useTaskRequirements = (task: () => Task) => {
           kind: 'other',
           met: true,
           label: otherRequirementLabel(requirement),
+          detail:
+            requirement.type === 'storyObjective'
+              ? t('page.tasks.requirements.story_chapter', {
+                  chapter: requirement.storyChapter.name ?? requirement.storyChapter.id,
+                })
+              : undefined,
           to:
             requirement.type === 'storyObjective'
               ? storyObjectiveLink(requirement.storyChapter.id, requirement.objective.id)
@@ -339,5 +386,33 @@ export const useTaskRequirements = (task: () => Task) => {
     ...metOtherSummary(),
     ...otherSummary(),
   ]);
-  return { blocking, summary };
+  const traderGroupKey = ({ kind, met, trader }: TaskRequirementRow) =>
+    trader ? JSON.stringify([kind, met, trader.requirement, trader.current]) : undefined;
+  /** Merge trader rows that share a requirement, status, and current value into one line. */
+  const groupTraderRows = (rows: TaskRequirementRow[]): TaskRequirementRow[] => {
+    const groups = new Map<string, TaskRequirementRow[]>();
+    rows.forEach((row) => {
+      const key = traderGroupKey(row);
+      if (key) groups.set(key, [...(groups.get(key) ?? []), row]);
+    });
+    const emitted = new Set<string>();
+    return rows.flatMap((row) => {
+      const key = traderGroupKey(row);
+      if (!key || !row.trader) return [row];
+      if (emitted.has(key)) return [];
+      emitted.add(key);
+      const members = groups.get(key) ?? [row];
+      if (members.length === 1) return [row];
+      return [
+        {
+          ...row,
+          label: t(`page.tasks.requirements.${row.kind}_group`, {
+            requirement: row.trader.requirement,
+            traders: members.map((member) => member.trader?.name).join(', '),
+          }),
+        },
+      ];
+    });
+  };
+  return { blocking, summary, groupTraderRows };
 };

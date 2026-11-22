@@ -678,6 +678,10 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
     expect(summary.text()).toContain('1 of 1 met');
+    const header = summary.get('[data-testid="task-requirements-header"] button');
+    expect(header.attributes('aria-expanded')).toBe('false');
+    expect(summary.text()).not.toContain('Level 20+');
+    await header.trigger('click');
     expect(summary.text()).toContain('Level 20+');
     tarkovStoreMock.playerLevel.mockReturnValue(1);
     wrapper.unmount();
@@ -738,9 +742,14 @@ describe('TaskCard appearance and expansion controls', () => {
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
     const rows = summary.findAll('li').map((item) => item.text());
     expect(rows).toEqual([
-      expect.stringMatching(/^Not met:\s*Requires an in-game trader conversation/),
-      expect.stringMatching(/^Met:\s*Story objective: Goal \(Chapter\)/),
-      expect.stringMatching(/^Met:\s*Additional in-game progression required/),
+      expect.stringMatching(/^Not met:\s*Trader conversation$/),
+      expect.stringMatching(/^Met:\s*Story: Goal$/),
+      expect.stringMatching(/^Met:\s*Additional in-game progression$/),
+    ]);
+    const details = summary.findAll('[data-testid="task-requirement-detail"]');
+    expect(details.map((detail) => detail.attributes('aria-label'))).toEqual([
+      expect.stringContaining('Requires an in-game trader conversation'),
+      'Story chapter: Chapter',
     ]);
     wrapper.unmount();
   });
@@ -759,9 +768,11 @@ describe('TaskCard appearance and expansion controls', () => {
         { type: 'globalVariable', id: 'scalar', variableId: 'v', compareMethod: '>=', value: 3 },
       ],
     });
-    expect(wrapper.get('[data-testid="task-requirements-summary"]').text()).toContain(
-      'Use Mark available only if this task is available in-game.'
-    );
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    expect(summary.text()).toContain('Additional in-game progression');
+    expect(
+      summary.get('[data-testid="task-requirement-detail"]').attributes('aria-label')
+    ).toContain('Use Mark available only if this task is available in-game.');
     wrapper.unmount();
   });
   it('shows unresolved-pool confirmation guidance before opening contributors', async () => {

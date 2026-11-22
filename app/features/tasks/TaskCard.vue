@@ -532,18 +532,21 @@
     const taskFaction = props.task.factionName;
     return taskFaction === 'Any' || taskFaction === tarkovStore.getPMCFaction();
   });
-  const { blocking: blockingRequirements, summary: requirementSummary } = useTaskRequirements(
-    () => props.task
-  );
+  const {
+    blocking: rawBlockingRequirements,
+    summary: requirementSummary,
+    groupTraderRows,
+  } = useTaskRequirements(() => props.task);
+  const blockingRequirements = computed(() => groupTraderRows(rawBlockingRequirements.value));
   const requirementKey = (row: TaskRequirementRow) => JSON.stringify([row.kind, row.to, row.label]);
   const expandedRequirements = computed(() => {
     const summary = requirementSummary.value;
-    if (!isLocked.value) return summary;
+    if (!isLocked.value) return groupTraderRows(summary);
     const summaryKeys = new Set(summary.map(requirementKey));
-    return [
+    return groupTraderRows([
       ...summary,
-      ...blockingRequirements.value.filter((row) => !summaryKeys.has(requirementKey(row))),
-    ];
+      ...rawBlockingRequirements.value.filter((row) => !summaryKeys.has(requirementKey(row))),
+    ]);
   });
   const locationTooltip = computed(() => {
     if (isGlobalTask.value) {
