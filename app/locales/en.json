@@ -1458,6 +1458,7 @@
         "story_alternative": "Or progress a story chapter: {chapters}",
         "met": "Met",
         "unmet": "Not met",
+        "status_prefix": "{status}:",
         "dialogue": "Trader conversation",
         "story": "Story: {objective}",
         "story_chapter": "Story chapter: {chapter}",

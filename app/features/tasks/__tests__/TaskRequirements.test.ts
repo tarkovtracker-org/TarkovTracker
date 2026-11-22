@@ -96,8 +96,12 @@ describe('task requirement components', () => {
     expect(header.attributes('aria-expanded')).toBe('true');
     expect(header.attributes('aria-controls')).toBe('task-requirements-task-1');
     const items = wrapper.findAll('li').map((item) => item.text());
-    expect(items[0]).toMatch(/^page\.tasks\.requirements\.unmet:\s*Debut\s*· not started$/);
-    expect(items[1]).toMatch(/^page\.tasks\.requirements\.met:\s*Level 15\+$/);
+    expect(items[0]).toMatch(
+      /^page\.tasks\.requirements\.status_prefix:\{"status":"page\.tasks\.requirements\.unmet"\}\s*Debut\s*· not started$/
+    );
+    expect(items[1]).toMatch(
+      /^page\.tasks\.requirements\.status_prefix:\{"status":"page\.tasks\.requirements\.met"\}\s*Level 15\+$/
+    );
     await header.trigger('click');
     expect(wrapper.find('li').exists()).toBe(false);
     expect(wrapper.text()).toContain('"met":1,"total":2');

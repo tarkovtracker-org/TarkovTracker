@@ -6,7 +6,7 @@
       class="h-4 w-4 shrink-0"
       :class="state.iconClass"
     />
-    <span class="sr-only">{{ t(`page.tasks.requirements.${state.key}`) }}:</span>
+    <span class="sr-only">{{ statusLabel }}</span>
     <div class="min-w-0 flex-1">
       <component
         :is="row.to ? RouterLink : 'span'"
@@ -45,6 +45,11 @@
     unmet: { icon: 'i-mdi-close-circle', iconClass: 'text-error-400', key: 'unmet' },
   } as const;
   const state = computed(() => MET_STATE[props.row.met ? 'met' : 'unmet']);
+  const statusLabel = computed(() =>
+    t('page.tasks.requirements.status_prefix', {
+      status: t(`page.tasks.requirements.${state.value.key}`),
+    })
+  );
   const linkClass = computed(() => (props.row.to ? LINK_CLASS : ''));
   // Met rows drop their progress unless a pool still needs its tracked count.
   const pending = computed(() =>

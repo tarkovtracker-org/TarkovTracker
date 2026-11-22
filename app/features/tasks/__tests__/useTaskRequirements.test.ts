@@ -60,8 +60,13 @@ vi.mock('@/stores/useMetadata', () => ({
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
-    t: (key: string, values?: { traders?: string }) =>
-      values?.traders ? `${key}:${values.traders}` : key,
+    // Render every interpolation so label tests catch missing names and values.
+    t: (key: string, values?: Record<string, unknown>) =>
+      values
+        ? `${key}(${Object.entries(values)
+            .map(([name, value]) => `${name}=${String(value)}`)
+            .join(', ')})`
+        : key,
   }),
 }));
 describe('task requirement summary server gates', () => {
@@ -94,7 +99,7 @@ describe('task requirement summary server gates', () => {
       state.data.confirmations = {};
       const storyOnly = useTaskRequirements(() => task).summary.value;
       expect(storyOnly.map((row) => row.met)).toEqual([true, false]);
-      expect(storyOnly[0]?.label).toBe('page.tasks.requirements.story');
+      expect(storyOnly[0]?.label).toBe('page.tasks.requirements.story(objective=objective)');
       state.data.confirmations = {
         target: { requirements: otherRequirementsSignature(task)!, timestamp: 2 },
       };
@@ -159,13 +164,20 @@ describe('task requirement summary server gates', () => {
         hint: 'page.tasks.requirements.availability_hint',
       },
       {
-        label: 'page.tasks.requirements.trader_unlock',
-        detail: 'page.tasks.blockers.trader_story_unlock',
+        label: 'page.tasks.requirements.trader_unlock(trader=Mechanic)',
+        detail: expect.stringMatching(
+          /^page\.tasks\.blockers\.trader_story_unlock\(.*trader=Mechanic.*objective=Hand over any 5 building materials/
+        ),
         hint: undefined,
       },
-      { label: 'page.tasks.requirements.trader_unlock_task', detail: undefined, hint: undefined },
-      { label: 'page.tasks.requirements.prestige', detail: undefined, hint: undefined },
+      {
+        label: 'page.tasks.requirements.trader_unlock_task(trader=Mechanic, task=Named quest)',
+        detail: undefined,
+        hint: undefined,
+      },
+      { label: 'page.tasks.requirements.prestige(required=1)', detail: undefined, hint: undefined },
     ]);
+    expect(rows[3]?.progress).toBe('page.tasks.requirements.you(value=0)');
   });
   it('merges trader rows that share a requirement and current value', () => {
     const traderBlocker = (id: string, current: number): TaskBlocker => ({
@@ -184,10 +196,12 @@ describe('task requirement summary server gates', () => {
     const { blocking, groupTraderRows } = useTaskRequirements(() => ({ id: 'target' }));
     const rows = groupTraderRows(blocking.value);
     expect(rows.map((row) => row.label)).toEqual([
-      'page.tasks.requirements.trader_level_group:Therapist, Skier',
+      'page.tasks.requirements.trader_level_group(requirement=page.tasks.requirements.comparison_at_least(value=3), traders=Therapist, Skier)',
       'page.tasks.requirements.dialogue',
-      'page.tasks.requirements.trader_level',
+      'page.tasks.requirements.trader_level(trader=Jaeger, requirement=page.tasks.requirements.comparison_at_least(value=3))',
     ]);
+    expect(rows[0]?.progress).toBe('page.tasks.requirements.you(value=1)');
+    expect(rows[2]?.progress).toBe('page.tasks.requirements.you(value=2)');
   });
   it('merges met reputation rows separately from unmet ones', () => {
     const rep = (id: string, current: number): TaskBlocker => ({
@@ -202,8 +216,14 @@ describe('task requirement summary server gates', () => {
     const unmet = blocking.value;
     const met = unmet.map((row) => ({ ...row, met: true }));
     expect(groupTraderRows([...unmet, ...met]).map((row) => [row.label, row.met])).toEqual([
-      ['page.tasks.requirements.trader_reputation_group:Fence, Lightkeeper', false],
-      ['page.tasks.requirements.trader_reputation_group:Fence, Lightkeeper', true],
+      [
+        'page.tasks.requirements.trader_reputation_group(requirement=page.tasks.requirements.comparison_at_least(value=0.20), traders=Fence, Lightkeeper)',
+        false,
+      ],
+      [
+        'page.tasks.requirements.trader_reputation_group(requirement=page.tasks.requirements.comparison_at_least(value=0.20), traders=Fence, Lightkeeper)',
+        true,
+      ],
     ]);
   });
 });
