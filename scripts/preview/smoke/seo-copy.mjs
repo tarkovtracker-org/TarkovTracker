@@ -4,7 +4,10 @@ export const english = JSON.parse(
 );
 export function readPreviewSeo(candidatePath) {
   if (!candidatePath) return english.seo;
-  const { seo } = JSON.parse(readFileSync(candidatePath, 'utf8'));
+  return parsePreviewSeo(readFileSync(candidatePath, 'utf8'));
+}
+function parsePreviewSeo(source) {
+  const { seo } = JSON.parse(source);
   if (typeof seo?.site_name !== 'string' || !seo.routes) {
     throw new Error('Missing SEO copy in preview revision English locale');
   }
