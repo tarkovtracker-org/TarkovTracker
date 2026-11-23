@@ -39,22 +39,7 @@
                   : 'border-locked-500/50 bg-locked-500/20 text-locked-400'
               "
             >
-              <span class="whitespace-nowrap">
-                <template v-if="prerequisitesMet">
-                  <i18n-t
-                    keypath="page.hideout.stationcard.level"
-                    scope="global"
-                    :plural="progressStore.hideoutLevels?.[props.station.id]?.self || 0"
-                  >
-                    <template #level>
-                      {{ progressStore.hideoutLevels?.[props.station.id]?.self || 0 }}
-                    </template>
-                  </i18n-t>
-                </template>
-                <template v-else>
-                  {{ $t('page.hideout.stationcard.level_not_ready') }}
-                </template>
-              </span>
+              <span class="whitespace-nowrap">{{ stationBadge }}</span>
             </div>
             <div
               v-if="highlightedLevel"
@@ -98,156 +83,38 @@
           </UButton>
         </div>
         <!-- Next level requirements -->
-        <div v-if="nextLevel" class="space-y-2.5 sm:space-y-3">
-          <!-- Item Requirements Section -->
+        <div
+          v-if="nextLevel && hasRequirements"
+          class="bg-surface-800 relative rounded-lg p-2.5 sm:p-3"
+          :class="moduleHighlightClasses"
+        >
+          <div class="mb-2.5 flex items-center text-sm font-medium sm:mb-3 sm:text-base">
+            <UIcon
+              name="i-mdi-package-variant-closed-check"
+              class="text-success-500 light:text-success-800 mr-1.5 h-4 w-4 sm:mr-2 sm:h-5 sm:w-5"
+            />
+            {{ $t('page.hideout.stationcard.next_level') }}
+          </div>
+          <!-- Item Requirements Grid -->
           <div
             v-if="hasItemRequirements"
-            class="bg-surface-800 relative rounded-lg p-2.5 sm:p-3"
-            :class="moduleHighlightClasses"
+            class="mb-2.5 grid gap-2 sm:mb-3"
+            :class="
+              inlineMaterials
+                ? 'grid-cols-1'
+                : 'grid-cols-2 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5'
+            "
           >
-            <div class="mb-2.5 flex items-center text-sm font-medium sm:mb-3 sm:text-[15px]">
-              <UIcon
-                name="i-mdi-package-variant-closed-check"
-                class="text-success-500 light:text-success-800 mr-1.5 h-4 w-4 sm:mr-2 sm:h-5 sm:w-5"
-              />
-              {{ $t('page.hideout.stationcard.next_level') }}
-            </div>
-            <!-- Item Requirements Grid -->
-            <div
-              class="mb-2.5 grid grid-cols-2 gap-2 sm:mb-3 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-5"
-            >
-              <HideoutRequirement
-                v-for="requirement in nextLevel.itemRequirements"
-                :key="requirement.id"
-                :requirement="requirement"
-                :station-id="props.station.id"
-                :level="nextLevel.level"
-              />
-            </div>
-            <!-- Prerequisites Section -->
-            <div
-              v-if="hasPrerequisites"
-              class="border-surface-700 space-y-1.5 border-t pt-2.5 sm:space-y-2 sm:pt-3"
-            >
-              <div
-                class="text-surface-400 mb-1.5 text-[11px] font-medium tracking-wider uppercase sm:mb-2 sm:text-xs"
-              >
-                {{ $t('page.hideout.stationcard.prerequisites') }}
-              </div>
-              <!-- Station Level Requirements -->
-              <div
-                v-for="(requirement, rIndex) in nextLevel.stationLevelRequirements"
-                :key="`station-${rIndex}`"
-                class="text-xs sm:text-sm"
-              >
-                <NuxtLink
-                  :to="getStationRequirementLink(requirement)"
-                  class="focus-visible:ring-primary-400/60 flex items-center gap-1.5 rounded-md transition hover:underline focus-visible:ring-2 focus-visible:outline-none sm:gap-2"
-                  :class="
-                    isStationReqMet(requirement)
-                      ? 'text-success-400'
-                      : 'text-error-400 font-semibold'
-                  "
-                >
-                  <UIcon
-                    name="i-mdi-home"
-                    class="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                    :class="
-                      isStationReqMet(requirement)
-                        ? 'text-info-500 light:text-info-800'
-                        : 'text-error-500 light:text-error-800'
-                    "
-                  />
-                  <i18n-t keypath="page.hideout.stationcard.requirements.station" scope="global">
-                    <template #level>
-                      {{ requirement.level }}
-                    </template>
-                    <template #stationname>
-                      {{ requirement.station.name }}
-                    </template>
-                  </i18n-t>
-                  <UIcon
-                    name="i-mdi-arrow-top-right"
-                    class="h-3 w-3 shrink-0 opacity-75 sm:h-3.5 sm:w-3.5"
-                  />
-                </NuxtLink>
-              </div>
-              <!-- Skill Requirements -->
-              <div
-                v-for="(requirement, rIndex) in nextLevel.skillRequirements"
-                :key="`skill-${rIndex}`"
-                class="text-xs sm:text-sm"
-              >
-                <NuxtLink
-                  :to="getSkillRequirementLink(requirement)"
-                  class="focus-visible:ring-primary-400/60 flex items-center gap-1.5 rounded-md transition hover:underline focus-visible:ring-2 focus-visible:outline-none sm:gap-2"
-                  :class="
-                    isSkillReqMet(requirement) ? 'text-success-400' : 'text-error-400 font-semibold'
-                  "
-                >
-                  <UIcon
-                    name="i-mdi-star"
-                    class="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                    :class="
-                      isSkillReqMet(requirement)
-                        ? 'text-warning-500 light:text-warning-800'
-                        : 'text-error-500 light:text-error-800'
-                    "
-                  />
-                  <i18n-t keypath="page.hideout.stationcard.requirements.skill" scope="global">
-                    <template #level>
-                      {{ requirement.level }}
-                    </template>
-                    <template #skillname>
-                      {{ requirement.name }}
-                    </template>
-                  </i18n-t>
-                  <UIcon
-                    name="i-mdi-arrow-top-right"
-                    class="h-3 w-3 shrink-0 opacity-75 sm:h-3.5 sm:w-3.5"
-                  />
-                </NuxtLink>
-              </div>
-              <!-- Trader Requirements -->
-              <div
-                v-for="(requirement, rIndex) in nextLevel.traderRequirements"
-                :key="`trader-${rIndex}`"
-                class="text-xs sm:text-sm"
-              >
-                <NuxtLink
-                  :to="getTraderRequirementLink(requirement)"
-                  class="focus-visible:ring-primary-400/60 flex items-center gap-1.5 rounded-md transition hover:underline focus-visible:ring-2 focus-visible:outline-none sm:gap-2"
-                  :class="
-                    isTraderReqMet(requirement)
-                      ? 'text-success-400'
-                      : 'text-error-400 font-semibold'
-                  "
-                >
-                  <UIcon
-                    name="i-mdi-account-tie"
-                    class="h-3.5 w-3.5 sm:h-4 sm:w-4"
-                    :class="
-                      isTraderReqMet(requirement)
-                        ? 'text-secondary-500 light:text-secondary-800'
-                        : 'text-error-500 light:text-error-800'
-                    "
-                  />
-                  <i18n-t keypath="page.hideout.stationcard.requirements.trader" scope="global">
-                    <template #loyaltylevel>
-                      {{ requirement.value }}
-                    </template>
-                    <template #tradername>
-                      {{ requirement.trader.name }}
-                    </template>
-                  </i18n-t>
-                  <UIcon
-                    name="i-mdi-arrow-top-right"
-                    class="h-3 w-3 shrink-0 opacity-75 sm:h-3.5 sm:w-3.5"
-                  />
-                </NuxtLink>
-              </div>
-            </div>
+            <HideoutRequirement
+              v-for="requirement in nextLevel.itemRequirements"
+              :key="requirement.id"
+              :requirement="requirement"
+              :inline="inlineMaterials"
+              :station-id="props.station.id"
+              :level="nextLevel.level"
+            />
           </div>
+          <HideoutPrerequisites :level="nextLevel" />
         </div>
         <!-- Max level indicator -->
         <div v-if="!nextLevel" class="bg-surface-800 rounded p-2.5 sm:p-3">
@@ -262,67 +129,27 @@
     </template>
     <template #footer>
       <div v-if="isContentVisible" class="p-1.5 sm:p-2">
-        <div v-if="!upgradeDisabled" class="flex flex-col gap-1.5 sm:gap-2">
+        <div :class="actionLayout">
           <UButton
-            v-if="nextLevel?.level"
+            v-if="nextLevel"
             color="success"
             variant="solid"
             size="md"
             block
             :ui="upgradeButtonUi"
-            @click="upgradeStation()"
+            @click="upgradeStation"
           >
-            <i18n-t
-              keypath="page.hideout.stationcard.upgrade_button"
-              scope="global"
-              :plural="nextLevel?.level"
-            >
-              <template #level>
-                {{ nextLevel?.level }}
-              </template>
-            </i18n-t>
+            {{ upgradeLabel }}
           </UButton>
           <UButton
-            v-if="currentLevel && !downgradeDisabled"
+            v-if="canDowngrade"
             size="sm"
-            block
+            :block="!upgradeDisabled"
             :ui="downgradeButtonUi"
-            @click="downgradeStation()"
+            @click="downgradeStation"
           >
-            <i18n-t
-              keypath="page.hideout.stationcard.downgrade_button"
-              scope="global"
-              :plural="(progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1"
-            >
-              <template #level>
-                {{ (progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1 }}
-              </template>
-            </i18n-t>
+            {{ downgradeLabel }}
           </UButton>
-        </div>
-        <div v-if="upgradeDisabled" class="flex flex-wrap items-center justify-center gap-2">
-          <UButton
-            v-if="currentLevel && !downgradeDisabled"
-            size="sm"
-            :ui="downgradeButtonUi"
-            @click="downgradeStation()"
-          >
-            <i18n-t
-              keypath="page.hideout.stationcard.downgrade_button"
-              scope="global"
-              :plural="(progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1"
-            >
-              <template #level>
-                {{ (progressStore.hideoutLevels?.[props.station.id]?.self || 0) - 1 }}
-              </template>
-            </i18n-t>
-          </UButton>
-          <span
-            v-if="nextLevel && (!currentLevel || downgradeDisabled)"
-            class="text-surface-400 text-xs sm:text-sm"
-          >
-            {{ t('page.hideout.stationcard.upgrade_unavailable') }}
-          </span>
         </div>
       </div>
     </template>
@@ -333,23 +160,17 @@
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useAnalyticsEvents } from '@/composables/useAnalyticsEvents';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
-  import { useMetadataStore } from '@/stores/useMetadata';
+  import HideoutPrerequisites from '@/features/hideout/HideoutPrerequisites.vue';
+  import HideoutRequirement from '@/features/hideout/HideoutRequirement.vue';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { CARD_HIGHLIGHT_GRADIENTS } from '@/utils/cardHighlights';
   import { SPECIAL_STATIONS } from '@/utils/constants';
-  import HideoutRequirement from './HideoutRequirement.vue';
-  import type {
-    HideoutLevel,
-    HideoutStation,
-    ItemRequirement,
-    SkillRequirement,
-    StationLevelRequirement,
-    TraderRequirement,
-  } from '@/types/tarkov';
+  import type { HideoutLevel, HideoutStation, ItemRequirement } from '@/types/tarkov';
   const props = withDefaults(
     defineProps<{
       station: HideoutStation;
+      inlineMaterials?: boolean;
       highlighted?: boolean;
       highlightModuleId?: string | null;
     }>(),
@@ -358,12 +179,10 @@
       highlightModuleId: null,
     }
   );
-  const metadataStore = useMetadataStore();
   const progressStore = useProgressStore();
   const tarkovStore = useTarkovStore();
   const { trackEvent } = useAnalyticsEvents();
-  const { arePrereqsMet, isSkillReqMet, isStationReqMet, isTraderReqMet } =
-    useHideoutStationStatus();
+  const { arePrereqsMet } = useHideoutStationStatus();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
   const isContentVisible = ref(true);
@@ -393,32 +212,6 @@
   const highlightClasses = computed(() => ({
     [CARD_HIGHLIGHT_GRADIENTS[highlightColor.value]]: true,
   }));
-  const getStationRequirementLink = (requirement: StationLevelRequirement) => {
-    const moduleId = metadataStore
-      .getStationById(requirement.station.id)
-      ?.levels.find((level) => level.level === requirement.level)?.id;
-    return {
-      path: '/hideout',
-      query: {
-        station: requirement.station.id,
-        ...(moduleId ? { module: moduleId } : {}),
-      },
-    };
-  };
-  const getSkillRequirementLink = (requirement: SkillRequirement) => ({
-    path: '/settings',
-    hash: '#skills',
-    query: {
-      skill: requirement.skill?.id || requirement.name,
-    },
-  });
-  const getTraderRequirementLink = (requirement: TraderRequirement) => ({
-    path: '/',
-    hash: '#dashboard-traders',
-    query: {
-      trader: requirement.trader.id,
-    },
-  });
   const prerequisitesMet = computed(() => {
     if (!nextLevel.value) return true;
     return arePrereqsMet(nextLevel.value);
@@ -459,14 +252,43 @@
       ) || null
     );
   });
+  const stationBadge = computed(() => {
+    const level = progressStore.hideoutLevels?.[props.station.id]?.self ?? 0;
+    if (props.inlineMaterials)
+      return level ? t('page.hideout.map.level', { level }) : t('page.hideout.map.not_built');
+    return prerequisitesMet.value
+      ? t('page.hideout.stationcard.level', { level, count: level }, level)
+      : t('page.hideout.stationcard.level_not_ready');
+  });
+  const actionLayout = computed(() =>
+    upgradeDisabled.value
+      ? 'flex flex-wrap items-center justify-center gap-2'
+      : 'flex flex-col gap-1.5 sm:gap-2'
+  );
+  const canDowngrade = computed(() => !!currentLevel.value && !downgradeDisabled.value);
+  const upgradeLabel = computed(() => {
+    const level = nextLevel.value?.level ?? 0;
+    return props.inlineMaterials
+      ? t('page.hideout.map.record_built', { level })
+      : t('page.hideout.stationcard.upgrade_button', { level }, level);
+  });
+  const downgradeLabel = computed(() => {
+    const level = (currentLevel.value?.level ?? 0) - 1;
+    return t('page.hideout.stationcard.downgrade_button', { level }, level);
+  });
   const hasItemRequirements = computed(() => {
     return (nextLevel.value?.itemRequirements?.length || 0) > 0;
   });
-  const hasPrerequisites = computed(() => {
+  const hasRequirements = computed(() => {
+    const level = nextLevel.value;
     return (
-      (nextLevel.value?.stationLevelRequirements?.length ?? 0) > 0 ||
-      (nextLevel.value?.skillRequirements?.length ?? 0) > 0 ||
-      (nextLevel.value?.traderRequirements?.length ?? 0) > 0
+      level &&
+      [
+        level.itemRequirements,
+        level.stationLevelRequirements,
+        level.skillRequirements,
+        level.traderRequirements,
+      ].some((rows) => rows.length > 0)
     );
   });
   const stationAvatar = computed(() => props.station.imageLink);

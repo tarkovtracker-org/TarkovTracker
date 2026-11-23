@@ -1508,6 +1508,36 @@
       "public_requirements": "PvP station requirements",
       "no_listed_requirements": "No requirements listed for this level.",
       "status_tabs_label": "Station status",
+      "map": {
+        "title": "Hideout map",
+        "layout": "Hideout layout",
+        "cards": "Station cards",
+        "area": "Area",
+        "all_areas": "All areas",
+        "upgrades": "Station upgrades",
+        "navigation": "Drag to pan. Scroll or pinch to zoom. With the map focused, use the arrow keys and + or −.",
+        "area_ready": "{area} · {count} ready",
+        "not_built": "Not built",
+        "level": "Level {level}",
+        "missing": "{count} item type missing | {count} item types missing",
+        "toggle_item": "Toggle collection of {name}",
+        "edit_count": "Edit count for {name}",
+        "record_built": "Mark level {level} built",
+        "states": {
+          "ready": "Ready now",
+          "items": "Needs items",
+          "locked": "Locked",
+          "maxed": "Fully built"
+        },
+        "areas": {
+          "workshop": "Workshop",
+          "gym": "Gym wing",
+          "living": "Living quarters",
+          "water": "Water & nutrition",
+          "utilities": "Utilities",
+          "security": "Security & Cultist Circle"
+        }
+      },
       "loading": "Loading hideout data",
       "station_link_label": "Go to {name}",
       "no_stations_found": "No stations found. Try changing your filters.",
@@ -1525,7 +1555,6 @@
         "level_not_ready": "Not ready to build",
         "next_level": "Requirements for next level",
         "max_level": "Max station level reached",
-        "upgrade_unavailable": "Upgrade unavailable",
         "prerequisites": "Prerequisites",
         "requirements": {
           "station": "{stationname} level {level}",
