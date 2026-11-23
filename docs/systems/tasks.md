@@ -770,10 +770,11 @@ Cycling pauses for completed objectives and completed or failed parent tasks, wh
 available.
 
 Shoot objectives with multiple weapons in a flat alternatives list use the same display and
-popover. The equipment strip groups alternative mods and wearable items while keeping separately
-required gear visible. Outfit choices can be shown per slot when the source lists every combination
-of those choices. Each alternative key group has its own popover. Consolidated find-and-handover
-rows show a shared accepted-item list when every objective in the row accepts the same set.
+popover. The equipment strip groups single-mod alternatives and wearable choices that share a
+known equipment kind. Gear with mixed or unknown kinds stays inline. Outfit choices can be shown
+per slot when the source lists every valid combination of the items in those slots. Each
+alternative key group has its own popover. Consolidated find-and-handover rows show a shared
+accepted-item list when every objective in the row accepts the same set.
 
 Weapon-build task objectives show their base weapon and explicit `containsAll` parts beneath the
 objective statement. `TaskWeaponBuildItems.vue` consumes the same `neededItemTaskObjectives`
