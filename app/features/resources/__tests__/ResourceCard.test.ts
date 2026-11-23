@@ -57,7 +57,7 @@ describe('ResourceCard', () => {
       ],
     });
     expect(wrapper.get('img').attributes()).toMatchObject({
-      alt: 'ratscanner',
+      alt: 'RatScanner',
       src: '/img/logos/ratscannerlogo.webp',
     });
     expect(wrapper.text()).not.toContain('Desktop App');
