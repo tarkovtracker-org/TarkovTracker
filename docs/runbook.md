@@ -127,6 +127,16 @@ Prepare and deploy each rollover in two releases during the no-write gap between
 4. Do not combine the database flip and application constants in one merge because their production
    deployment order is uncontrolled. Do not delete the previous season's rows.
 
+### Correcting an end time within the active season
+
+When correcting the end of the current season, update the application timestamp and replace only
+`private.active_season_ends_at()` in a forward migration. The app reads its bundled timestamp for the
+countdown and log import. The database selects writable Seasonal rows by season number, so either
+artifact can deploy first. After both deploy, verify the displayed cutoff, the database end timestamp,
+and the active season number. If the same season is still active and the correction must be reverted,
+restore the prior app timestamp and use a separately reviewed forward migration to restore the prior
+database timestamp. Repeat those checks after both reversions deploy.
+
 ## Deployment
 
 ### Internal game-data browser verification
