@@ -13,7 +13,7 @@
       trailing-icon="i-mdi-open-in-new"
     >
       <span class="text-center sm:truncate">
-        {{ t(primaryAction.labelKey, primaryAction.labelFallback) }}
+        {{ t(primaryAction.labelKey, {}, { default: primaryAction.labelFallback }) }}
       </span>
     </UButton>
     <UButton
@@ -29,7 +29,9 @@
       :icon="link.icon"
       trailing-icon="i-mdi-open-in-new"
     >
-      <span class="text-center sm:truncate">{{ t(link.labelKey, link.labelFallback) }}</span>
+      <span class="text-center sm:truncate">
+        {{ t(link.labelKey, {}, { default: link.labelFallback }) }}
+      </span>
     </UButton>
   </div>
 </template>

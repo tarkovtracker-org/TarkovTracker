@@ -1,7 +1,6 @@
 <template>
   <section
     class="border-surface-700 bg-surface-950/45 flex min-w-0 flex-col overflow-hidden rounded-xl border"
-    :aria-labelledby="headingId"
   >
     <header class="flex items-center justify-between gap-3 border-b px-4 py-3" :class="headerClass">
       <div>

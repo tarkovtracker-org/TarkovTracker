@@ -9,7 +9,7 @@
       :class="checkboxClass"
       :checked="selected"
       :aria-label="entry.name"
-      :aria-describedby="effectId"
+      :aria-describedby="`${pointsId} ${effectId}`"
       :aria-disabled="blocked || undefined"
       @change="emit('toggle', $event)"
     />
@@ -22,7 +22,12 @@
         </template>
       </span>
     </span>
-    <UBadge :color="positive ? 'success' : 'error'" variant="soft" class="tabular-nums">
+    <UBadge
+      :id="pointsId"
+      :color="positive ? 'success' : 'error'"
+      variant="soft"
+      class="tabular-nums"
+    >
       {{ signedPoints(entry.netCost) }}
     </UBadge>
   </label>
@@ -38,6 +43,7 @@
   const emit = defineEmits<{ toggle: [event: Event] }>();
   const positive = computed(() => props.positive);
   const effectId = useId();
+  const pointsId = useId();
   const cardClass = computed(() =>
     positive.value
       ? 'border-success-500/20 border-s-success-500/60 from-success-500/15 to-success-500/5 hover:border-success-400/60 focus-within:ring-success-400/60 bg-linear-to-r'

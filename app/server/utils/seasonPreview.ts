@@ -6,7 +6,6 @@ const validPaths = (value: unknown) =>
   Array.isArray(value) &&
   value.length === translationPaths.length &&
   translationPaths.every((path, index) => value[index] === path);
-const validDate = (value: unknown) => value === null || Number.isSafeInteger(value);
 const hasEnglish = (dictionary: Record<string, unknown>, key: string): boolean => {
   if (!Object.hasOwn(dictionary, key)) return false;
   const text = dictionary[key];
@@ -57,8 +56,8 @@ function validSeason(value: unknown, dictionary: Record<string, unknown>): boole
     id === UNTAR_CONTROL_PREVIEW_ID,
     name === nameKey,
     hasEnglish(dictionary, nameKey),
-    validDate(start),
-    validDate(end),
+    start === null,
+    end === null,
     validPaths(value.translations),
     validGroups(perks, dictionary),
   ].every(Boolean);

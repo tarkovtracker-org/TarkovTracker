@@ -9,7 +9,6 @@ const PUBLIC_PAGE_KEYS = {
   '/kappa': 'kappa',
   '/storyline': 'storyline',
   '/resources': 'resources',
-  '/resources/seasonal-modifiers': 'seasonal_modifiers',
   '/about': 'about',
   '/credits': 'credits',
   '/changelog': 'changelog',
@@ -23,6 +22,7 @@ export const PUBLIC_SEO_ROUTES: string[] = [
   ...GUIDES.map((resource) => `/resources/${resource.slug}`),
 ];
 const CLIENT_PAGE_KEYS = {
+  '/resources/seasonal-modifiers': 'seasonal_modifiers',
   '/tasks/traders': 'tasks_traders',
   '/tasks/maps': 'tasks_maps',
   '/tasks/graph': 'tasks_graph',

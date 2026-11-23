@@ -15,8 +15,8 @@ export interface SeasonPreview {
     data: {
       id: string;
       name: string;
-      start: number | null;
-      end: number | null;
+      start: null;
+      end: null;
       perks: { common: PreviewPerk<null>[]; personal: PreviewPerk<number>[] };
     };
     translations: string[];

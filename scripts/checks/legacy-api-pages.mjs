@@ -23,7 +23,11 @@ const harness = createTestHarness({
         main: './scripts/checks/legacy-api-pages-worker.mjs',
         compatibility_date: '2026-01-09',
         compatibility_flags: ['nodejs_compat'],
-        vars: { APP_URL: 'https://tarkovtracker.org', NODE_ENV: 'production' },
+        vars: {
+          APP_URL: 'https://tarkovtracker.org',
+          NODE_ENV: 'production',
+          OVERLAY_TOKEN: 'compiled-season-fixture-token',
+        },
       },
     },
   ],
@@ -401,7 +405,16 @@ for (const route of tarkovRoutes) {
       const get = await harness.fetch(url, { headers: { Accept: 'text/html' } });
       assert.equal(get.status, 200, `${url}: GET fixture must succeed`);
       assert.match(get.headers.get('Content-Type'), /^application\/json/, url);
-      await get.json();
+      const body = await get.json();
+      if (route === 'season-preview') {
+        assert.equal(body.provisional, true);
+        assert.equal(body.season.data.id, 'preview:untar-control');
+        assert.deepEqual(
+          body.season.data.perks.personal.map(({ points }) => points),
+          [-2, 2]
+        );
+        assert.ok(!JSON.stringify(body).includes('compiled-season-fixture-token'));
+      }
       for (const head of [coldHead, await requestHead()]) {
         assert.equal(head.status, get.status, url);
         for (const header of [

@@ -118,10 +118,59 @@ export const tarkovHeadKv = {
     return snapshotStream(key, type);
   },
 };
+const seasonId = 'preview:untar-control';
+const previewPerk = (id, points) => ({
+  id: `${seasonId}:${id}`,
+  name: `${seasonId}:${id} name`,
+  description: `${seasonId}:${id} description`,
+  points,
+  exclusiveToPerks: [],
+  imageLink: null,
+});
+const previewCommon = [previewPerk('global', null)];
+const previewPersonal = [previewPerk('perk', -2), previewPerk('drawback', 2)];
+function seasonPreviewResponse(url, { headers, redirect }) {
+  const pinned =
+    'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/a749270dcad82b26334ccf6feb15b8f4a66ff145/src/previews/untar-control.json';
+  if (url.href !== pinned) throw new Error('Unexpected season preview artifact');
+  if (
+    new Headers(headers).get('Authorization') !== 'Bearer compiled-season-fixture-token' ||
+    redirect !== 'error'
+  )
+    throw new Error('Season preview must use scoped authorization and reject redirects');
+  return Response.json({
+    provisional: true,
+    source: 'https://t.me/escapefromtarkovEN/7003',
+    season: {
+      data: {
+        id: seasonId,
+        name: `${seasonId} name`,
+        start: null,
+        end: null,
+        perks: { common: previewCommon, personal: previewPersonal },
+      },
+      translations: ['$.data.name', '$.data.perks.*.*.name', '$.data.perks.*.*.description'],
+    },
+    season_en: {
+      data: {
+        [`${seasonId} name`]: 'UNTAR fixture',
+        ...Object.fromEntries(
+          [...previewCommon, ...previewPersonal].flatMap((perk) => [
+            [perk.name, 'Modifier'],
+            [perk.description, 'Effect'],
+          ])
+        ),
+      },
+    },
+  });
+}
 // Install before importing Nitro: ofetch captures global fetch during module evaluation.
-globalThis.fetch = async (input) => {
+globalThis.fetch = async (input, options) => {
   tarkovHeadOutbound.reads++;
   const url = new URL(input.url ?? input);
+  if (url.pathname.endsWith('/src/previews/untar-control.json')) {
+    return seasonPreviewResponse(url, options);
+  }
   if (url.hostname === 'raw.githubusercontent.com') {
     return Response.json({
       $meta: { ...identity, generated },

@@ -22,24 +22,20 @@
         <dd class="text-lg font-semibold tabular-nums">{{ earned }}</dd>
       </div>
     </dl>
-    <div v-if="suggestedNames.length" class="flex max-w-full flex-wrap items-center gap-2 text-sm">
-      <template v-if="suggestedNames.length <= 2">
-        <p>
-          {{
-            t('page.seasonal_modifiers.suggestion', {
-              names: suggestionList.format(suggestedNames),
-              total: signed(suggestion.closest),
-            })
-          }}
-        </p>
-        <UButton
-          size="sm"
-          variant="soft"
-          :label="t('page.seasonal_modifiers.add_suggestions')"
-          @click="emit('apply')"
-        />
-      </template>
-      <details v-else class="min-w-0">
+    <component
+      :is="suggestedNames.length <= 2 ? 'div' : 'details'"
+      v-if="suggestedNames.length"
+      class="max-w-full min-w-0 space-y-2 text-sm"
+    >
+      <p v-if="suggestedNames.length <= 2">
+        {{
+          t('page.seasonal_modifiers.suggestion', {
+            names: suggestionList.format(suggestedNames),
+            total: signed(suggestion.closest),
+          })
+        }}
+      </p>
+      <template v-else>
         <summary class="text-primary-200 cursor-pointer">
           {{
             t('page.seasonal_modifiers.review_suggestions', {
@@ -51,14 +47,20 @@
         <ul class="my-2 max-h-36 list-inside list-disc overflow-y-auto">
           <li v-for="name in suggestedNames" :key="name">{{ name }}</li>
         </ul>
+      </template>
+      <div class="flex flex-wrap items-center gap-2">
         <UButton
           size="sm"
           variant="soft"
           :label="t('page.seasonal_modifiers.add_suggestions')"
+          :aria-describedby="suggestionScopeId"
           @click="emit('apply')"
         />
-      </details>
-    </div>
+        <p :id="suggestionScopeId" class="text-surface-300 text-xs">
+          {{ t('page.seasonal_modifiers.suggestion_scope') }}
+        </p>
+      </div>
+    </component>
     <p v-else-if="net !== 0" class="text-surface-300 text-sm">
       {{ t('page.seasonal_modifiers.no_suggestion') }}
     </p>
@@ -74,6 +76,7 @@
   }>();
   const emit = defineEmits<{ apply: [] }>();
   const { t, locale } = useI18n({ useScope: 'global' });
+  const suggestionScopeId = useId();
   const signed = (value: number) =>
     new Intl.NumberFormat(locale.value, { signDisplay: 'exceptZero' }).format(value);
   const budgetMessage = computed(() => {
