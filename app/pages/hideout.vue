@@ -3,8 +3,14 @@
     <div class="px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350 space-y-3 sm:space-y-4">
         <slot name="header" />
+        <HideoutLayoutSwitch
+          v-if="!isHideoutHelpTourActive"
+          :show-map="showMap"
+          @select="setMapLayout"
+        />
         <!-- The help tour re-picks the shown tab, so the selected tab stays clickable. -->
         <StatusTabBar
+          v-if="!showMap"
           :tabs="primaryViews"
           :model-value="displayPrimaryView"
           :group-label="t('page.hideout.status_tabs_label')"
@@ -78,6 +84,7 @@
               <RefreshButton />
             </div>
           </div>
+          <HideoutMapView v-else-if="mapHasStations" :stations="stationList" />
           <div v-else-if="displayVisibleStations.length === 0" class="flex justify-center">
             <UAlert
               icon="i-mdi-clipboard-search"
@@ -87,28 +94,14 @@
               :title="$t('page.hideout.no_stations_found')"
             />
           </div>
-          <div
+          <HideoutStationGrid
             v-else
-            data-help-target="hideout-station-grid"
-            class="mt-2 grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-3 xl:grid-cols-3"
-          >
-            <div
-              v-for="(hStation, hIndex) in visibleStationsSlice"
-              :key="hStation.id"
-              class="content-visibility-auto-240 h-full"
-              :data-help-target="hIndex === 0 ? 'hideout-first-station-card' : undefined"
-            >
-              <HideoutCard
-                :station="hStation"
-                :highlighted="highlightedStationId === hStation.id"
-                :highlight-module-id="
-                  highlightedStationId === hStation.id ? highlightedModuleId : undefined
-                "
-              />
-            </div>
-          </div>
+            :visible-stations-slice="visibleStationsSlice"
+            :highlighted-station-id="highlightedStationId"
+            :highlighted-module-id="highlightedModuleId"
+          />
           <div
-            v-if="visibleStationCount < displayVisibleStations.length"
+            v-if="showLoadMore"
             ref="loadMoreSentinel"
             class="flex items-center justify-center py-4"
           >
@@ -187,8 +180,9 @@
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
   import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { usePrereqModal, type PrereqType } from '@/composables/usePrereqModal';
-  import HideoutCard from '@/features/hideout/HideoutCard.vue';
+  import HideoutLayoutSwitch from '@/features/hideout/HideoutLayoutSwitch.vue';
   import HideoutSettingsDrawer from '@/features/hideout/HideoutSettingsDrawer.vue';
+  import HideoutStationGrid from '@/features/hideout/HideoutStationGrid.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
@@ -199,6 +193,9 @@
     () => import('@/features/hideout/HideoutHelpDemoCard.vue')
   );
   const RefreshButton = defineAsyncComponent(() => import('@/components/ui/RefreshButton.vue'));
+  const HideoutMapView = defineAsyncComponent(
+    () => import('@/features/hideout/HideoutMapView.vue')
+  );
   const route = useRoute();
   const router = useRouter();
   const { t } = useI18n({ useScope: 'global' });
@@ -421,6 +418,18 @@
     return hideoutHelpPrimaryView.value ?? activePrimaryView.value;
   });
   const stationList = computed(() => (hideoutStations.value ?? []) as HideoutStation[]);
+  const showMap = computed(
+    () => route.query.layout === 'map' && !isHideoutHelpTourActive.value && !route.query.station
+  );
+  function setMapLayout(map: boolean) {
+    const query = { ...route.query };
+    if (map) {
+      query.layout = 'map';
+      delete query.station;
+      delete query.module;
+    } else delete query.layout;
+    void router.replace({ query });
+  }
   const displayVisibleStations = computed(() => {
     if (isStoreLoading.value) return [];
     if (!isHideoutHelpTourActive.value) return visibleStations.value;
@@ -442,6 +451,8 @@
   const hasMoreStations = computed(
     () => visibleStationCount.value < displayVisibleStations.value.length
   );
+  const mapHasStations = computed(() => showMap.value && stationList.value.length > 0);
+  const showLoadMore = computed(() => !showMap.value && hasMoreStations.value);
   const loadMoreStations = () => {
     if (!hasMoreStations.value) return;
     visibleStationCount.value = Math.min(
