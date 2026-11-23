@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, ref } from 'vue';
+import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
 import { isMapViewKey, trackTaskProgressInteractionKey } from '@/features/tasks/task-context';
 import TaskObjectiveItemGroup from '@/features/tasks/TaskObjectiveItemGroup.vue';
 import type { TaskObjective } from '@/types/tarkov';
@@ -113,6 +114,22 @@ describe('TaskObjectiveItemGroup', () => {
     const wrapper = mountComponent();
     expect(wrapper.get('output').text()).toBe('3/3');
     expect(wrapper.text()).not.toContain('Ready to hand over');
+    wrapper.unmount();
+  });
+  it('shows the shared alternatives on a consolidated find and handover row', () => {
+    const handover = metadataStoreMock.objectives[0]!;
+    const items = [handover.item!, { id: 'item-2', name: 'Item 2' }];
+    handover.items = items;
+    metadataStoreMock.objectives.push({
+      ...handover,
+      id: 'find-1',
+      type: 'findItem',
+      items: [...items].reverse(),
+    });
+    const wrapper = mountComponent();
+    const displays = wrapper.findAllComponents(ObjectiveItemDisplay);
+    expect(displays.map((display) => display.props('acceptedItems'))).toEqual([items]);
+    expect(wrapper.get('output').text()).toBe('1/3');
     wrapper.unmount();
   });
   it.each([
