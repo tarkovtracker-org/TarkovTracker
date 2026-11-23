@@ -95,12 +95,10 @@
     stationId.value = null;
     area.value = null;
   }
-  function back() {
-    if (selected.value) {
-      stationId.value = null;
-      return;
-    }
-    clearSelection();
-    canvas.value?.reset();
+  async function back() {
+    if (selected.value) stationId.value = null;
+    else canvas.value?.reset();
+    await nextTick();
+    details.value?.focus({ preventScroll: true });
   }
 </script>

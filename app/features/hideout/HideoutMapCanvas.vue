@@ -257,7 +257,8 @@
   }
   watchEffect(drawMarkers);
   onMounted(async () => {
-    const api = await import('leaflet');
+    const module = await import('leaflet');
+    const api = module.default ?? module;
     if (!surface.value) return;
     leaflet.value = api;
     const instance = api.map(surface.value, {
