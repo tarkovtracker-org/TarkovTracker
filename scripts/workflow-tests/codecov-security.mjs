@@ -50,6 +50,10 @@ test('reporting outages cannot disable authoritative test or coverage failures',
   const workers = jobBlock(workflow, 'workers');
   assert.doesNotMatch(workers, /continue-on-error:/);
   assert.match(workflowStep(workers, 'Run Deno tests'), /^ {8}run: pnpm run test:deno$/m);
+  assert.match(
+    workflowStep(workers, 'Verify private diagnostic collector in workerd'),
+    /^ {8}run: pnpm run test:progress-diagnostics$/m
+  );
 });
 test('bundle analysis uses supported OIDC without static credential fallback', () => {
   const config = readFileSync('nuxt.config.ts', 'utf8');
