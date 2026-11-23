@@ -24,7 +24,7 @@ test('a run that is not visible yet stays pending; other read failures stay fata
 test('the CLI retries only workflow-run lookups and keeps pending as exit code 2', () => {
   const cli = readFileSync('scripts/ci/review-admission-cli.mjs', 'utf8');
   assert.equal(cli.match(/pendingWhileMissing\(/g)?.length, 1);
-  assert.match(cli, /getWorkflowRun: async \(params\) =>\n\s+pendingWhileMissing\(/);
+  assert.match(cli, /getWorkflowRun: async \(params\) =>\r?\n\s+pendingWhileMissing\(/);
   assert.match(cli, /process\.exitCode = error instanceof AdmissionPending \? 2 : 1;/);
   assert.match(read('scripts/ci/github-ci-gate.sh'), /2\) sleep 5 ;;/);
 });
