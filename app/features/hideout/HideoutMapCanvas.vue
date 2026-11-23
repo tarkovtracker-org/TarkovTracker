@@ -70,7 +70,11 @@
   const map = shallowRef<L.Map>();
   const leaflet = shallowRef<typeof L>();
   const markers = shallowRef<L.LayerGroup>();
-  const detailed = ref(false);
+  const currentZoom = ref(0);
+  const fittedZoom = ref(0);
+  const detailed = computed(
+    () => currentZoom.value > fittedZoom.value && (currentZoom.value >= 0.5 || !!props.activeArea)
+  );
   const bounds: L.LatLngBoundsLiteral = [
     [0, 0],
     [HIDEOUT_MAP_SIZE.height, HIDEOUT_MAP_SIZE.width],
@@ -100,8 +104,6 @@
   );
   const worldPoint = (x: number, y: number): L.LatLngTuple => [HIDEOUT_MAP_SIZE.height - y, x];
   const stationPoint = (pin: HideoutPin) => worldPoint(pin.x, pin.y);
-  const detailZoom = 0.5;
-  let fittedZoom = 0;
   const chooseArea = (event: Event) => {
     const next = (event.target as HTMLSelectElement).value as HideoutArea;
     if (next) emit('area', next);
@@ -113,8 +115,8 @@
     instance.stop();
     instance.setMinZoom(-4);
     instance.fitBounds(bounds, { padding: [12, 12], animate: false });
-    fittedZoom = instance.getZoom();
-    instance.setMinZoom(fittedZoom);
+    fittedZoom.value = instance.getZoom();
+    instance.setMinZoom(fittedZoom.value);
   }
   function reset() {
     fit();
@@ -125,8 +127,8 @@
     const instance = map.value;
     if (!pin || !instance) return;
     const point = stationPoint(pin);
-    if (instance.getZoom() < detailZoom)
-      instance.setView(point, detailZoom + 0.5, { animate: false });
+    if (!detailed.value)
+      instance.setView(point, Math.max(1, fittedZoom.value + 0.5), { animate: false });
     else instance.panInside(point, { padding: [48, 48], animate: false });
   }
   function focusArea(area: HideoutArea) {
@@ -136,7 +138,7 @@
     if (!points.length || !map.value || !leaflet.value) return;
     const extent = leaflet.value.latLngBounds(points);
     const zoom = map.value.getBoundsZoom(extent, false, leaflet.value.point(80, 80));
-    map.value.setView(extent.getCenter(), Math.max(detailZoom, Math.min(1.5, zoom)), {
+    map.value.setView(extent.getCenter(), Math.max(fittedZoom.value + 0.25, Math.min(1.5, zoom)), {
       animate: false,
     });
   }
@@ -286,7 +288,7 @@
     map.value = instance;
     api.imageOverlay('/img/hideout-floor.svg', bounds, { interactive: false }).addTo(instance);
     instance.on('zoomend', () => {
-      detailed.value = instance.getZoom() >= detailZoom;
+      currentZoom.value = instance.getZoom();
     });
     fit();
     markers.value = api.layerGroup().addTo(instance);
@@ -294,18 +296,18 @@
   useResizeObserver(surface, () => {
     const instance = map.value;
     if (!instance) return;
-    const wasFitted = instance.getZoom() === fittedZoom;
+    const wasFitted = instance.getZoom() === fittedZoom.value;
     instance.invalidateSize({ pan: false });
     surfaceWidth.value = instance.getSize().x;
     if (wasFitted) fit();
     else if (leaflet.value) {
       instance.setMinZoom(-4);
-      fittedZoom = instance.getBoundsZoom(
+      fittedZoom.value = instance.getBoundsZoom(
         leaflet.value.latLngBounds(bounds),
         false,
         leaflet.value.point(24, 24)
       );
-      instance.setMinZoom(fittedZoom);
+      instance.setMinZoom(fittedZoom.value);
     }
   });
   onBeforeUnmount(() => {
