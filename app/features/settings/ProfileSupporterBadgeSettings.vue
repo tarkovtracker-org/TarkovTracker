@@ -1,8 +1,13 @@
 <template>
   <div v-if="available" class="space-y-2">
     <USwitch
-      :label="t('settings.profile_sharing.show_supporter_badge')"
-      :description="t('settings.profile_sharing.show_supporter_badge_help')"
+      :label="t('settings.profile_sharing.show_supporter_badge', 'Show my supporter badge')"
+      :description="
+        t(
+          'settings.profile_sharing.show_supporter_badge_help',
+          'Show your supporter or active subscriber badge on public profiles when Streamer Mode is off.'
+        )
+      "
       :model-value="enabled"
       :disabled="disabled"
       :loading="saving"
@@ -10,10 +15,15 @@
     />
     <div v-if="readFailed || saveFailed" class="space-y-1">
       <p class="text-error text-sm" role="alert">
-        {{ t('settings.profile_sharing.supporter_badge_failed') }}
+        {{
+          t(
+            'settings.profile_sharing.supporter_badge_failed',
+            'Unable to load or save your supporter badge setting. Try again.'
+          )
+        }}
       </p>
       <UButton v-if="readFailed" size="xs" variant="soft" @click="retry++">
-        {{ t('common.retry') }}
+        {{ t('common.retry', 'Retry') }}
       </UButton>
     </div>
   </div>

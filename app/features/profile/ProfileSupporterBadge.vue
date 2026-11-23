@@ -15,6 +15,8 @@
   const { t } = useI18n({ useScope: 'global' });
   const current = computed(() => badge === 'active_subscriber');
   const label = computed(() =>
-    current.value ? t('page.profile.badge_active_subscriber') : t('page.profile.badge_supporter')
+    current.value
+      ? t('page.profile.badge_active_subscriber', 'Active Subscriber')
+      : t('page.profile.badge_supporter', 'Supporter')
   );
 </script>

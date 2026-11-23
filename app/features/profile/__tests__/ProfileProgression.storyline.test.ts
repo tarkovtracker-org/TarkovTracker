@@ -227,10 +227,8 @@ describe('ProfileProgression storyline chapter toggle', () => {
       });
       const wrapper = await createWrapper();
       await flushPromises();
-      expect(wrapper.text().includes('page.profile.badge_supporter')).toBe(
-        supporterBadge === 'supporter'
-      );
-      expect(wrapper.text().includes('page.profile.badge_active_subscriber')).toBe(
+      expect(wrapper.text().includes('Supporter')).toBe(supporterBadge === 'supporter');
+      expect(wrapper.text().includes('Active Subscriber')).toBe(
         supporterBadge === 'active_subscriber'
       );
       wrapper.unmount();

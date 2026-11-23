@@ -8,6 +8,7 @@ export const getOwnProfileSupporterBadge = (
   supporter: SupporterStatus | null,
   hasActiveSubscriptionAccess: boolean
 ): ProfileSupporterBadge | null => {
+  // The retention trigger clears has_ever_supported when a supporter is disqualified.
   if (!supporter?.hasEverSupported) return null;
   const subscribed =
     hasActiveSubscriptionAccess &&
