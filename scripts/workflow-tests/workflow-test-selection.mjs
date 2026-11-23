@@ -21,6 +21,45 @@ test('changelog-only PRs retain release controls and selection regressions', () 
   }
   assert.ok(all.length > retained.length);
 });
+test('app-only PRs run only the selection regressions', () => {
+  const selection = ['scripts/workflow-tests/workflow-test-selection.mjs'];
+  for (const paths of [
+    ['app/features/tasks/TaskCard.vue'],
+    ['app/server/api/tarkov/catalog.ts', 'app/stores/useProgressStore.ts'],
+    ['app/components/ui/__tests__/StatusTabBar.test.ts', 'app/assets/css/main.css'],
+  ])
+    assert.deepEqual(selectWorkflowTests(all, environment(paths)), selection, paths.join());
+  for (const path of [
+    'app/locales/en.json',
+    'app/locales/fr.json',
+    'app/utils/locales.ts',
+    'app/pages/../../scripts/ci/validation-plan.mjs',
+    'app/',
+    'apps/web/index.ts',
+  ]) {
+    assert.deepEqual(selectWorkflowTests(all, environment([path])), all, path);
+    assert.deepEqual(
+      selectWorkflowTests(all, environment(['app/features/tasks/TaskCard.vue', path])),
+      all,
+      path
+    );
+  }
+  assert.deepEqual(selectWorkflowTests(all, environment([helper, 'app/pages/index.vue'])), all);
+  for (const event of ['push', 'merge_group', 'workflow_dispatch'])
+    assert.deepEqual(
+      selectWorkflowTests(all, {
+        ...environment(['app/features/tasks/TaskCard.vue']),
+        WORKFLOW_TEST_EVENT: event,
+      }),
+      all,
+      event
+    );
+  const incomplete = all.filter((file) => !file.endsWith('/workflow-test-selection.mjs'));
+  assert.deepEqual(
+    selectWorkflowTests(incomplete, environment(['app/features/tasks/TaskCard.vue'])),
+    incomplete
+  );
+});
 test('tooling, workflow, config, mixed and unknown changes retain every test', () => {
   for (const path of [
     'scripts/release/release-commit.sh',
