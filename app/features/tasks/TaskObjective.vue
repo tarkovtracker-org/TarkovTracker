@@ -219,11 +219,25 @@
     }
     return getItemAlternatives('useAny') ?? getItemAlternatives('items');
   });
+  const withoutGroupedItems = (
+    objective: TaskObjective,
+    field: 'items' | 'useAny' | 'usingWeapon',
+    alternatives: TarkovItem[]
+  ) => {
+    const remaining = { ...objective, [field]: undefined };
+    if (field === 'useAny') {
+      const acceptedIds = new Set(alternatives.map((item) => item.id));
+      remaining.items = remaining.items?.filter((item) => !acceptedIds.has(item?.id));
+    }
+    return remaining;
+  };
   const objectiveEquipment = computed(() => {
     const objective = currentObjective.value;
     if (objective.type === 'sellItem') return [];
-    const field = groupedItems.value?.field;
-    return getObjectiveEquipmentItems(field ? { ...objective, [field]: undefined } : objective);
+    const group = groupedItems.value;
+    return getObjectiveEquipmentItems(
+      group?.field ? withoutGroupedItems(objective, group.field, group.items) : objective
+    );
   });
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
