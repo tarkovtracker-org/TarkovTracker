@@ -166,12 +166,23 @@ const clearBilling = (
   ids
 ) => `SELECT public.clear_ended_deletion_subscription('${user}', 'sub_${user}', 'cus_${user}',
   (SELECT claim_token FROM public.account_deletion_jobs WHERE user_id='${user}'), ${ids})`;
+// The lease lasts 15 minutes. Starting 5 seconds before expiry keeps the wait short; a slower
+// setup fails the lock-wait or still-valid checks below instead of passing without the race.
+const nearLeaseExpiry = `UPDATE public.account_deletion_jobs SET updated_at=clock_timestamp()-interval '14 minutes 55 seconds' WHERE user_id='${user}'`;
+const leaseExpired = () =>
+  query(
+    `SELECT (updated_at <= clock_timestamp()-interval '15 minutes')::integer FROM public.account_deletion_jobs WHERE user_id='${user}'`
+  );
+function waitOutLease() {
+  assert.equal(leaseExpired(), '0', 'the lease must still be valid while the waiter queues');
+  query(`SELECT pg_sleep(LEAST(30,GREATEST(0,extract(epoch FROM updated_at + interval '15 minutes' - clock_timestamp()))))
+    FROM public.account_deletion_jobs WHERE user_id='${user}'`);
+  assert.equal(leaseExpired(), '1');
+}
 async function leaseExpiryHistory() {
   prepareBilling();
   // A real lease expiry is the tested condition, never the holder release mechanism.
-  query(
-    `UPDATE public.account_deletion_jobs SET updated_at=clock_timestamp()-interval '14 minutes 30 seconds' WHERE user_id='${user}'`
-  );
+  query(nearLeaseExpiry);
   const holder = await heldTransaction(
     `SELECT 1 FROM public.supporters WHERE user_id='${user}' FOR UPDATE`
   );
@@ -179,14 +190,7 @@ async function leaseExpiryHistory() {
     `SET application_name='${waiterName}'; ${clearBilling(`ARRAY['sub_${user}']::text[]`)};`
   );
   await waitFor(activity(waiterName, "wait_event_type='Lock'"));
-  query(`SELECT pg_sleep(LEAST(30,GREATEST(0,extract(epoch FROM updated_at + interval '15 minutes' - clock_timestamp()))))
-    FROM public.account_deletion_jobs WHERE user_id='${user}'`);
-  assert.equal(
-    query(
-      `SELECT (updated_at <= clock_timestamp()-interval '15 minutes')::integer FROM public.account_deletion_jobs WHERE user_id='${user}'`
-    ),
-    '1'
-  );
+  waitOutLease();
   const recorderName = `${waiterName}_record`;
   const recorder = connection(
     `SET application_name='${recorderName}'; SELECT public.record_account_billing_subscription('${user}','sub_late_${user}');`
@@ -240,7 +244,7 @@ async function mutationWaitLeaseExpiry() {
   prepareBilling();
   query(`INSERT INTO private.account_retention(user_id) VALUES ('${user}') ON CONFLICT DO NOTHING;
     UPDATE public.supporters SET has_ever_supported=true WHERE user_id='${user}';
-    UPDATE public.account_deletion_jobs SET updated_at=clock_timestamp()-interval '14 minutes 30 seconds' WHERE user_id='${user}'`);
+    ${nearLeaseExpiry}`);
   const holder = await heldTransaction(
     `SELECT 1 FROM private.account_retention WHERE user_id='${user}' FOR UPDATE`
   );
@@ -248,14 +252,7 @@ async function mutationWaitLeaseExpiry() {
     `SET application_name='${waiterName}'; ${clearBilling(`ARRAY['sub_${user}']::text[]`)};`
   );
   await waitFor(activity(waiterName, "wait_event_type='Lock'"));
-  query(`SELECT pg_sleep(LEAST(30,GREATEST(0,extract(epoch FROM updated_at + interval '15 minutes' - clock_timestamp()))))
-    FROM public.account_deletion_jobs WHERE user_id='${user}'`);
-  assert.equal(
-    query(
-      `SELECT (updated_at <= clock_timestamp()-interval '15 minutes')::integer FROM public.account_deletion_jobs WHERE user_id='${user}'`
-    ),
-    '1'
-  );
+  waitOutLease();
   assert.equal((await holder.release()).code, 0);
   const result = await clearer;
   assert.notEqual(result.code, 0, 'expiry during a mutation trigger must abort the transaction');
