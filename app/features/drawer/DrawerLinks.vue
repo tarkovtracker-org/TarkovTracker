@@ -42,13 +42,13 @@
     <div class="bg-divider mx-3 my-2 h-px" aria-hidden="true"></div>
     <ul class="flex flex-col gap-0.5 px-1 pb-2">
       <DrawerItem
-        icon="i-mdi-compass-outline"
+        icon="i-mdi-compass"
         locale-key="navigation_drawer.resources"
         to="/resources"
         :is-collapsed="props.isCollapsed"
       />
       <DrawerItem
-        icon="i-mdi-cog-outline"
+        icon="i-mdi-cog"
         locale-key="common.settings"
         to="/settings"
         :is-collapsed="props.isCollapsed"
