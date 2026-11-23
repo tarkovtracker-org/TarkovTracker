@@ -201,7 +201,8 @@ test keep the release tests as well. Locale files, `app/utils/locales.ts`, chang
 with other paths, any path outside `app/`, and every merge-group, push and dispatch run select the
 whole suite.
 The [dependency-security portability workflow](../.github/workflows/dependency-security-portability.yml)
-runs its isolated suite without installation on Ubuntu and native Windows. See the workflow's
+runs its isolated suite without installation on native Windows; CI's `pnpm run test:workflow` covers
+Linux. See the workflow's
 test command, [test-only subprocess adapter](../scripts/workflow-tests/helpers/dependency-cli-loader.mjs),
 and [offline source-comparison tool](../scripts/checks/review-release-source.mjs) for execution and
 receipt details. These fixtures verify security checks; host CLI installation is outside their scope.
