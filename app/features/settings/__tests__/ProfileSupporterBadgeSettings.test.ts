@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive, ref } from 'vue';
 import ProfileSupporterBadgeSettings from '@/features/settings/ProfileSupporterBadgeSettings.vue';
+import { logger } from '@/utils/logger';
 const { maybeSingle, upsert } = vi.hoisted(() => ({
   maybeSingle: vi.fn(),
   upsert: vi.fn(),
@@ -29,10 +30,10 @@ const render = () =>
     global: {
       stubs: {
         USwitch: {
-          props: ['modelValue', 'disabled'],
+          props: ['modelValue', 'disabled', 'loading'],
           emits: ['update:model-value'],
           template:
-            '<button :aria-pressed="modelValue" :disabled="disabled" @click="$emit(\'update:model-value\', !modelValue)">Share</button>',
+            '<button :aria-pressed="modelValue" :aria-busy="loading" :disabled="disabled" @click="$emit(\'update:model-value\', !modelValue)">Share</button>',
         },
       },
     },
@@ -67,6 +68,7 @@ describe('profile supporter badge visibility', () => {
     expect(toggle.attributes('aria-pressed')).toBe('false');
   });
   it('keeps the confirmed setting if saving fails', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     upsert.mockResolvedValueOnce({ error: { code: '42501' } });
     const wrapper = render();
     await flushPromises();
@@ -74,11 +76,24 @@ describe('profile supporter badge visibility', () => {
     await flushPromises();
     expect(wrapper.get('button').attributes('aria-pressed')).toBe('false');
     expect(wrapper.get('[role="alert"]').text()).toContain('supporter_badge_failed');
+    expect(warn).toHaveBeenCalledWith(
+      '[ProfileSupporterBadgeSettings] Failed to save the supporter badge setting',
+      { code: '42501' }
+    );
+    warn.mockRestore();
   });
   it('restores a previously enabled setting without writing it again', async () => {
-    maybeSingle.mockResolvedValueOnce({ data: { show_supporter_badge: true }, error: null });
+    let finishRead!: (result: { data: { show_supporter_badge: boolean }; error: null }) => void;
+    maybeSingle.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRead = resolve;
+      })
+    );
     const wrapper = render();
+    expect(wrapper.get('button').attributes('aria-busy')).toBe('true');
+    finishRead({ data: { show_supporter_badge: true }, error: null });
     await flushPromises();
+    expect(wrapper.get('button').attributes('aria-busy')).toBe('false');
     expect(wrapper.get('button').attributes('aria-pressed')).toBe('true');
     expect(upsert).not.toHaveBeenCalled();
   });

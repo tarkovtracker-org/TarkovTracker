@@ -10,7 +10,7 @@
       "
       :model-value="enabled"
       :disabled="disabled"
-      :loading="saving"
+      :loading="loading || saving"
       @update:model-value="save"
     />
     <div v-if="readFailed || saveFailed" class="space-y-1">
@@ -29,6 +29,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { logger } from '@/utils/logger';
   const { t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
   const { isSupporter, loadedUserId } = useSupporter();
@@ -42,6 +43,12 @@
   const saveFailed = ref(false);
   const retry = ref(0);
   const disabled = computed(() => loading.value || saving.value || readFailed.value);
+  const reportFailure = (action: 'load' | 'save', error: unknown) => {
+    const code = error instanceof Error ? error.name : (error as { code?: string } | null)?.code;
+    logger.warn(`[ProfileSupporterBadgeSettings] Failed to ${action} the supporter badge setting`, {
+      code,
+    });
+  };
   let saveVersion = 0;
   watch(
     [userId, retry],
@@ -64,10 +71,12 @@
           .eq('user_id', id)
           .maybeSingle();
         if (!current) return;
-        readFailed.value = Boolean(error);
-        enabled.value = !error && data?.show_supporter_badge === true;
-      } catch {
-        if (current) readFailed.value = true;
+        if (error) throw error;
+        enabled.value = data?.show_supporter_badge === true;
+      } catch (error) {
+        if (!current) return;
+        reportFailure('load', error);
+        readFailed.value = true;
       } finally {
         if (current) loading.value = false;
       }
@@ -88,10 +97,12 @@
           { onConflict: 'user_id', defaultToNull: false }
         );
       if (version !== saveVersion) return;
-      saveFailed.value = Boolean(error);
-      if (!error) enabled.value = value;
-    } catch {
-      if (version === saveVersion) saveFailed.value = true;
+      if (error) throw error;
+      enabled.value = value;
+    } catch (error) {
+      if (version !== saveVersion) return;
+      reportFailure('save', error);
+      saveFailed.value = true;
     } finally {
       if (version === saveVersion) saving.value = false;
     }
