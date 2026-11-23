@@ -117,7 +117,7 @@ describe('pool requirement rows', () => {
     expect(row).toEqual({
       kind: 'other',
       met: false,
-      label: 'Additional in-game progression required',
+      label: 'Additional in-game progression',
     });
   });
 });

@@ -15,6 +15,7 @@
       width="24"
       height="24"
       class="light:invert size-6 object-contain"
+      :class="colorClass"
     />
     <UIcon
       v-else-if="icon?.startsWith('i-')"

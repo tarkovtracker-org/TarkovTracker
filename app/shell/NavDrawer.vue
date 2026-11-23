@@ -60,7 +60,7 @@
       <template v-else>
         <DrawerLevel :is-collapsed="true" />
       </template>
-      <div class="bg-surface-800 mx-3 my-2 h-px shrink-0" />
+      <div class="bg-divider mx-3 my-2 h-px shrink-0" aria-hidden="true" />
       <DrawerLinks :is-collapsed="isCollapsed" />
     </div>
   </nav>
