@@ -2,6 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
+import { reactive } from 'vue';
 import StashCellEditor from '@/features/stash-import/StashCellEditor.vue';
 import StashRegionEditor from '@/features/stash-import/StashRegionEditor.vue';
 import StashScreenshot from '@/features/stash-import/StashScreenshot.vue';
@@ -222,7 +223,7 @@ describe('region coordinate editor', () => {
   function editor() {
     return mount(StashRegionEditor, {
       props: {
-        modelValue: { x: 0, y: 0, width: 130, height: 130, slotsWide: 1, slotsHigh: 1 },
+        modelValue: reactive({ x: 0, y: 0, width: 130, height: 130, slotsWide: 1, slotsHigh: 1 }),
         width: 130,
         height: 130,
       },
