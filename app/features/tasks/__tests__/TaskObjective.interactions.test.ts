@@ -148,6 +148,39 @@ describe('TaskObjective interaction boundaries', () => {
     expect(wrapper.findComponent(ObjectiveItemDisplay).exists()).toBe(false);
     expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([weapon, mod]);
   });
+  it('groups the hydrated stash pool and keeps independent equipment visible', async () => {
+    const items = Array.from({ length: 8 }, (_, index) => ({ id: `ammo-pack-${index}` }));
+    const marker = { id: 'marker' };
+    fullObjectives.push({
+      id: 'objective-1',
+      type: 'plantItem',
+      items: [...items, items[0]!, { id: '' }],
+      markerItem: marker,
+    });
+    const wrapper = createWrapper({ type: 'plantItem', items: [items[0]!] });
+    const display = wrapper.getComponent(ObjectiveItemDisplay);
+    expect(display.props('primaryItem')).toEqual(items[0]);
+    expect(display.props('acceptedItems')).toEqual(items);
+    expect(wrapper.findAllComponents(ObjectiveRequiredItems)).toHaveLength(1);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([marker]);
+    await wrapper.get('[data-testid="accepted-items"] button').trigger('click');
+    expect(toggle).not.toHaveBeenCalled();
+    await wrapper.get('[data-objective-controls] button').trigger('click');
+    expect(toggle).toHaveBeenCalledExactlyOnceWith('objective-1');
+  });
+  it('keeps a single stash item inline', () => {
+    const item = { id: 'rifle' };
+    const wrapper = createWrapper({ type: 'plantItem', items: [item] });
+    expect(wrapper.findComponent(ObjectiveItemDisplay).exists()).toBe(false);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([item]);
+  });
+  it('groups use-any items without removing the equipment requirement', () => {
+    const useAny = [{ id: 'yellow-flare' }, { id: 'green-flare' }];
+    const equipment = { id: 'flare-pistol' };
+    const wrapper = createWrapper({ type: 'useItem', useAny, usingWeapon: [equipment] });
+    expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual(useAny);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([equipment]);
+  });
   it('lets display clicks reach outside-dismissal listeners without changing progress', async () => {
     const wrapper = createWrapper({ type: 'sellItem', items: [{ id: 'a' }, { id: 'b' }] });
     const host = document.createElement('div');
