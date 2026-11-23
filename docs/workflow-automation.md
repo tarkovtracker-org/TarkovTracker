@@ -375,10 +375,11 @@ compare refs. Comparisons also reject different `.fallowrc.json` fingerprints so
 analyzer rules cannot masquerade as a code-health improvement. CRAP maxima and threshold counts
 come from all scored files, including functions below the reporting thresholds.
 
-After enforcing coverage thresholds, CI compares the merged head map with the retained map from
-a successful main push at the exact comparison base. Use `--base-coverage` with `--coverage`
-and `--base` to reproduce a measured comparison. If the base run or its artifact is unavailable,
-the advisory job summary records the missing comparison. Model and CLI tests live in `scripts/ci/metrics*.test.mjs`.
+CI does not run this comparison; Codecov reports coverage changes on pull requests. For a
+measured local comparison, follow the steps in [`scripts/ci/README.md`](../scripts/ci/README.md):
+generate both reports in this checkout, the base one at `git merge-base HEAD <ref>` and the head
+one from a clean working tree, then pass `--base <ref>`, `--base-coverage` and `--coverage`.
+Model and CLI tests live in `scripts/ci/metrics*.test.mjs`.
 
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 

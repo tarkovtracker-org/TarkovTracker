@@ -31,8 +31,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only and skip thresholds; Codecov merges their lcov uploads.
-- `Coverage thresholds` — merges the shard blob reports with the full `app/**/*.{ts,vue}` denominator (`scripts/ci/vitest-merged-coverage.mjs`) and enforces the `vitest.config.ts` thresholds. Uploads `coverage-final` for metrics.
-- `Codebase metrics` — compares merged head coverage with coverage from successful default-branch CI at the exact merge base. Missing baseline artifacts are reported in the job summary.
+- `Coverage thresholds` — merges the shard blob reports with the full `app/**/*.{ts,vue}` denominator (`scripts/ci/vitest-merged-coverage.mjs`) and enforces the `vitest.config.ts` thresholds.
 - `Validate` — Nuxt build for full or preview-required validation, including forks; preview builds export a validated artifact and main builds export the production artifact
 - `Supabase DB` — Reset + pgTAP regressions + lint local migrations
 - `Systems drift check` — verifies `docs/systems/` invariants against the codebase
