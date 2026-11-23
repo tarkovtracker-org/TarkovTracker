@@ -30,6 +30,7 @@ import {
   resolveDefaultSharedMode,
   resolveSharedProfileHandle,
 } from '@/server/utils/sharedProfileHandle';
+import { withSharedProfileSupporterBadge } from '@/server/utils/sharedProfileSupporterBadge';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { isProfileHandle } from '@/utils/profileHandle';
@@ -714,7 +715,7 @@ const createProfileRestClient = ({
     throw createError({ statusCode: 401, statusMessage: 'Missing auth token' });
   }
   const resourcesController = new AbortController();
-  const restFetch = (path: string) =>
+  const restFetch = (path: string, timeoutMs = REST_FETCH_TIMEOUT_MS) =>
     fetchWithTimeout(
       `${supabaseUrl}/rest/v1/${path}`,
       {
@@ -726,7 +727,7 @@ const createProfileRestClient = ({
         },
         signal: resourcesController.signal,
       },
-      REST_FETCH_TIMEOUT_MS,
+      timeoutMs,
       'Timed out while loading shared profile data'
     );
   return { restFetch, abortResources: () => resourcesController.abort() };
@@ -799,10 +800,12 @@ export default defineEventHandler(async (event) => {
   const userId = handle ? await resolveSharedProfileHandle(restFetch, handle) : identifier;
   const mode = requestedMode ?? (await resolveDefaultSharedMode(restFetch, userId));
   const seasonNumber = await resolveGameModeSeason(mode, { supabaseUrl, supabaseServiceKey });
+  const attachSupporterBadge = <T extends object>(payload: T) =>
+    withSharedProfileSupporterBadge(payload, restFetch, userId, mode, seasonNumber);
   const sharedProfileCacheKey = `${userId}:${mode}:${seasonNumber}:${requesterKey}`;
   if (!isTestEnvironment && !handle) {
     const cached = await getCachedProfile(sharedCacheHandle, sharedProfileCacheKey);
-    if (cached) return cached;
+    if (cached) return attachSupporterBadge(cached);
   }
   const { progressRow, modeProgressRow, preferencesRow, preferencesAvailable } =
     await fetchProfileResources({
@@ -825,7 +828,7 @@ export default defineEventHandler(async (event) => {
     gameEdition: typeof progressRow.game_edition === 'number' ? progressRow.game_edition : 1,
     mode,
   };
-  if (handle) return { ...publicData, visibility: 'public' as const };
+  if (handle) return attachSupporterBadge({ ...publicData, visibility: 'public' as const });
   const payload: SharedProfilePayload = {
     ...publicData,
     ...(isOwner ? { profilePublic: modeProgressRow?.profile_public === true } : {}),
@@ -840,5 +843,5 @@ export default defineEventHandler(async (event) => {
       sharedProfileCacheTtlMs
     );
   }
-  return payload;
+  return attachSupporterBadge(payload);
 });

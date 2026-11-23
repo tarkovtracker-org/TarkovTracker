@@ -214,6 +214,28 @@ const expectNoStoryStoreWrites = () => {
   expect(setStoryObjectiveUncompleteMock).not.toHaveBeenCalled();
 };
 describe('ProfileProgression storyline chapter toggle', () => {
+  it.each(['supporter', 'active_subscriber', undefined])(
+    'renders only the supplied shared profile badge (%s)',
+    async (supporterBadge) => {
+      routeState.params = { handle: 'rat_one', mode: 'pve' };
+      vi.stubGlobal('$fetch', sharedProfileFetch);
+      sharedProfileFetch.mockResolvedValueOnce({
+        data: createProgressData({ displayName: 'Rat One' }),
+        mode: 'pve',
+        supporterBadge,
+        visibility: 'public',
+      });
+      const wrapper = await createWrapper();
+      await flushPromises();
+      expect(wrapper.text().includes('page.profile.badge_supporter')).toBe(
+        supporterBadge === 'supporter'
+      );
+      expect(wrapper.text().includes('page.profile.badge_active_subscriber')).toBe(
+        supporterBadge === 'active_subscriber'
+      );
+      wrapper.unmount();
+    }
+  );
   it.each([false, true])(
     'honors owner UUID visibility (%s) when sharing',
     async (profilePublic) => {

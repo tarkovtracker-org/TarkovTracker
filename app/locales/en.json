@@ -1866,6 +1866,8 @@
     "profile": {
       "shared_player": "Shared Player",
       "shared_view": "Shared View",
+      "badge_supporter": "Supporter",
+      "badge_active_subscriber": "Active Subscriber",
       "loading_shared_profile": "Loading shared profile...",
       "loading_data": "Loading progression metadata...",
       "shared_private": "This shared profile is private.",
@@ -2413,6 +2415,9 @@
     },
     "profile_sharing": {
       "handle_label": "Profile handle",
+      "show_supporter_badge": "Show my supporter badge",
+      "show_supporter_badge_help": "Show your supporter or active subscriber badge on public profiles when Streamer Mode is off.",
+      "supporter_badge_failed": "Unable to load or save your supporter badge setting. Try again.",
       "handle_placeholder": "your_handle",
       "handle_help": "Choose 3–24 letters, numbers, or underscores, including at least one letter.",
       "handle_claim": "Claim handle",
