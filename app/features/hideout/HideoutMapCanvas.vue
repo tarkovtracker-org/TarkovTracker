@@ -292,6 +292,8 @@
     });
     fit();
     markers.value = api.layerGroup().addTo(instance);
+    if (props.selectedId) focusStation(props.selectedId);
+    else if (props.activeArea) focusArea(props.activeArea);
   });
   useResizeObserver(surface, () => {
     const instance = map.value;
