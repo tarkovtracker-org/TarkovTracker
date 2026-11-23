@@ -898,7 +898,9 @@ describe('Team realtime resources', () => {
         )
         .mockRejectedValueOnce({ statusCode: 503 });
       const calls = mockGetTeamMembers.mock.calls.length;
-      useSystemStore().$patch({ pvp_team_id: 'team-2' });
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = 'team-2';
+      });
       await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1));
       firstTeamRecord(teamRecords)
         .handlers.find(({ config }) => config.table === 'team_memberships')!
