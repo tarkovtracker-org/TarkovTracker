@@ -79,12 +79,23 @@ test('every ordinary CI installer is gated by the pre-install dependency policy,
   }
   const lighthouse = jobBlock(read('.github/workflows/pr-checks.yml'), 'lighthouse');
   assert.match(
-    workflowStep(lighthouse, 'Dependency Security before installation'),
-    /node scripts\/checks\/dependency-security\.mjs/
+    lighthouse,
+    /uses: \.\/\.github\/actions\/setup-project\n\s+with:\n\s+check-dependency-security: 'true'/
+  );
+  assert.equal(lighthouse.match(/uses: \.\/\.github\/actions\/setup-project/g)?.length, 1);
+  const setup = read('.github/actions/setup-project/action.yml');
+  const steps = setup.replace(/^ {4}- /gm, '      - ');
+  const dependencyGate = workflowStep(steps, 'Dependency Security before installation');
+  assert.match(dependencyGate, /^\s*if: inputs.check-dependency-security == 'true'$/m);
+  assert.match(dependencyGate, /GITHUB_TOKEN: \$\{\{ github.token \}\}/);
+  assert.match(dependencyGate, /^\s*run: node scripts\/checks\/dependency-security\.mjs$/m);
+  assert.doesNotMatch(dependencyGate, /^\s*continue-on-error:/m);
+  assert.ok(
+    setup.indexOf('Activate packageManager') <
+      setup.indexOf('Dependency Security before installation')
   );
   assert.ok(
-    lighthouse.indexOf('Dependency Security before installation') <
-      lighthouse.lastIndexOf('uses: ./.github/actions/setup-project')
+    setup.indexOf('Dependency Security before installation') < setup.indexOf('Install dependencies')
   );
 });
 test('security is a reusable workflow with only the weekly schedule as a standalone trigger', () => {

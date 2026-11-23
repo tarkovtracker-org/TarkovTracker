@@ -497,6 +497,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let latestMembersRequestVersion = 0;
   let disposed = false;
   let authSessionVersion = 0;
+  type MembersRead = { teamId: string; result: Promise<boolean> };
+  let latestMembersRead: MembersRead | null = null;
+  let initialTeamRefresh: Promise<void> | null = null;
   // Successful reads fence delayed snapshots, including reads that cancel the warning.
   let authoritativeDeadlineTeamId: string | null = null;
   let authoritativeOwnerTeamId: string | null = null;
@@ -515,6 +518,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     refreshInFlight = null;
     refreshInFlightTeamId = null;
     refreshContext = null;
+    latestMembersRead = null;
+    initialTeamRefresh = null;
     lastMembersRefreshAt = 0;
   };
   listenerScope.run(() => {
@@ -556,7 +561,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     return typeof owner === 'string' || owner === null ? { owner } : {};
   };
   // Custom data handler that transforms DB data before patching to store
-  const handleTeamData = (data: Record<string, unknown> | null) => {
+  const handleTeamData = (data: Record<string, unknown> | null, refreshRoster: boolean) => {
     if (disposed) return;
     if (data) {
       // Transform database fields to client fields BEFORE patching
@@ -579,7 +584,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         transformed.joinCode = null;
       }
       teamStore.$patch(transformed as Partial<TeamState>);
-      void refreshMembers(true);
+      if (refreshRoster) void refreshMembers(true);
     } else {
       invalidateRefresh();
       teamStore.$reset();
@@ -702,6 +707,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       queued: false,
     };
     const inFlightRequest = runRefresh(refreshContext, force);
+    latestMembersRead = { teamId: currentTeamId, result: inFlightRequest };
     refreshInFlight = inFlightRequest;
     refreshInFlightTeamId = currentTeamId;
     try {
@@ -722,6 +728,27 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     getTeamId: () => getTeamIdFromSystemStore(systemStore),
     refreshMembers,
   });
+  const failedLatestMembersRead = async (teamId: string): Promise<MembersRead | null> => {
+    const read = latestMembersRead;
+    if (read?.teamId !== teamId) return null;
+    const succeeded = await read.result;
+    if (read !== latestMembersRead) return failedLatestMembersRead(teamId);
+    return succeeded ? null : read;
+  };
+  const recoverInitialRoster = async (teamId: string, initialRefresh: Promise<void>) => {
+    await initialRefresh;
+    // Membership events can supersede channel setup while the roster read is pending.
+    const failed = await failedLatestMembersRead(teamId);
+    if (failed !== latestMembersRead || initialRefresh !== initialTeamRefresh) return;
+    if (failed?.teamId === getTeamIdFromSystemStore(systemStore)) await teamChannel.refresh();
+  };
+  const handleInitialTeamData = (data: Record<string, unknown> | null) => {
+    handleTeamData(data, false);
+    const initialRefresh = initialTeamRefresh;
+    if (typeof data?.id === 'string' && initialRefresh) {
+      void recoverInitialRoster(data.id, initialRefresh);
+    }
+  };
   // Setup Supabase listener with custom onData handler
   // Mapping and deadline freshness belong to our handler, not the listener's generic patch.
   const listenerState = listenerScope.run(() =>
@@ -731,7 +758,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       patchStore: false,
       filter: teamFilter,
       storeId: 'team',
-      onData: handleTeamData,
+      onData: (data) => handleTeamData(data, true),
+      // The team channel's filter watcher already starts the initial roster read.
+      onInitialData: handleInitialTeamData,
       scope: listenerScope,
     })
   );
@@ -741,7 +770,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     watch(
       teamFilter,
       () => {
-        void teamChannel.refresh();
+        initialTeamRefresh = teamChannel.refresh();
       },
       { immediate: true }
     );

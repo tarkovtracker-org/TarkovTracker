@@ -816,6 +816,114 @@ describe('Team realtime resources', () => {
       instance.cleanup();
     }
   });
+  it.each([
+    { order: 'before', failed: false },
+    { order: 'after', failed: false },
+    { order: 'before', failed: true },
+    { order: 'after', failed: true },
+  ])(
+    'loads the roster when the snapshot arrives $order the first response (failed: $failed)',
+    async ({ order, failed }) => {
+      const { teamQuery, teamRecords } = buildRealtimeHarness();
+      const { useSupabaseListener: actualListener } = await vi.importActual<
+        typeof import('@/composables/supabase/useSupabaseListener')
+      >('@/composables/supabase/useSupabaseListener');
+      const fallback = mockUseSupabaseListener.getMockImplementation()!;
+      mockUseSupabaseListener.mockImplementation((config) =>
+        config.table === 'teams' ? actualListener(config) : fallback(config)
+      );
+      const row = { id: 'team-1', join_code: 'initial-code' };
+      let finishSnapshot!: () => void;
+      teamQuery.single.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishSnapshot = () => resolve({ data: row, error: null });
+        })
+      );
+      const roster = { members: ['first-member'], profiles: {} };
+      let finishRoster!: () => void;
+      mockGetTeamMembers.mockResolvedValue(roster).mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          finishRoster = failed ? () => reject({ statusCode: 503 }) : () => resolve(roster);
+        })
+      );
+      const instance = useTeamStoreWithSupabase();
+      try {
+        await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledOnce());
+        if (order === 'before') {
+          finishSnapshot();
+          await vi.waitFor(() => expect(instance.teamStore.joinCode).toBe('initial-code'));
+          finishRoster();
+        } else {
+          finishRoster();
+          if (failed) await new Promise((resolve) => setTimeout(resolve, 0));
+          else await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+          finishSnapshot();
+          await vi.waitFor(() => expect(instance.teamStore.joinCode).toBe('initial-code'));
+        }
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        const expectedReads = failed ? 2 : 1;
+        expect(mockGetTeamMembers.mock.calls).toEqual(
+          Array.from({ length: expectedReads }, () => ['team-1', true])
+        );
+        expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(expectedReads);
+        expect(instance.teamStore.members).toEqual(roster.members);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
+  it('recovers startup when a membership event supersedes the failed roster refresh', async () => {
+    const { teamQuery, teamRecords } = buildRealtimeHarness();
+    const { useSupabaseListener: actualListener } = await vi.importActual<
+      typeof import('@/composables/supabase/useSupabaseListener')
+    >('@/composables/supabase/useSupabaseListener');
+    const fallback = mockUseSupabaseListener.getMockImplementation()!;
+    mockUseSupabaseListener.mockImplementation((config) =>
+      config.table === 'teams' ? actualListener(config) : fallback(config)
+    );
+    const instance = useTeamStoreWithSupabase();
+    try {
+      await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+      let finishSnapshot!: () => void;
+      teamQuery.single.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishSnapshot = () => resolve({ data: { id: 'team-2' }, error: null });
+        })
+      );
+      let failFirstRoster!: () => void;
+      mockGetTeamMembers
+        .mockResolvedValue({ members: ['next-member'], profiles: {} })
+        .mockReturnValueOnce(
+          new Promise((_resolve, reject) => {
+            failFirstRoster = () => reject({ statusCode: 503 });
+          })
+        )
+        .mockRejectedValueOnce({ statusCode: 503 });
+      const calls = mockGetTeamMembers.mock.calls.length;
+      useSystemStore().$patch((state) => {
+        state.pvp_team_id = 'team-2';
+      });
+      await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 1));
+      firstTeamRecord(teamRecords)
+        .handlers.find(({ config }) => config.table === 'team_memberships')!
+        .handler({ eventType: 'UPDATE', new: {} });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      failFirstRoster();
+      await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 2));
+      finishSnapshot();
+      await vi.waitFor(() =>
+        expect(teamRecords().some(({ topic }) => topic === 'team:team-2')).toBe(true)
+      );
+      expect(mockGetTeamMembers.mock.calls.slice(calls)).toEqual([
+        ['team-2', true],
+        ['team-2', true],
+        ['team-2', true],
+      ]);
+      expect(instance.teamStore.members).toEqual(['next-member']);
+    } finally {
+      instance.cleanup();
+    }
+  });
   it('refreshes current snapshots but skips them when logged out or no longer in a team', async () => {
     const { teamRecords } = buildRealtimeHarness();
     const instance = useTeamStoreWithSupabase();
