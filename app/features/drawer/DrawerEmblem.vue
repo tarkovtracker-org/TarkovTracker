@@ -1,6 +1,6 @@
 <template>
   <span
-    class="relative flex shrink-0 items-center justify-center"
+    class="flex shrink-0 items-center justify-center"
     :style="{ width: `${size}px`, height: `${size}px` }"
   >
     <UIcon
