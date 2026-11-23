@@ -1519,8 +1519,9 @@
         "area_ready": "{area} · {count} ready",
         "not_built": "Not built",
         "level": "Level {level}",
-        "missing": "{count} material remaining | {count} materials remaining",
+        "missing": "{count} item type missing | {count} item types missing",
         "toggle_item": "Toggle collection of {name}",
+        "edit_count": "Edit count for {name}",
         "record_built": "Mark level {level} built",
         "states": {
           "ready": "Ready now",

@@ -17,6 +17,7 @@
     </div>
     <section
       ref="details"
+      :aria-label="selected?.station.name ?? t('page.hideout.map.upgrades')"
       tabindex="-1"
       class="border-surface-700 space-y-3 border-t p-3 lg:border-t-0 lg:border-l"
     >

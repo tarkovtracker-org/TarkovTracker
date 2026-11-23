@@ -1,4 +1,5 @@
 import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
+import { formatHideoutTraderRequirement } from '@/features/hideout/formatHideoutTraderRequirement';
 import { HIDEOUT_PINS, type HideoutPin } from '@/features/hideout/hideoutMapLayout';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -43,11 +44,7 @@ export function useHideoutMapStations(stations: () => HideoutStation[]) {
         level: skill.level,
       });
     const trader = level.traderRequirements.find((req) => !isTraderReqMet(req));
-    if (trader)
-      return t('page.hideout.stationcard.requirements.trader', {
-        tradername: trader.trader.name,
-        loyaltylevel: trader.value,
-      });
+    if (trader) return formatHideoutTraderRequirement(t, trader);
     return '';
   }
   function needsItem(requirement: ItemRequirement) {

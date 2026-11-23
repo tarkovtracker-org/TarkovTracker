@@ -1,4 +1,5 @@
-// Coordinates are measured from the top-left of the angled bunker illustration.
+// Image-pixel coordinates already include the SVG viewBox offset (+174, +27).
+// For example, the ritual circle at (677.5, 670.96) is centered at (852, 698).
 export const HIDEOUT_MAP_SIZE = { width: 1178, height: 793 } as const;
 export const HIDEOUT_AREAS = [
   'workshop',

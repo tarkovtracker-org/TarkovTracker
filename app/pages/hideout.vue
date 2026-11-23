@@ -186,6 +186,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { queueQueryWrite } from '@/utils/routeHelpers';
   import { ALL_TAB_ICON } from '@/utils/statusTones';
   import type { HideoutStation } from '@/types/tarkov';
   import type { StatusTabItem, StatusTone } from '@/utils/statusTones';
@@ -422,13 +423,17 @@
     () => route.query.layout === 'map' && !isHideoutHelpTourActive.value && !route.query.station
   );
   function setMapLayout(map: boolean) {
-    const query = { ...route.query };
-    if (map) {
-      query.layout = 'map';
-      delete query.station;
-      delete query.module;
-    } else delete query.layout;
-    void router.replace({ query });
+    const path = route.path;
+    void queueQueryWrite(() => {
+      if (route.path !== path) return;
+      const query = { ...route.query };
+      if (map) {
+        query.layout = 'map';
+        delete query.station;
+        delete query.module;
+      } else delete query.layout;
+      return router.replace({ query });
+    });
   }
   const displayVisibleStations = computed(() => {
     if (isStoreLoading.value) return [];

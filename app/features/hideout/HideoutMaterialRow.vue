@@ -24,6 +24,9 @@
     <ItemCountControls
       v-else
       size="sm"
+      :count-label="$t('page.hideout.map.edit_count', { name: itemLabel })"
+      :decrease-label="$t('needed_items.inline_counts.decrease', { name: itemLabel })"
+      :increase-label="$t('needed_items.inline_counts.increase', { name: itemLabel })"
       :current-count="currentCount"
       :needed-count="requiredCount"
       @decrease="emit('count', currentCount - 1)"

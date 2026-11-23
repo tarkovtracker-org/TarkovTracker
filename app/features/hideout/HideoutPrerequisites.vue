@@ -27,6 +27,7 @@
 </template>
 <script setup lang="ts">
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
+  import { formatHideoutTraderRequirement } from '@/features/hideout/formatHideoutTraderRequirement';
   import { useMetadataStore } from '@/stores/useMetadata';
   import type {
     HideoutLevel,
@@ -93,10 +94,7 @@
       tone: 'text-secondary-500 light:text-secondary-800',
       link: getTraderRequirementLink(req),
       met: isTraderReqMet(req),
-      label: t('page.hideout.stationcard.requirements.trader', {
-        loyaltylevel: req.value,
-        tradername: req.trader.name,
-      }),
+      label: formatHideoutTraderRequirement(t, req),
     })),
   ]);
 </script>

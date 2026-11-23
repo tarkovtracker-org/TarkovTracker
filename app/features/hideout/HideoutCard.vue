@@ -84,7 +84,7 @@
         </div>
         <!-- Next level requirements -->
         <div
-          v-if="nextLevel"
+          v-if="nextLevel && hasRequirements"
           class="bg-surface-800 relative rounded-lg p-2.5 sm:p-3"
           :class="moduleHighlightClasses"
         >
@@ -277,6 +277,18 @@
   });
   const hasItemRequirements = computed(() => {
     return (nextLevel.value?.itemRequirements?.length || 0) > 0;
+  });
+  const hasRequirements = computed(() => {
+    const level = nextLevel.value;
+    return (
+      level &&
+      [
+        level.itemRequirements,
+        level.stationLevelRequirements,
+        level.skillRequirements,
+        level.traderRequirements,
+      ].some((rows) => rows.length > 0)
+    );
   });
   const stationAvatar = computed(() => props.station.imageLink);
   const highlightedLevel = computed(() => {
