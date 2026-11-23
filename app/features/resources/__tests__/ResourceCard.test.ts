@@ -1,23 +1,16 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils';
 import { assert, describe, expect, it, vi } from 'vitest';
+import { createI18n } from 'vue-i18n';
 import ResourceCard from '@/features/resources/ResourceCard.vue';
 import { getResourceBySlug, type Resource } from '@/features/resources/resourceData';
-vi.mock('vue-i18n', async (importOriginal) => {
-  const i18n = await importOriginal<typeof import('vue-i18n')>();
-  const { default: english } = await import('@/locales/en.json');
-  const { t } = i18n.createI18n({
-    legacy: false,
-    locale: 'en-US',
-    messages: { 'en-US': english },
-  }).global;
-  return {
-    ...i18n,
-    useI18n: () => ({
-      t: (key: string, fallback: string) => fallback || t(key),
-    }),
-  };
-});
+import en from '@/locales/en.json';
+import { createTestLocaleMessages } from '#tests/test-helpers/i18nMessages';
+const i18n = createI18n({ legacy: false, locale: 'en', messages: createTestLocaleMessages(en) });
+vi.mock('vue-i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-i18n')>()),
+  useI18n: () => i18n.global,
+}));
 const mountCard = (resource: Resource, showCategoryBadge = false) =>
   mount(ResourceCard, {
     props: { resource, showCategoryBadge },
