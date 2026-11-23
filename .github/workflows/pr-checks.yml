@@ -126,12 +126,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
         with:
-          install-dependencies: 'false'
-      - name: Dependency Security before installation
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/checks/dependency-security.mjs
-      - uses: ./.github/actions/setup-project
+          check-dependency-security: 'true'
       - name: Build Cloudflare Pages app
         run: pnpm run build
         env:

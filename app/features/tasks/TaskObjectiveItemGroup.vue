@@ -82,6 +82,7 @@
       v-if="groupRequiredKeys.length > 0"
       variant="keys"
       :required-keys="groupRequiredKeys"
+      :paused="isParentTaskLocked"
       class="ml-6"
     />
     <ObjectiveRequiredItems
@@ -105,6 +106,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { distinctObjectiveItems } from '@/utils/objectiveEquipment';
   import { getKeyDevUrl, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
   import { isHandoverObjective } from '@/utils/taskObjectiveProgress';
   import type { TaskObjective, TarkovItem } from '@/types/tarkov';
@@ -331,18 +333,18 @@
     const source = full ?? objective;
     return source.item ?? source.items?.[0] ?? source.markerItem ?? source.questItem ?? undefined;
   };
-  // "Any of these" objectives accept multiple items; expose the full list so the
-  // display can rotate through them. Only returns >1 items for a single
-  // objective whose items array has alternatives (display-only).
+  const acceptedItemsFor = (objective: TaskObjective) => {
+    const full = fullObjectives.value.find((entry) => entry.id === objective.id);
+    return distinctObjectiveItems(full?.items ?? objective.items ?? []);
+  };
+  // Consolidated rows can share a choice only when each objective accepts the same items.
   const getRowAcceptedItems = (row: ConsolidatedRow): TarkovItem[] | undefined => {
-    if (row.objectives.length !== 1) return undefined;
-    const objective = row.objectives[0]?.objective;
-    if (!objective) return undefined;
-    const full = fullObjectives.value.find((o) => o.id === objective.id);
-    const items = (full ?? objective).items;
-    if (!Array.isArray(items)) return undefined;
-    const valid = items.filter((entry): entry is TarkovItem => Boolean(entry?.id));
-    return valid.length > 1 ? valid : undefined;
+    const [first, ...others] = row.objectives.map(({ objective }) => acceptedItemsFor(objective));
+    if (!first || first.length < 2) return undefined;
+    const ids = new Set(first.map((item) => item.id));
+    const samePool = (items: TarkovItem[]) =>
+      items.length === first.length && items.every((item) => ids.has(item.id));
+    return others.every(samePool) ? first : undefined;
   };
   const isRowReadyToHandOver = (row: ConsolidatedRow): boolean =>
     row.currentCount >= row.meta.neededCount &&

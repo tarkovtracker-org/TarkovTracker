@@ -44,6 +44,7 @@
           v-if="objectiveRequiredKeys.length"
           variant="keys"
           :required-keys="objectiveRequiredKeys"
+          :paused="objectiveItemDisplayProps.paused"
         />
         <div
           v-if="objectiveItemDisplayProps.acceptedItems.length"
@@ -53,9 +54,11 @@
           <ObjectiveItemDisplay v-bind="objectiveItemDisplayProps" />
         </div>
         <ObjectiveRequiredItems
-          v-if="objectiveEquipment.length"
+          v-if="hasObjectiveEquipment"
           variant="equipment"
-          :equipment="objectiveEquipment"
+          :equipment="objectiveEquipment.equipment"
+          :accepted-equipment="objectiveEquipment.choices"
+          :paused="objectiveItemDisplayProps.paused"
         />
         <AppTooltip v-if="showTeamNeeds" :text="userNeedsTitle">
           <div class="text-surface-500 mt-1 inline-flex items-center gap-1 text-[11px]">
@@ -125,7 +128,7 @@
     trackTaskProgressInteractionKey,
   } from '@/features/tasks/task-context';
   import { OBJECTIVE_ICON_MAP } from '@/features/tasks/task-objective-constants';
-  import { getObjectiveEquipmentItems } from '@/features/tasks/task-objective-equipment';
+  import { getTaskEquipmentDisplay } from '@/features/tasks/task-objective-equipment';
   import { objectiveHasMapLocation } from '@/features/tasks/task-objective-helpers';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
@@ -133,7 +136,7 @@
   import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES } from '@/utils/constants';
-  import { objectiveEquipmentItems } from '@/utils/objectiveEquipment';
+  import { distinctObjectiveItems, objectiveEquipmentItems } from '@/utils/objectiveEquipment';
   import type { TarkovItem, TaskObjective } from '@/types/tarkov';
   const FALLBACK_IS_MAP_VIEW_REF = ref(false);
   const { t } = useI18n({ useScope: 'global' });
@@ -186,29 +189,21 @@
     const keys = fullObjective.value?.requiredKeys ?? props.objective.requiredKeys;
     return (keys ?? []).filter((group) => group.length > 0);
   });
-  const distinctItems = (items: (TarkovItem | undefined)[]) => {
-    const seen = new Set<string>();
-    return items.filter((item): item is TarkovItem => {
-      if (!item?.id || seen.has(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    });
-  };
   const weaponAlternatives = computed(() => {
     const { type, usingWeapon } = currentObjective.value;
     // Only a flat weapon list expresses a pool of individual alternatives.
     if (type !== 'shoot' || !Array.isArray(usingWeapon) || usingWeapon.some(Array.isArray)) {
       return [];
     }
-    return distinctItems(objectiveEquipmentItems(usingWeapon));
+    return distinctObjectiveItems(objectiveEquipmentItems(usingWeapon));
   });
   const sellItems = computed(() => {
     const { item, items } = currentObjective.value;
-    const accepted = distinctItems(items?.length ? items : [item]);
+    const accepted = distinctObjectiveItems(items?.length ? items : [item]);
     return { field: undefined, items: accepted, primary: item ?? accepted[0] };
   });
   const getItemAlternatives = (field: 'useAny' | 'items') => {
-    const items = distinctItems(currentObjective.value[field] ?? []);
+    const items = distinctObjectiveItems(currentObjective.value[field] ?? []);
     return items.length > 1 ? { field, items, primary: items[0] } : undefined;
   };
   const useItemAlternatives = computed(() =>
@@ -236,12 +231,16 @@
   };
   const objectiveEquipment = computed(() => {
     const objective = currentObjective.value;
-    if (objective.type === 'sellItem') return [];
+    if (objective.type === 'sellItem') return { equipment: [], choices: [] };
     const group = groupedItems.value;
-    return getObjectiveEquipmentItems(
+    return getTaskEquipmentDisplay(
       group?.field ? withoutGroupedItems(objective, group.field, group.items) : objective
     );
   });
+  const hasObjectiveEquipment = computed(
+    () =>
+      objectiveEquipment.value.equipment.length > 0 || objectiveEquipment.value.choices.length > 0
+  );
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
   });
