@@ -341,25 +341,6 @@ schema, expression and shell check; unsupported values or changed lock/cancellat
 
 Live activation/canary and rollback remain gated by [merge queue rollout](../merge-queue-rollout.md).
 
-### Opt-in finalization shadow
-
-`.github/workflows/finalization-shadow.yml` is a non-authoritative rehearsal of a late build.
-A maintain/admin actor dispatches it from `main` with an open non-draft PR number and its successful
-exact-head CI run id. The trusted planner checks the live head/base/test-merge parents and tree,
-the CI run's PR snapshot, and the attempt-specific `CI Result` job. Docs-only changes skip build.
-The `github-script` handoff passes the repository explicitly because spreading its context drops
-the computed `repo` property; missing repository identity fails planning before any build.
-Docs-only runs still receive a terminal revision recheck. GitHub's workflow-run API may omit the
-PR/base snapshot for fork runs; the shadow rejects those runs until an authenticated historical
-base source is available. This does not change the existing approved fork-preview path.
-Deployable changes build the test merge in a digest-pinned Node container without repository
-write credentials, Actions runtime/cache token, OIDC, deployment secrets, or Docker socket. A
-trusted host step rejects links, special files, and oversized output before the artifact uploader
-can read it. A separate clean runner treats the candidate build artifact as hostile, safely extracts it, rechecks
-the live revision, and seals `pages-preview-shadow` with a digest and versioned manifest. Competing
-same-PR dispatches cancel; pushes and base changes invalidate the old request. The shadow neither
-deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages-preview`.
-
 ### Efficiency evidence
 
 The optional `benchmark` tests in `scripts/workflow-tests/preview.mjs` and
@@ -387,8 +368,6 @@ becomes available later; ordinary synchronize events still wait for current succ
 - `.github/workflows/preview.yml` — explicit trusted controller: plan, deploy, smoke, result jobs
 - `.github/workflows/preview-request.yml`, `scripts/preview/comment-request.mjs` — trusted
   maintainer comment request, current CI selection, and dispatch
-- `.github/workflows/finalization-shadow.yml`, `scripts/preview/finalization-shadow.mjs`,
-  `scripts/preview/shadow-container.sh` — opt-in late-build rehearsal, no deployment or required result
 - `.github/workflows/ci.yml` — `Validate` build profile, manifest, `pages-preview` artifact; `security` call
 - `.github/workflows/security.yml` — reusable audit/Gitleaks/CodeQL workflow plus weekly schedule
 - `scripts/preview/profile.mjs` — project identity, branch alias derivation, anonymous build env

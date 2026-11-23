@@ -1,119 +1,107 @@
 <template>
-  <div class="min-h-full overflow-x-hidden">
-    <div class="px-3 py-6 sm:px-6">
-      <div class="mx-auto max-w-350 space-y-3 sm:space-y-4">
-        <slot name="header" />
-        <!-- The help tour re-picks the shown tab, so the selected tab stays clickable. -->
-        <StatusTabBar
-          :tabs="primaryViews"
-          :model-value="displayPrimaryView"
-          :group-label="t('page.hideout.status_tabs_label')"
-          :inert-when-selected="false"
-          tabs-help-target="hideout-status-filters"
-          data-testid="hideout-view-switcher"
-          data-help-target="hideout-view-switcher"
-          @update:model-value="selectPrimaryView"
-        >
-          <template #actions>
-            <div
-              data-testid="hideout-filter-actions"
-              data-help-target="hideout-filter-actions"
-              class="ml-auto flex items-center gap-2"
-            >
-              <SettingsButton
-                page-key="hideout"
-                data-testid="hideout-settings-button"
-                data-help-target="hideout-settings-button"
-                :label="t('page.hideout.settings.title')"
-              />
-            </div>
-          </template>
-        </StatusTabBar>
-        <UModal
-          v-model:open="showPrereqConfirm"
-          :title="prereqConfirmTitle"
-          :description="prereqConfirmDescription"
-          :ui="{ content: 'bg-transparent border-0 p-0 shadow-none ring-0 outline-none' }"
-          prevent-close
-        >
-          <template #content>
-            <UCard class="w-full max-w-sm">
-              <template #header>
-                <div class="light:text-surface-50 px-4 py-3 text-lg font-semibold text-white">
-                  {{ prereqConfirmTitle }}
-                </div>
-              </template>
-              <div class="text-surface-300 px-4 pb-4 text-sm">
-                {{ prereqConfirmDescription }}
-              </div>
-              <template #footer>
-                <div class="flex justify-end gap-2 px-4 pb-4">
-                  <UButton color="neutral" variant="ghost" @click="cancelPrereqToggle">
-                    {{ helpText('common.cancel', 'Cancel') }}
-                  </UButton>
-                  <UButton color="warning" variant="solid" @click="confirmPrereqToggle">
-                    {{ helpText('page.hideout.prereq_filters.confirm_confirm', 'Enable') }}
-                  </UButton>
-                </div>
-              </template>
-            </UCard>
-          </template>
-        </UModal>
-        <div v-if="showHideoutHelpDemo" class="mx-auto max-w-3xl">
-          <HideoutHelpDemoCard
-            :mode="hideoutHelpDemoMode"
-            :requirement-complete="hideoutHelpRequirementComplete"
-            @build="handleHideoutHelpBuild"
-            @toggle-requirement="toggleHideoutHelpRequirement"
-          />
-        </div>
-        <div>
+  <div class="flex min-w-0 flex-1 flex-col py-6">
+    <div class="flex flex-1 flex-col space-y-3 sm:space-y-4">
+      <slot name="header" />
+      <HideoutLayoutSwitch
+        v-if="!isHideoutHelpTourActive"
+        :show-map="showMap"
+        @select="setMapLayout"
+      />
+      <!-- The help tour re-picks the shown tab, so the selected tab stays clickable. -->
+      <StatusTabBar
+        v-if="!showMap"
+        :tabs="primaryViews"
+        :model-value="displayPrimaryView"
+        :group-label="t('page.hideout.status_tabs_label')"
+        :inert-when-selected="false"
+        tabs-help-target="hideout-status-filters"
+        data-testid="hideout-view-switcher"
+        data-help-target="hideout-view-switcher"
+        @update:model-value="selectPrimaryView"
+      >
+        <template #actions>
           <div
-            v-if="isStoreLoading"
-            class="text-surface-200 flex flex-col items-center gap-3 py-10"
+            data-testid="hideout-filter-actions"
+            data-help-target="hideout-filter-actions"
+            class="ml-auto flex items-center gap-2"
           >
-            <UIcon name="i-heroicons-arrow-path" class="text-info-400 h-8 w-8 animate-spin" />
-            <div class="flex items-center gap-2 text-sm">
-              {{ $t('page.hideout.loading') }}
-              <RefreshButton />
-            </div>
-          </div>
-          <div v-else-if="displayVisibleStations.length === 0" class="flex justify-center">
-            <UAlert
-              icon="i-mdi-clipboard-search"
-              color="neutral"
-              variant="soft"
-              class="max-w-xl"
-              :title="$t('page.hideout.no_stations_found')"
+            <SettingsButton
+              page-key="hideout"
+              data-testid="hideout-settings-button"
+              data-help-target="hideout-settings-button"
+              :label="t('page.hideout.settings.title')"
             />
           </div>
-          <div
-            v-else
-            data-help-target="hideout-station-grid"
-            class="mt-2 grid grid-cols-1 gap-2.5 md:grid-cols-2 md:gap-3 xl:grid-cols-3"
-          >
-            <div
-              v-for="(hStation, hIndex) in visibleStationsSlice"
-              :key="hStation.id"
-              class="content-visibility-auto-240 h-full"
-              :data-help-target="hIndex === 0 ? 'hideout-first-station-card' : undefined"
-            >
-              <HideoutCard
-                :station="hStation"
-                :highlighted="highlightedStationId === hStation.id"
-                :highlight-module-id="
-                  highlightedStationId === hStation.id ? highlightedModuleId : undefined
-                "
-              />
+        </template>
+      </StatusTabBar>
+      <UModal
+        v-model:open="showPrereqConfirm"
+        :title="prereqConfirmTitle"
+        :description="prereqConfirmDescription"
+        :ui="{ content: 'bg-transparent border-0 p-0 shadow-none ring-0 outline-none' }"
+        prevent-close
+      >
+        <template #content>
+          <UCard class="w-full max-w-sm">
+            <template #header>
+              <div class="light:text-surface-50 px-4 py-3 text-lg font-semibold text-white">
+                {{ prereqConfirmTitle }}
+              </div>
+            </template>
+            <div class="text-surface-300 px-4 pb-4 text-sm">
+              {{ prereqConfirmDescription }}
             </div>
+            <template #footer>
+              <div class="flex justify-end gap-2 px-4 pb-4">
+                <UButton color="neutral" variant="ghost" @click="cancelPrereqToggle">
+                  {{ helpText('common.cancel', 'Cancel') }}
+                </UButton>
+                <UButton color="warning" variant="solid" @click="confirmPrereqToggle">
+                  {{ helpText('page.hideout.prereq_filters.confirm_confirm', 'Enable') }}
+                </UButton>
+              </div>
+            </template>
+          </UCard>
+        </template>
+      </UModal>
+      <div v-if="showHideoutHelpDemo" class="mx-auto max-w-3xl">
+        <HideoutHelpDemoCard
+          :mode="hideoutHelpDemoMode"
+          :requirement-complete="hideoutHelpRequirementComplete"
+          @build="handleHideoutHelpBuild"
+          @toggle-requirement="toggleHideoutHelpRequirement"
+        />
+      </div>
+      <div :class="{ 'lg:flex lg:flex-1 lg:flex-col': showMap }">
+        <div v-if="isStoreLoading" class="text-surface-200 flex flex-col items-center gap-3 py-10">
+          <UIcon name="i-heroicons-arrow-path" class="text-info-400 h-8 w-8 animate-spin" />
+          <div class="flex items-center gap-2 text-sm">
+            {{ $t('page.hideout.loading') }}
+            <RefreshButton />
           </div>
-          <div
-            v-if="visibleStationCount < displayVisibleStations.length"
-            ref="loadMoreSentinel"
-            class="flex items-center justify-center py-4"
-          >
-            <UIcon name="i-mdi-loading" class="text-surface-400 h-5 w-5 animate-spin" />
-          </div>
+        </div>
+        <HideoutMapView v-else-if="mapHasStations" :stations="stationList" />
+        <div v-else-if="displayVisibleStations.length === 0" class="flex justify-center">
+          <UAlert
+            icon="i-mdi-clipboard-search"
+            color="neutral"
+            variant="soft"
+            class="max-w-xl"
+            :title="$t('page.hideout.no_stations_found')"
+          />
+        </div>
+        <HideoutStationGrid
+          v-else
+          :visible-stations-slice="visibleStationsSlice"
+          :highlighted-station-id="highlightedStationId"
+          :highlighted-module-id="highlightedModuleId"
+        />
+        <div
+          v-if="showLoadMore"
+          ref="loadMoreSentinel"
+          class="flex items-center justify-center py-4"
+        >
+          <UIcon name="i-mdi-loading" class="text-surface-400 h-5 w-5 animate-spin" />
         </div>
       </div>
     </div>
@@ -187,11 +175,13 @@
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
   import { usePageSettingsDrawer } from '@/composables/usePageSettingsDrawer';
   import { usePrereqModal, type PrereqType } from '@/composables/usePrereqModal';
-  import HideoutCard from '@/features/hideout/HideoutCard.vue';
+  import HideoutLayoutSwitch from '@/features/hideout/HideoutLayoutSwitch.vue';
   import HideoutSettingsDrawer from '@/features/hideout/HideoutSettingsDrawer.vue';
+  import HideoutStationGrid from '@/features/hideout/HideoutStationGrid.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { queueQueryWrite } from '@/utils/routeHelpers';
   import { ALL_TAB_ICON } from '@/utils/statusTones';
   import type { HideoutStation } from '@/types/tarkov';
   import type { StatusTabItem, StatusTone } from '@/utils/statusTones';
@@ -199,6 +189,9 @@
     () => import('@/features/hideout/HideoutHelpDemoCard.vue')
   );
   const RefreshButton = defineAsyncComponent(() => import('@/components/ui/RefreshButton.vue'));
+  const HideoutMapView = defineAsyncComponent(
+    () => import('@/features/hideout/HideoutMapView.vue')
+  );
   const route = useRoute();
   const router = useRouter();
   const { t } = useI18n({ useScope: 'global' });
@@ -421,6 +414,22 @@
     return hideoutHelpPrimaryView.value ?? activePrimaryView.value;
   });
   const stationList = computed(() => (hideoutStations.value ?? []) as HideoutStation[]);
+  const showMap = computed(
+    () => route.query.layout === 'map' && !isHideoutHelpTourActive.value && !route.query.station
+  );
+  function setMapLayout(map: boolean) {
+    const path = route.path;
+    void queueQueryWrite(() => {
+      if (route.path !== path) return;
+      const query = { ...route.query };
+      if (map) {
+        query.layout = 'map';
+        delete query.station;
+        delete query.module;
+      } else delete query.layout;
+      return router.replace({ query });
+    });
+  }
   const displayVisibleStations = computed(() => {
     if (isStoreLoading.value) return [];
     if (!isHideoutHelpTourActive.value) return visibleStations.value;
@@ -442,6 +451,8 @@
   const hasMoreStations = computed(
     () => visibleStationCount.value < displayVisibleStations.value.length
   );
+  const mapHasStations = computed(() => showMap.value && stationList.value.length > 0);
+  const showLoadMore = computed(() => !showMap.value && hasMoreStations.value);
   const loadMoreStations = () => {
     if (!hasMoreStations.value) return;
     visibleStationCount.value = Math.min(

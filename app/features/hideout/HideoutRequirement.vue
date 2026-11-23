@@ -1,12 +1,21 @@
 <template>
+  <HideoutMaterialRow
+    v-if="inline"
+    :item-label="itemLabel"
+    :current-count="currentCount"
+    :required-count="requiredCount"
+    :is-currency="isCurrency"
+    :is-complete="isComplete"
+    :show-found-in-raid-badge="showFoundInRaidBadge"
+    @contextmenu.prevent="openContextMenu"
+    @count="setCount"
+    @toggle="toggleComplete"
+  />
   <!-- Compact Card Layout - Works for ALL items -->
   <div
+    v-else
     class="group relative flex flex-col items-center rounded-lg border p-1.5 transition-all select-none hover:scale-105 sm:p-2"
-    :class="[
-      isComplete
-        ? 'border-success-500/50 bg-success-900/20'
-        : 'border-surface-700 bg-surface-800/80 hover:border-surface-600 hover:bg-surface-800',
-    ]"
+    :class="tileClass"
     @click="toggleComplete"
     @contextmenu.prevent="openContextMenu"
   >
@@ -41,7 +50,7 @@
       <div v-if="showPartialCount" class="absolute right-0 -bottom-1 left-0 flex justify-center">
         <div
           class="border-surface-700 bg-surface-900/90 rounded border px-1 py-0.5 text-[9px] font-bold sm:px-1.5 sm:text-[10px]"
-          :class="isComplete ? 'text-success-400' : 'text-surface-300'"
+          :class="countTone"
         >
           {{ formatNumber(currentCount) }}/{{ formatNumber(requiredCount) }}
         </div>
@@ -62,29 +71,15 @@
         {{ requirement.item.name }}
       </div>
       <ContextMenuItem
-        v-if="!isComplete"
-        icon="i-mdi-check-circle"
-        :label="
-          $t('page.hideout.stationcard.requirement.mark_complete', {
-            count: formatNumber(requiredCount),
-          })
-        "
+        :icon="toggleIcon"
+        :label="$t(toggleLabelKey, { count: formatNumber(requiredCount) })"
         @click="
-          markComplete();
+          toggleComplete();
           close();
         "
       />
-      <ContextMenuItem
-        v-if="isComplete"
-        icon="i-mdi-close-circle"
-        :label="$t('page.hideout.stationcard.requirement.mark_incomplete')"
-        @click="
-          markIncomplete();
-          close();
-        "
-      />
-      <div v-if="showPartialCount" class="border-surface-700 my-1 border-t" />
-      <template v-if="showPartialCount">
+      <template v-if="showAmountEditor">
+        <div class="border-surface-700 my-1 border-t" />
         <div class="space-y-2 px-3 py-2">
           <div class="text-surface-400 text-xs">
             {{ $t('page.hideout.stationcard.requirement.set_custom_amount') }}
@@ -105,7 +100,7 @@
               :min="0"
               :max="requirement.count"
               class="border-surface-600 focus:ring-primary-500/30 bg-surface-700 w-20 rounded border px-2 py-1 text-center text-sm font-bold focus:ring-1 focus:outline-none"
-              :class="isComplete ? 'text-success-400' : 'text-surface-300'"
+              :class="countTone"
               @input="handleInput"
               @click.stop
             />
@@ -157,6 +152,7 @@
 <script setup lang="ts">
   import GameItem from '@/components/ui/GameItem.vue';
   import { useWikiLink } from '@/composables/useWikiLink';
+  import HideoutMaterialRow from '@/features/hideout/HideoutMaterialRow.vue';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { getCurrencySymbol } from '@/utils/constants';
   import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
@@ -185,6 +181,7 @@
       }>;
     };
     stationId: string;
+    inline?: boolean;
     level: number;
   }
   const props = defineProps<Props>();
@@ -233,6 +230,12 @@
     return storeCount;
   });
   const isComplete = computed(() => currentCount.value >= requiredCount.value);
+  const countTone = computed(() => (isComplete.value ? 'text-success-400' : 'text-surface-300'));
+  const tileClass = computed(() =>
+    isComplete.value
+      ? 'border-success-500/50 bg-success-900/20'
+      : 'border-surface-700 bg-surface-800/80 hover:border-surface-600 hover:bg-surface-800'
+  );
   // Watch current count to update edit value
   watch(
     currentCount,
@@ -278,12 +281,15 @@
       setCount(requiredCount.value);
     }
   };
-  const markComplete = (): void => {
-    setCount(requiredCount.value);
-  };
-  const markIncomplete = (): void => {
-    setCount(0);
-  };
+  const toggleIcon = computed(() =>
+    isComplete.value ? 'i-mdi-close-circle' : 'i-mdi-check-circle'
+  );
+  const toggleLabelKey = computed(() =>
+    isComplete.value
+      ? 'page.hideout.stationcard.requirement.mark_incomplete'
+      : 'page.hideout.stationcard.requirement.mark_complete'
+  );
+  const showAmountEditor = computed(() => !props.inline && showPartialCount.value);
   const openContextMenu = (event: MouseEvent): void => {
     editValue.value = currentCount.value;
     event.stopPropagation();
