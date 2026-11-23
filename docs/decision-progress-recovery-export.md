@@ -55,10 +55,9 @@ internal changes. A direct exact dependency reuses the existing lockfile resolut
 does not promise compatibility across codec releases; any dependency/format change requires
 explicit compatibility review and retained old-file decoding, not a silent tag change.
 
-On 2026-10-06 the installed package and lock resolution were verified at 5.9.4. The live
-[GitHub advisory API](https://api.github.com/advisories?ecosystem=npm&affects=devalue%405.9.4)
-returned zero matching advisories for that exact version. This is a scoped advisory receipt,
-not a claim that an untrusted file needs no validation.
+On 2026-10-06 the installed package and lock resolution were verified at 5.9.4. The command
+`gh api 'advisories?ecosystem=npm&affects=devalue%405.9.4'` returned zero matching advisories
+for that exact version. Untrusted files still require validation.
 
 ## Loss and resource boundaries
 
