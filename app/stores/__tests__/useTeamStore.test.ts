@@ -862,7 +862,9 @@ describe('Team realtime resources', () => {
         }
         await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
         const expectedReads = failed ? 2 : 1;
-        expect(mockGetTeamMembers).toHaveBeenCalledTimes(expectedReads);
+        expect(mockGetTeamMembers.mock.calls).toEqual(
+          Array.from({ length: expectedReads }, () => ['team-1', true])
+        );
         expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(expectedReads);
         expect(instance.teamStore.members).toEqual(roster.members);
       } finally {
@@ -912,7 +914,11 @@ describe('Team realtime resources', () => {
       await vi.waitFor(() =>
         expect(teamRecords().some(({ topic }) => topic === 'team:team-2')).toBe(true)
       );
-      expect(mockGetTeamMembers).toHaveBeenCalledTimes(calls + 3);
+      expect(mockGetTeamMembers.mock.calls.slice(calls)).toEqual([
+        ['team-2', true],
+        ['team-2', true],
+        ['team-2', true],
+      ]);
       expect(instance.teamStore.members).toEqual(['next-member']);
     } finally {
       instance.cleanup();
