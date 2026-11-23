@@ -230,17 +230,6 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - uses: ./.github/actions/setup-project
-      - name: Setup Deno
-        if: matrix.shard == 1
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          deno-version: v2.9.4
-      - name: Run Deno tests
-        if: matrix.shard == 1
-        run: pnpm run test:deno
-      - name: Verify private diagnostic collector in workerd
-        if: matrix.shard == 1
-        run: pnpm run test:progress-diagnostics
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
         run: pnpm exec vitest run --coverage --shard="$VITEST_SHARD"
       - name: Upload blob report
@@ -399,6 +388,15 @@ jobs:
         run: pnpm run check:progress-contracts
       - name: Check versioned API and frontend parity in every mode
         run: pnpm run verify:api-parity
+      # Kept off the Vitest shards so shard 1 carries no extra work.
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.9.4
+      - name: Run Deno tests
+        run: pnpm run test:deno
+      - name: Verify private diagnostic collector in workerd
+        run: pnpm run test:progress-diagnostics
   # Dependency audit, Gitleaks, and CodeQL run for every CI event and gate `CI Result`. The reusable
   # workflow's scanner errors, cancellations, or missing jobs surface as a non-success result here.
   security:

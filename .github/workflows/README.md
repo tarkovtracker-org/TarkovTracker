@@ -37,7 +37,8 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Systems drift check` — verifies `docs/systems/` invariants against the codebase
 - `Workers` - Verify immutable frontend contracts pins, then fetch the exact tagged API source,
   compare compiled contracts, run its standalone types/schema/API/workerd/dry-run checks, and
-  run all-mode frontend integration tests. No local gateway workspace remains.
+  run all-mode frontend integration tests. It also runs the Supabase Edge Function Deno tests and
+  the progress-diagnostics workerd check, which keeps the Vitest shards evenly loaded. No local gateway workspace remains.
 
 Heavy jobs run in parallel after classification; systems drift runs independently.
 Lighthouse scope detection runs independently of PR metadata.
