@@ -1,5 +1,5 @@
 <template>
-  <div class="isolate">
+  <div class="isolate lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
     <div class="border-surface-700 flex flex-wrap items-center justify-between gap-2 border-b p-2">
       <label class="flex min-w-0 items-center gap-2 text-sm">
         {{ t('page.hideout.map.area') }}
@@ -43,7 +43,7 @@
       role="region"
       :aria-label="t('page.hideout.map.navigation')"
       data-testid="hideout-map-canvas"
-      class="!bg-surface-950 relative z-0 h-80 w-full sm:h-112 lg:h-136"
+      class="!bg-surface-950 relative z-0 h-[clamp(20rem,52svh,32rem)] w-full lg:h-auto lg:flex-1"
     />
   </div>
 </template>

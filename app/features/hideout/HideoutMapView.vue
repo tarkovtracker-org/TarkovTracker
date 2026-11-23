@@ -1,9 +1,10 @@
 <template>
   <section
-    class="border-surface-700 bg-surface-900 grid overflow-hidden rounded-lg border lg:grid-cols-3"
+    data-hideout-map
+    class="border-surface-700 bg-surface-900 grid overflow-hidden rounded-lg border lg:min-h-96 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_clamp(19rem,26%,26rem)]"
     :aria-label="t('page.hideout.map.title')"
   >
-    <div class="min-w-0 lg:col-span-2">
+    <div class="min-w-0 lg:flex lg:min-h-0 lg:flex-col">
       <HideoutMapCanvas
         ref="canvas"
         :entries="entries"
@@ -16,10 +17,11 @@
       <p class="text-surface-400 px-3 py-2 text-xs">{{ t('page.hideout.map.navigation') }}</p>
     </div>
     <section
+      :key="selected?.station.id ?? area ?? 'all'"
       ref="details"
       :aria-label="selected?.station.name ?? t('page.hideout.map.upgrades')"
       tabindex="-1"
-      class="border-surface-700 space-y-3 border-t p-3 lg:border-t-0 lg:border-l"
+      class="border-surface-700 space-y-3 border-t p-3 lg:min-h-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:[contain:size]"
     >
       <UButton
         v-if="area || selected"

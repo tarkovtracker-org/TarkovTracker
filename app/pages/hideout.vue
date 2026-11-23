@@ -1,112 +1,107 @@
 <template>
-  <div class="min-h-full overflow-x-hidden">
-    <div class="px-3 py-6 sm:px-6">
-      <div class="mx-auto max-w-350 space-y-3 sm:space-y-4">
-        <slot name="header" />
-        <HideoutLayoutSwitch
-          v-if="!isHideoutHelpTourActive"
-          :show-map="showMap"
-          @select="setMapLayout"
-        />
-        <!-- The help tour re-picks the shown tab, so the selected tab stays clickable. -->
-        <StatusTabBar
-          v-if="!showMap"
-          :tabs="primaryViews"
-          :model-value="displayPrimaryView"
-          :group-label="t('page.hideout.status_tabs_label')"
-          :inert-when-selected="false"
-          tabs-help-target="hideout-status-filters"
-          data-testid="hideout-view-switcher"
-          data-help-target="hideout-view-switcher"
-          @update:model-value="selectPrimaryView"
-        >
-          <template #actions>
-            <div
-              data-testid="hideout-filter-actions"
-              data-help-target="hideout-filter-actions"
-              class="ml-auto flex items-center gap-2"
-            >
-              <SettingsButton
-                page-key="hideout"
-                data-testid="hideout-settings-button"
-                data-help-target="hideout-settings-button"
-                :label="t('page.hideout.settings.title')"
-              />
-            </div>
-          </template>
-        </StatusTabBar>
-        <UModal
-          v-model:open="showPrereqConfirm"
-          :title="prereqConfirmTitle"
-          :description="prereqConfirmDescription"
-          :ui="{ content: 'bg-transparent border-0 p-0 shadow-none ring-0 outline-none' }"
-          prevent-close
-        >
-          <template #content>
-            <UCard class="w-full max-w-sm">
-              <template #header>
-                <div class="light:text-surface-50 px-4 py-3 text-lg font-semibold text-white">
-                  {{ prereqConfirmTitle }}
-                </div>
-              </template>
-              <div class="text-surface-300 px-4 pb-4 text-sm">
-                {{ prereqConfirmDescription }}
-              </div>
-              <template #footer>
-                <div class="flex justify-end gap-2 px-4 pb-4">
-                  <UButton color="neutral" variant="ghost" @click="cancelPrereqToggle">
-                    {{ helpText('common.cancel', 'Cancel') }}
-                  </UButton>
-                  <UButton color="warning" variant="solid" @click="confirmPrereqToggle">
-                    {{ helpText('page.hideout.prereq_filters.confirm_confirm', 'Enable') }}
-                  </UButton>
-                </div>
-              </template>
-            </UCard>
-          </template>
-        </UModal>
-        <div v-if="showHideoutHelpDemo" class="mx-auto max-w-3xl">
-          <HideoutHelpDemoCard
-            :mode="hideoutHelpDemoMode"
-            :requirement-complete="hideoutHelpRequirementComplete"
-            @build="handleHideoutHelpBuild"
-            @toggle-requirement="toggleHideoutHelpRequirement"
-          />
-        </div>
-        <div>
+  <div class="flex min-w-0 flex-1 flex-col py-6">
+    <div class="flex flex-1 flex-col space-y-3 sm:space-y-4">
+      <slot name="header" />
+      <HideoutLayoutSwitch
+        v-if="!isHideoutHelpTourActive"
+        :show-map="showMap"
+        @select="setMapLayout"
+      />
+      <!-- The help tour re-picks the shown tab, so the selected tab stays clickable. -->
+      <StatusTabBar
+        v-if="!showMap"
+        :tabs="primaryViews"
+        :model-value="displayPrimaryView"
+        :group-label="t('page.hideout.status_tabs_label')"
+        :inert-when-selected="false"
+        tabs-help-target="hideout-status-filters"
+        data-testid="hideout-view-switcher"
+        data-help-target="hideout-view-switcher"
+        @update:model-value="selectPrimaryView"
+      >
+        <template #actions>
           <div
-            v-if="isStoreLoading"
-            class="text-surface-200 flex flex-col items-center gap-3 py-10"
+            data-testid="hideout-filter-actions"
+            data-help-target="hideout-filter-actions"
+            class="ml-auto flex items-center gap-2"
           >
-            <UIcon name="i-heroicons-arrow-path" class="text-info-400 h-8 w-8 animate-spin" />
-            <div class="flex items-center gap-2 text-sm">
-              {{ $t('page.hideout.loading') }}
-              <RefreshButton />
-            </div>
-          </div>
-          <HideoutMapView v-else-if="mapHasStations" :stations="stationList" />
-          <div v-else-if="displayVisibleStations.length === 0" class="flex justify-center">
-            <UAlert
-              icon="i-mdi-clipboard-search"
-              color="neutral"
-              variant="soft"
-              class="max-w-xl"
-              :title="$t('page.hideout.no_stations_found')"
+            <SettingsButton
+              page-key="hideout"
+              data-testid="hideout-settings-button"
+              data-help-target="hideout-settings-button"
+              :label="t('page.hideout.settings.title')"
             />
           </div>
-          <HideoutStationGrid
-            v-else
-            :visible-stations-slice="visibleStationsSlice"
-            :highlighted-station-id="highlightedStationId"
-            :highlighted-module-id="highlightedModuleId"
-          />
-          <div
-            v-if="showLoadMore"
-            ref="loadMoreSentinel"
-            class="flex items-center justify-center py-4"
-          >
-            <UIcon name="i-mdi-loading" class="text-surface-400 h-5 w-5 animate-spin" />
+        </template>
+      </StatusTabBar>
+      <UModal
+        v-model:open="showPrereqConfirm"
+        :title="prereqConfirmTitle"
+        :description="prereqConfirmDescription"
+        :ui="{ content: 'bg-transparent border-0 p-0 shadow-none ring-0 outline-none' }"
+        prevent-close
+      >
+        <template #content>
+          <UCard class="w-full max-w-sm">
+            <template #header>
+              <div class="light:text-surface-50 px-4 py-3 text-lg font-semibold text-white">
+                {{ prereqConfirmTitle }}
+              </div>
+            </template>
+            <div class="text-surface-300 px-4 pb-4 text-sm">
+              {{ prereqConfirmDescription }}
+            </div>
+            <template #footer>
+              <div class="flex justify-end gap-2 px-4 pb-4">
+                <UButton color="neutral" variant="ghost" @click="cancelPrereqToggle">
+                  {{ helpText('common.cancel', 'Cancel') }}
+                </UButton>
+                <UButton color="warning" variant="solid" @click="confirmPrereqToggle">
+                  {{ helpText('page.hideout.prereq_filters.confirm_confirm', 'Enable') }}
+                </UButton>
+              </div>
+            </template>
+          </UCard>
+        </template>
+      </UModal>
+      <div v-if="showHideoutHelpDemo" class="mx-auto max-w-3xl">
+        <HideoutHelpDemoCard
+          :mode="hideoutHelpDemoMode"
+          :requirement-complete="hideoutHelpRequirementComplete"
+          @build="handleHideoutHelpBuild"
+          @toggle-requirement="toggleHideoutHelpRequirement"
+        />
+      </div>
+      <div :class="{ 'lg:flex lg:flex-1 lg:flex-col': showMap }">
+        <div v-if="isStoreLoading" class="text-surface-200 flex flex-col items-center gap-3 py-10">
+          <UIcon name="i-heroicons-arrow-path" class="text-info-400 h-8 w-8 animate-spin" />
+          <div class="flex items-center gap-2 text-sm">
+            {{ $t('page.hideout.loading') }}
+            <RefreshButton />
           </div>
+        </div>
+        <HideoutMapView v-else-if="mapHasStations" :stations="stationList" />
+        <div v-else-if="displayVisibleStations.length === 0" class="flex justify-center">
+          <UAlert
+            icon="i-mdi-clipboard-search"
+            color="neutral"
+            variant="soft"
+            class="max-w-xl"
+            :title="$t('page.hideout.no_stations_found')"
+          />
+        </div>
+        <HideoutStationGrid
+          v-else
+          :visible-stations-slice="visibleStationsSlice"
+          :highlighted-station-id="highlightedStationId"
+          :highlighted-module-id="highlightedModuleId"
+        />
+        <div
+          v-if="showLoadMore"
+          ref="loadMoreSentinel"
+          class="flex items-center justify-center py-4"
+        >
+          <UIcon name="i-mdi-loading" class="text-surface-400 h-5 w-5 animate-spin" />
         </div>
       </div>
     </div>
