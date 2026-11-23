@@ -267,14 +267,18 @@ node scripts/ci/workflow-metrics.mjs --after <rollout-ISO-time> --count 20
 ```
 
 For full PR plans, the **Observe Supabase DB selection** step records a shadow decision. Only
-changes limited to Vue and CSS files in frontend directories are candidates. Match that decision
-to the same run ID and attempt in the collector output before comparing timings. All checks still
-run as selected by the regular plan. For each measured full attempt with a successful CI Result,
-`ci_balance` reports Supabase and coverage job durations plus the full job and Vitest step duration
-for each shard. A missing step duration is reported as null. The estimated Supabase gate gap is the
-time between Supabase and the last other validation job when Supabase finishes last. It assumes
-unchanged scheduling and excludes the advisory Codebase metrics job. Compare Vitest step durations
-across runs to distinguish uneven test assignments from setup or shard 1’s extra checks.
+Vue and CSS changes in `app/{assets,components,features,layouts,pages,shell}/` qualify.
+Match the decision to the same run ID and attempt in the collector output.
+
+All checks still run as selected by the regular plan. For each full attempt with a successful
+CI Result, `ci_balance` reports Supabase and coverage job durations plus the full job and Vitest
+step duration for each shard. A missing Vitest step duration is reported as null. An incomplete
+shard set or missing Supabase, coverage, or shard job duration omits the entire balance record.
+
+The estimated Supabase gate gap is the time between Supabase and the last other validation job
+when Supabase finishes last. It assumes unchanged scheduling and excludes CI Result and Codebase
+metrics. Compare Vitest step durations across runs to distinguish uneven test assignments from
+setup or shard 1’s extra checks.
 
 The follow-up selects the first 20 merges after the boundary; record the actual rollout timestamp.
 Compare categories separately (documentation, translations, mixed documentation/translations,

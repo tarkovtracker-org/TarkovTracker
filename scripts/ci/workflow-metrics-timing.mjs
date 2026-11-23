@@ -4,24 +4,47 @@ const seconds = (item) => {
   const minutes = duration(item?.started_at, item?.completed_at);
   return minutes === null ? null : Math.round(minutes * 60);
 };
-function testShard(job, shard) {
-  const step = job?.steps?.find((item) => item.name === `Run shard ${shard}/4`);
-  return { shard, job_seconds: seconds(job), vitest_seconds: seconds(step) };
+const shardJob = /^Test \(shard ([1-9]\d*)\/([1-9]\d*)\)$/u;
+function readShards(jobs) {
+  return jobs
+    .flatMap((job) => {
+      const match = shardJob.exec(job.name);
+      if (!match) return [];
+      const [, shard, total] = match;
+      const step = job.steps?.find((item) => item.name === `Run shard ${shard}/${total}`);
+      return [
+        {
+          shard: Number(shard),
+          total: Number(total),
+          job_seconds: seconds(job),
+          vitest_seconds: seconds(step),
+        },
+      ];
+    })
+    .sort((a, b) => a.shard - b.shard);
+}
+function completeShardSet(shards) {
+  const total = shards[0]?.total;
+  return (
+    shards.length === total &&
+    shards.every((entry, index) => entry.total === total && entry.shard === index + 1)
+  );
+}
+function completeJobTimings(shards, supabase, coverage) {
+  const durations = [
+    seconds(supabase),
+    seconds(coverage),
+    ...shards.map((entry) => entry.job_seconds),
+  ];
+  return completeShardSet(shards) && durations.every(Number.isFinite);
 }
 function ciBalanceFields(jobs) {
   const byName = new Map(jobs.map((job) => [job.name, job]));
   if (byName.get('CI Result')?.conclusion !== 'success') return {};
   const supabase = byName.get('Supabase DB');
   const coverage = byName.get('Coverage thresholds');
-  const shards = [1, 2, 3, 4].map((shard) =>
-    testShard(byName.get(`Test (shard ${shard}/4)`), shard)
-  );
-  const measuredSeconds = [
-    seconds(supabase),
-    seconds(coverage),
-    ...shards.map((shard) => shard.job_seconds),
-  ];
-  if (measuredSeconds.includes(null)) return {};
+  const shards = readShards(jobs);
+  if (!completeJobTimings(shards, supabase, coverage)) return {};
   const otherJobs = jobs.filter(
     (job) => !['Supabase DB', 'CI Result', 'Codebase metrics'].includes(job.name)
   );
@@ -32,7 +55,7 @@ function ciBalanceFields(jobs) {
       supabase_job_seconds: seconds(supabase),
       supabase_only_gate_gap_seconds: Math.max(0, gap),
       coverage_job_seconds: seconds(coverage),
-      shards,
+      shards: shards.map(({ total: _total, ...shard }) => shard),
     },
   };
 }

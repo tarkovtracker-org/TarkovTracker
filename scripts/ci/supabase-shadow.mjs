@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { isValidPlan } from './validation-plan.mjs';
 // Keep the initial sample narrow: frontend directories, simple paths, and Vue or CSS files.
 const frontendPath =
-  /^app\/(?:assets|components|features|layouts|pages)\/(?:[\w@-][\w.@-]*\/)*[\w@-][\w.@-]*\.(?:css|vue)$/u;
+  /^app\/(?:assets|components|features|layouts|pages|shell)\/(?:[\w@-][\w.@-]*\/)*[\w@-][\w.@-]*\.(?:css|vue)$/u;
 function frontendOnly(paths) {
   return paths.every((path) => typeof path === 'string' && frontendPath.test(path));
 }
