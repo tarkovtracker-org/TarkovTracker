@@ -3,7 +3,8 @@ name: Preview Retention
 # Deployment deletion stays disabled until the reviewed activation variable is set.
 on:
   schedule:
-    - cron: '43 * * * *'
+    # Daily: only queue previews at least 48 hours old are eligible, so hourly runs add nothing.
+    - cron: '43 4 * * *'
   workflow_dispatch:
     inputs:
       apply:

@@ -299,7 +299,7 @@ the accepting aggregator version ships in the same change that activates the job
 ### Queue preview retention
 
 `.github/workflows/preview-retention.yml` uses trusted main and the protected `preview`
-environment. It runs hourly in dry-run mode until the separately approved environment variable
+environment. It runs daily in dry-run mode until the separately approved environment variable
 `PREVIEW_QUEUE_RETENTION_ENABLED=true` enables bounded cleanup. Manual `apply=true` additionally
 requires a current maintainer. No production, normal PR, unknown or pre-lock deployment is eligible.
 
