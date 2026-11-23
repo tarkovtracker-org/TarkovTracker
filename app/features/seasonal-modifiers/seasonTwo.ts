@@ -75,7 +75,7 @@ const categories = new Map(
   )
 );
 const highlight =
-  /(?:\blevel \d+|[+--]?\d+(?:\.\d+)?(?:%| health regeneration| arm and leg stamina points| kg| seconds?| days?| Fence reputation)(?: (?:faster|slower|more slowly|more|less|later|each))?|twice as fast|solo play|without inspecting|\bheavy bleed\b|Found in Raid status|\bFresh Wound\b)/gi;
+  /(?:\blevel \d+|[+\u2212-]?\d+(?:\.\d+)?(?:%| health regeneration| arm and leg stamina points| kg| seconds?| days?| Fence reputation)(?: (?:faster|slower|more slowly|more|less|later|each))?|twice as fast|solo play|without inspecting|\bheavy bleed\b|Found in Raid status|\bFresh Wound\b)/gi;
 function displayText(perk: PreviewPerk, dictionary: Record<string, string>) {
   return { id: perk.id, name: dictionary[perk.name]!, effect: dictionary[perk.description]! };
 }

@@ -103,6 +103,12 @@ describe('provisional season catalog', () => {
       'heavy bleeding, Fresh Wounds, **heavy bleed**, **Fresh Wound**'
     );
   });
+  it('keeps signs in effect highlights without capturing commas', () => {
+    const payload = fixture();
+    const item = payload.season.data.perks.personal[0]!;
+    payload.season_en.data[item.description] = '+2%,-5%,\u221210%';
+    expect(previewModifiers(payload)[0]?.effect).toBe('**+2%**,**-5%**,**\u221210%**');
+  });
 });
 describe('season preview route', () => {
   const token = 'synthetic-season-preview-token';

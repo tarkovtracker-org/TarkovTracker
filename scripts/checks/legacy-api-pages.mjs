@@ -7,12 +7,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { createTestHarness } from 'wrangler';
 const root = fileURLToPath(new URL('../../', import.meta.url));
+const seasonPreviewRoute = 'season-preview';
 const tarkovRoutes = readdirSync(new URL('../../app/server/api/tarkov/', import.meta.url), {
   recursive: true,
 })
   .filter((name) => name.endsWith('.get.ts'))
   .map((name) => name.replaceAll('\\', '/').replace('.get.ts', ''));
 assert.ok(tarkovRoutes.includes('access-check'), 'Tarkov GET route discovery must not be empty');
+assert.ok(tarkovRoutes.includes(seasonPreviewRoute), 'Season preview GET route must be discovered');
 const routes = JSON.parse(readFileSync(join(root, 'dist', '_routes.json'), 'utf8'));
 const harness = createTestHarness({
   root,
@@ -406,7 +408,7 @@ for (const route of tarkovRoutes) {
       assert.equal(get.status, 200, `${url}: GET fixture must succeed`);
       assert.match(get.headers.get('Content-Type'), /^application\/json/, url);
       const body = await get.json();
-      if (route === 'season-preview') {
+      if (route === seasonPreviewRoute) {
         assert.equal(body.provisional, true);
         assert.equal(body.season.data.id, 'preview:untar-control');
         assert.deepEqual(

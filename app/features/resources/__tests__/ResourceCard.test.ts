@@ -1,14 +1,19 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { assert, describe, expect, it, vi } from 'vitest';
 import ResourceCard from '@/features/resources/ResourceCard.vue';
-import type { Resource } from '@/features/resources/resourceData';
-vi.mock('vue-i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('vue-i18n')>()),
-  useI18n: () => ({
-    t: (key: string, fallback: string) => fallback || key,
-  }),
-}));
+import { getResourceBySlug, type Resource } from '@/features/resources/resourceData';
+vi.mock('vue-i18n', async (importOriginal) => {
+  const i18n = await importOriginal<typeof import('vue-i18n')>();
+  const { default: english } = await import('@/locales/en.json');
+  const { t } = i18n.createI18n({ legacy: false, locale: 'en', messages: { en: english } }).global;
+  return {
+    ...i18n,
+    useI18n: () => ({
+      t: (key: string, fallback: string) => fallback || t(key),
+    }),
+  };
+});
 const mountCard = (resource: Resource, showCategoryBadge = false) =>
   mount(ResourceCard, {
     props: { resource, showCategoryBadge },
@@ -32,6 +37,13 @@ const mountCard = (resource: Resource, showCategoryBadge = false) =>
     },
   });
 describe('ResourceCard', () => {
+  it('renders the translated internal planner action', () => {
+    const resource = getResourceBySlug('seasonal_modifiers');
+    assert(resource);
+    const wrapper = mountCard(resource);
+    const link = wrapper.get('a[href="/resources/seasonal-modifiers"]');
+    expect(link.text()).toBe('Open planner');
+  });
   it('renders a primary setup guide, one secondary link, and a more menu for extras', () => {
     const wrapper = mountCard({
       slug: 'ratscanner',

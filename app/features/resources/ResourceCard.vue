@@ -55,7 +55,7 @@
         class="min-h-9"
         :icon="primaryAction.icon"
         :trailing-icon="primaryAction.external ? 'i-mdi-open-in-new' : undefined"
-        :label="t(primaryAction.labelKey, {}, { default: primaryAction.labelFallback })"
+        :label="t(primaryAction.labelKey, primaryAction.labelFallback ?? '')"
       />
       <UButton
         v-if="highlightedSecondary"
@@ -69,9 +69,7 @@
         class="text-surface-200 hover:text-primary-300 min-h-9 px-1"
         :icon="highlightedSecondary.icon"
         :trailing-icon="highlightedSecondary.external ? 'i-mdi-open-in-new' : undefined"
-        :label="
-          t(highlightedSecondary.labelKey, {}, { default: highlightedSecondary.labelFallback })
-        "
+        :label="t(highlightedSecondary.labelKey, highlightedSecondary.labelFallback ?? '')"
       />
       <UDropdownMenu
         v-if="moreMenuItems.length"
@@ -128,7 +126,7 @@
   const moreMenuItems = computed<DropdownMenuItem[][]>(() => {
     const items = secondarySplit.value.more.map((action) => ({
       icon: action.icon,
-      label: t(action.labelKey, {}, { default: action.labelFallback }),
+      label: t(action.labelKey, action.labelFallback ?? ''),
       to: action.kind === 'internal' ? action.href : undefined,
       href: action.kind === 'external' ? action.href : undefined,
       target: action.external ? ('_blank' as const) : undefined,
