@@ -1,11 +1,11 @@
 <template>
   <div class="isolate">
     <div class="border-surface-700 flex flex-wrap items-center justify-between gap-2 border-b p-2">
-      <label class="flex items-center gap-2 text-sm">
+      <label class="flex min-w-0 items-center gap-2 text-sm">
         {{ t('page.hideout.map.area') }}
         <select
           :value="activeArea ?? ''"
-          class="border-surface-600 bg-surface-800 max-w-48 rounded border px-2 py-1.5"
+          class="border-surface-600 bg-surface-800 max-w-48 min-w-0 rounded border px-2 py-1.5"
           @change="chooseArea"
         >
           <option value="">{{ t('page.hideout.map.all_areas') }}</option>
@@ -84,7 +84,8 @@
     utilities: [516, 442],
     security: [695, 641],
   };
-  const compact = ref(false);
+  const surfaceWidth = ref(0);
+  const compact = computed(() => surfaceWidth.value < 500);
   const compactLabels: Record<HideoutArea, [number, number]> = {
     workshop: [198, 235],
     gym: [500, -16],
@@ -93,6 +94,7 @@
     utilities: [250, 542],
     security: [717, 755],
   };
+  const compactEdgeSpacing: Partial<Record<HideoutArea, number>> = { gym: -110, security: 110 };
   const visibleAreas = computed(() =>
     HIDEOUT_AREAS.filter((area) => props.entries.some((entry) => entry.pin?.area === area))
   );
@@ -186,7 +188,13 @@
       badge.append(ready);
     }
     const anchor = worldPoint(...positions[area]);
-    const point = compact.value ? worldPoint(...compactLabels[area]) : anchor;
+    let point = anchor;
+    if (compact.value) {
+      const [x, y] = compactLabels[area];
+      // On the smallest phones, stagger the two end labels outside the central rooms.
+      const stagger = surfaceWidth.value < 260 ? (compactEdgeSpacing[area] ?? 0) : 0;
+      point = worldPoint(x, y + stagger);
+    }
     if (compact.value && leaflet.value && markers.value) {
       leaflet.value
         .polyline([anchor, point], {
@@ -274,7 +282,7 @@
       maxBounds: api.latLngBounds(bounds).pad(0.2),
       maxBoundsViscosity: 1,
     });
-    compact.value = instance.getSize().x < 500;
+    surfaceWidth.value = instance.getSize().x;
     map.value = instance;
     api.imageOverlay('/img/hideout-floor.svg', bounds, { interactive: false }).addTo(instance);
     instance.on('zoomend', () => {
@@ -288,7 +296,7 @@
     if (!instance) return;
     const wasFitted = instance.getZoom() === fittedZoom;
     instance.invalidateSize({ pan: false });
-    compact.value = instance.getSize().x < 500;
+    surfaceWidth.value = instance.getSize().x;
     if (wasFitted) fit();
     else if (leaflet.value) {
       instance.setMinZoom(-4);
