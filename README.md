@@ -36,7 +36,7 @@ in your browser's local storage and stays there between visits.
 ### What works without an account
 
 - Track task and objective completion (PvP and PvE separately)
-- Track hideout module upgrades and the parts you still need
+- Explore the angled Hideout map, pan or zoom into a station, and track its upgrades and missing parts
 - View player level, faction progress, and needed items
 - Browse interactive maps with spawn points and objectives
 - Customize display preferences and game mode

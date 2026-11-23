@@ -104,7 +104,7 @@
     "typecheck": "NODE_ENV=development nuxt typecheck && tsc -p scripts/precompute && tsc -p workers/progress-diagnostics",
     "lint:fix": "NODE_ENV=development nuxt prepare && eslint app --fix && pnpm run format:blank-lines",
     "metrics": "node scripts/ci/metrics.mjs",
-    "postinstall": "nuxt prepare",
+    "postinstall": "node scripts/setup/prepare-nuxt.mjs",
     "verify:overlay": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/check-overlay.ts",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",
     "prod-db:test": "vitest run scripts/ops/prod-db.test.mjs",

@@ -137,6 +137,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
+        with:
+          prepare-nuxt: 'false'
       - name: Lint
         if: needs.changes.outputs.tooling == 'true'
         run: pnpm run lint
@@ -201,6 +203,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
+        with:
+          prepare-nuxt: 'false'
       - name: Type check
         run: pnpm run typecheck
   test:
@@ -412,6 +416,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
+        with:
+          prepare-nuxt: 'false'
       - name: Validate Supabase migrations
         run: node scripts/checks/check-supabase-ci.mjs
   systems-drift:
