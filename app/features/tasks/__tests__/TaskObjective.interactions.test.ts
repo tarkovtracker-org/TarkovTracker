@@ -150,19 +150,19 @@ describe('TaskObjective interaction boundaries', () => {
   });
   it('groups the hydrated stash pool and keeps independent equipment visible', async () => {
     const items = Array.from({ length: 8 }, (_, index) => ({ id: `ammo-pack-${index}` }));
-    const marker = { id: 'marker' };
+    const equipment = { id: 'required-gear' };
     fullObjectives.push({
       id: 'objective-1',
       type: 'plantItem',
       items: [...items, items[0]!, { id: '' }],
-      markerItem: marker,
+      wearing: [[equipment]],
     });
     const wrapper = createWrapper({ type: 'plantItem', items: [items[0]!] });
     const display = wrapper.getComponent(ObjectiveItemDisplay);
     expect(display.props('primaryItem')).toEqual(items[0]);
     expect(display.props('acceptedItems')).toEqual(items);
     expect(wrapper.findAllComponents(ObjectiveRequiredItems)).toHaveLength(1);
-    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([marker]);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([equipment]);
     await wrapper.get('[data-testid="accepted-items"] button').trigger('click');
     expect(toggle).not.toHaveBeenCalled();
     await wrapper.get('[data-objective-controls] button').trigger('click');
@@ -181,6 +181,22 @@ describe('TaskObjective interaction boundaries', () => {
     expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual(useAny);
     expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([equipment]);
   });
+  it.each([false, true])(
+    'groups use objectives backed by items (duplicate use-any entries: %s)',
+    (hasUseAny) => {
+      const items = [{ id: 'first' }, { id: 'second' }];
+      const required = { id: 'required' };
+      const wrapper = createWrapper({
+        type: 'useItem',
+        items,
+        useAny: hasUseAny ? [required, required] : undefined,
+      });
+      expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual(items);
+      expect(
+        wrapper.findAllComponents(ObjectiveRequiredItems).map((row) => row.props('equipment'))
+      ).toEqual(hasUseAny ? [[required]] : []);
+    }
+  );
   it('lets display clicks reach outside-dismissal listeners without changing progress', async () => {
     const wrapper = createWrapper({ type: 'sellItem', items: [{ id: 'a' }, { id: 'b' }] });
     const host = document.createElement('div');

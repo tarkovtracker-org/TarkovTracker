@@ -207,19 +207,17 @@
     const accepted = distinctItems(items?.length ? items : [item]);
     return { field: undefined, items: accepted, primary: item ?? accepted[0] };
   });
-  const itemAlternatives = computed(() => {
-    const objective = currentObjective.value;
-    const field = objective.type === 'useItem' ? 'useAny' : 'items';
-    const items = distinctItems(objective[field] ?? []);
+  const getItemAlternatives = (field: 'useAny' | 'items') => {
+    const items = distinctItems(currentObjective.value[field] ?? []);
     return items.length > 1 ? { field, items, primary: items[0] } : undefined;
-  });
+  };
   const groupedItems = computed(() => {
     if (currentObjective.value.type === 'sellItem') return sellItems.value;
     if (weaponAlternatives.value.length > 1) {
       const items = weaponAlternatives.value;
       return { field: 'usingWeapon' as const, items, primary: items[0] };
     }
-    return itemAlternatives.value;
+    return getItemAlternatives('useAny') ?? getItemAlternatives('items');
   });
   const objectiveEquipment = computed(() => {
     const objective = currentObjective.value;
