@@ -1,7 +1,7 @@
 <template>
   <DrawerLevelRail v-if="isCollapsed" />
   <section v-else class="px-3 pt-1 pb-2" :aria-label="t('navigation_drawer.profile')">
-    <div class="border-surface-800 bg-surface-850 overflow-hidden rounded-md border">
+    <div class="border-divider/60 bg-surface-850 overflow-hidden rounded-md border">
       <DrawerLevelEditor />
       <DrawerPrestigeLink
         v-if="prestige.isAvailable.value"

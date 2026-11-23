@@ -88,7 +88,7 @@ describe('DrawerGameSettings', () => {
     expect(setPMCFactionMock).toHaveBeenCalledWith('BEAR');
     wrapper.unmount();
   });
-  it('colors each selected mode with its own mode tone', () => {
+  it('gives each mode button its own selected-state tone', () => {
     const wrapper = mount(DrawerGameSettings);
     const buttons = wrapper.get('[role="group"][aria-label="Select game mode"]').findAll('button');
     expect(buttons[0]!.classes()).toContain('aria-pressed:border-pvp-500/70');

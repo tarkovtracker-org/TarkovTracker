@@ -1,7 +1,7 @@
 <template>
   <NuxtLink
     to="/prestige"
-    class="border-surface-800 text-surface-300 hover:bg-surface-800/60 hover:text-surface-50 focus-visible:outline-primary group/prestige flex items-center gap-2 border-t px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
+    class="border-divider/60 text-surface-300 hover:bg-surface-800/60 hover:text-surface-50 focus-visible:outline-primary group/prestige flex items-center gap-2 border-t px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
     :aria-label="
       t(
         'navigation_drawer.prestige_link',

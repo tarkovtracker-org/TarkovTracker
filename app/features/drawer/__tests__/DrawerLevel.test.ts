@@ -1,20 +1,24 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick, reactive } from 'vue';
 import DrawerLevel from '@/features/drawer/DrawerLevel.vue';
-const { progress, setLevel } = vi.hoisted(() => ({
-  progress: { mode: 'pvp', prestigeLevel: 0 },
-  setLevel: vi.fn(),
-}));
+// Reactive so the editor's computed level follows setLevel like the real store; the mock factory
+// reads it only when a component calls useTarkovStore.
+const progress = reactive({ level: 37, mode: 'pvp', prestigeLevel: 0 });
+const setLevel = vi.fn((level: number) => {
+  progress.level = level;
+});
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getCurrentGameMode: () => progress.mode,
     getCurrentProgressData: () => ({ prestigeLevel: progress.prestigeLevel }),
-    playerLevel: () => 37,
+    playerLevel: () => progress.level,
     setLevel,
   }),
 }));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
+    error: null,
     loading: false,
     minPlayerLevel: 1,
     maxPlayerLevel: 79,
@@ -33,9 +37,14 @@ const stubs = {
   UTooltip: { props: ['text'], template: '<div :data-tooltip="text"><slot /></div>' },
 };
 const mountLevel = (isCollapsed = false) =>
-  mountSuspended(DrawerLevel, { props: { isCollapsed }, global: { stubs } });
+  mountSuspended(DrawerLevel, {
+    attachTo: document.body,
+    props: { isCollapsed },
+    global: { stubs },
+  });
 describe('manual drawer level', () => {
   beforeEach(() => {
+    progress.level = 37;
     progress.mode = 'pvp';
     progress.prestigeLevel = 0;
     setLevel.mockClear();
@@ -57,7 +66,20 @@ describe('manual drawer level', () => {
     const wrapper = await mountLevel();
     await wrapper.get('[aria-label="Decrease level"]').trigger('click');
     await wrapper.get('[aria-label="Increase level"]').trigger('click');
-    expect(setLevel.mock.calls).toEqual([[36], [38]]);
+    expect(setLevel.mock.calls).toEqual([[36], [37]]);
+  });
+  it('returns focus to the level after Escape cancels an edit', async () => {
+    const wrapper = await mountLevel();
+    await wrapper.get('[role="button"]').trigger('click');
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+    const bubbled = vi.fn();
+    wrapper.element.parentElement?.addEventListener('keydown', bubbled);
+    wrapper.get('input').element.dispatchEvent(escape);
+    await nextTick();
+    await nextTick();
+    expect(bubbled).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(wrapper.get('[role="button"]').element);
+    expect(setLevel).not.toHaveBeenCalled();
   });
   it('links the current prestige and its emblem to prestige settings', async () => {
     progress.prestigeLevel = 2;

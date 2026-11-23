@@ -12,6 +12,7 @@ const { metadata, toastAdd } = vi.hoisted(() => ({
     minPlayerLevel: 1,
     maxPlayerLevel: 79,
     playerLevels: [] as { level: number }[],
+    prestigeLevels: [],
   },
   toastAdd: vi.fn(),
 }));
@@ -20,6 +21,7 @@ const useLevelTestStore = defineStore('playerLevelEditorTest', {
   state: (): UserState => structuredClone(defaultState),
   getters: {
     getCurrentGameMode: getters.getCurrentGameMode,
+    getCurrentProgressData: getters.getCurrentProgressData,
     playerLevel: getters.playerLevel,
   },
   actions: {

@@ -55,7 +55,7 @@ describe('DrawerItem', () => {
       const wrapper = mountSettingsDrawerItem();
       expect(wrapper.get('a').classes()).toContain('border-primary-500');
       expect(wrapper.getComponent({ name: 'DrawerItemIcon' }).props('colorClass')).toBe(
-        'text-white light:text-surface-50'
+        'text-white transition-opacity light:text-surface-50'
       );
     }
   );

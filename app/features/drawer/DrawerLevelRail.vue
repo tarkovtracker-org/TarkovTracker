@@ -1,14 +1,15 @@
 <template>
   <UTooltip :text="summary" :content="{ side: 'right' }">
     <div
-      class="mx-auto my-1 flex w-10 flex-col items-center gap-1 py-1"
+      class="focus-visible:outline-primary mx-auto my-1 flex w-10 flex-col items-center gap-1 rounded-sm py-1 focus-visible:outline-2 focus-visible:outline-offset-2"
       role="group"
+      tabindex="0"
       :aria-label="summary"
     >
       <span class="relative">
         <DrawerEmblem
           :src="badgeSrc"
-          :loading="!isReady"
+          :loading="isLoading"
           :size="32"
           fallback-icon="i-heroicons-photo"
         />
@@ -36,7 +37,7 @@
   const tarkovStore = useTarkovStore();
   const prestige = useDrawerPrestige();
   const level = computed<number>(() => tarkovStore.playerLevel());
-  const { badgeSrc, isReady } = useDrawerLevelBadge(level);
+  const { badgeSrc, isLoading } = useDrawerLevelBadge(level);
   const showPrestigeEmblem = computed<boolean>(
     () => prestige.isAvailable.value && prestige.level.value > 0
   );

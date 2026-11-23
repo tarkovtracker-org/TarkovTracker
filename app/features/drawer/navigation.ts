@@ -28,5 +28,5 @@ export const isNavigationRouteActive = (
  */
 export const getDrawerIconClass = (isActive: boolean): string =>
   isActive
-    ? 'text-white light:text-surface-50'
+    ? 'text-white transition-opacity light:text-surface-50'
     : 'text-surface-300 opacity-75 transition-opacity group-hover:text-white group-hover:opacity-100 light:group-hover:text-surface-50';
