@@ -93,7 +93,7 @@ export const poolBlockerLabel = (
 ): string =>
   poolRequirementLabel(t, blocker.taskPool, trader, blocker.compareMethod, blocker.required ?? 0);
 export const genericProgressionLabel = (t: RequirementTranslate): string =>
-  t('page.tasks.requirements.global_variable');
+  t('page.tasks.requirements.in_game_progression');
 export const poolTrackedValue = (
   counter: TaskCounterDerivation,
   context: PoolTaskContext
