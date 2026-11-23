@@ -936,13 +936,20 @@
       "traders": {
         "title": "Trader Progress",
         "view_tasks": "View tasks from {name}",
+        "view_tasks_short": "View tasks",
         "tasks": "tasks",
         "loyalty_level": "Loyalty Level",
+        "loyalty_short": "LL{level}",
         "reputation": "Reputation",
-        "reputation_input_label": "Reputation input",
-        "set_loyalty_level": "Set loyalty level {level}",
-        "rep_progress_label": "→ LL{level}",
+        "reputation_short": "{value} rep",
+        "minimum_rep_hint": "Minimum {value} rep",
+        "next_rep_requirement": "LL{level} requires {value} rep",
+        "rep_invalid": "Enter a valid reputation value.",
+        "rep_below_minimum": "Enter at least {value} rep.",
+        "rep_raised": "Reputation raised to {value} in this browser.",
+        "standing_saved": "Updated in this browser",
         "scav_karma": "Scav Karma",
+        "karma_short": "Karma {value}",
         "sort": {
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction"

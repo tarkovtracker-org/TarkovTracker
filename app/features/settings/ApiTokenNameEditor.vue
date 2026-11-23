@@ -1,6 +1,10 @@
 <template>
   <div class="flex min-w-0 items-center gap-2">
-    <UIcon name="i-mdi-key-variant" class="text-primary-400 h-5 w-5" />
+    <UIcon
+      name="i-mdi-key-variant"
+      class="text-primary-400 size-5 shrink-0"
+      :class="{ 'mt-0.5 self-start': !editing }"
+    />
     <form
       v-if="editing"
       class="flex min-w-0 flex-1 items-center gap-1.5"
@@ -43,13 +47,14 @@
       </UTooltip>
     </form>
     <template v-else>
-      <span class="text-surface-50 truncate font-medium">
+      <span class="text-surface-50 min-w-0 font-medium wrap-anywhere @min-[32rem]:truncate">
         {{ displayName }}
       </span>
       <UTooltip :text="t('page.settings.card.apitokens.edit_name')">
         <UButton
           type="button"
           icon="i-mdi-pencil-outline"
+          class="mt-1 shrink-0 self-start"
           color="neutral"
           variant="ghost"
           size="xs"
