@@ -105,11 +105,11 @@ describe('DrawerGameSettings', () => {
   });
   it('shows the active-season countdown and exact end timestamp', () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-05T13:44:00.000Z'));
+    vi.setSystemTime(new Date('2026-11-23T16:44:00.000Z'));
     currentGameMode.value = GAME_MODES.SEASONAL;
     const wrapper = mount(DrawerGameSettings);
     const countdown = wrapper.get('time');
-    expect(countdown.text()).toBe('Season 1 ends in 123d 20h 16m');
+    expect(countdown.text()).toBe('Season 1 ends in 13d 16h 16m');
     expect(countdown.attributes('datetime')).toBe(ACTIVE_SEASON.endsAt);
     wrapper.unmount();
   });

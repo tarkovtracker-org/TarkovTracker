@@ -1,6 +1,23 @@
 BEGIN;
 
-SELECT plan(15);
+SELECT plan(16);
+
+SELECT is(
+  private.active_season_ends_at(),
+  TIMESTAMPTZ '2026-12-07 09:00:00+00',
+  'the Season 1 end metadata matches the in-game boundary'
+);
+
+-- Exercise the existing sync and rollover checks after the end metadata has elapsed.
+CREATE OR REPLACE FUNCTION private.active_season_ends_at()
+RETURNS TIMESTAMPTZ
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+  SELECT now() - interval '1 hour';
+$$;
 
 CREATE TEMP TABLE seasonal_progress_fixture AS
 SELECT
@@ -88,7 +105,7 @@ SELECT lives_ok(
     (SELECT initial_modes FROM seasonal_progress_fixture),
     (SELECT active_season FROM seasonal_progress_fixture)
   )$$,
-  'an active-season all-mode sync succeeds'
+  'an active-season all-mode sync succeeds after the end timestamp'
 );
 RESET ROLE;
 
