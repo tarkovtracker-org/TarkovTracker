@@ -43,7 +43,7 @@
       role="region"
       :aria-label="t('page.hideout.map.navigation')"
       data-testid="hideout-map-canvas"
-      class="relative z-0 h-80 w-full !bg-stone-950 sm:h-112 lg:h-136"
+      class="!bg-surface-950 relative z-0 h-80 w-full sm:h-112 lg:h-136"
     />
   </div>
 </template>
@@ -189,7 +189,11 @@
     const point = compact.value ? worldPoint(...compactLabels[area]) : anchor;
     if (compact.value && leaflet.value && markers.value) {
       leaflet.value
-        .polyline([anchor, point], { color: '#a2a996', weight: 1, interactive: false })
+        .polyline([anchor, point], {
+          color: 'var(--color-surface-400)',
+          weight: 1,
+          interactive: false,
+        })
         .addTo(markers.value);
     }
     addMarker(

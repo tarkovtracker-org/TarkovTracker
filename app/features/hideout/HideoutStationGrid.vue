@@ -20,7 +20,7 @@
   </div>
 </template>
 <script setup lang="ts">
-  import HideoutCard from './HideoutCard.vue';
+  import HideoutCard from '@/features/hideout/HideoutCard.vue';
   import type { HideoutStation } from '@/types/tarkov';
   defineProps<{
     visibleStationsSlice: HideoutStation[];

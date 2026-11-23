@@ -159,12 +159,12 @@
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useAnalyticsEvents } from '@/composables/useAnalyticsEvents';
   import { useHideoutStationStatus } from '@/composables/useHideoutStationStatus';
+  import HideoutPrerequisites from '@/features/hideout/HideoutPrerequisites.vue';
+  import HideoutRequirement from '@/features/hideout/HideoutRequirement.vue';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { CARD_HIGHLIGHT_GRADIENTS } from '@/utils/cardHighlights';
   import { SPECIAL_STATIONS } from '@/utils/constants';
-  import HideoutPrerequisites from './HideoutPrerequisites.vue';
-  import HideoutRequirement from './HideoutRequirement.vue';
   import type { HideoutLevel, HideoutStation, ItemRequirement } from '@/types/tarkov';
   const props = withDefaults(
     defineProps<{
