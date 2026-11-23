@@ -187,6 +187,77 @@ describe('TaskObjective interaction boundaries', () => {
     expect(wrapper.findComponent(ObjectiveItemDisplay).exists()).toBe(false);
     expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual(useAny);
   });
+  it('keeps alternative weapon mods and wearable items in separate lists', () => {
+    const mods = [{ id: 'mod-1' }, { id: 'mod-2' }];
+    const headsets = ['headset-1', 'headset-2'].map((id) => ({
+      id,
+      properties: { propertiesType: 'ItemPropertiesHeadphone' },
+    }));
+    const weapon = { id: 'weapon' };
+    const wrapper = createWrapper({
+      type: 'shoot',
+      usingWeapon: weapon,
+      usingWeaponMods: mods.map((mod) => [mod]),
+      wearing: headsets.map((headset) => [headset]),
+    });
+    const equipment = wrapper.getComponent(ObjectiveRequiredItems);
+    expect(equipment.props()).toMatchObject({
+      equipment: [weapon],
+      acceptedEquipment: [mods, headsets],
+    });
+  });
+  it('keeps equipment that must be worn or mounted together visible', () => {
+    const mods = [{ id: 'suppressor' }, { id: 'scope' }];
+    const beanie = { id: 'beanie', properties: { propertiesType: 'ItemPropertiesHelmet' } };
+    const glasses = { id: 'glasses', properties: { propertiesType: 'ItemPropertiesGlasses' } };
+    const wrapper = createWrapper({
+      type: 'shoot',
+      usingWeaponMods: [mods],
+      wearing: [[beanie], [glasses]],
+    });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([
+      ...mods,
+      beanie,
+      glasses,
+    ]);
+  });
+  it('keeps named gear with unknown kinds inline', () => {
+    const hat = { id: 'hat', name: 'Hat' };
+    const glasses = { id: 'glasses', name: 'Glasses' };
+    const wrapper = createWrapper({ type: 'shoot', wearing: [[hat], [glasses]] });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props()).toMatchObject({
+      equipment: [hat, glasses],
+      acceptedEquipment: [],
+    });
+  });
+  it('groups the verified face covers whose lite data omits the equipment kind', () => {
+    const respirator = { id: '59e7715586f7742ee5789605' };
+    const gasMask = { id: '5b432c305acfc40019478128' };
+    const wrapper = createWrapper({ type: 'shoot', wearing: [[respirator], [gasMask]] });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props()).toMatchObject({
+      equipment: [],
+      acceptedEquipment: [[respirator, gasMask]],
+    });
+  });
+  it('shows each independent slot of an outfit as its own choice', () => {
+    const hats = [{ id: 'ushanka' }, { id: 'domont' }];
+    const rigs = [{ id: 'vest' }, { id: 'jaypc' }];
+    const wearing = hats.flatMap((hat) => rigs.map((rig) => [hat, rig]));
+    const wrapper = createWrapper({ type: 'shoot', wearing });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props()).toMatchObject({
+      equipment: [],
+      acceptedEquipment: [hats, rigs],
+    });
+  });
+  it('does not offer independent choices for restricted outfits', () => {
+    const first = [{ id: 'hat-1' }, { id: 'rig-1' }];
+    const second = [{ id: 'hat-2' }, { id: 'rig-2' }];
+    const wrapper = createWrapper({ type: 'shoot', wearing: [first, second] });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props()).toMatchObject({
+      equipment: [...first, ...second],
+      acceptedEquipment: [],
+    });
+  });
   it('keeps overlapping use-any items out of the equipment strip', () => {
     const first = { id: 'first' };
     const second = { id: 'second' };

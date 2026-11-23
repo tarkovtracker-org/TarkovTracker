@@ -17,9 +17,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-project
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          install-dependencies: 'false'
+          node-version-file: .nvmrc
       # Squash merges make the PR title the commit on main. Fix a failure by editing the title;
       # no commit rewording or force-push is needed.
       - name: Validate PR title

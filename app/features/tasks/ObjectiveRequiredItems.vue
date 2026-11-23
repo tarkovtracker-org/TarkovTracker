@@ -4,7 +4,7 @@
   >
     <UIcon :name="variantIcon" aria-hidden="true" class="text-surface-400 h-3.5 w-3.5" />
     <span
-      v-for="(item, itemIndex) in flatItems"
+      v-for="item in flatItems"
       :key="item.id"
       class="relative inline-flex items-center gap-1"
       @contextmenu="handleContextMenu($event, item)"
@@ -61,12 +61,19 @@
           />
         </a>
       </AppTooltip>
-      <span
-        v-if="isAnyOf && itemIndex < flatItems.length - 1"
-        class="text-surface-500 text-[10px] italic"
-      >
-        {{ $t('page.tasks.questcard.keys_or') }}
-      </span>
+    </span>
+    <span
+      v-for="[id, group] in itemChoices"
+      :key="id"
+      class="inline-flex max-w-full min-w-0 items-center gap-1"
+      data-objective-display
+    >
+      <ObjectiveItemDisplay
+        :primary-item="group[0]"
+        :accepted-items="group"
+        :fallback-name="group[0]!.id"
+        :paused="paused"
+      />
     </span>
     <AppTooltip :text="$t(variantDisclaimerKey)">
       <button
@@ -121,8 +128,10 @@
 </template>
 <script setup lang="ts">
   import { useWikiLink } from '@/composables/useWikiLink';
+  import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
   import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
   import { logger } from '@/utils/logger';
+  import { distinctObjectiveItems } from '@/utils/objectiveEquipment';
   import { openExternalUrl } from '@/utils/redirect';
   import {
     getKeyBackgroundClass,
@@ -139,7 +148,9 @@
     variant: 'keys' | 'equipment';
     requiredKeys?: TarkovItem[][];
     equipment?: TarkovItem[];
+    acceptedEquipment?: TarkovItem[][];
     counts?: Record<string, number>;
+    paused?: boolean;
   }>();
   const { copyToClipboard } = useCopyToClipboard();
   const contextMenu = ref<InstanceType<typeof ContextMenu>>();
@@ -165,22 +176,29 @@
   const variantDisclaimerKey = computed(() => config.value.disclaimerKey);
   const variantAriaKey = computed(() => config.value.ariaKey);
   const variantCopyKey = computed(() => config.value.copyKey);
-  const flatItems = computed(() => {
-    const source =
-      props.variant === 'keys' ? (props.requiredKeys ?? []).flat() : (props.equipment ?? []);
-    const seen = new Set<string>();
-    return source.filter((item) => {
-      if (!item?.id || seen.has(item.id)) return false;
-      seen.add(item.id);
-      return true;
-    });
-  });
-  const isAnyOf = computed(
-    () =>
-      props.variant === 'keys' &&
-      props.requiredKeys?.length === 1 &&
-      (props.requiredKeys[0]?.length ?? 0) > 1
+  const keyGroups = computed(() => (props.requiredKeys ?? []).map(distinctObjectiveItems));
+  const flatItems = computed(() =>
+    distinctObjectiveItems(
+      props.variant === 'keys'
+        ? keyGroups.value.filter((group) => group.length === 1).flat()
+        : (props.equipment ?? [])
+    )
   );
+  const itemChoices = computed(() => {
+    const groups = props.variant === 'keys' ? keyGroups.value : (props.acceptedEquipment ?? []);
+    const choices = new Map<string, TarkovItem[]>();
+    for (const group of groups) {
+      if (group.length < 2) continue;
+      choices.set(
+        group
+          .map((item) => item.id)
+          .sort()
+          .join(','),
+        group
+      );
+    }
+    return Array.from(choices);
+  });
   const getItemCount = (itemId?: string) =>
     itemId && props.counts ? (props.counts[itemId] ?? 0) : 0;
   const getPrimaryTooltip = (item: TarkovItem) =>
