@@ -210,7 +210,7 @@ export type TeamChannelController = {
   /** Leaves the channel and waits for the leave to settle. */
   cleanup: () => Promise<void>;
   /** Refreshes members, then rebuilds the channel only if its bindings changed. */
-  refresh: () => Promise<void>;
+  refresh: () => Promise<'settled' | 'read-failed'>;
   /** Permanently stops the controller: no further setup or retry can run. */
   dispose: () => Promise<void>;
 };
@@ -461,12 +461,16 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     dispatchHydration(joinedTeamId);
     return true;
   };
-  const refreshForRequest = async (requestVersion: number): Promise<void> => {
-    if (!(await refreshMembersForRequest(requestVersion))) return;
-    if (reuseCurrentBinding()) return;
-    await setup(requestVersion);
+  const refreshForRequest = async (
+    requestVersion: number
+  ): ReturnType<TeamChannelController['refresh']> => {
+    if (!(await refreshMembersForRequest(requestVersion))) {
+      return isStale(requestVersion) ? 'settled' : 'read-failed';
+    }
+    if (!reuseCurrentBinding()) await setup(requestVersion);
+    return 'settled';
   };
-  const refresh = (): Promise<void> => refreshForRequest(++version);
+  const refresh = () => refreshForRequest(++version);
   return {
     cleanup,
     dispose: () => {
@@ -497,6 +501,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let latestMembersRequestVersion = 0;
   let disposed = false;
   let authSessionVersion = 0;
+  let initialTeamRefresh: ReturnType<TeamChannelController['refresh']> | null = null;
   // Successful reads fence delayed snapshots, including reads that cancel the warning.
   let authoritativeDeadlineTeamId: string | null = null;
   let authoritativeOwnerTeamId: string | null = null;
@@ -515,6 +520,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     refreshInFlight = null;
     refreshInFlightTeamId = null;
     refreshContext = null;
+    initialTeamRefresh = null;
     lastMembersRefreshAt = 0;
   };
   listenerScope.run(() => {
@@ -722,6 +728,16 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     getTeamId: () => getTeamIdFromSystemStore(systemStore),
     refreshMembers,
   });
+  const handleInitialTeamData = (data: Record<string, unknown> | null) => {
+    handleTeamData(data, false);
+    const initialRefresh = initialTeamRefresh;
+    if (!data || !initialRefresh) return;
+    // If startup failed, the authorized team row still supplies one recovery attempt.
+    void initialRefresh.then((result) => {
+      if (result !== 'read-failed' || initialRefresh !== initialTeamRefresh) return;
+      if (data.id === getTeamIdFromSystemStore(systemStore)) return teamChannel.refresh();
+    });
+  };
   // Setup Supabase listener with custom onData handler
   // Mapping and deadline freshness belong to our handler, not the listener's generic patch.
   const listenerState = listenerScope.run(() =>
@@ -733,7 +749,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       storeId: 'team',
       onData: (data) => handleTeamData(data, true),
       // The team channel's filter watcher already starts the initial roster read.
-      onInitialData: (data) => handleTeamData(data, false),
+      onInitialData: handleInitialTeamData,
       scope: listenerScope,
     })
   );
@@ -743,7 +759,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     watch(
       teamFilter,
       () => {
-        void teamChannel.refresh();
+        initialTeamRefresh = teamChannel.refresh();
       },
       { immediate: true }
     );

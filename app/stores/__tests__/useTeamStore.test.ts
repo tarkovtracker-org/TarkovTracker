@@ -816,9 +816,14 @@ describe('Team realtime resources', () => {
       instance.cleanup();
     }
   });
-  it.each(['before', 'after'])(
-    'loads the roster once when the initial team snapshot arrives %s the roster response',
-    async (order) => {
+  it.each([
+    { order: 'before', failed: false },
+    { order: 'after', failed: false },
+    { order: 'before', failed: true },
+    { order: 'after', failed: true },
+  ])(
+    'loads the roster when the snapshot arrives $order the first response (failed: $failed)',
+    async ({ order, failed }) => {
       const { teamQuery, teamRecords } = buildRealtimeHarness();
       const { useSupabaseListener: actualListener } = await vi.importActual<
         typeof import('@/composables/supabase/useSupabaseListener')
@@ -836,9 +841,9 @@ describe('Team realtime resources', () => {
       );
       const roster = { members: ['first-member'], profiles: {} };
       let finishRoster!: () => void;
-      mockGetTeamMembers.mockReturnValueOnce(
-        new Promise((resolve) => {
-          finishRoster = () => resolve(roster);
+      mockGetTeamMembers.mockResolvedValue(roster).mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          finishRoster = failed ? () => reject({ statusCode: 503 }) : () => resolve(roster);
         })
       );
       const instance = useTeamStoreWithSupabase();
@@ -850,13 +855,15 @@ describe('Team realtime resources', () => {
           finishRoster();
         } else {
           finishRoster();
-          await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+          if (failed) await new Promise((resolve) => setTimeout(resolve, 0));
+          else await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
           finishSnapshot();
           await vi.waitFor(() => expect(instance.teamStore.joinCode).toBe('initial-code'));
         }
         await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
-        expect(mockGetTeamMembers).toHaveBeenCalledOnce();
-        expect(teamQuery.maybeSingle).toHaveBeenCalledOnce();
+        const expectedReads = failed ? 2 : 1;
+        expect(mockGetTeamMembers).toHaveBeenCalledTimes(expectedReads);
+        expect(teamQuery.maybeSingle).toHaveBeenCalledTimes(expectedReads);
         expect(instance.teamStore.members).toEqual(roster.members);
       } finally {
         instance.cleanup();
