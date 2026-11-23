@@ -17,7 +17,7 @@
         :id="getRowObjectiveIds(row)[0] ? `objective-${getRowObjectiveIds(row)[0]}` : undefined"
         :key="row.itemKey"
         :data-objective-ids="getRowObjectiveIds(row).join(',')"
-        class="flex w-full max-w-full items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors"
+        class="flex w-full max-w-full flex-wrap items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors"
         :class="[
           row.allComplete
             ? 'border-success-500/50 bg-success-500/10'
@@ -25,12 +25,14 @@
           isParentTaskLocked ? 'opacity-70' : '',
         ]"
       >
-        <ObjectiveItemDisplay
-          :primary-item="getRowPrimaryItem(row)"
-          :accepted-items="getRowAcceptedItems(row)"
-          :fallback-name="row.meta.itemName"
-          :paused="isParentTaskLocked"
-        />
+        <div class="flex min-w-0 grow basis-36 items-center gap-1.5">
+          <ObjectiveItemDisplay
+            :primary-item="getRowPrimaryItem(row)"
+            :accepted-items="getRowAcceptedItems(row)"
+            :fallback-name="row.meta.itemName"
+            :paused="isParentTaskLocked"
+          />
+        </div>
         <span
           v-if="row.meta.foundInRaid"
           class="bg-kappa-500/20 text-kappa-300 rounded px-1 py-0.5 text-[10px] font-semibold"
