@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createError, defineEventHandler, readBody } from 'h3';
 import Stripe from 'stripe';
 import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
@@ -10,7 +11,7 @@ import {
   getSupporterBillingState,
   SupporterCustomerLookupUnavailableError,
 } from '@/server/utils/supporterCustomerLookup';
-import type { SupporterBillingState } from '@/server/utils/supporterCustomerLookup';
+import type { CheckoutMode } from '@/server/utils/stripeCheckoutValidation';
 import type { H3Event } from 'h3';
 const logger = createLogger('StripeCheckout');
 export default defineEventHandler(async (event) => {
@@ -40,25 +41,7 @@ export default defineEventHandler(async (event) => {
   // Reuse the existing Stripe Customer for returning supporters so refund and
   // dispute lookups against stripe_customer_id keep matching after re-subscribe.
   // Falls back to customer_email for first-time supporters (Stripe creates one).
-  let billingState: SupporterBillingState | null;
-  try {
-    billingState = await getSupporterBillingState(event, userId, {
-      throwOnUnavailable: mode === 'subscription',
-    });
-  } catch (error) {
-    if (error instanceof SupporterCustomerLookupUnavailableError) {
-      logger.error('[Stripe Checkout] Supporter customer lookup unavailable', {
-        userId,
-        mode,
-        error,
-      });
-      throw createError({
-        statusCode: 503,
-        message: 'Unable to verify existing subscription',
-      });
-    }
-    throw error;
-  }
+  const billingState = await getCheckoutBillingState(event, userId, mode, checkoutAttemptId);
   const existingCustomerId = billingState?.stripeCustomerId;
   const customerFields: { customer?: string; customer_email?: string } = existingCustomerId
     ? { customer: existingCustomerId }
@@ -147,8 +130,36 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 502, message: 'Failed to create subscription' });
   }
 });
+async function getCheckoutBillingState(
+  event: H3Event,
+  userId: string,
+  mode: CheckoutMode,
+  checkoutAttemptId?: string
+) {
+  try {
+    return await getSupporterBillingState(event, userId, {
+      // Preserve the legacy fallback for unkeyed one-time checkout only.
+      throwOnUnavailable: mode === 'subscription' || Boolean(checkoutAttemptId),
+    });
+  } catch (error) {
+    if (!(error instanceof SupporterCustomerLookupUnavailableError)) throw error;
+    logger.error('[Stripe Checkout] Supporter customer lookup unavailable', {
+      userId,
+      mode,
+      error,
+    });
+    throw createError({
+      statusCode: 503,
+      message: 'Unable to verify Stripe billing state',
+    });
+  }
+}
 function checkoutRequestOptions(userId: string, attemptId?: string): Stripe.RequestOptions {
-  return attemptId ? { idempotencyKey: `supporter-checkout:${userId}:${attemptId}` } : {};
+  if (!attemptId) return {};
+  const digest = createHash('sha256')
+    .update(JSON.stringify([userId, attemptId]))
+    .digest('hex');
+  return { idempotencyKey: `supporter-checkout:${digest}` };
 }
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);

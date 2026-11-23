@@ -511,6 +511,55 @@ describe('useSupporter', () => {
     expect(ids[1]).toBe(ids[0]);
     expect(ids[2]).not.toBe(ids[0]);
   });
+  it('keeps a retry keyed while auth state hydrates and gives a changed selection a new key', async () => {
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+    mockFetch.mockRejectedValue(new Error('Connection lost'));
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    userState.id = '';
+    await supporter.createCheckout({ mode: 'payment', amount: 5 });
+    userState.id = 'user-1';
+    await supporter.createCheckout({ mode: 'payment', amount: 5 });
+    await supporter.createCheckout({ mode: 'payment', amount: 10 });
+    const [first, retry, changed] = mockFetch.mock.calls.map(
+      ([, options]) => options.body.checkoutAttemptId
+    );
+    expect(first).toEqual(expect.any(String));
+    expect(retry).toBe(first);
+    expect(changed).not.toBe(first);
+  });
+  it('releases checkout on auth reset and ignores the previous request finishing', async () => {
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+    const stale = createDeferred<{ url: string }>();
+    const current = createDeferred<{ url: string }>();
+    mockFetch.mockReturnValueOnce(stale.promise).mockReturnValueOnce(current.promise);
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const params = { mode: 'payment', amount: 5 } as const;
+    const first = supporter.createCheckout(params);
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const firstSignal = mockFetch.mock.calls[0]?.[1].signal;
+    supporter.reset();
+    const unlocked = !supporter.checkoutPending.value;
+    userState.id = 'user-2';
+    const second = supporter.createCheckout(params);
+    stale.resolve({ url: 'https://checkout.test/old' });
+    const oldUrl = await first;
+    const currentPending = supporter.checkoutPending.value;
+    current.resolve({ url: 'https://checkout.test/new' });
+    expect(unlocked).toBe(true);
+    expect(firstSignal.aborted).toBe(true);
+    expect(oldUrl).toBeNull();
+    expect(currentPending).toBe(true);
+    await expect(second).resolves.toBe('https://checkout.test/new');
+    expect(supporter.checkoutPending.value).toBe(false);
+  });
   it('refreshes auth before creating a checkout session when no cached token exists', async () => {
     mockFetch.mockResolvedValue({ url: 'https://checkout.test' });
     mockSupabase.client.auth.getSession.mockResolvedValue({
@@ -530,6 +579,7 @@ describe('useSupporter', () => {
       body: { mode: 'payment', checkoutAttemptId: expect.any(String) },
       headers: { Authorization: 'Bearer refreshed-token' },
       method: 'POST',
+      signal: expect.any(AbortSignal),
     });
   });
   afterEach(() => {

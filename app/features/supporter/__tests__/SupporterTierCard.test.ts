@@ -7,6 +7,7 @@ import { logger } from '@/utils/logger';
 import type { SupporterTier } from '@/features/supporter/supporterTypes';
 const activeTier = ref<'supporter' | 'scav' | 'timmy' | 'chad' | null>('scav');
 const composableError = ref<string | null>(null);
+const checkoutPending = ref(false);
 const isActiveSubscriber = ref(true);
 const isSubscribed = ref(true);
 const billingSubscription = ref({ tier: 'scav' });
@@ -16,7 +17,7 @@ vi.mock('@/composables/useSupporter', () => ({
   useSupporter: () => ({
     activeTier,
     createCheckout: mockCreateCheckout,
-    checkoutPending: ref(false),
+    checkoutPending,
     error: composableError,
     isActiveSubscriber,
     isSubscribed,
@@ -64,6 +65,7 @@ describe('SupporterTierCard', () => {
   beforeEach(() => {
     activeTier.value = 'scav';
     composableError.value = null;
+    checkoutPending.value = false;
     isActiveSubscriber.value = true;
     isSubscribed.value = true;
     billingSubscription.value = { tier: 'scav' };
@@ -98,6 +100,18 @@ describe('SupporterTierCard', () => {
     expect(logger.error).not.toHaveBeenCalled();
     const button = wrapper.get('button');
     expect(button.text()).toBe('page.supporter.tier_cta');
+    expect(button.attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
+  it('disables subscription checkout while another checkout is pending', async () => {
+    isSubscribed.value = false;
+    checkoutPending.value = true;
+    const wrapper = await mountCard();
+    await flushPromises();
+    const button = wrapper.get('button');
+    expect(button.attributes('disabled')).toBeDefined();
+    checkoutPending.value = false;
+    await flushPromises();
     expect(button.attributes('disabled')).toBeUndefined();
     wrapper.unmount();
   });

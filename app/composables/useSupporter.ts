@@ -31,7 +31,8 @@ export interface SupporterStatus {
 const supporterState = ref<SupporterStatus | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
-const checkoutPending = ref(false);
+const checkoutRequest = shallowRef<AbortController | null>(null);
+const checkoutPending = computed(() => checkoutRequest.value !== null);
 const CHECKOUT_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
 let checkoutAttempt: { scope: string; id: string; expiresAt: number } | null = null;
 function getCheckoutAttemptId(scope: string) {
@@ -42,6 +43,14 @@ function getCheckoutAttemptId(scope: string) {
   const id = crypto.randomUUID();
   checkoutAttempt = { scope, id, expiresAt: now + CHECKOUT_RETRY_WINDOW_MS };
   return id;
+}
+function finishCheckout(url: string | null, signal: AbortSignal) {
+  if (signal.aborted) return null;
+  if (url) checkoutAttempt = null;
+  return url;
+}
+function reportSupporterRequestError(message: string, signal?: AbortSignal) {
+  if (!signal?.aborted) error.value = message;
 }
 let channel: OwnedRealtimeChannel | null = null;
 const channelRelease = createChannelReleaseLatch();
@@ -245,6 +254,8 @@ export function useSupporter() {
     supporterState.value = null;
     error.value = null;
     loading.value = false;
+    checkoutRequest.value?.abort();
+    checkoutRequest.value = null;
     checkoutAttempt = null;
   }
   async function createCheckout(params: {
@@ -253,19 +264,20 @@ export function useSupporter() {
     interval?: string;
     amount?: number;
   }): Promise<string | null> {
-    if (checkoutPending.value) return null;
-    checkoutPending.value = true;
+    if (checkoutRequest.value) return null;
+    const request = new AbortController();
+    checkoutRequest.value = request;
     try {
       const { mode, tier, interval, amount } = params;
-      const scope = JSON.stringify([$supabase?.user?.id, mode, tier, interval, amount]);
-      const result = await postWithAuth<{ url: string }>('/api/stripe/checkout', {
-        ...params,
-        checkoutAttemptId: getCheckoutAttemptId(scope),
-      });
-      if (result?.url) checkoutAttempt = null;
-      return result?.url ?? null;
+      const scope = JSON.stringify([mode, tier, interval, amount]);
+      const result = await postWithAuth<{ url: string }>(
+        '/api/stripe/checkout',
+        { ...params, checkoutAttemptId: getCheckoutAttemptId(scope) },
+        request.signal
+      );
+      return finishCheckout(result?.url ?? null, request.signal);
     } finally {
-      checkoutPending.value = false;
+      if (checkoutRequest.value === request) checkoutRequest.value = null;
     }
   }
   async function openBillingPortal(returnUrl?: string): Promise<string | null> {
@@ -273,9 +285,13 @@ export function useSupporter() {
       (r) => r?.url ?? null
     );
   }
-  async function postWithAuth<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
+  async function postWithAuth<T>(
+    path: string,
+    body: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<T | null> {
     if (!$supabase) {
-      error.value = 'Supabase client not available';
+      reportSupporterRequestError('Supabase client not available', signal);
       return null;
     }
     try {
@@ -293,18 +309,19 @@ export function useSupporter() {
       }
       if (!token) {
         const message = 'You must be signed in to support TarkovTracker.';
-        error.value = message;
+        reportSupporterRequestError(message, signal);
         return null;
       }
       const result = await $fetch(path, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body,
+        signal,
       });
       return result as T;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Request failed';
-      error.value = message;
+      reportSupporterRequestError(message, signal);
       logger.error('Supporter request failed', { path, error: e });
       return null;
     }
@@ -324,7 +341,7 @@ export function useSupporter() {
     subscribe,
     unsubscribe,
     reset,
-    checkoutPending: readonly(checkoutPending),
+    checkoutPending,
     createCheckout,
     openBillingPortal,
   };
