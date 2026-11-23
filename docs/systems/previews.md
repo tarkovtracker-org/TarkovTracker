@@ -289,8 +289,8 @@ Current gates consume `CI Result` and `Preview Result` on the validated head for
 standalone branch candidates. Both come from GitHub
 Actions (app id 15368), and waiting automation re-reads them from the API rather than trusting
 `target_url` or a payload snapshot. The app id does not authenticate a workflow definition: a
-same-repository PR can edit its `pull_request` workflow and request `statuses: write`. The opt-in
-shadow below never publishes a merge result; a separate trusted publisher boundary is required
+same-repository PR can edit its `pull_request` workflow and request `statuses: write`. A separate
+trusted publisher boundary is required
 before moving the ordinary preview build out of CI. When an aggregate accepts a job during a
 documented compatibility window, the window
 applies only to that job's absence; a reported non-success outcome still fails the aggregate, and
