@@ -89,7 +89,7 @@ for (const lang of languages) {
   stage(`strings/${lang}`, { strings });
 }
 export const tarkovHeadScopes = Object.keys(manifest.entries);
-export const tarkovHeadOutbound = { reads: 0 };
+export const tarkovHeadOutbound = { reads: 0, redirectSeasonPreview: false };
 function currentManifest() {
   if (!manifest.completedAt) manifest.completedAt = Date.now();
   return manifest;
@@ -129,15 +129,20 @@ const previewPerk = (id, points) => ({
 });
 const previewCommon = [previewPerk('global', null)];
 const previewPersonal = [previewPerk('perk', -2), previewPerk('drawback', 2)];
-function seasonPreviewResponse(url, { headers, redirect }) {
+function seasonPreviewResponse(url, options) {
   const pinned =
     'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/a749270dcad82b26334ccf6feb15b8f4a66ff145/src/previews/untar-control.json';
-  if (url.href !== pinned) throw new Error('Unexpected season preview artifact');
+  const request = new Request(url.href, options);
   if (
-    new Headers(headers).get('Authorization') !== 'Bearer compiled-season-fixture-token' ||
-    redirect !== 'error'
+    ![
+      request.url === pinned,
+      request.headers.get('Authorization') === 'Bearer compiled-season-fixture-token',
+      request.redirect === 'manual',
+    ].every(Boolean)
   )
     throw new Error('Season preview must use scoped authorization and reject redirects');
+  if (tarkovHeadOutbound.redirectSeasonPreview)
+    return Response.redirect('https://example.invalid/redirected-catalog', 302);
   return Response.json({
     provisional: true,
     source: 'https://t.me/escapefromtarkovEN/7003',

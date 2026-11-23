@@ -14,7 +14,8 @@ async function fetchPreview(): Promise<SeasonPreview> {
   const auth = overlayAuthHeaders(PREVIEW_URL);
   if (!auth.Authorization) throw new Error('Overlay read token unavailable');
   const response = await fetch(PREVIEW_URL, {
-    redirect: 'error',
+    // Workers requires manual mode to return redirects without following them.
+    redirect: 'manual',
     signal: AbortSignal.timeout(5000),
     headers: {
       Accept: 'application/json',
@@ -22,7 +23,10 @@ async function fetchPreview(): Promise<SeasonPreview> {
       ...auth,
     },
   });
-  if (!response.ok) throw new Error(`Season preview upstream returned ${response.status}`);
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error(`Season preview upstream returned ${response.status}`);
+  }
   const preview = parseSeasonPreview(await response.json().catch(() => null));
   if (!preview) throw new Error('Invalid season preview catalog');
   return preview;

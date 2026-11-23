@@ -140,7 +140,7 @@ describe('season preview route', () => {
       upstream,
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
-        redirect: 'error',
+        redirect: 'manual',
       })
     );
     pending.resolve(Response.json(fixture()));
@@ -152,6 +152,26 @@ describe('season preview route', () => {
     fetchMock.mockRejectedValue(new Error('network unavailable'));
     expect((await handle(new Request(url))).status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('rejects an upstream redirect without reading its body or following its location', async () => {
+    const target = 'https://example.invalid/redirected-catalog';
+    const redirect = Response.json(fixture(), { status: 302, headers: { Location: target } });
+    const readBody = vi.spyOn(redirect, 'json');
+    const fetchMock = vi.fn().mockResolvedValueOnce(redirect);
+    vi.stubGlobal('fetch', fetchMock);
+    const handle = await webHandler();
+    const response = await handle(new Request(url));
+    expect(response.status).toBe(503);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.has('Location')).toBe(false);
+    expect(readBody).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(
+      upstream,
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+        redirect: 'manual',
+      })
+    );
   });
   it('fails closed without credentials and never exposes the server token', async () => {
     vi.stubEnv('OVERLAY_TOKEN', '');

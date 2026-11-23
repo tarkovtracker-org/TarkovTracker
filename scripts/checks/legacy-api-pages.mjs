@@ -397,6 +397,15 @@ test('compiled warm catalog GET and HEAD retain last-good bytes during a KV outa
     assert.equal(await stale.text(), method === 'HEAD' ? '' : body);
   }
 });
+test('compiled season preview rejects a redirect without fetching its location', async () => {
+  const url = `https://tarkovtracker.org/api/tarkov/${seasonPreviewRoute}`;
+  const response = await harness.fetch(url, { headers: { 'X-Test-Season-Preview-Redirect': '1' } });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal(response.headers.has('Location'), false);
+  assert.equal(response.headers.get('X-Test-Upstream-Reads'), '1');
+  assert.deepEqual(outbound, []);
+});
 for (const route of tarkovRoutes) {
   test(`compiled ${route} HEAD preserves GET metadata without a body`, async () => {
     for (const suffix of ['', '/?gameMode=pve&lang=en']) {
