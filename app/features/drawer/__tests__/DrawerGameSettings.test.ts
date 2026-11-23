@@ -88,6 +88,14 @@ describe('DrawerGameSettings', () => {
     expect(setPMCFactionMock).toHaveBeenCalledWith('BEAR');
     wrapper.unmount();
   });
+  it('colors each selected mode with its own mode tone', () => {
+    const wrapper = mount(DrawerGameSettings);
+    const buttons = wrapper.get('[role="group"][aria-label="Select game mode"]').findAll('button');
+    expect(buttons[0]!.classes()).toContain('aria-pressed:border-pvp-500/70');
+    expect(buttons[1]!.classes()).toContain('aria-pressed:border-pve-500/70');
+    expect(buttons[2]!.classes()).toContain('aria-pressed:border-warning-500/70');
+    wrapper.unmount();
+  });
   it('marks PvP selected for an unrecognized saved mode', () => {
     currentGameMode.value = 'unknown' as GameMode;
     const wrapper = mount(DrawerGameSettings);

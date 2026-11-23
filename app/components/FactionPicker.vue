@@ -8,7 +8,7 @@
     <CompactChoiceButton
       v-for="faction in factions"
       :key="faction"
-      class="flex min-h-8 items-center justify-center gap-1.5 px-2 py-1.5 leading-none uppercase"
+      class="flex min-h-9 items-center justify-center gap-1.5 px-2 py-1.5 leading-none uppercase"
       :disabled="disabled"
       :aria-pressed="selectedFaction === faction"
       @click="selectedFaction = faction"

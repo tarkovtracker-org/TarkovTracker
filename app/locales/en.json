@@ -2220,7 +2220,10 @@
     "level_display_editable": "Level {level}, click or press Enter to edit",
     "increment_level": "Increase level",
     "decrement_level": "Decrease level",
-    "level_input": "Current level, {min} to {max}"
+    "level_input": "Current level, {min} to {max}",
+    "level_summary": "Level {level}",
+    "level_prestige_summary": "Level {level} · {prestige}",
+    "prestige_link": "{prestige}, open prestige settings"
   },
   "profile": {
     "season_short": "S{season}"
