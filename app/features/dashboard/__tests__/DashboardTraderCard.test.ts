@@ -9,6 +9,7 @@ import type { Trader, TraderLoyaltyLevel } from '@/types/tarkov';
 const mockState = reactive({
   traderLevel: 1,
   reputation: 0,
+  locale: 'en',
 });
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
 const setTraderLevel = vi.fn((_id: string, value: number) => {
@@ -22,7 +23,10 @@ mockNuxtImport('useRouter', () => () => ({
 }));
 mockNuxtImport('useI18n', () => () => ({
   t: (key: string, params?: Record<string, string | number>) =>
-    [key, ...Object.values(params ?? {})].join(' '),
+    [
+      mockState.locale === 'en' ? key : `${mockState.locale} ${key}`,
+      ...Object.values(params ?? {}),
+    ].join(' '),
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
@@ -53,6 +57,7 @@ describe('DashboardTraderCard', () => {
   beforeEach(() => {
     mockState.traderLevel = 1;
     mockState.reputation = 0;
+    mockState.locale = 'en';
     mockTheme.themeMode = 'dark';
     document.documentElement.removeAttribute('data-theme');
     vi.clearAllMocks();
@@ -278,5 +283,21 @@ describe('DashboardTraderCard', () => {
     await rep.trigger('blur');
     expect(setTraderReputation).not.toHaveBeenCalled();
     expect(rep.element.value).toBe('0.50');
+  });
+  it('retranslates the current update feedback when the locale changes', async () => {
+    const editor = createEditor();
+    const status = editor.get('[role="status"]');
+    await editor.get('select').setValue('2');
+    expect(status.text()).toBe('page.dashboard.traders.rep_raised 0.20');
+    mockState.locale = 'de';
+    await editor.vm.$nextTick();
+    expect(status.text()).toBe('de page.dashboard.traders.rep_raised 0.20');
+    const rep = editor.get('input');
+    await rep.setValue('0.50');
+    await rep.trigger('blur');
+    expect(status.text()).toBe('de page.dashboard.traders.standing_saved');
+    mockState.locale = 'en';
+    await editor.vm.$nextTick();
+    expect(status.text()).toBe('page.dashboard.traders.standing_saved');
   });
 });

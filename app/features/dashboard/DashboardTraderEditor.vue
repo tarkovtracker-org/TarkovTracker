@@ -105,14 +105,21 @@
   const draft = ref(reputation.value.toFixed(2));
   const draftBase = ref<number | null>(null);
   const error = ref<'invalid' | 'minimum' | null>(null);
-  const saved = ref('');
+  const updateFeedback = ref<{ kind: 'updated' } | { kind: 'raised'; value: string } | null>(null);
   const minimumAllowed = computed(() => minimum.value || -10);
   function validationMessage(issue: 'invalid' | 'minimum') {
     return issue === 'invalid'
       ? t('page.dashboard.traders.rep_invalid')
       : t('page.dashboard.traders.rep_below_minimum', { value: minimum.value.toFixed(2) });
   }
-  const feedback = computed(() => (error.value ? validationMessage(error.value) : saved.value));
+  const feedback = computed(() => {
+    if (error.value) return validationMessage(error.value);
+    const update = updateFeedback.value;
+    if (!update) return '';
+    return update.kind === 'raised'
+      ? t('page.dashboard.traders.rep_raised', { value: update.value })
+      : t('page.dashboard.traders.standing_saved');
+  });
   watch(reputation, (value) => {
     const formatted = value.toFixed(2);
     if (draftBase.value !== null || draft.value === formatted) return;
@@ -121,7 +128,7 @@
   });
   function clearFeedback() {
     error.value = null;
-    saved.value = '';
+    updateFeedback.value = null;
   }
   function onReputationInput() {
     draftBase.value ??= reputation.value;
@@ -140,9 +147,9 @@
     tarkovStore.setTraderLevel(props.trader.id, next);
     draftBase.value = null;
     draft.value = reputation.value.toFixed(2);
-    saved.value = raised
-      ? t('page.dashboard.traders.rep_raised', { value: required.toFixed(2) })
-      : t('page.dashboard.traders.standing_saved');
+    updateFeedback.value = raised
+      ? { kind: 'raised', value: required.toFixed(2) }
+      : { kind: 'updated' };
   }
   function parseReputation(text: string): number | null {
     const normalized = text.trim().replace(',', '.');
@@ -173,6 +180,6 @@
     }
     tarkovStore.setTraderReputation(props.trader.id, value);
     draft.value = value.toFixed(2);
-    saved.value = t('page.dashboard.traders.standing_saved');
+    updateFeedback.value = { kind: 'updated' };
   }
 </script>
