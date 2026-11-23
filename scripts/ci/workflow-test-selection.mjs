@@ -28,9 +28,9 @@ const nonEmpty = (paths) => (Array.isArray(paths) && paths.length > 0 ? paths : 
 function planPaths(plan) {
   return isValidPlan(plan) && plan.full ? nonEmpty(plan.paths) : null;
 }
+const isAppPath = (path) => typeof path === 'string' && appPath.test(path);
 function appOnly(path) {
-  if (typeof path !== 'string' || !appPath.test(path)) return false;
-  return !path.startsWith('app/locales/') && !toolingAppPaths.has(path);
+  return isAppPath(path) && !path.startsWith('app/locales/') && !toolingAppPaths.has(path);
 }
 function reducedTests(paths) {
   if (paths.every(appOnly)) return selectionTests;
