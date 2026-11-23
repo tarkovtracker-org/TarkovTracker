@@ -123,7 +123,7 @@
         :variant="tier.featured ? 'solid' : 'soft'"
         size="lg"
         :loading="(isSubscribed ? manageLoading : checkoutLoading) || !authResolved"
-        :disabled="!authResolved"
+        :disabled="checkoutActionDisabled"
         @click="isSubscribed ? handleManage() : handleCheckout()"
       >
         {{
@@ -162,6 +162,7 @@
     isSubscribed,
     openBillingPortal,
     createCheckout,
+    checkoutPending,
     error: composableError,
   } = useSupporter();
   const checkoutLoading = ref(false);
@@ -169,6 +170,9 @@
   const manageLoading = ref(false);
   const currentUserId = ref<string | null>(null);
   const authResolved = ref(false);
+  const checkoutActionDisabled = computed(
+    () => !authResolved.value || (!isSubscribed.value && checkoutPending.value)
+  );
   const loginLink = '/login?redirect=/supporter';
   const isCurrentTier = computed(
     () => isSubscribed.value && billingSubscription.value?.tier === props.tier.id
