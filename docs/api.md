@@ -25,6 +25,9 @@ Players can claim or change a handle in **Settings → Account → Profile Shari
 The first change is available immediately. Further changes have a 30-day cooldown.
 A rename immediately frees the old handle for others to claim. Old handle links stop
 resolving to the previous owner and may later resolve to a new owner.
+Players can also opt in to a supporter badge from **Profile Sharing**. Eligible shared profiles
+expose only the badge label as `supporterBadge` (`supporter` or `active_subscriber`).
+The badge respects each mode's sharing visibility and is hidden in Streamer Mode.
 The short `/@<handle>` link chooses public PvP, then public PvE, then the public
 active Seasonal profile. Use `/@<handle>/<mode>` to link to a specific mode.
 Existing `/profile/<uuid>/<mode>` links keep their current access rules. Claims

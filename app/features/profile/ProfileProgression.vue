@@ -22,6 +22,7 @@
                 <UBadge variant="soft" size="sm" :class="modeTheme.modeBadgeClass">
                   {{ modeLabel }}
                 </UBadge>
+                <ProfileSupporterBadge :badge="profileSupporterBadge" />
                 <UBadge v-if="isViewingSharedProfile" color="info" variant="soft" size="sm">
                   {{ t('page.profile.shared_view', 'Shared View') }}
                 </UBadge>
@@ -233,6 +234,7 @@
     getCountedTasks,
   } from '@/features/profile/profileStats';
   import ProfileStorylineTab from '@/features/profile/ProfileStorylineTab.vue';
+  import ProfileSupporterBadge from '@/features/profile/ProfileSupporterBadge.vue';
   import ProfileTasksTab from '@/features/profile/ProfileTasksTab.vue';
   import { buildTaskEvaluations } from '@/stores/taskAvailability';
   import { useMetadataStore } from '@/stores/useMetadata';
@@ -245,6 +247,11 @@
   import { logger } from '@/utils/logger';
   import { buildPrestigeTaskMap } from '@/utils/prestige';
   import { isProfileHandle, profileHandlePath } from '@/utils/profileHandle';
+  import {
+    getOwnProfileSupporterBadge,
+    normalizeProfileSupporterBadge,
+    type ProfileSupporterBadge as SupporterBadge,
+  } from '@/utils/profileSupporterBadge';
   import {
     createProfileVisibility,
     fetchProfileVisibilityRows,
@@ -291,6 +298,7 @@
     gameEdition: number | null;
     mode: GameMode;
     profilePublic?: boolean;
+    supporterBadge?: unknown;
     visibility: 'owner' | 'public';
   }
   interface StatCard {
@@ -404,6 +412,7 @@
   const tarkovStore = useTarkovStore();
   const { copyToClipboard } = useCopyToClipboard();
   const { $supabase } = useNuxtApp();
+  const { supporter, isActiveSubscriber, loadedUserId: loadedSupporterUserId } = useSupporter();
   const formatNumber = useLocaleNumberFormatter();
   const routeSharedUserId = computed(() => normalizeUserId(route.params.userId));
   const querySharedUserId = computed(() => normalizeUserId(route.query.user));
@@ -540,6 +549,7 @@
   const sharedProfileError = ref<string | null>(null);
   const sharedProfileEdition = ref<number | null>(null);
   const sharedProfileData = ref<UserProgressData | null>(null);
+  const sharedSupporterBadge = ref<SupporterBadge | null>(null);
   let sharedProfileRequestId = 0;
   const getAuthHeader = async (profileId: string): Promise<string | null> => {
     if (profileId.startsWith('@')) return null;
@@ -574,6 +584,7 @@
     sharedProfilePublic.value = false;
     sharedProfileError.value = null;
     sharedProfileData.value = null;
+    sharedSupporterBadge.value = null;
     sharedProfileEdition.value = null;
     try {
       const authHeader = await getAuthHeader(userId);
@@ -584,6 +595,7 @@
         return;
       }
       sharedProfileData.value = normalizeSharedProgressData(response.data, DEFAULT_PROGRESS_DATA);
+      sharedSupporterBadge.value = normalizeProfileSupporterBadge(response.supporterBadge);
       sharedProfilePublic.value =
         response.visibility === 'public' || response.profilePublic === true;
       if (mode === 'default') selectedMode.value = response.mode;
@@ -622,6 +634,7 @@
         sharedProfilePublic.value = false;
         sharedProfileError.value = null;
         sharedProfileData.value = null;
+        sharedSupporterBadge.value = null;
         sharedProfileEdition.value = null;
         return;
       }
@@ -630,6 +643,16 @@
     { immediate: true }
   );
   const isViewingSharedProfile = computed(() => Boolean(sharedUserId.value));
+  const profileSupporterBadge = computed(() => {
+    if (isViewingSharedProfile.value) return sharedSupporterBadge.value;
+    if (
+      preferencesStore.getStreamerMode ||
+      loadedSupporterUserId.value !== $supabase.user.id ||
+      !$supabase.user.loggedIn
+    )
+      return null;
+    return getOwnProfileSupporterBadge(supporter.value, isActiveSubscriber.value);
+  });
   const canRenderProfileContent = computed(() => {
     if (!isViewingSharedProfile.value) {
       return true;
