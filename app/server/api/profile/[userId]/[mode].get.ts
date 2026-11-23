@@ -30,7 +30,10 @@ import {
   resolveDefaultSharedMode,
   resolveSharedProfileHandle,
 } from '@/server/utils/sharedProfileHandle';
-import { withSharedProfileSupporterBadge } from '@/server/utils/sharedProfileSupporterBadge';
+import {
+  loadSharedProfileSupporterBadge,
+  withSharedProfileSupporterBadge,
+} from '@/server/utils/sharedProfileSupporterBadge';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { isProfileHandle } from '@/utils/profileHandle';
@@ -800,12 +803,14 @@ export default defineEventHandler(async (event) => {
   const userId = handle ? await resolveSharedProfileHandle(restFetch, handle) : identifier;
   const mode = requestedMode ?? (await resolveDefaultSharedMode(restFetch, userId));
   const seasonNumber = await resolveGameModeSeason(mode, { supabaseUrl, supabaseServiceKey });
-  const attachSupporterBadge = <T extends object>(payload: T) =>
-    withSharedProfileSupporterBadge(payload, restFetch, userId, mode, seasonNumber);
+  const loadSupporterBadge = () =>
+    supabaseServiceKey
+      ? loadSharedProfileSupporterBadge(restFetch, userId, mode, seasonNumber)
+      : null;
   const sharedProfileCacheKey = `${userId}:${mode}:${seasonNumber}:${requesterKey}`;
   if (!isTestEnvironment && !handle) {
     const cached = await getCachedProfile(sharedCacheHandle, sharedProfileCacheKey);
-    if (cached) return attachSupporterBadge(cached);
+    if (cached) return withSharedProfileSupporterBadge(cached, await loadSupporterBadge());
   }
   const { progressRow, modeProgressRow, preferencesRow, preferencesAvailable } =
     await fetchProfileResources({
@@ -823,12 +828,19 @@ export default defineEventHandler(async (event) => {
     isOwner,
     isHandle: Boolean(handle),
   });
+  const [data, badge] = await Promise.all([
+    enrichStoryProgress(sanitizedData, mode).then((progress) =>
+      enrichProgressTaskFailures(progress, mode)
+    ),
+    loadSupporterBadge(),
+  ]);
   const publicData = {
-    data: await enrichProgressTaskFailures(await enrichStoryProgress(sanitizedData, mode), mode),
+    data,
     gameEdition: typeof progressRow.game_edition === 'number' ? progressRow.game_edition : 1,
     mode,
   };
-  if (handle) return attachSupporterBadge({ ...publicData, visibility: 'public' as const });
+  if (handle)
+    return withSharedProfileSupporterBadge({ ...publicData, visibility: 'public' as const }, badge);
   const payload: SharedProfilePayload = {
     ...publicData,
     ...(isOwner ? { profilePublic: modeProgressRow?.profile_public === true } : {}),
@@ -843,5 +855,5 @@ export default defineEventHandler(async (event) => {
       sharedProfileCacheTtlMs
     );
   }
-  return attachSupporterBadge(payload);
+  return withSharedProfileSupporterBadge(payload, badge);
 });

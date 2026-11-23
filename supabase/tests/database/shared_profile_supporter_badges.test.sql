@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(14);
+SELECT plan(15);
 
 INSERT INTO auth.users (id, email) VALUES
   ('00000000-0000-4000-8000-000000000661', 'badge-owner@example.invalid'),
@@ -34,6 +34,12 @@ SELECT is((SELECT count(*) FROM updated), 0::bigint, 'only the owner can opt in'
 SET LOCAL request.jwt.claim.sub = '00000000-0000-4000-8000-000000000661';
 SELECT lives_ok($$UPDATE public.user_preferences SET show_supporter_badge = true
   WHERE user_id = auth.uid()$$, 'the owner can enable the badge');
+INSERT INTO public.user_preferences (user_id, streamer_mode)
+VALUES (auth.uid(), false)
+ON CONFLICT (user_id) DO UPDATE SET
+  user_id = excluded.user_id, streamer_mode = excluded.streamer_mode;
+SELECT is((SELECT show_supporter_badge FROM public.user_preferences WHERE user_id = auth.uid()),
+  true, 'a preference sync upsert leaves the opted-in badge unchanged');
 RESET ROLE;
 SET LOCAL ROLE service_role;
 SELECT is((SELECT badge FROM public.shared_profile_supporter_badges WHERE game_mode = 'pvp'),

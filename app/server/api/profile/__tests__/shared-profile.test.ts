@@ -142,6 +142,7 @@ describe('Shared Profile API', () => {
     );
   });
   it('keeps shared profiles available before the badge migration is deployed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     mockFetch
       .mockResolvedValueOnce(progressResponse())
       .mockResolvedValueOnce(modeProgressResponse({ displayName: 'Rat One', level: 18 }))
@@ -151,6 +152,11 @@ describe('Shared Profile API', () => {
     const result = await handler(mockEvent as H3Event);
     expect(result).toMatchObject({ visibility: 'public' });
     expect(result).not.toHaveProperty('supporterBadge');
+    expect(warn).toHaveBeenCalledWith(
+      '[SharedProfileSupporterBadge]',
+      'Supporter badge lookup returned an unsuccessful response',
+      { status: 404 }
+    );
   });
   it('opens the public PvE mode from a short link without returning the account ID', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) =>
@@ -627,6 +633,7 @@ describe('Shared Profile API', () => {
         })
       )
       .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -657,7 +664,7 @@ describe('Shared Profile API', () => {
       );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
-    expect(mockFetch.mock.calls[3]?.[0]).toBe('https://json.tarkov.dev/pve/tasks');
+    expect(mockFetch.mock.calls.map(([url]) => url)).toContain('https://json.tarkov.dev/pve/tasks');
     expect(result.mode).toBe('pve');
     expect(result.data?.taskCompletions).toMatchObject({
       '597a0f5686f774273b74f676': { complete: true, failed: true },
@@ -675,6 +682,7 @@ describe('Shared Profile API', () => {
         })
       )
       .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ data: { tasks: {} } }), {
           headers: { 'Content-Type': 'application/json' },
@@ -683,7 +691,9 @@ describe('Shared Profile API', () => {
       );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     await handler(mockEvent as H3Event);
-    expect(mockFetch.mock.calls[3]?.[0]).toBe('https://json-mirror.example/regular/tasks');
+    expect(mockFetch.mock.calls.map(([url]) => url)).toContain(
+      'https://json-mirror.example/regular/tasks'
+    );
   });
   it('removes non-progress fields from shared profile payload', async () => {
     mockFetch

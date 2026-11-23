@@ -42,9 +42,11 @@
   const saveFailed = ref(false);
   const retry = ref(0);
   const disabled = computed(() => loading.value || saving.value || readFailed.value);
+  let saveVersion = 0;
   watch(
     [userId, retry],
     async ([id], _previous, onCleanup) => {
+      saveVersion += 1;
       let current = true;
       onCleanup(() => {
         current = false;
@@ -70,11 +72,12 @@
         if (current) loading.value = false;
       }
     },
-    { immediate: true }
+    { immediate: true, flush: 'sync' }
   );
   const save = async (value: boolean) => {
     const id = userId.value;
     if (!id || disabled.value) return;
+    const version = ++saveVersion;
     saving.value = true;
     saveFailed.value = false;
     try {
@@ -84,13 +87,13 @@
           { user_id: id, show_supporter_badge: value },
           { onConflict: 'user_id', defaultToNull: false }
         );
-      if (userId.value !== id) return;
+      if (version !== saveVersion) return;
       saveFailed.value = Boolean(error);
       if (!error) enabled.value = value;
     } catch {
-      if (userId.value === id) saveFailed.value = true;
+      if (version === saveVersion) saveFailed.value = true;
     } finally {
-      if (userId.value === id) saving.value = false;
+      if (version === saveVersion) saving.value = false;
     }
   };
 </script>
