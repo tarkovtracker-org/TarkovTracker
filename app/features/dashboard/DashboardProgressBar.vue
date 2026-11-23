@@ -1,6 +1,6 @@
 <template>
-  <div class="bg-surface-700/70 relative overflow-hidden rounded-full" :class="sizeClass">
-    <div
+  <span class="bg-surface-700/70 relative block overflow-hidden rounded-full" :class="sizeClass">
+    <span
       class="absolute inset-y-0 left-0 rounded-full transition-[width,background-color] duration-300 ease-out"
       :class="fillClass"
       :style="fillStyle"
@@ -9,8 +9,8 @@
       :aria-valuenow="percentage"
       aria-valuemin="0"
       aria-valuemax="100"
-    ></div>
-  </div>
+    ></span>
+  </span>
 </template>
 <script setup lang="ts">
   import { useTheme } from '@/composables/useTheme';

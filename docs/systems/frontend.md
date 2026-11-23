@@ -298,6 +298,15 @@ Page load
 - The retry URL always carries `_tt_retry=<timestamp>` so the reload bypasses the browser's cached
   HTML and revalidates against the current deployment.
 
+## Dashboard trader progress
+
+Trader summaries keep task progress, loyalty level, and reputation visible. Fence shows Scav Karma.
+One inline editor opens at a time. Locked traders appear at the end of the same grid with their
+lock status and unlock requirements visible, with links to known quests or storyline objectives.
+Reputation edits commit on blur or Enter. Changing loyalty commits immediately and raises
+reputation to the catalog minimum when necessary. Existing standing is read as stored until
+edited, and the editor rejects reputation below the selected loyalty level's minimum.
+
 ## Light/dark theme system
 
 **Summary**: Dark is the default and only mandatory theme; light mode is an opt-in user
@@ -367,12 +376,10 @@ App boot
 - Light-mode dimmed `surface-500` copy remains readable on shell chrome. Pale accent steps
   50–100 and translucent accent labels require explicit opaque light-mode ink companions when
   placed on paper surfaces; remapping the opaque accent ladder alone does not fix alpha contrast.
-- Inline `hsl()` colors bypass the token ladder entirely, so any element that computes a color
-  inline (the trader progress-percentage text and the progress-bar gradient fill are the
-  examples; both resolve through `traderPercentageStyle.ts`) must read `useTheme`'s
-  `isLightTheme` and pick a light-safe lightness itself — for the 0–120° hue ramp, 22% lightness
-  clears AA for text (worst case 5.06:1 on the surface-900 card) and 26% keeps the progress-bar
-  fill above the 3:1 non-text threshold against its track, while dark keeps the authored 55%/45%.
+- Inline `hsl()` colors bypass the token ladder. The trader task progress bar reads
+  `useTheme`'s `isLightTheme` and resolves its fill through `traderPercentageStyle.ts`.
+  In light mode 26% lightness keeps the 0–120° hue ramp above the 3:1 non-text contrast threshold
+  against the track. Dark mode uses 45% lightness.
   Hue gradients encode information; keep the hue, change only the lightness.
 - New components should prefer `surface-*`/semantic tokens over hardcoded `white`/`black` so both
   themes work without `light:` overrides; reserve `light:` for accent-on-accent cases.
