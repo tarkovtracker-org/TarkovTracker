@@ -45,8 +45,10 @@ path.
   deadline shown in a persistent, non-dismissible alert on the current owner's team invite card.
   Creation shows the policy before its button. Clients never derive eligibility from the
   `TeamMembers.vue` display list, old `created_at`, account activity or a client clock.
-  Membership events, reconnects and team snapshots use one authoritative membership/deadline
-  refresh. Events during either read queue one fresh pair, and request, team, instance-lifetime
+  On team selection, channel setup owns the first membership/deadline refresh. The initial
+  team row supplies team metadata without starting another roster read. Membership and team
+  updates, plus reconnects, still trigger an authoritative refresh. Events during either read
+  queue one fresh pair, and request, team, instance-lifetime
   and auth-session fences reject stale results. A new team's fetched snapshot can seed its
   deadline while the independent read is unavailable; snapshots never replace a successful
   same-team deadline or owner refresh, including cancellation. These fields stay together when

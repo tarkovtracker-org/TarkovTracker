@@ -556,7 +556,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     return typeof owner === 'string' || owner === null ? { owner } : {};
   };
   // Custom data handler that transforms DB data before patching to store
-  const handleTeamData = (data: Record<string, unknown> | null) => {
+  const handleTeamData = (data: Record<string, unknown> | null, refreshRoster: boolean) => {
     if (disposed) return;
     if (data) {
       // Transform database fields to client fields BEFORE patching
@@ -579,7 +579,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         transformed.joinCode = null;
       }
       teamStore.$patch(transformed as Partial<TeamState>);
-      void refreshMembers(true);
+      if (refreshRoster) void refreshMembers(true);
     } else {
       invalidateRefresh();
       teamStore.$reset();
@@ -731,7 +731,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       patchStore: false,
       filter: teamFilter,
       storeId: 'team',
-      onData: handleTeamData,
+      onData: (data) => handleTeamData(data, true),
+      // The team channel's filter watcher already starts the initial roster read.
+      onInitialData: (data) => handleTeamData(data, false),
       scope: listenerScope,
     })
   );

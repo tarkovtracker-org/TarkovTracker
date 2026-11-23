@@ -816,6 +816,53 @@ describe('Team realtime resources', () => {
       instance.cleanup();
     }
   });
+  it.each(['before', 'after'])(
+    'loads the roster once when the initial team snapshot arrives %s the roster response',
+    async (order) => {
+      const { teamQuery, teamRecords } = buildRealtimeHarness();
+      const { useSupabaseListener: actualListener } = await vi.importActual<
+        typeof import('@/composables/supabase/useSupabaseListener')
+      >('@/composables/supabase/useSupabaseListener');
+      const fallback = mockUseSupabaseListener.getMockImplementation()!;
+      mockUseSupabaseListener.mockImplementation((config) =>
+        config.table === 'teams' ? actualListener(config) : fallback(config)
+      );
+      const row = { id: 'team-1', join_code: 'initial-code' };
+      let finishSnapshot!: () => void;
+      teamQuery.single.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishSnapshot = () => resolve({ data: row, error: null });
+        })
+      );
+      const roster = { members: ['first-member'], profiles: {} };
+      let finishRoster!: () => void;
+      mockGetTeamMembers.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishRoster = () => resolve(roster);
+        })
+      );
+      const instance = useTeamStoreWithSupabase();
+      try {
+        await vi.waitFor(() => expect(mockGetTeamMembers).toHaveBeenCalledOnce());
+        if (order === 'before') {
+          finishSnapshot();
+          await vi.waitFor(() => expect(instance.teamStore.joinCode).toBe('initial-code'));
+          finishRoster();
+        } else {
+          finishRoster();
+          await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+          finishSnapshot();
+          await vi.waitFor(() => expect(instance.teamStore.joinCode).toBe('initial-code'));
+        }
+        await vi.waitFor(() => expect(teamRecords()).toHaveLength(1));
+        expect(mockGetTeamMembers).toHaveBeenCalledOnce();
+        expect(teamQuery.maybeSingle).toHaveBeenCalledOnce();
+        expect(instance.teamStore.members).toEqual(roster.members);
+      } finally {
+        instance.cleanup();
+      }
+    }
+  );
   it('refreshes current snapshots but skips them when logged out or no longer in a team', async () => {
     const { teamRecords } = buildRealtimeHarness();
     const instance = useTeamStoreWithSupabase();
