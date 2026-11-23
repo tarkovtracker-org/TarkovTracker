@@ -97,6 +97,7 @@
           </div>
           <!-- Item Requirements Grid -->
           <div
+            v-if="hasItemRequirements"
             class="mb-2.5 grid gap-2 sm:mb-3"
             :class="
               inlineMaterials
