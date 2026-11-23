@@ -80,6 +80,9 @@ PR update → CI (selected validation + security + preview build + manifest + ar
           → freshness recheck → Preview Result success [preview <digest12> v<profile>]
 ```
 
+The trusted smoke suite reads expected SEO copy as JSON from the exact verified deployment revision.
+The default branch still defines the route inventory, canonical URLs, and robots assertions.
+
 The smoke runner finishes shared readiness before starting two browser workers. Files may overlap;
 tests within each file keep their existing order and intentional serial groups. Each test retains
 its own browser context, and Access sessions remain scoped to the preview origin and process.

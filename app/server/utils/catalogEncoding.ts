@@ -13,7 +13,7 @@ function acceptsGzip(value: string | null): boolean {
   const wildcard = encodings.find((entry) => /^\s*\*\s*(?:;|$)/.test(entry));
   return hasPositiveWeight(gzip ?? wildcard);
 }
-const GZIP_CATALOGS = new Set(['strings', 'items-lite', 'items']);
+const GZIP_CATALOGS = new Set(['strings', 'items-lite', 'items', 'tasks-objectives', 'tasks-core']);
 export function negotiatesCatalogGzip(dataset?: string): boolean {
   return dataset !== undefined && GZIP_CATALOGS.has(dataset);
 }

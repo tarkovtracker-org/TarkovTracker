@@ -42,25 +42,31 @@
     <div class="bg-divider mx-3 my-2 h-px" aria-hidden="true"></div>
     <ul class="flex flex-col gap-0.5 px-1 pb-2">
       <li>
-        <UDropdownMenu
-          :items="resourceLinks"
-          :content="{ side: props.isCollapsed ? 'right' : 'bottom', align: 'start' }"
+        <AppTooltip
+          :text="t('navigation_drawer.resources')"
+          :disabled="!props.isCollapsed"
+          :content="{ side: 'right' }"
         >
-          <UButton
-            color="neutral"
-            variant="ghost"
-            icon="i-mdi-compass-outline"
-            :trailing-icon="props.isCollapsed ? undefined : 'i-mdi-chevron-down'"
-            :label="props.isCollapsed ? undefined : t('navigation_drawer.resources')"
-            :aria-label="t('navigation_drawer.resources')"
-            class="min-h-10 w-full rounded-sm border-l-2 px-3 text-sm"
-            :class="resourceButtonClass"
-            :ui="{ trailingIcon: 'ms-auto' }"
-          />
-        </UDropdownMenu>
+          <UDropdownMenu
+            :items="resourceLinks"
+            :content="{ side: props.isCollapsed ? 'right' : 'bottom', align: 'start' }"
+          >
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-mdi-compass"
+              :trailing-icon="props.isCollapsed ? undefined : 'i-mdi-chevron-down'"
+              :label="props.isCollapsed ? undefined : t('navigation_drawer.resources')"
+              :aria-label="t('navigation_drawer.resources')"
+              class="min-h-10 w-full rounded-sm border-l-2 px-3 text-sm"
+              :class="resourceButtonClass"
+              :ui="{ trailingIcon: 'ms-auto' }"
+            />
+          </UDropdownMenu>
+        </AppTooltip>
       </li>
       <DrawerItem
-        icon="i-mdi-cog-outline"
+        icon="i-mdi-cog"
         locale-key="common.settings"
         to="/settings"
         :is-collapsed="props.isCollapsed"
@@ -69,6 +75,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import AppTooltip from '@/components/ui/AppTooltip.vue';
   import DrawerItem from '@/features/drawer/DrawerItem.vue';
   import { isNavigationRouteActive } from '@/features/drawer/navigation';
   const props = defineProps({

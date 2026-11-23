@@ -184,7 +184,7 @@ graph TB
 Settings applies hash scrolls immediately while the page is mounted. Both the page and Nuxt can
 handle a hash change, so the page also disables inherited smooth scrolling for Nuxt's scroll.
 
-The [player-level card](../app/features/settings/PlayerLevelCard.vue) reserves the translated
+The [player-level field](../app/features/settings/PlayerLevelField.vue) reserves the translated
 loading hint's height while displaying the current range hint. Loading level metadata can shorten
 that hint; keeping its footprint stable prevents nested `#skills` links below it from moving under
 the fixed header after scrolling. The hidden reservation is excluded from assistive output. Existing

@@ -51,3 +51,4 @@ export const isTaskRequirementSatisfied = (
   }
   return false;
 };
+export const COMPACT_REQUIREMENT_LIMIT = 3;

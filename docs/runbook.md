@@ -16,6 +16,11 @@ is explicitly set to a `cloudflare*` preset.
 See the canonical map for `STRIPE_SECRET_KEY` and the nine `STRIPE_PRICE_*` IDs used by the Nuxt
 `/api/stripe/checkout` route to create Checkout Sessions.
 
+The supporter page allows one Checkout request at a time across all tiers and the one-time form.
+For up to 24 hours, retrying a failed request with the same selection in the same page uses the
+same attempt ID. The route scopes that ID to the signed-in user before passing it to Stripe as
+an idempotency key. Clients served before this change can still omit the ID.
+
 ### Stripe webhook (Supabase Edge Function `stripe-webhook`)
 
 Receipt completion, fenced retries, migration-before-handler rollout and historical receipt
@@ -121,6 +126,16 @@ Prepare and deploy each rollover in two releases during the no-write gap between
    the app countdown and `/progress` Seasonal row selection before announcing the new season open.
 4. Do not combine the database flip and application constants in one merge because their production
    deployment order is uncontrolled. Do not delete the previous season's rows.
+
+### Correcting an end time within the active season
+
+When correcting the end of the current season, update the application timestamp and replace only
+`private.active_season_ends_at()` in a forward migration. The app reads its bundled timestamp for the
+countdown and log import. The database selects writable Seasonal rows by season number, so either
+artifact can deploy first. After both deploy, verify the displayed cutoff, the database end timestamp,
+and the active season number. If the same season is still active and the correction must be reverted,
+restore the prior app timestamp and use a separately reviewed forward migration to restore the prior
+database timestamp. Repeat those checks after both reversions deploy.
 
 ## Deployment
 

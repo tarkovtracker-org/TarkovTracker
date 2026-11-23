@@ -1,5 +1,5 @@
 <template>
-  <UPopover v-if="hasAlternatives" :open="open" :content="contentOptions" @update:open="setOpen">
+  <UPopover v-if="hasQuestLinks" :open="open" :content="contentOptions" @update:open="setOpen">
     <UButton
       type="button"
       size="xs"
@@ -32,18 +32,18 @@
             {{ t('page.tasks.questcard.quest_links') }}
           </h3>
           <span class="text-surface-300">
-            {{ t('page.tasks.questcard.quest_links_count', { count: alternativeCount }) }}
+            {{ t('page.tasks.questcard.quest_links_count', { count: questLinkCount }) }}
           </span>
         </div>
         <div
           class="divide-surface-700 max-h-96 min-h-0 divide-y overflow-y-auto overscroll-contain"
         >
-          <section v-for="group in alternativeGroups" :key="group.kind" class="px-3 pt-2.5 pb-1">
+          <section v-for="group in questLinkGroups" :key="group.kind" class="px-3 pt-2.5 pb-1">
             <div class="flex items-start justify-between gap-3">
               <h4 class="text-surface-100 flex min-w-0 items-start gap-1.5 font-semibold">
                 <UIcon
                   :name="group.icon"
-                  :class="group.kind === 'mutual' ? 'text-warning-200' : 'text-error-300'"
+                  :class="group.iconClass"
                   class="size-3.5 shrink-0"
                   aria-hidden="true"
                 />
@@ -61,7 +61,7 @@
                   class="text-link hover:text-link-hover hover:bg-surface-800 focus-visible:ring-primary-500 flex min-h-8 items-center justify-between gap-2 rounded-sm py-1.5 ps-5 pe-1 text-start font-medium focus-visible:ring-2 focus-visible:ring-inset pointer-coarse:min-h-11"
                   @click="closeAfterLink"
                 >
-                  <span class="min-w-0 wrap-anywhere">{{ quest.name }}</span>
+                  <span class="min-w-0 wrap-anywhere">{{ quest.name || quest.id }}</span>
                   <UIcon
                     name="i-mdi-chevron-right"
                     class="text-surface-300 size-3.5 shrink-0 rtl:rotate-180"
@@ -72,70 +72,62 @@
             </ul>
           </section>
         </div>
+        <AppTooltip v-if="impactCount" :text="t('page.tasks.questcard.impact_tooltip')">
+          <p tabindex="0" class="text-surface-300 border-surface-700 border-t px-3 py-2">
+            {{ t('common.impact') }}: {{ impactCount }}
+          </p>
+        </AppTooltip>
       </div>
     </template>
   </UPopover>
+  <AppTooltip v-else-if="impactCount" :text="t('page.tasks.questcard.impact_tooltip')">
+    <span
+      tabindex="0"
+      class="text-surface-400 border-surface-600 inline-flex shrink-0 cursor-help items-center gap-1 border-b border-dotted text-[11px]"
+    >
+      <UIcon name="i-mdi-sitemap" class="size-3 shrink-0" aria-hidden="true" />
+      {{ t('common.impact') }}: {{ impactCount }}
+    </span>
+  </AppTooltip>
 </template>
 <script setup lang="ts">
-  import { useTimeoutFn } from '@vueuse/core';
+  import { useTaskCardPreview } from '@/features/tasks/composables/useTaskCardPreview';
   import { useMetadataStore } from '@/stores/useMetadata';
-  const props = defineProps<{ taskId: string }>();
+  import { usePreferencesStore } from '@/stores/usePreferences';
+  import type { Task } from '@/types/tarkov';
+  const props = defineProps<{
+    taskId: string;
+    previousTasks: Task[];
+    nextTasks: Task[];
+    impactCount: number;
+  }>();
   const metadataStore = useMetadataStore();
+  const preferencesStore = usePreferencesStore();
   const { t } = useI18n({ useScope: 'global' });
-  const open = ref(false);
-  let manageFocus = false;
   const panel = useTemplateRef<HTMLDivElement>('panel');
+  const {
+    open,
+    setOpen,
+    openOnHover,
+    scheduleHoverClose,
+    cancelHoverClose,
+    onOpenAutoFocus,
+    onCloseAutoFocus,
+    activatePanel,
+    keepHoverOpen,
+    closeAfterLink,
+  } = useTaskCardPreview(panel);
   const contentOptions = computed(() => ({
     align: 'end' as const,
     sideOffset: 4,
     'aria-label': t('page.tasks.questcard.quest_links'),
-    onOpenAutoFocus: preserveFocus,
-    onCloseAutoFocus: preserveFocus,
+    onOpenAutoFocus,
+    onCloseAutoFocus,
   }));
-  const { start: startHoverClose, stop: cancelHoverClose } = useTimeoutFn(
-    () => setOpen(false),
-    200,
-    { immediate: false }
-  );
-  function setOpen(next: boolean) {
-    cancelHoverClose();
-    if (next) manageFocus = true;
-    open.value = next;
-  }
-  function openOnHover(event: PointerEvent) {
-    if (event.pointerType !== 'mouse') return;
-    cancelHoverClose();
-    if (open.value) return;
-    manageFocus = false;
-    open.value = true;
-  }
-  function scheduleHoverClose() {
-    if (open.value && !manageFocus) startHoverClose();
-  }
-  function preserveFocus(event: Event) {
-    if (!manageFocus) event.preventDefault();
-  }
-  function activatePanel() {
-    cancelHoverClose();
-    manageFocus = true;
-  }
-  function keepHoverOpen(event: MouseEvent) {
-    if (!open.value || manageFocus) return;
-    // The first click keeps a hovered preview open so later clicks can toggle it.
-    event.stopImmediatePropagation();
-    activatePanel();
-    panel.value?.querySelector('a')?.focus();
-  }
-  function closeAfterLink() {
-    // Let the quest deep link handle navigation without refocusing the old chip.
-    manageFocus = false;
-    setOpen(false);
-  }
-  const alternativeGroups = computed(() => {
+  const questLinkGroups = computed(() => {
     const id = props.taskId;
     const targets = new Set(metadataStore.alternativeTasks[id]);
     const sources = new Set(metadataStore.alternativeTaskSources[id]);
-    if (!targets.size && !sources.size) return [];
     const resolveTasks = (ids: string[]) =>
       ids.flatMap((taskId) => {
         const task = metadataStore.getTaskById(taskId);
@@ -147,25 +139,44 @@
         label: t('page.tasks.questcard.quest_links_mutual'),
         hint: t('page.tasks.questcard.quest_links_mutual_hint'),
         icon: 'i-mdi-swap-horizontal',
+        iconClass: 'text-warning-200',
         tasks: resolveTasks([...targets].filter((taskId) => sources.has(taskId))),
       },
       {
         kind: 'outgoing',
         label: t('page.tasks.questcard.quest_links_fails_others'),
         icon: 'i-mdi-arrow-right',
+        iconClass: 'text-error-300',
         tasks: resolveTasks([...targets].filter((taskId) => !sources.has(taskId))),
       },
       {
         kind: 'incoming',
         label: t('page.tasks.questcard.quest_links_failed_by_others'),
         icon: 'i-mdi-arrow-left',
+        iconClass: 'text-error-300',
         tasks: resolveTasks([...sources].filter((taskId) => !targets.has(taskId))),
+      },
+      {
+        kind: 'next',
+        label: t('page.tasks.questcard.unlocks_next'),
+        hint: undefined,
+        icon: 'i-mdi-arrow-right-circle-outline',
+        iconClass: 'text-surface-300',
+        tasks: preferencesStore.getShowNextQuests ? props.nextTasks : [],
+      },
+      {
+        kind: 'previous',
+        label: t('page.tasks.settings.cards.previous_tasks'),
+        hint: undefined,
+        icon: 'i-mdi-arrow-left-circle-outline',
+        iconClass: 'text-surface-300',
+        tasks: preferencesStore.getShowPreviousQuests ? props.previousTasks : [],
       },
     ].filter((group) => group.tasks.length > 0);
   });
-  const alternativeCount = computed(() =>
-    alternativeGroups.value.reduce((count, group) => count + group.tasks.length, 0)
+  const questLinkCount = computed(() =>
+    questLinkGroups.value.reduce((count, group) => count + group.tasks.length, 0)
   );
-  const hasAlternatives = computed(() => alternativeCount.value > 0);
-  watch([() => props.taskId, hasAlternatives], () => setOpen(false));
+  const hasQuestLinks = computed(() => questLinkCount.value > 0);
+  watch([() => props.taskId, hasQuestLinks], () => setOpen(false));
 </script>

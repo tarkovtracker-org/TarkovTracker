@@ -16,36 +16,39 @@
       </UButton>
     </header>
     <ApiTokenQuota v-if="activity" :snapshots="activity.quota" />
-    <div class="flex flex-wrap items-end gap-2">
-      <UFormField :label="text('range')" class="min-w-0">
-        <USelect v-model="range" :items="rangeOptions" class="max-w-full" />
-      </UFormField>
-      <UFormField :label="text('quota_kind')" class="min-w-0">
-        <USelect v-model="kind" :items="kindOptions" class="max-w-full" />
-      </UFormField>
-      <UFormField v-if="activity" :label="text('endpoint')" class="min-w-0">
-        <USelect v-model="endpointFilter" :items="endpointOptions" class="max-w-full" />
-      </UFormField>
-      <UFormField v-if="activity" :label="text('client')" class="min-w-0">
-        <USelect v-model="clientFilter" :items="clientOptions" class="max-w-full" />
-      </UFormField>
-      <UCheckbox v-model="throttleOnly" :label="text('throttle_only')" class="py-1.5" />
+    <div class="space-y-1">
+      <div class="flex flex-wrap items-end gap-2">
+        <UFormField :label="text('range')" class="min-w-0">
+          <USelect v-model="range" :items="rangeOptions" class="max-w-full" />
+        </UFormField>
+        <UFormField :label="text('quota_kind')" class="min-w-0">
+          <USelect v-model="kind" :items="kindOptions" class="max-w-full" />
+        </UFormField>
+        <UFormField v-if="activity" :label="text('endpoint')" class="min-w-0">
+          <USelect v-model="endpointFilter" :items="endpointOptions" class="max-w-full" />
+        </UFormField>
+        <UFormField v-if="activity" :label="text('client')" class="min-w-0">
+          <USelect v-model="clientFilter" :items="clientOptions" class="max-w-full" />
+        </UFormField>
+        <UCheckbox v-model="throttleOnly" :label="text('throttle_only')" class="py-1.5" />
+      </div>
+      <p :role="statusRole" :class="statusColor" class="min-h-4 text-xs">
+        {{ statusMessage }}
+      </p>
     </div>
-    <p v-if="failed" role="alert" class="text-error text-sm">{{ text('load_error') }}</p>
-    <p v-if="loading" role="status" class="text-surface-400 text-sm">{{ text('loading') }}</p>
-    <template v-if="visibleActivity">
+    <template v-if="activity">
       <div class="grid gap-2 border-y border-white/10 py-3 @min-[15rem]:grid-cols-3">
         <div v-for="metric in metrics" :key="metric">
           <strong class="block text-lg tabular-nums">
-            {{ number(visibleActivity.summary[metric]) }}
+            {{ number(activity.summary[metric]) }}
           </strong>
           <span class="text-surface-400 text-xs wrap-anywhere">{{ text(metric) }}</span>
         </div>
       </div>
       <ApiTokenActivityChart
-        v-if="visibleActivity.summary.requests"
-        :buckets="visibleActivity.buckets"
-        :range="range"
+        v-if="activity.summary.requests"
+        :buckets="activity.buckets"
+        :range="displayRange"
       />
       <div v-if="groups.some((group) => group.rows.length)" class="grid gap-3 sm:grid-cols-2">
         <ApiTokenActivityRanking
@@ -61,6 +64,7 @@
         :requests="requests"
         :has-more="hasMore"
         :loading="loading"
+        :stale="resultsStale"
         @copy-evidence="copyEvidence"
         @select-client="client = $event"
         @load-more="load(requests.at(-1))"
@@ -80,6 +84,7 @@
   const toast = useToast();
   const {
     range,
+    displayRange,
     endpoint,
     client,
     throttleOnly,
@@ -91,9 +96,15 @@
     hasMore,
     load,
   } = useApiTokenActivity(() => props.tokenId);
-  const visibleActivity = computed(() => {
-    if (requests.value.length || (!failed.value && !loading.value)) return activity.value;
-    return null;
+  const resultsStale = computed(() => loading.value || failed.value);
+  const statusRole = computed(() => (failed.value ? 'alert' : 'status'));
+  const statusColor = computed(() => (failed.value ? 'text-error' : 'text-surface-400'));
+  const statusMessage = computed(() => {
+    const keys = activity.value
+      ? { failure: 'stale_results', pending: 'updating' }
+      : { failure: 'load_error', pending: 'loading' };
+    if (failed.value) return text(keys.failure);
+    return loading.value ? text(keys.pending) : '';
   });
   const quotaKinds = ['read', 'write'] as const;
   const metrics = ['requests', 'counted', 'throttled'] as const;
@@ -177,6 +188,7 @@
     filter.value = filter.value === value ? null : value;
   }
   async function copyEvidence() {
+    if (resultsStale.value) return;
     try {
       await navigator.clipboard.writeText(
         JSON.stringify(

@@ -123,6 +123,41 @@ describe('Shared Profile API', () => {
     await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid profile id');
     expect(mockOverlay).not.toHaveBeenCalled();
   });
+  it.each(['supporter', 'active_subscriber'])('only exposes the %s badge label', async (badge) => {
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(modeProgressResponse({ displayName: 'Rat One', level: 18 }))
+      .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ badge, stripe_customer_id: 'private', amount_total: 123 }],
+      });
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({ supporterBadge: badge });
+    expect(JSON.stringify(result)).not.toContain('stripe_customer_id');
+    expect(JSON.stringify(result)).not.toContain('amount_total');
+    expect(String(mockFetch.mock.calls[3]?.[0])).toContain(
+      '/rest/v1/shared_profile_supporter_badges?select=badge&user_id=eq.11111111-1111-4111-8111-111111111111&game_mode=eq.pvp&season_number=eq.0&limit=1'
+    );
+  });
+  it('keeps shared profiles available before the badge migration is deployed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(modeProgressResponse({ displayName: 'Rat One', level: 18 }))
+      .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: false, status: 404 });
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({ visibility: 'public' });
+    expect(result).not.toHaveProperty('supporterBadge');
+    expect(warn).toHaveBeenCalledWith(
+      '[SharedProfileSupporterBadge]',
+      'Supporter badge lookup returned an unsuccessful response',
+      { status: 404 }
+    );
+  });
   it('opens the public PvE mode from a short link without returning the account ID', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) =>
       key === 'userId' ? '@rat_one' : 'default'
@@ -301,7 +336,7 @@ describe('Shared Profile API', () => {
     const urls = mockFetch.mock.calls.map(([url]) => url as string);
     expect(urls).toContain('https://test.supabase.co/auth/v1/user');
     const restUrls = urls.filter((url) => url.includes('/rest/v1/'));
-    expect(restUrls).toHaveLength(3);
+    expect(restUrls).toHaveLength(4);
     for (const url of urls) {
       expect(url).not.toContain('source=config');
       expect(url).not.toContain('#fragment');
@@ -488,7 +523,7 @@ describe('Shared Profile API', () => {
     const restCalls = mockFetch.mock.calls
       .map(([url]) => new URL(String(url)))
       .filter((url) => url.pathname.includes('/rest/v1/'));
-    expect(restCalls).toHaveLength(3);
+    expect(restCalls).toHaveLength(4);
     expect(
       restCalls.find((url) => url.pathname.endsWith('/user_progress'))?.searchParams.get('select')
     ).toBe('user_id,game_edition');
@@ -516,7 +551,8 @@ describe('Shared Profile API', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [{ pvp_data: { level: 39 } }] });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     expect(await handler(mockEvent as H3Event)).toMatchObject({ data: {}, gameEdition: 3 });
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(String(mockFetch.mock.calls[3]?.[0])).toContain('/shared_profile_supporter_badges?');
   });
   it('loads Seasonal profiles from the active season row', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) => {
@@ -597,6 +633,7 @@ describe('Shared Profile API', () => {
         })
       )
       .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -627,7 +664,7 @@ describe('Shared Profile API', () => {
       );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
-    expect(mockFetch.mock.calls[3]?.[0]).toBe('https://json.tarkov.dev/pve/tasks');
+    expect(mockFetch.mock.calls.map(([url]) => url)).toContain('https://json.tarkov.dev/pve/tasks');
     expect(result.mode).toBe('pve');
     expect(result.data?.taskCompletions).toMatchObject({
       '597a0f5686f774273b74f676': { complete: true, failed: true },
@@ -645,6 +682,7 @@ describe('Shared Profile API', () => {
         })
       )
       .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ data: { tasks: {} } }), {
           headers: { 'Content-Type': 'application/json' },
@@ -653,7 +691,9 @@ describe('Shared Profile API', () => {
       );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     await handler(mockEvent as H3Event);
-    expect(mockFetch.mock.calls[3]?.[0]).toBe('https://json-mirror.example/regular/tasks');
+    expect(mockFetch.mock.calls.map(([url]) => url)).toContain(
+      'https://json-mirror.example/regular/tasks'
+    );
   });
   it('removes non-progress fields from shared profile payload', async () => {
     mockFetch
@@ -750,19 +790,33 @@ describe('Shared Profile API', () => {
         let season = 2;
         let lookupOk = true;
         let level = 24;
+        let showBadge = true;
         vi.spyOn(Date, 'now').mockImplementation(() => now);
         mockFetch.mockImplementation(async (url: string) => {
           if (url.includes('/rpc/')) return { ok: lookupOk, json: async () => season };
           if (url.includes('/user_game_mode_progress?')) return modeProgressResponse({ level });
           if (url.includes('/user_progress?')) return progressResponse();
           if (url.includes('/user_preferences?')) return preferencesResponse();
+          if (url.includes('/shared_profile_supporter_badges?')) {
+            return { ok: true, json: async () => (showBadge ? [{ badge: 'supporter' }] : []) };
+          }
           throw new Error(`Unexpected test request: ${url}`);
         });
         const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-        expect((await handler(mockEvent as H3Event)).data).toEqual({ level: 24 });
+        expect(await handler(mockEvent as H3Event)).toMatchObject({
+          data: { level: 24 },
+          supporterBadge: 'supporter',
+        });
         now = 30;
         level = 30;
-        expect((await handler(mockEvent as H3Event)).data).toEqual({ level: 24 });
+        expect(await handler(mockEvent as H3Event)).toMatchObject({
+          data: { level: 24 },
+          supporterBadge: 'supporter',
+        });
+        showBadge = false;
+        const cached = await handler(mockEvent as H3Event);
+        expect(cached.data).toEqual({ level: 24 });
+        expect(cached).not.toHaveProperty('supporterBadge');
         now = 60;
         season = 3;
         expect((await handler(mockEvent as H3Event)).data).toEqual({ level: 30 });

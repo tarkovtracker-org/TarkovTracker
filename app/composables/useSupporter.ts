@@ -31,6 +31,27 @@ export interface SupporterStatus {
 const supporterState = ref<SupporterStatus | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+const checkoutRequest = shallowRef<AbortController | null>(null);
+const checkoutPending = computed(() => checkoutRequest.value !== null);
+const CHECKOUT_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+let checkoutAttempt: { scope: string; id: string; expiresAt: number } | null = null;
+function getCheckoutAttemptId(scope: string) {
+  const now = Date.now();
+  if (checkoutAttempt?.scope === scope && checkoutAttempt.expiresAt > now) {
+    return checkoutAttempt.id;
+  }
+  const id = crypto.randomUUID();
+  checkoutAttempt = { scope, id, expiresAt: now + CHECKOUT_RETRY_WINDOW_MS };
+  return id;
+}
+function finishCheckout(url: string | null, signal: AbortSignal) {
+  if (signal.aborted) return null;
+  if (url) checkoutAttempt = null;
+  return url;
+}
+function reportSupporterRequestError(message: string, signal?: AbortSignal) {
+  if (!signal?.aborted) error.value = message;
+}
 let channel: OwnedRealtimeChannel | null = null;
 const channelRelease = createChannelReleaseLatch();
 let channelUserId: string | null = null;
@@ -233,6 +254,9 @@ export function useSupporter() {
     supporterState.value = null;
     error.value = null;
     loading.value = false;
+    checkoutRequest.value?.abort();
+    checkoutRequest.value = null;
+    checkoutAttempt = null;
   }
   async function createCheckout(params: {
     mode: 'payment' | 'subscription';
@@ -240,18 +264,34 @@ export function useSupporter() {
     interval?: string;
     amount?: number;
   }): Promise<string | null> {
-    return postWithAuth<{ url: string }>('/api/stripe/checkout', params).then(
-      (r) => r?.url ?? null
-    );
+    if (checkoutRequest.value) return null;
+    const request = new AbortController();
+    checkoutRequest.value = request;
+    try {
+      const { mode, tier, interval, amount } = params;
+      const scope = JSON.stringify([mode, tier, interval, amount]);
+      const result = await postWithAuth<{ url: string }>(
+        '/api/stripe/checkout',
+        { ...params, checkoutAttemptId: getCheckoutAttemptId(scope) },
+        request.signal
+      );
+      return finishCheckout(result?.url ?? null, request.signal);
+    } finally {
+      if (checkoutRequest.value === request) checkoutRequest.value = null;
+    }
   }
   async function openBillingPortal(returnUrl?: string): Promise<string | null> {
     return postWithAuth<{ url: string }>('/api/stripe/portal', returnUrl ? { returnUrl } : {}).then(
       (r) => r?.url ?? null
     );
   }
-  async function postWithAuth<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
+  async function postWithAuth<T>(
+    path: string,
+    body: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<T | null> {
     if (!$supabase) {
-      error.value = 'Supabase client not available';
+      reportSupporterRequestError('Supabase client not available', signal);
       return null;
     }
     try {
@@ -269,18 +309,19 @@ export function useSupporter() {
       }
       if (!token) {
         const message = 'You must be signed in to support TarkovTracker.';
-        error.value = message;
+        reportSupporterRequestError(message, signal);
         return null;
       }
       const result = await $fetch(path, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body,
+        signal,
       });
       return result as T;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Request failed';
-      error.value = message;
+      reportSupporterRequestError(message, signal);
       logger.error('Supporter request failed', { path, error: e });
       return null;
     }
@@ -300,6 +341,7 @@ export function useSupporter() {
     subscribe,
     unsubscribe,
     reset,
+    checkoutPending,
     createCheckout,
     openBillingPortal,
   };

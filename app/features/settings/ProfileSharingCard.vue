@@ -12,6 +12,7 @@
         <template v-if="isLoggedIn">
           <div class="space-y-4">
             <ProfileHandleSettings v-model="handle" :has-public-mode="hasPublicMode" />
+            <ProfileSupporterBadgeSettings />
             <p class="text-surface-400 text-sm">
               {{
                 t(
@@ -109,6 +110,7 @@
   import GenericCard from '@/components/ui/GenericCard.vue';
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
   import ProfileHandleSettings from '@/features/settings/ProfileHandleSettings.vue';
+  import ProfileSupporterBadgeSettings from '@/features/settings/ProfileSupporterBadgeSettings.vue';
   import {
     GAME_MODE_VALUES,
     GAME_MODE_UI,

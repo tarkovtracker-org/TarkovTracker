@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col gap-1.5 px-3 py-1">
+  <div class="flex flex-col gap-2 px-3 pb-1">
     <div
       class="grid grid-cols-3 gap-1"
       role="group"
@@ -9,26 +9,32 @@
       <CompactChoiceButton
         v-for="option in modeOptions"
         :key="option.value"
-        class="flex flex-col items-center px-0.5 py-1.5 leading-tight"
+        class="flex flex-col items-center gap-1 px-0.5 pt-1.5 pb-1.5 leading-none"
+        :tone="GAME_MODE_UI[option.value].color"
         :aria-pressed="selectedMode === option.value"
         :disabled="dataLoading"
         @click="switchMode(option.value)"
       >
-        <GameModeBadge :mode="option.value" :size="52" class="-my-1.5 size-13 max-w-full" />
+        <GameModeBadge :mode="option.value" :size="36" class="size-9 max-w-full" />
         <span class="w-full wrap-anywhere">{{ option.label }}</span>
       </CompactChoiceButton>
     </div>
     <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
       {{ t(switchModeError) }}
     </div>
-    <time
+    <p
       v-if="currentGameMode === GAME_MODES.SEASONAL"
-      :datetime="ACTIVE_SEASON.endsAt"
-      class="text-warning-300 light:text-warning-700 text-xs"
-      :title="seasonEndDate"
+      class="text-surface-400 -mt-0.5 flex items-center justify-center gap-1.5 text-[11px] leading-none"
     >
-      {{ seasonCountdownLabel }}
-    </time>
+      <UIcon
+        name="i-mdi-timer-sand"
+        class="text-warning-400 size-3.5 shrink-0"
+        aria-hidden="true"
+      />
+      <time :datetime="ACTIVE_SEASON.endsAt" :title="seasonEndDate">
+        {{ seasonCountdownLabel }}
+      </time>
+    </p>
     <FactionPicker v-model="currentFaction" :disabled="dataLoading" />
   </div>
 </template>
@@ -39,7 +45,12 @@
   import { useCurrentFaction } from '@/composables/useCurrentFaction';
   import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useTarkovStore } from '@/stores/useTarkov';
-  import { ACTIVE_SEASON, GAME_MODES, getActiveSeasonTimeRemaining } from '@/utils/constants';
+  import {
+    ACTIVE_SEASON,
+    GAME_MODE_UI,
+    GAME_MODES,
+    getActiveSeasonTimeRemaining,
+  } from '@/utils/constants';
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
   const { dataLoading, switchMode, switchModeError } = useGameModeSwitch();

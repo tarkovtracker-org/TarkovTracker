@@ -12,21 +12,21 @@
         </DashboardProgressSummary>
         <DashboardUpNext />
         <div id="dashboard-traders" class="mb-8 scroll-mt-16">
-          <div class="mb-4 flex w-full items-center">
+          <div class="mb-3 flex w-full flex-wrap items-center gap-2">
             <button
               type="button"
-              class="group light:text-surface-50 flex min-w-0 flex-1 cursor-pointer items-center text-2xl font-bold text-white"
+              class="group light:text-surface-50 focus-visible:ring-primary-500 flex min-w-0 flex-auto cursor-pointer items-center rounded text-start text-base font-bold text-white focus-visible:ring-2 focus-visible:outline-none sm:text-2xl"
               :aria-expanded="!tradersSectionCollapsed"
               @click="tradersSectionCollapsed = !tradersSectionCollapsed"
             >
               <UIcon
                 name="i-mdi-account-group"
-                class="text-primary-500 light:text-primary-800 mr-2 h-6 w-6 shrink-0"
+                class="text-primary-500 light:text-primary-800 me-1.5 size-5 shrink-0 sm:me-2 sm:size-6"
               />
-              <span class="truncate">{{ $t('page.dashboard.traders.title') }}</span>
+              <span>{{ $t('page.dashboard.traders.title') }}</span>
               <UIcon
                 :name="tradersSectionCollapsed ? 'i-mdi-chevron-down' : 'i-mdi-chevron-up'"
-                class="text-surface-400 group-hover:text-surface-200 ml-2 h-5 w-5 shrink-0 transition-colors"
+                class="text-surface-400 group-hover:text-surface-200 ms-1 size-4 shrink-0 transition-colors sm:ms-2 sm:size-5"
               />
             </button>
             <div class="ml-auto flex shrink-0 items-center gap-1.5">
@@ -35,7 +35,7 @@
                 :items="traderSortOptions"
                 value-key="value"
                 size="sm"
-                class="w-28"
+                class="w-24 sm:w-28"
                 :aria-label="$t('page.dashboard.traders.sort.aria_label')"
                 @update:model-value="traderSortMode = $event"
               />
@@ -52,30 +52,12 @@
               />
             </div>
           </div>
-          <div
+          <DashboardTraderGrid
             v-show="!tradersSectionCollapsed"
-            class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-          >
-            <div
-              v-for="trader in orderedTraderStats"
-              :id="`dashboard-trader-${trader.id}`"
-              :key="trader.id"
-              class="content-visibility-auto-220 h-full"
-              :class="
-                highlightedTraderId === trader.id
-                  ? 'ring-primary-500 ring-offset-surface-950 rounded-lg ring-2 ring-offset-2'
-                  : ''
-              "
-            >
-              <DashboardTraderCard
-                :trader="trader"
-                :completed-tasks="trader.completedTasks"
-                :total-tasks="trader.totalTasks"
-                :percentage="trader.percentage"
-                :unlock="trader.unlock"
-              />
-            </div>
-          </div>
+            :key="traderGameMode"
+            :traders="tradersWithUnlock"
+            :highlighted-trader-id="highlightedTraderId"
+          />
         </div>
       </div>
     </div>
@@ -181,17 +163,12 @@
     getTraderReputation: tarkovStore.getTraderReputation,
   }));
   const metadataTasksLoaded = computed(() => metadataStore.tasks.length > 0);
-  // Locked traders stay visible with their unlock requirement, after the open ones.
-  const orderedTraderStats = computed(() => {
-    const withUnlock = traderStats.value.map((trader) => ({
+  const tradersWithUnlock = computed(() =>
+    traderStats.value.map((trader) => ({
       ...trader,
       unlock: resolveTraderUnlock(trader, traderLockDeps.value),
-    }));
-    return [
-      ...withUnlock.filter((trader) => !trader.unlock),
-      ...withUnlock.filter((trader) => trader.unlock),
-    ];
-  });
+    }))
+  );
   const clearTraderHighlight = () => {
     if (traderHighlightTimeout.value) {
       clearTimeout(traderHighlightTimeout.value);

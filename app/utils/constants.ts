@@ -36,7 +36,7 @@ export const API_TOKEN_PREFIXES = {
 export const ACTIVE_SEASON = {
   number: 1,
   startsOn: '2026-08-03',
-  endsAt: '2026-12-07T10:00:00.000Z',
+  endsAt: '2026-12-07T09:00:00.000Z',
 } as const;
 export const ACTIVE_SEASON_NUMBER = ACTIVE_SEASON.number;
 export interface SeasonTimeRemaining {

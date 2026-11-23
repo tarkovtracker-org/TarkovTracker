@@ -102,7 +102,7 @@
           variant="soft"
           size="lg"
           :loading="checkoutLoading"
-          :disabled="!isValid"
+          :disabled="!isValid || checkoutPending"
           icon="i-mdi-heart-outline"
           @click="handleCheckout"
         >
@@ -138,7 +138,7 @@
   import { logger } from '@/utils/logger';
   const { locale, t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
-  const { createCheckout, error: composableError } = useSupporter();
+  const { createCheckout, checkoutPending, error: composableError } = useSupporter();
   const ONE_TIME_BASE = 4;
   const ONE_TIME_MAX = 500;
   const amountId = useId();

@@ -186,36 +186,62 @@
     const keys = fullObjective.value?.requiredKeys ?? props.objective.requiredKeys;
     return (keys ?? []).filter((group) => group.length > 0);
   });
+  const distinctItems = (items: (TarkovItem | undefined)[]) => {
+    const seen = new Set<string>();
+    return items.filter((item): item is TarkovItem => {
+      if (!item?.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  };
   const weaponAlternatives = computed(() => {
     const { type, usingWeapon } = currentObjective.value;
     // Only a flat weapon list expresses a pool of individual alternatives.
     if (type !== 'shoot' || !Array.isArray(usingWeapon) || usingWeapon.some(Array.isArray)) {
       return [];
     }
-    const seen = new Set<string>();
-    return objectiveEquipmentItems(usingWeapon).filter((weapon) => {
-      if (!weapon?.id || seen.has(weapon.id)) return false;
-      seen.add(weapon.id);
-      return true;
-    });
+    return distinctItems(objectiveEquipmentItems(usingWeapon));
   });
-  const hasWeaponAlternatives = computed(() => weaponAlternatives.value.length > 1);
+  const sellItems = computed(() => {
+    const { item, items } = currentObjective.value;
+    const accepted = distinctItems(items?.length ? items : [item]);
+    return { field: undefined, items: accepted, primary: item ?? accepted[0] };
+  });
+  const getItemAlternatives = (field: 'useAny' | 'items') => {
+    const items = distinctItems(currentObjective.value[field] ?? []);
+    return items.length > 1 ? { field, items, primary: items[0] } : undefined;
+  };
+  const useItemAlternatives = computed(() =>
+    currentObjective.value.type === 'useItem' ? getItemAlternatives('useAny') : undefined
+  );
+  const groupedItems = computed(() => {
+    if (currentObjective.value.type === 'sellItem') return sellItems.value;
+    if (weaponAlternatives.value.length > 1) {
+      const items = weaponAlternatives.value;
+      return { field: 'usingWeapon' as const, items, primary: items[0] };
+    }
+    return useItemAlternatives.value ?? getItemAlternatives('items');
+  });
+  const withoutGroupedItems = (
+    objective: TaskObjective,
+    field: 'items' | 'useAny' | 'usingWeapon',
+    alternatives: TarkovItem[]
+  ) => {
+    const remaining = { ...objective, [field]: undefined };
+    if (field === 'useAny') {
+      const acceptedIds = new Set(alternatives.map((item) => item.id));
+      remaining.items = remaining.items?.filter((item) => !acceptedIds.has(item?.id));
+    }
+    return remaining;
+  };
   const objectiveEquipment = computed(() => {
     const objective = currentObjective.value;
     if (objective.type === 'sellItem') return [];
+    const group = groupedItems.value;
     return getObjectiveEquipmentItems(
-      hasWeaponAlternatives.value ? { ...objective, usingWeapon: undefined } : objective
+      group?.field ? withoutGroupedItems(objective, group.field, group.items) : objective
     );
   });
-  const objectiveSellItems = computed(() => {
-    const objective = currentObjective.value;
-    if (objective.type !== 'sellItem') return [];
-    const items = objective.items?.length ? objective.items : [objective.item];
-    return items.filter((item): item is TarkovItem => Boolean(item?.id));
-  });
-  const objectiveSellPrimaryItem = computed(
-    () => currentObjective.value.item ?? objectiveSellItems.value[0]
-  );
   const parentTaskId = computed(() => {
     return fullObjective.value?.taskId ?? props.objective.taskId;
   });
@@ -233,12 +259,8 @@
     return isParentTaskComplete.value || isParentTaskFailed.value;
   });
   const objectiveItemDisplayProps = computed(() => ({
-    primaryItem: hasWeaponAlternatives.value
-      ? weaponAlternatives.value[0]
-      : objectiveSellPrimaryItem.value,
-    acceptedItems: hasWeaponAlternatives.value
-      ? weaponAlternatives.value
-      : objectiveSellItems.value,
+    primaryItem: groupedItems.value?.primary,
+    acceptedItems: groupedItems.value?.items ?? [],
     fallbackName: props.objective.description ?? '',
     paused: isParentTaskLocked.value || isComplete.value,
   }));

@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { RESOURCES } from '@/features/resources/resourceData';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import { previewGet, protectPreviewBrowser } from './access.mjs';
 import { previewOrigin } from './readiness.mjs';
+import { english, readPreviewSeo, socialTitle } from './seo-copy.mjs';
 const origin = previewOrigin();
 const canonicalOrigin = 'https://tarkovtracker.org';
 const publicPages = {
@@ -43,9 +43,7 @@ const privatePages = {
   '/oauth/consent': 'oauth_consent',
   '/not-found': 'not_found',
 };
-const english = JSON.parse(
-  readFileSync(new URL('../../../app/locales/en.json', import.meta.url), 'utf8')
-);
+const seo = readPreviewSeo(process.env.PREVIEW_SEO_COPY_PATH);
 const discordUserAgent = 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)';
 const discordFetch = (url, options) =>
   fetch(url, {
@@ -83,12 +81,12 @@ async function readMetadata(page, html) {
   return { ...document, meta };
 }
 function assertSocialMetadata(meta, copy, route) {
-  const title = copy.title.replace(/ · TarkovTracker\.org$/, '');
+  const title = socialTitle(copy);
   expect(meta['og:title']).toEqual([title]);
   expect(meta['twitter:title']).toEqual([title]);
   expect(meta['og:description']).toEqual([copy.description]);
   expect(meta['twitter:description']).toEqual([copy.description]);
-  expect(meta['og:site_name']).toEqual([english.seo.site_name]);
+  expect(meta['og:site_name']).toEqual([seo.site_name]);
   expect(meta['theme-color']).toEqual(['#c8a882']);
   assertSelectedImage(meta, route);
   expect(meta['og:type']).toEqual([route.startsWith('/resources/') ? 'article' : 'website']);
@@ -128,7 +126,7 @@ for (const [route, key] of Object.entries({ ...publicPages, ...privatePages })) 
     const response = await previewGet(request, `${origin}${route}`, origin, discordFetch, 10000);
     expect(response.status()).toBe(200);
     const document = await readMetadata(page, await response.text());
-    const copy = english.seo.routes[key];
+    const copy = seo.routes[key];
     expect(document.titles).toEqual([copy.title]);
     if (route === '/tasks') expect(document.hasMonitorGuide).toBe(true);
     if (route === '/needed-items') {
@@ -145,7 +143,7 @@ test('filter queries retain the clean route preview', async ({ page, request }) 
     const response = await previewGet(request, `${origin}${route}`, origin, discordFetch, 10000);
     expect(response.status()).toBe(200);
     const { meta, canonicals } = await readMetadata(page, await response.text());
-    expect(meta['og:title']).toEqual(['Tarkov Quest Tracker']);
+    expect(meta['og:title']).toEqual([socialTitle(seo.routes.tasks)]);
     expect(meta['og:url']).toEqual([`${canonicalOrigin}/tasks`]);
     expect(canonicals).toEqual([`${canonicalOrigin}/tasks`]);
     expect(JSON.stringify(meta)).not.toContain('private-filter');
@@ -180,7 +178,7 @@ test('private shells are unindexed and unknown routes return 404', async ({ page
   const profileMetadata = await readMetadata(page, profileHtml);
   expect(profileMetadata.canonicals).toEqual([]);
   expect(profileMetadata.meta['og:url']).toBeUndefined();
-  expect(profileMetadata.meta['og:title']).toEqual(['Player Profile']);
+  expect(profileMetadata.meta['og:title']).toEqual([socialTitle(seo.routes.profile)]);
   expect(JSON.stringify(profileMetadata.meta)).not.toContain('11111111');
 });
 test('legacy aliases remain HTTP 301 redirects', async ({ request }) => {
@@ -216,12 +214,12 @@ test('handle links use the private profile shell and load the public mode', asyn
 test('public to private to public navigation restores metadata', async ({ page }) => {
   await page.goto(`${origin}/resources/tarkovmonitor`, { waitUntil: 'networkidle' });
   await page.locator('footer a[href="/tasks"]').click();
-  await expect(page).toHaveTitle('Tarkov Quest Tracker · TarkovTracker.org');
+  await expect(page).toHaveTitle(seo.routes.tasks.title);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
   await page.locator('footer a[href="/team"]').click();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
   await page.locator('footer a[href="/tasks"]').click();
-  await expect(page).toHaveTitle('Tarkov Quest Tracker · TarkovTracker.org');
+  await expect(page).toHaveTitle(seo.routes.tasks.title);
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(1);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',

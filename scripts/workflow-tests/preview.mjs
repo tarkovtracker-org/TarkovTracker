@@ -12,7 +12,6 @@ import {
   publishControllerFailure,
   publishResult,
   reconcileMissingPreviewStatuses,
-  reconcilePreviewRequest,
   successMarker,
   verifyForDeploy,
   verifyManifest,
@@ -30,11 +29,12 @@ import {
   previewBuildEnv,
   resolveBuildProfile,
 } from '../preview/profile.mjs';
+import { FULL_VALIDATION_JOBS } from '../preview/queue-reuse.mjs';
 import { isForbiddenRequest, waitForDeployment } from '../preview/smoke/readiness.mjs';
+import { english, readPreviewSeo } from '../preview/smoke/seo-copy.mjs';
 import { countApiCalls } from './helpers/api-count.mjs';
 import { toolingPaths } from './helpers/queue-preview-scope.mjs';
 import { buildZip } from './helpers/zip.mjs';
-import { FULL_VALIDATION_JOBS } from '../preview/queue-reuse.mjs';
 const PREVIEW_OPT_IN_START = '2026-09-26T04:12:26Z';
 process.env.PREVIEW_OPT_IN_START = PREVIEW_OPT_IN_START;
 process.env.REVIEW_ADMISSION_APP_ID = '5328610';
@@ -58,6 +58,23 @@ function tempDir(t) {
 /* ------------------------------------------------------------------------------------------ */
 /* Profile                                                                                     */
 /* ------------------------------------------------------------------------------------------ */
+test('preview SEO expects candidate copy even when the trusted checkout has different copy', (t) => {
+  const file = join(tempDir(t), 'candidate-en.json');
+  const candidate = structuredClone(english);
+  candidate.seo.routes.kappa = {
+    title: 'Revised Kappa guide',
+    description: 'Updated Kappa guide description.',
+  };
+  writeFileSync(file, JSON.stringify(candidate));
+  const seo = readPreviewSeo(file);
+  assert.deepEqual(seo.routes.kappa, candidate.seo.routes.kappa);
+  assert.notDeepEqual(seo.routes.kappa, english.seo.routes.kappa);
+  assert.deepEqual(seo.routes.tasks, english.seo.routes.tasks);
+  assert.equal(seo.site_name, english.seo.site_name);
+  assert.throws(() => readPreviewSeo(file + '.missing'), { code: 'ENOENT' });
+  writeFileSync(file, '{"seo":{}}');
+  assert.throws(() => readPreviewSeo(file), /Missing SEO copy/);
+});
 test('preview branch names are deterministic, alias-safe and never the production branch', () => {
   assert.equal(previewBranchName({ pullRequest: 123 }), 'preview-pr-123');
   const staging = previewBranchName({ branch: 'wip/release-1.80.2-1234567890-1' });

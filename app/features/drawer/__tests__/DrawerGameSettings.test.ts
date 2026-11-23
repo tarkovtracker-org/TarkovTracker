@@ -88,6 +88,14 @@ describe('DrawerGameSettings', () => {
     expect(setPMCFactionMock).toHaveBeenCalledWith('BEAR');
     wrapper.unmount();
   });
+  it('gives each mode button its own selected-state tone', () => {
+    const wrapper = mount(DrawerGameSettings);
+    const buttons = wrapper.get('[role="group"][aria-label="Select game mode"]').findAll('button');
+    expect(buttons[0]!.classes()).toContain('aria-pressed:border-pvp-500/70');
+    expect(buttons[1]!.classes()).toContain('aria-pressed:border-pve-500/70');
+    expect(buttons[2]!.classes()).toContain('aria-pressed:border-warning-500/70');
+    wrapper.unmount();
+  });
   it('marks PvP selected for an unrecognized saved mode', () => {
     currentGameMode.value = 'unknown' as GameMode;
     const wrapper = mount(DrawerGameSettings);
@@ -97,11 +105,11 @@ describe('DrawerGameSettings', () => {
   });
   it('shows the active-season countdown and exact end timestamp', () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-08-05T13:44:00.000Z'));
+    vi.setSystemTime(new Date('2026-11-23T16:44:00.000Z'));
     currentGameMode.value = GAME_MODES.SEASONAL;
     const wrapper = mount(DrawerGameSettings);
     const countdown = wrapper.get('time');
-    expect(countdown.text()).toBe('Season 1 ends in 123d 20h 16m');
+    expect(countdown.text()).toBe('Season 1 ends in 13d 16h 16m');
     expect(countdown.attributes('datetime')).toBe(ACTIVE_SEASON.endsAt);
     wrapper.unmount();
   });
