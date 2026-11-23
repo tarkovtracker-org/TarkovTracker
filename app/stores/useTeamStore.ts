@@ -210,7 +210,7 @@ export type TeamChannelController = {
   /** Leaves the channel and waits for the leave to settle. */
   cleanup: () => Promise<void>;
   /** Refreshes members, then rebuilds the channel only if its bindings changed. */
-  refresh: () => Promise<'settled' | 'read-failed'>;
+  refresh: () => Promise<void>;
   /** Permanently stops the controller: no further setup or retry can run. */
   dispose: () => Promise<void>;
 };
@@ -461,16 +461,12 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     dispatchHydration(joinedTeamId);
     return true;
   };
-  const refreshForRequest = async (
-    requestVersion: number
-  ): ReturnType<TeamChannelController['refresh']> => {
-    if (!(await refreshMembersForRequest(requestVersion))) {
-      return isStale(requestVersion) ? 'settled' : 'read-failed';
-    }
-    if (!reuseCurrentBinding()) await setup(requestVersion);
-    return 'settled';
+  const refreshForRequest = async (requestVersion: number): Promise<void> => {
+    if (!(await refreshMembersForRequest(requestVersion))) return;
+    if (reuseCurrentBinding()) return;
+    await setup(requestVersion);
   };
-  const refresh = () => refreshForRequest(++version);
+  const refresh = (): Promise<void> => refreshForRequest(++version);
   return {
     cleanup,
     dispose: () => {
@@ -501,7 +497,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let latestMembersRequestVersion = 0;
   let disposed = false;
   let authSessionVersion = 0;
-  let initialTeamRefresh: ReturnType<TeamChannelController['refresh']> | null = null;
+  type MembersRead = { teamId: string; result: Promise<boolean> };
+  let latestMembersRead: MembersRead | null = null;
+  let initialTeamRefresh: Promise<void> | null = null;
   // Successful reads fence delayed snapshots, including reads that cancel the warning.
   let authoritativeDeadlineTeamId: string | null = null;
   let authoritativeOwnerTeamId: string | null = null;
@@ -520,6 +518,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     refreshInFlight = null;
     refreshInFlightTeamId = null;
     refreshContext = null;
+    latestMembersRead = null;
     initialTeamRefresh = null;
     lastMembersRefreshAt = 0;
   };
@@ -708,6 +707,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       queued: false,
     };
     const inFlightRequest = runRefresh(refreshContext, force);
+    latestMembersRead = { teamId: currentTeamId, result: inFlightRequest };
     refreshInFlight = inFlightRequest;
     refreshInFlightTeamId = currentTeamId;
     try {
@@ -728,15 +728,26 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     getTeamId: () => getTeamIdFromSystemStore(systemStore),
     refreshMembers,
   });
+  const failedLatestMembersRead = async (teamId: string): Promise<MembersRead | null> => {
+    const read = latestMembersRead;
+    if (read?.teamId !== teamId) return null;
+    const succeeded = await read.result;
+    if (read !== latestMembersRead) return failedLatestMembersRead(teamId);
+    return succeeded ? null : read;
+  };
+  const recoverInitialRoster = async (teamId: string, initialRefresh: Promise<void>) => {
+    await initialRefresh;
+    // Membership events can supersede channel setup while the roster read is pending.
+    const failed = await failedLatestMembersRead(teamId);
+    if (failed !== latestMembersRead || initialRefresh !== initialTeamRefresh) return;
+    if (failed?.teamId === getTeamIdFromSystemStore(systemStore)) await teamChannel.refresh();
+  };
   const handleInitialTeamData = (data: Record<string, unknown> | null) => {
     handleTeamData(data, false);
     const initialRefresh = initialTeamRefresh;
-    if (!data || !initialRefresh) return;
-    // If startup failed, the authorized team row still supplies one recovery attempt.
-    void initialRefresh.then((result) => {
-      if (result !== 'read-failed' || initialRefresh !== initialTeamRefresh) return;
-      if (data.id === getTeamIdFromSystemStore(systemStore)) return teamChannel.refresh();
-    });
+    if (typeof data?.id === 'string' && initialRefresh) {
+      void recoverInitialRoster(data.id, initialRefresh);
+    }
   };
   // Setup Supabase listener with custom onData handler
   // Mapping and deadline freshness belong to our handler, not the listener's generic patch.
