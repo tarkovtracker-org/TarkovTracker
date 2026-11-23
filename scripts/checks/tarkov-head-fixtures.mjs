@@ -89,7 +89,7 @@ for (const lang of languages) {
   stage(`strings/${lang}`, { strings });
 }
 export const tarkovHeadScopes = Object.keys(manifest.entries);
-export const tarkovHeadOutbound = { reads: 0 };
+export const tarkovHeadOutbound = { reads: 0, redirectSeasonPreview: false };
 function currentManifest() {
   if (!manifest.completedAt) manifest.completedAt = Date.now();
   return manifest;
@@ -118,10 +118,64 @@ export const tarkovHeadKv = {
     return snapshotStream(key, type);
   },
 };
+const seasonId = 'preview:untar-control';
+const previewPerk = (id, points) => ({
+  id: `${seasonId}:${id}`,
+  name: `${seasonId}:${id} name`,
+  description: `${seasonId}:${id} description`,
+  points,
+  exclusiveToPerks: [],
+  imageLink: null,
+});
+const previewCommon = [previewPerk('global', null)];
+const previewPersonal = [previewPerk('perk', -2), previewPerk('drawback', 2)];
+function seasonPreviewResponse(url, options) {
+  const pinned =
+    'https://raw.githubusercontent.com/tarkovtracker-org/tarkov-data-overlay/a749270dcad82b26334ccf6feb15b8f4a66ff145/src/previews/untar-control.json';
+  const request = new Request(url.href, options);
+  if (
+    ![
+      request.url === pinned,
+      request.headers.get('Authorization') === 'Bearer compiled-season-fixture-token',
+      request.redirect === 'manual',
+    ].every(Boolean)
+  )
+    throw new Error('Season preview must use scoped authorization and reject redirects');
+  if (tarkovHeadOutbound.redirectSeasonPreview)
+    return Response.redirect('https://example.invalid/redirected-catalog', 302);
+  return Response.json({
+    provisional: true,
+    source: 'https://t.me/escapefromtarkovEN/7003',
+    season: {
+      data: {
+        id: seasonId,
+        name: `${seasonId} name`,
+        start: null,
+        end: null,
+        perks: { common: previewCommon, personal: previewPersonal },
+      },
+      translations: ['$.data.name', '$.data.perks.*.*.name', '$.data.perks.*.*.description'],
+    },
+    season_en: {
+      data: {
+        [`${seasonId} name`]: 'UNTAR fixture',
+        ...Object.fromEntries(
+          [...previewCommon, ...previewPersonal].flatMap((perk) => [
+            [perk.name, 'Modifier'],
+            [perk.description, 'Effect'],
+          ])
+        ),
+      },
+    },
+  });
+}
 // Install before importing Nitro: ofetch captures global fetch during module evaluation.
-globalThis.fetch = async (input) => {
+globalThis.fetch = async (input, options) => {
   tarkovHeadOutbound.reads++;
   const url = new URL(input.url ?? input);
+  if (url.pathname.endsWith('/src/previews/untar-control.json')) {
+    return seasonPreviewResponse(url, options);
+  }
   if (url.hostname === 'raw.githubusercontent.com') {
     return Response.json({
       $meta: { ...identity, generated },

@@ -7,12 +7,14 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { createTestHarness } from 'wrangler';
 const root = fileURLToPath(new URL('../../', import.meta.url));
+const seasonPreviewRoute = 'season-preview';
 const tarkovRoutes = readdirSync(new URL('../../app/server/api/tarkov/', import.meta.url), {
   recursive: true,
 })
   .filter((name) => name.endsWith('.get.ts'))
   .map((name) => name.replaceAll('\\', '/').replace('.get.ts', ''));
 assert.ok(tarkovRoutes.includes('access-check'), 'Tarkov GET route discovery must not be empty');
+assert.ok(tarkovRoutes.includes(seasonPreviewRoute), 'Season preview GET route must be discovered');
 const routes = JSON.parse(readFileSync(join(root, 'dist', '_routes.json'), 'utf8'));
 const harness = createTestHarness({
   root,
@@ -23,7 +25,11 @@ const harness = createTestHarness({
         main: './scripts/checks/legacy-api-pages-worker.mjs',
         compatibility_date: '2026-01-09',
         compatibility_flags: ['nodejs_compat'],
-        vars: { APP_URL: 'https://tarkovtracker.org', NODE_ENV: 'production' },
+        vars: {
+          APP_URL: 'https://tarkovtracker.org',
+          NODE_ENV: 'production',
+          OVERLAY_TOKEN: 'compiled-season-fixture-token',
+        },
       },
     },
   ],
@@ -391,6 +397,15 @@ test('compiled warm catalog GET and HEAD retain last-good bytes during a KV outa
     assert.equal(await stale.text(), method === 'HEAD' ? '' : body);
   }
 });
+test('compiled season preview rejects a redirect without fetching its location', async () => {
+  const url = `https://tarkovtracker.org/api/tarkov/${seasonPreviewRoute}`;
+  const response = await harness.fetch(url, { headers: { 'X-Test-Season-Preview-Redirect': '1' } });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.equal(response.headers.has('Location'), false);
+  assert.equal(response.headers.get('X-Test-Upstream-Reads'), '1');
+  assert.deepEqual(outbound, []);
+});
 for (const route of tarkovRoutes) {
   test(`compiled ${route} HEAD preserves GET metadata without a body`, async () => {
     for (const suffix of ['', '/?gameMode=pve&lang=en']) {
@@ -401,7 +416,16 @@ for (const route of tarkovRoutes) {
       const get = await harness.fetch(url, { headers: { Accept: 'text/html' } });
       assert.equal(get.status, 200, `${url}: GET fixture must succeed`);
       assert.match(get.headers.get('Content-Type'), /^application\/json/, url);
-      await get.json();
+      const body = await get.json();
+      if (route === seasonPreviewRoute) {
+        assert.equal(body.provisional, true);
+        assert.equal(body.season.data.id, 'preview:untar-control');
+        assert.deepEqual(
+          body.season.data.perks.personal.map(({ points }) => points),
+          [-2, 2]
+        );
+        assert.ok(!JSON.stringify(body).includes('compiled-season-fixture-token'));
+      }
       for (const head of [coldHead, await requestHead()]) {
         assert.equal(head.status, get.status, url);
         for (const header of [

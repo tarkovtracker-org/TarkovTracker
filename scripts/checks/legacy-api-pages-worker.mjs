@@ -28,6 +28,9 @@ async function clearCatalogCache(request) {
 export default {
   async fetch(request, env, context) {
     tarkovHeadOutbound.reads = 0;
+    tarkovHeadOutbound.redirectSeasonPreview = request.headers.has(
+      'X-Test-Season-Preview-Redirect'
+    );
     await clearCatalogCache(request);
     let bodyReads = 0;
     const read = request.arrayBuffer.bind(request);

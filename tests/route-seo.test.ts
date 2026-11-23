@@ -54,6 +54,15 @@ describe('route SEO registry', () => {
       CLIENT_DOCUMENT_ROUTES.length
     );
   });
+  it('serves the provisional planner as a noindex client document', () => {
+    const route = '/resources/seasonal-modifiers';
+    expect(CLIENT_DOCUMENT_ROUTES).toContain(route);
+    expect(PUBLIC_SEO_ROUTES).not.toContain(route);
+    expect(resolveRouteSeo(route)).toMatchObject({ indexable: false });
+    expect(createRouteSeoHead(route).meta).toContainEqual(
+      expect.objectContaining({ name: 'robots', content: 'noindex, nofollow' })
+    );
+  });
   it('omits personalized profile canonicals and excludes query values from head output', () => {
     for (const path of ['/profile', '/profile/private-user/pve?token=secret']) {
       const head = createRouteSeoHead(path);

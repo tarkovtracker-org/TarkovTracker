@@ -41,12 +41,30 @@
     </ul>
     <div class="bg-divider mx-3 my-2 h-px" aria-hidden="true"></div>
     <ul class="flex flex-col gap-0.5 px-1 pb-2">
-      <DrawerItem
-        icon="i-mdi-compass"
-        locale-key="navigation_drawer.resources"
-        to="/resources"
-        :is-collapsed="props.isCollapsed"
-      />
+      <li>
+        <AppTooltip
+          :text="t('navigation_drawer.resources')"
+          :disabled="!props.isCollapsed"
+          :content="{ side: 'right' }"
+        >
+          <UDropdownMenu
+            :items="resourceLinks"
+            :content="{ side: props.isCollapsed ? 'right' : 'bottom', align: 'start' }"
+          >
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-mdi-compass"
+              :trailing-icon="props.isCollapsed ? undefined : 'i-mdi-chevron-down'"
+              :label="props.isCollapsed ? undefined : t('navigation_drawer.resources')"
+              :aria-label="t('navigation_drawer.resources')"
+              class="min-h-10 w-full rounded-sm border-l-2 px-3 text-sm"
+              :class="resourceButtonClass"
+              :ui="{ trailingIcon: 'ms-auto' }"
+            />
+          </UDropdownMenu>
+        </AppTooltip>
+      </li>
       <DrawerItem
         icon="i-mdi-cog"
         locale-key="common.settings"
@@ -57,7 +75,9 @@
   </div>
 </template>
 <script setup lang="ts">
+  import AppTooltip from '@/components/ui/AppTooltip.vue';
   import DrawerItem from '@/features/drawer/DrawerItem.vue';
+  import { isNavigationRouteActive } from '@/features/drawer/navigation';
   const props = defineProps({
     isCollapsed: {
       type: Boolean,
@@ -65,4 +85,15 @@
     },
   });
   const { t } = useI18n({ useScope: 'global' });
+  const route = useRoute();
+  const resourceLinks = computed(() => [
+    { label: t('navigation_drawer.resources_overview'), to: '/resources' },
+    { label: t('page.seasonal_modifiers.title'), to: '/resources/seasonal-modifiers' },
+  ]);
+  const resourceButtonClass = computed(() => [
+    props.isCollapsed && 'justify-center',
+    isNavigationRouteActive('/resources', route.path)
+      ? 'border-primary-500 bg-surface-800/50 text-surface-50'
+      : 'border-transparent text-surface-300',
+  ]);
 </script>
