@@ -86,6 +86,17 @@ export class AdmissionHeld extends AdmissionDenied {}
 export function requireEvidence(condition, message) {
   if (!condition) throw new AdmissionDenied(message);
 }
+// A just-dispatched run can return 404 briefly before the API shows it. Treat that as pending so
+// the caller's bounded poll retries; every other read failure stays fatal.
+export function pendingWhileMissing(read) {
+  try {
+    return read();
+  } catch (error) {
+    if (/\(HTTP 404\)/.test(String(error?.stderr)))
+      throw new AdmissionPending('Admission run is not visible yet.');
+    throw error;
+  }
+}
 function requirePolicy(condition, message) {
   if (!condition) throw new AdmissionHeld(message);
 }

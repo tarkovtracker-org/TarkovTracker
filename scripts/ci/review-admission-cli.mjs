@@ -1,7 +1,12 @@
 // Trusted workflow helper; gh authentication is inherited without printing credentials.
 import { execFileSync } from 'node:child_process';
 import { requireReviewAdmission } from './review-admission-binding.mjs';
-import { AdmissionPending, requireEvidence, SHA } from './review-admission-policy.mjs';
+import {
+  AdmissionPending,
+  pendingWhileMissing,
+  requireEvidence,
+  SHA,
+} from './review-admission-policy.mjs';
 function request(endpoint, flags = []) {
   return execFileSync('gh', ['api', endpoint, ...flags], {
     maxBuffer: 2000000,
@@ -62,7 +67,7 @@ function adapter() {
             `${repository(params)}/actions/runs/${params.run_id}/attempts/${params.attempt_number}`
           ),
         getWorkflowRun: async (params) =>
-          json(`${repository(params)}/actions/runs/${params.run_id}`),
+          pendingWhileMissing(() => json(`${repository(params)}/actions/runs/${params.run_id}`)),
         listWorkflowRunArtifacts: (params) =>
           `${repository(params)}/actions/runs/${params.run_id}/artifacts?per_page=100`,
         downloadArtifact: async (params) => ({
