@@ -302,10 +302,10 @@ Page load
 
 Trader summaries keep task progress, loyalty level, and reputation visible. Fence shows Scav Karma.
 One inline editor opens at a time. Locked traders appear at the end of the same grid with their
-lock status and unlock requirements visible. Reputation edits commit on blur or Enter. Changing
-loyalty commits immediately and raises reputation to the catalog minimum when necessary. Existing
-standing is read as stored until edited, and the editor rejects reputation below the selected
-loyalty level's minimum.
+lock status and unlock requirements visible, with links to known quests or storyline objectives.
+Reputation edits commit on blur or Enter. Changing loyalty commits immediately and raises
+reputation to the catalog minimum when necessary. Existing standing is read as stored until
+edited, and the editor rejects reputation below the selected loyalty level's minimum.
 
 ## Light/dark theme system
 

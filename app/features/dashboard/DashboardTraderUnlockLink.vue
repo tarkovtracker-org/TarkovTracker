@@ -4,7 +4,7 @@
     :to="link.to"
     class="bg-surface-900 border-surface-700/70 group flex min-h-12 w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-start"
     :class="{
-      'hover:bg-surface-800 focus-visible:ring-primary-500 focus-visible:ring-2 focus-visible:outline-none':
+      'hover:bg-surface-800 focus-visible:ring-primary-500 focus:outline-hidden focus-visible:ring-2':
         link.to,
     }"
     data-testid="trader-unlock-requirement"
@@ -34,7 +34,7 @@
           {{ $t('common.locked') }}
         </span>
       </span>
-      <span class="text-surface-300 text-xs wrap-anywhere">
+      <span class="text-surface-300 text-xs wrap-anywhere" data-testid="trader-unlock-message">
         {{ $t(link.labelKey, link.labelParams) }}
         <span
           v-if="link.target"
