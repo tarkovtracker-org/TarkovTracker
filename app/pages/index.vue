@@ -186,8 +186,6 @@
     await nextTick();
     const traderElement = document.getElementById(`dashboard-trader-${traderId}`);
     if (!traderElement) return;
-    const lockedGroup = traderElement.closest('details');
-    if (lockedGroup) lockedGroup.open = true;
     clearTraderHighlight();
     highlightedTraderId.value = traderId;
     traderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });

@@ -100,8 +100,9 @@ it('closes the editor when the selected trader locks and keeps it closed after u
   await grid.setProps({
     traders: [{ ...traders[0]!, unlock: { kind: 'unknown' } }, ...traders.slice(1)],
   });
-  expect(grid.get('details').attributes('open')).toBeUndefined();
-  expect(grid.find('details #dashboard-trader-prapor').exists()).toBe(true);
+  expect(grid.find('details').exists()).toBe(false);
+  const locked = grid.get('#dashboard-trader-prapor');
+  expect(locked.element.previousElementSibling?.id).toBe('dashboard-trader-peacekeeper');
   expect(grid.find(editorSelector).exists()).toBe(false);
   await grid.setProps({ traders });
   expect(grid.find(editorSelector).exists()).toBe(false);

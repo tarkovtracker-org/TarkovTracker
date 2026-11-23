@@ -950,7 +950,6 @@
         "standing_saved": "Updated in this browser",
         "scav_karma": "Scav Karma",
         "karma_short": "Karma {value}",
-        "locked_traders": "Locked traders ({count})",
         "sort": {
           "aria_label": "Sort traders",
           "direction_aria_label": "Toggle sort direction"

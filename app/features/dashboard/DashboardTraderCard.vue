@@ -1,10 +1,5 @@
 <template>
-  <div v-if="unlock" class="flex items-center gap-3">
-    <span class="text-surface-200 min-w-0 basis-36 text-sm font-medium break-words">
-      {{ trader.name }}
-    </span>
-    <DashboardTraderUnlockLink class="min-w-0 flex-1" :unlock="unlock" />
-  </div>
+  <DashboardTraderUnlockLink v-if="unlock" :trader="trader" :unlock="unlock" />
   <button
     v-else
     type="button"

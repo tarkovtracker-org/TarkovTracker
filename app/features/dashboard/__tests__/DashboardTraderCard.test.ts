@@ -168,6 +168,8 @@ describe('DashboardTraderCard', () => {
       unlock: { kind: 'task', task: { id: 'task-1', name: 'Getting Acquainted' } },
     });
     const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
+    expect(requirement.text()).toContain('Prapor');
+    expect(requirement.text()).toContain('common.locked');
     expect(requirement.text()).toContain('Getting Acquainted');
     expect(JSON.parse(requirement.attributes('data-to')!)).toEqual({
       path: '/tasks',
@@ -178,13 +180,13 @@ describe('DashboardTraderCard', () => {
     const wrapper = createWrapper({ unlock: { kind: 'unknown' } });
     const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
     expect(requirement.element.tagName).toBe('DIV');
-    expect(requirement.text()).toBe('page.dashboard.traders.unlock_unconfirmed');
+    expect(requirement.text()).toContain('page.dashboard.traders.unlock_unconfirmed');
   });
   it('shows a neutral status when unlock data is unavailable', () => {
     const wrapper = createWrapper({ unlock: { kind: 'pending' } });
     const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
     expect(requirement.element.tagName).toBe('DIV');
-    expect(requirement.text()).toBe('page.dashboard.traders.unlock_unavailable');
+    expect(requirement.text()).toContain('page.dashboard.traders.unlock_unavailable');
   });
   it('hides progress and loyalty controls while locked', () => {
     const wrapper = createWrapper({

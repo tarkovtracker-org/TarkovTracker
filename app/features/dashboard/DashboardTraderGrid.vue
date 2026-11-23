@@ -1,5 +1,5 @@
 <template>
-  <div class="@container space-y-3">
+  <div class="@container">
     <div
       ref="traderGrid"
       class="grid grid-cols-1 gap-1.5 @min-[32rem]:grid-cols-2 @min-[60rem]:grid-cols-4"
@@ -18,30 +18,13 @@
           :completed-tasks="item.trader.completedTasks"
           :total-tasks="item.trader.totalTasks"
           :percentage="item.trader.percentage"
+          :unlock="item.trader.unlock"
           :expanded="expandedTraderId === item.trader.id"
           :class="traderHighlightClass(item.trader.id)"
           @toggle="toggleTraderEditor(item.trader.id)"
         />
       </template>
     </div>
-    <details v-if="lockedTraders.length" class="border-surface-700/70 border-t">
-      <summary class="text-surface-200 min-h-11 cursor-pointer py-3 text-sm font-medium">
-        {{ $t('page.dashboard.traders.locked_traders', { count: lockedTraders.length }) }}
-      </summary>
-      <div class="space-y-2 pb-2">
-        <DashboardTraderCard
-          v-for="trader in lockedTraders"
-          :id="`dashboard-trader-${trader.id}`"
-          :key="trader.id"
-          :trader="trader"
-          :completed-tasks="trader.completedTasks"
-          :total-tasks="trader.totalTasks"
-          :percentage="trader.percentage"
-          :unlock="trader.unlock"
-          :class="traderHighlightClass(trader.id)"
-        />
-      </div>
-    </details>
   </div>
 </template>
 <script setup lang="ts">
@@ -66,14 +49,14 @@
     expandedTraderId.value = null;
   });
   const traderGridItems = computed(() => {
-    const items = unlockedTraders.value.map((trader) => ({
+    const items = [...unlockedTraders.value, ...lockedTraders.value].map((trader) => ({
       trader,
       key: `trader-${trader.id}`,
       editor: false,
     }));
     const index = items.findIndex(({ trader }) => trader.id === expandedTraderId.value);
     const selected = items[index];
-    if (!selected) return items;
+    if (!selected || selected.trader.unlock) return items;
     const columns = traderGridColumns.value;
     const rowEnd = Math.ceil((index + 1) / columns) * columns;
     items.splice(rowEnd, 0, {
