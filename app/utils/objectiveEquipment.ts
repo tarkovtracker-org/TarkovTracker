@@ -1,4 +1,12 @@
 import type { ObjectiveEquipment, TarkovItem } from '@/types/tarkov';
+export function distinctObjectiveItems(items: readonly (TarkovItem | undefined)[]): TarkovItem[] {
+  const seen = new Set<string>();
+  return items.filter((item): item is TarkovItem => {
+    if (!item?.id || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
 /** Flatten only for item presentation; the stored objective retains its equipment groups. */
 export function objectiveEquipmentItems(value: ObjectiveEquipment | undefined): TarkovItem[] {
   if (value === undefined) return [];
