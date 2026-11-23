@@ -827,17 +827,6 @@ standalone release candidates read the head status. A briefly missing test merge
 the result stays pending. The hourly fallback re-evaluates that head once the test merge
 becomes available after the event retry. One required context appears per PR.
 
-**Late-build shadow:** `gh workflow run finalization-shadow.yml --ref main -f pull_request=<pr-number> -f ci_run_id=<ci-run-id>`.
-Only a maintain/admin actor can request this non-authoritative rehearsal. It checks the current
-PR, base, test merge, CI run and attempt, then builds a deployable candidate in an isolated
-credential-free container unless the PR has no deployable changes. A trusted host step rejects links and special
-files before upload; a fresh trusted runner seals the output as
-`pages-preview-shadow`. The shadow does not deploy, publish `CI Result`/`Preview Result`, or change
-merge behavior. Ordinary PR CI continues to build and upload `pages-preview`. Re-dispatch after a
-push or base change; dispatch from `main` so the trusted default-branch workflow definition runs.
-Requests without deployable changes recheck the revision before finishing. Fork runs without a CI API base snapshot
-fail closed in the shadow; the existing protected `preview-fork` deployment path is unaffected.
-
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
 requests one after all candidate checks pass and remains the sole automatic request owner for

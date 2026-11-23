@@ -4,6 +4,8 @@ Baseline: `b09cd3cc79a269b2e20ab93276a3f83f99a25daa`, inspected 2026-10-02.
 This audit proposes one bounded setup optimization. It does not change the classifier,
 selected checks, workflow triggers, permissions, production gates, or preview automation.
 PR #1011's discovery brief is advisory; its classifier consumer remains compatible.
+The tables below record the baseline; the Finalization Shadow workflow they list was later
+removed in #1573.
 
 ## Current coverage and triggers
 
