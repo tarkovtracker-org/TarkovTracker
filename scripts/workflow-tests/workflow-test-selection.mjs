@@ -45,6 +45,16 @@ test('app-only PRs run only the selection regressions', () => {
     );
   }
   assert.deepEqual(selectWorkflowTests(all, environment([helper, 'app/pages/index.vue'])), all);
+  const valid = classifyPaths(['app/features/tasks/TaskCard.vue']);
+  for (const extra of [42, null, { toString: () => 'app/a.vue' }])
+    assert.deepEqual(
+      selectWorkflowTests(all, {
+        WORKFLOW_TEST_EVENT: 'pull_request',
+        WORKFLOW_TEST_PLAN: JSON.stringify({ ...valid, paths: [...valid.paths, extra] }),
+      }),
+      all,
+      String(extra)
+    );
   for (const event of ['push', 'merge_group', 'workflow_dispatch'])
     assert.deepEqual(
       selectWorkflowTests(all, {

@@ -28,7 +28,8 @@ Vitest tests, the application tests, all required CI jobs and the aggregate rema
 Pull requests that change only other `app/` files select just the selection regressions; locale
 files and `app/utils/locales.ts` stay excluded because this suite and Crowdin tooling read them.
 This is a deliberately narrow dependency boundary, not a general affected-test graph. Update it
-when a workflow test starts reading an `app/` file. Workflow, tooling, configuration, mixed or
-unknown paths, malformed or missing plans, main pushes and merge groups run the full Node suite.
+when a workflow test, release test, or Crowdin tool starts reading an `app/` file. Workflow,
+tooling, configuration, mixed or unknown paths, malformed or missing plans, main pushes and merge
+groups run the full Node suite.
 Local `pnpm run test:workflow` also defaults to the full suite; clearing the two `WORKFLOW_TEST_*`
 variables is the rollback.

@@ -29,7 +29,8 @@ function planPaths(plan) {
   return isValidPlan(plan) && plan.full ? nonEmpty(plan.paths) : null;
 }
 function appOnly(path) {
-  return appPath.test(path) && !path.startsWith('app/locales/') && !toolingAppPaths.has(path);
+  if (typeof path !== 'string' || !appPath.test(path)) return false;
+  return !path.startsWith('app/locales/') && !toolingAppPaths.has(path);
 }
 function reducedTests(paths) {
   if (paths.every(appOnly)) return selectionTests;
