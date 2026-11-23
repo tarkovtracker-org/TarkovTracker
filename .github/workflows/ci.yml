@@ -87,6 +87,12 @@ jobs:
             args+=(--full)
           fi
           node scripts/ci/validate-changes.mjs "${args[@]}"
+      - name: Observe Supabase DB selection
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          VALIDATION_PLAN: ${{ steps.plan.outputs.plan }}
+        run: node scripts/ci/supabase-shadow.mjs
   fallow:
     needs: changes
     if: needs.changes.outputs.full == 'true'

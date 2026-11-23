@@ -169,6 +169,8 @@ console.log(
           'Workflow started_at to updated_at (completion-time proxy); reruns use latest attempt duration.',
         runner_minutes:
           'Sum of executed job durations over all attempts; excludes queue time and is not billable-minute rounding.',
+        ci_balance:
+          'Full successful CI Result attempts only. The Supabase gate gap holds all other job end times fixed.',
         first_ci_pass:
           'First attempt of earliest associated CI run succeeded; null when historical association is unavailable.',
         missing_metrics:
