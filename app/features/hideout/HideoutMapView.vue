@@ -21,7 +21,7 @@
       ref="details"
       :aria-label="selected?.station.name ?? t('page.hideout.map.upgrades')"
       tabindex="-1"
-      class="border-surface-700 space-y-3 border-t p-3 lg:min-h-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:[contain:size]"
+      class="border-surface-700 scroll-mt-(--shell-bar-h) space-y-3 border-t p-3 lg:min-h-0 lg:overflow-y-auto lg:border-t-0 lg:border-l lg:[contain:size]"
     >
       <UButton
         v-if="area || selected"
