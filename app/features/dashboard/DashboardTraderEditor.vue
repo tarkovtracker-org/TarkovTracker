@@ -21,8 +21,7 @@
         class="bg-surface-900 border-surface-600 focus-visible:ring-primary-500 aria-invalid:border-error-500 min-h-11 w-22 rounded-md border px-2 text-base tabular-nums focus-visible:ring-2 focus-visible:outline-none"
         :aria-invalid="Boolean(error)"
         :aria-describedby="requirementId"
-        @focus="editing = true"
-        @input="clearFeedback"
+        @input="onReputationInput"
         @blur="commitReputation"
         @keydown.enter.prevent="($event.target as HTMLInputElement).blur()"
       />
@@ -104,35 +103,46 @@
     requirement.value ? `dashboard-trader-requirement-${props.trader.id}` : undefined
   );
   const draft = ref(reputation.value.toFixed(2));
-  const editing = ref(false);
+  const draftBase = ref<number | null>(null);
   const error = ref<'invalid' | 'minimum' | null>(null);
-  const saved = ref<'updated' | 'raised' | null>(null);
-  const feedback = computed(() => {
-    if (error.value === 'invalid') return t('page.dashboard.traders.rep_invalid');
-    if (error.value === 'minimum') {
-      return t('page.dashboard.traders.rep_below_minimum', { value: minimum.value.toFixed(2) });
-    }
-    if (saved.value === 'raised') {
-      return t('page.dashboard.traders.rep_raised', { value: reputation.value.toFixed(2) });
-    }
-    return saved.value ? t('page.dashboard.traders.standing_saved') : '';
-  });
+  const saved = ref('');
+  const minimumAllowed = computed(() => minimum.value || -10);
+  function validationMessage(issue: 'invalid' | 'minimum') {
+    return issue === 'invalid'
+      ? t('page.dashboard.traders.rep_invalid')
+      : t('page.dashboard.traders.rep_below_minimum', { value: minimum.value.toFixed(2) });
+  }
+  const feedback = computed(() => (error.value ? validationMessage(error.value) : saved.value));
   watch(reputation, (value) => {
-    if (!editing.value) draft.value = value.toFixed(2);
+    const formatted = value.toFixed(2);
+    if (draftBase.value !== null || draft.value === formatted) return;
+    draft.value = formatted;
+    clearFeedback();
   });
   function clearFeedback() {
     error.value = null;
-    saved.value = null;
+    saved.value = '';
+  }
+  function onReputationInput() {
+    draftBase.value ??= reputation.value;
+    clearFeedback();
+  }
+  function raiseReputationForLevel(required: number) {
+    if (!hasReputation.value || required <= 0 || reputation.value >= required) return false;
+    tarkovStore.setTraderReputation(props.trader.id, required);
+    return true;
   }
   function updateLevel(event: Event) {
     const next = Number((event.target as HTMLSelectElement).value);
     const required = minimumFor(next);
-    const raiseReputation = hasReputation.value && required > 0 && reputation.value < required;
     clearFeedback();
-    if (raiseReputation) tarkovStore.setTraderReputation(props.trader.id, required);
+    const raised = raiseReputationForLevel(required);
     tarkovStore.setTraderLevel(props.trader.id, next);
+    draftBase.value = null;
     draft.value = reputation.value.toFixed(2);
-    saved.value = raiseReputation ? 'raised' : 'updated';
+    saved.value = raised
+      ? t('page.dashboard.traders.rep_raised', { value: required.toFixed(2) })
+      : t('page.dashboard.traders.standing_saved');
   }
   function parseReputation(text: string): number | null {
     const normalized = text.trim().replace(',', '.');
@@ -142,19 +152,27 @@
     return Number(Math.max(-10, Math.min(Math.max(10, minimum.value), value)).toFixed(2));
   }
   function commitReputation() {
-    editing.value = false;
-    if (draft.value === reputation.value.toFixed(2)) return;
+    const base = draftBase.value;
+    if (base === null) return;
+    draftBase.value = null;
     const value = parseReputation(draft.value);
     if (value === null) {
       error.value = 'invalid';
       return;
     }
-    if (minimum.value > 0 && value < minimum.value) {
+    applyReputationEdit(value, base);
+  }
+  function applyReputationEdit(value: number, base: number) {
+    if (value === base || value === reputation.value) {
+      draft.value = reputation.value.toFixed(2);
+      return;
+    }
+    if (value < minimumAllowed.value) {
       error.value = 'minimum';
       return;
     }
     tarkovStore.setTraderReputation(props.trader.id, value);
     draft.value = value.toFixed(2);
-    saved.value = 'updated';
+    saved.value = t('page.dashboard.traders.standing_saved');
   }
 </script>

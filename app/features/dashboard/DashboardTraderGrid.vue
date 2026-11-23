@@ -61,6 +61,10 @@
   });
   const unlockedTraders = computed(() => props.traders.filter((trader) => !trader.unlock));
   const lockedTraders = computed(() => props.traders.filter((trader) => trader.unlock));
+  watch(unlockedTraders, (traders) => {
+    if (traders.some(({ id }) => id === expandedTraderId.value)) return;
+    expandedTraderId.value = null;
+  });
   const traderGridItems = computed(() => {
     const items = unlockedTraders.value.map((trader) => ({
       trader,

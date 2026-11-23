@@ -153,7 +153,7 @@ describe('DashboardTraderCard', () => {
       query: { chapter: 'tour', objective: 'talk-to-prapor' },
     });
   });
-  it('opens the traders view on this trader', async () => {
+  it('opens the tasks view directly for a trader without standing controls', async () => {
     const wrapper = createWrapper({ trader: { ...baseTrader, normalizedName: 'lightkeeper' } });
     await wrapper.get('[aria-label="page.dashboard.traders.view_tasks"]').trigger('click');
     expect(pushMock).toHaveBeenCalledWith({ path: '/tasks/traders', query: { trader: 'prapor' } });
@@ -242,5 +242,41 @@ describe('DashboardTraderCard', () => {
     await karma.setValue('-0.25');
     await karma.trigger('blur');
     expect(setTraderReputation).toHaveBeenCalledWith('fence', -0.25);
+  });
+  it('updates an untouched focused field when reputation syncs and skips the blur write', async () => {
+    const editor = createEditor();
+    const rep = editor.get('input');
+    await rep.trigger('focus');
+    mockState.reputation = 0.5;
+    await editor.vm.$nextTick();
+    expect(rep.element.value).toBe('0.50');
+    await rep.trigger('blur');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+  });
+  it('preserves a changed draft through sync and commits it when focus leaves', async () => {
+    const editor = createEditor();
+    const rep = editor.get('input');
+    await rep.trigger('focus');
+    await rep.setValue('0.70');
+    mockState.reputation = 0.5;
+    await editor.vm.$nextTick();
+    expect(rep.element.value).toBe('0.70');
+    await rep.trigger('blur');
+    expect(setTraderReputation).toHaveBeenCalledExactlyOnceWith('prapor', 0.7);
+  });
+  it('avoids a write for equivalent input, even when reputation synced during editing', async () => {
+    mockState.reputation = 0.2;
+    const editor = createEditor();
+    const rep = editor.get('input');
+    await rep.setValue('0,2');
+    mockState.reputation = 0.5;
+    await editor.vm.$nextTick();
+    await rep.trigger('blur');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+    expect(rep.element.value).toBe('0.50');
+    await rep.setValue('0.5');
+    await rep.trigger('blur');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+    expect(rep.element.value).toBe('0.50');
   });
 });
