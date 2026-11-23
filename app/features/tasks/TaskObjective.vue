@@ -211,13 +211,16 @@
     const items = distinctItems(currentObjective.value[field] ?? []);
     return items.length > 1 ? { field, items, primary: items[0] } : undefined;
   };
+  const useItemAlternatives = computed(() =>
+    currentObjective.value.type === 'useItem' ? getItemAlternatives('useAny') : undefined
+  );
   const groupedItems = computed(() => {
     if (currentObjective.value.type === 'sellItem') return sellItems.value;
     if (weaponAlternatives.value.length > 1) {
       const items = weaponAlternatives.value;
       return { field: 'usingWeapon' as const, items, primary: items[0] };
     }
-    return getItemAlternatives('useAny') ?? getItemAlternatives('items');
+    return useItemAlternatives.value ?? getItemAlternatives('items');
   });
   const withoutGroupedItems = (
     objective: TaskObjective,

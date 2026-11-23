@@ -181,6 +181,12 @@ describe('TaskObjective interaction boundaries', () => {
     expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual(useAny);
     expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([equipment]);
   });
+  it('keeps use-any equipment inline on other objective types', () => {
+    const useAny = [{ id: 'first' }, { id: 'second' }];
+    const wrapper = createWrapper({ type: 'shoot', useAny });
+    expect(wrapper.findComponent(ObjectiveItemDisplay).exists()).toBe(false);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual(useAny);
+  });
   it('keeps overlapping use-any items out of the equipment strip', () => {
     const first = { id: 'first' };
     const second = { id: 'second' };
