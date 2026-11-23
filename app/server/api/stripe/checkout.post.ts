@@ -32,7 +32,8 @@ export default defineEventHandler(async (event) => {
   }
   const email = authUser?.email;
   const rawBody = await readBody(event);
-  const { mode, tier, interval, amount } = validateCheckoutBody(rawBody);
+  const { mode, tier, interval, amount, checkoutAttemptId } = validateCheckoutBody(rawBody);
+  const options = checkoutRequestOptions(userId, checkoutAttemptId);
   await requireSupporterBenefitsAvailable(event, userId);
   const stripe = new Stripe(stripeSecretKey);
   const appUrl = (config.public.appUrl as string) || 'https://tarkovtracker.org';
@@ -67,26 +68,29 @@ export default defineEventHandler(async (event) => {
   if (mode === 'payment') {
     const amountCents = validateOneTimeAmount(amount);
     try {
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        client_reference_id: userId,
-        ...customerFields,
-        ...(existingCustomerId ? {} : { customer_creation: 'always' as const }),
-        metadata: { tier: 'supporter', type: 'one_time', user_id: userId },
-        payment_intent_data: { metadata: { user_id: userId } },
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: { name: 'TarkovTracker One-Time Support' },
-              unit_amount: amountCents,
+      const session = await stripe.checkout.sessions.create(
+        {
+          mode: 'payment',
+          client_reference_id: userId,
+          ...customerFields,
+          ...(existingCustomerId ? {} : { customer_creation: 'always' as const }),
+          metadata: { tier: 'supporter', type: 'one_time', user_id: userId },
+          payment_intent_data: { metadata: { user_id: userId } },
+          line_items: [
+            {
+              price_data: {
+                currency: 'usd',
+                product_data: { name: 'TarkovTracker One-Time Support' },
+                unit_amount: amountCents,
+              },
+              quantity: 1,
             },
-            quantity: 1,
-          },
-        ],
-        success_url: `${appUrl}/supporter?thanks=one_time`,
-        cancel_url: `${appUrl}/supporter`,
-      });
+          ],
+          success_url: `${appUrl}/supporter?thanks=one_time`,
+          cancel_url: `${appUrl}/supporter`,
+        },
+        options
+      );
       return { url: session.url };
     } catch (err: unknown) {
       logger.error('[Stripe Checkout] One-time session creation failed', { userId, err });
@@ -119,16 +123,19 @@ export default defineEventHandler(async (event) => {
     });
   }
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      client_reference_id: userId,
-      ...customerFields,
-      metadata: { tier, interval, type: 'subscription', user_id: userId },
-      subscription_data: { metadata: { tier, interval, user_id: userId } },
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${appUrl}/supporter?thanks=${tier}`,
-      cancel_url: `${appUrl}/supporter`,
-    });
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'subscription',
+        client_reference_id: userId,
+        ...customerFields,
+        metadata: { tier, interval, type: 'subscription', user_id: userId },
+        subscription_data: { metadata: { tier, interval, user_id: userId } },
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${appUrl}/supporter?thanks=${tier}`,
+        cancel_url: `${appUrl}/supporter`,
+      },
+      options
+    );
     return { url: session.url };
   } catch (err: unknown) {
     logger.error('[Stripe Checkout] Subscription session creation failed', {
@@ -140,6 +147,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 502, message: 'Failed to create subscription' });
   }
 });
+function checkoutRequestOptions(userId: string, attemptId?: string): Stripe.RequestOptions {
+  return attemptId ? { idempotencyKey: `supporter-checkout:${userId}:${attemptId}` } : {};
+}
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

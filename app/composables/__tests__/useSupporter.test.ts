@@ -467,6 +467,50 @@ describe('useSupporter', () => {
       new Set(createdChannels)
     );
   });
+  it('blocks overlapping requests across checkout controls', async () => {
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+    const response = createDeferred<{ url: string }>();
+    mockFetch.mockReturnValue(response.promise);
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const first = useSupporter().createCheckout({ mode: 'subscription', tier: 'scav' });
+    const otherControl = useSupporter();
+    const pending = otherControl.checkoutPending?.value;
+    const overlapping = otherControl.createCheckout({ mode: 'payment', amount: 5 });
+    response.resolve({ url: 'https://checkout.test' });
+    await expect(overlapping).resolves.toBeNull();
+    await expect(first).resolves.toBe('https://checkout.test');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(pending).toBe(true);
+    expect(otherControl.checkoutPending.value).toBe(false);
+  });
+  it.each([0, 23 * 60 * 60 * 1000])('reuses the attempt ID on retry after %d ms', async (delay) => {
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+    mockFetch
+      .mockRejectedValueOnce(new Error('Connection lost'))
+      .mockResolvedValue({ url: 'https://checkout.test' });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const params = { mode: 'payment', amount: 5 } as const;
+    await expect(supporter.createCheckout(params)).resolves.toBeNull();
+    const retryAt = Date.now() + delay;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(retryAt);
+    try {
+      await expect(supporter.createCheckout(params)).resolves.toBe('https://checkout.test');
+    } finally {
+      clock.mockRestore();
+    }
+    await expect(supporter.createCheckout(params)).resolves.toBe('https://checkout.test');
+    const ids = mockFetch.mock.calls.map(([, options]) => options.body.checkoutAttemptId);
+    expect(ids[0]).toEqual(expect.any(String));
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[0]);
+  });
   it('refreshes auth before creating a checkout session when no cached token exists', async () => {
     mockFetch.mockResolvedValue({ url: 'https://checkout.test' });
     mockSupabase.client.auth.getSession.mockResolvedValue({
@@ -483,7 +527,7 @@ describe('useSupporter', () => {
       'https://checkout.test'
     );
     expect(mockFetch).toHaveBeenCalledWith('/api/stripe/checkout', {
-      body: { mode: 'payment' },
+      body: { mode: 'payment', checkoutAttemptId: expect.any(String) },
       headers: { Authorization: 'Bearer refreshed-token' },
       method: 'POST',
     });

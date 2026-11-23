@@ -31,6 +31,18 @@ export interface SupporterStatus {
 const supporterState = ref<SupporterStatus | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+const checkoutPending = ref(false);
+const CHECKOUT_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+let checkoutAttempt: { scope: string; id: string; expiresAt: number } | null = null;
+function getCheckoutAttemptId(scope: string) {
+  const now = Date.now();
+  if (checkoutAttempt?.scope === scope && checkoutAttempt.expiresAt > now) {
+    return checkoutAttempt.id;
+  }
+  const id = crypto.randomUUID();
+  checkoutAttempt = { scope, id, expiresAt: now + CHECKOUT_RETRY_WINDOW_MS };
+  return id;
+}
 let channel: OwnedRealtimeChannel | null = null;
 const channelRelease = createChannelReleaseLatch();
 let channelUserId: string | null = null;
@@ -233,6 +245,7 @@ export function useSupporter() {
     supporterState.value = null;
     error.value = null;
     loading.value = false;
+    checkoutAttempt = null;
   }
   async function createCheckout(params: {
     mode: 'payment' | 'subscription';
@@ -240,9 +253,20 @@ export function useSupporter() {
     interval?: string;
     amount?: number;
   }): Promise<string | null> {
-    return postWithAuth<{ url: string }>('/api/stripe/checkout', params).then(
-      (r) => r?.url ?? null
-    );
+    if (checkoutPending.value) return null;
+    checkoutPending.value = true;
+    try {
+      const { mode, tier, interval, amount } = params;
+      const scope = JSON.stringify([$supabase?.user?.id, mode, tier, interval, amount]);
+      const result = await postWithAuth<{ url: string }>('/api/stripe/checkout', {
+        ...params,
+        checkoutAttemptId: getCheckoutAttemptId(scope),
+      });
+      if (result?.url) checkoutAttempt = null;
+      return result?.url ?? null;
+    } finally {
+      checkoutPending.value = false;
+    }
   }
   async function openBillingPortal(returnUrl?: string): Promise<string | null> {
     return postWithAuth<{ url: string }>('/api/stripe/portal', returnUrl ? { returnUrl } : {}).then(
@@ -300,6 +324,7 @@ export function useSupporter() {
     subscribe,
     unsubscribe,
     reset,
+    checkoutPending: readonly(checkoutPending),
     createCheckout,
     openBillingPortal,
   };

@@ -16,6 +16,7 @@ vi.mock('@/composables/useSupporter', () => ({
   useSupporter: () => ({
     activeTier,
     createCheckout: mockCreateCheckout,
+    checkoutPending: ref(false),
     error: composableError,
     isActiveSubscriber,
     isSubscribed,

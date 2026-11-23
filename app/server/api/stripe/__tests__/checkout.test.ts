@@ -106,6 +106,42 @@ describe('POST /api/stripe/checkout', () => {
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
   it.each(['payment', 'subscription'])(
+    'makes %s retries idempotent per authenticated user',
+    async (mode) => {
+      const checkoutAttemptId = 'e9c6c198-0f24-4351-95ac-773f2abac282';
+      mockReadBody.mockResolvedValue({
+        mode,
+        amount: 5,
+        tier: 'scav',
+        interval: 'monthly',
+        checkoutAttemptId,
+      });
+      mockGetSupporterBillingState.mockResolvedValue(null);
+      mockCreateCheckoutSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay' });
+      const { default: handler } = await import('@/server/api/stripe/checkout.post');
+      await Promise.all([
+        handler(makeEvent({ id: 'user-1' })),
+        handler(makeEvent({ id: 'user-1' })),
+        handler(makeEvent({ id: 'user-2' })),
+      ]);
+      const options = mockCreateCheckoutSession.mock.calls.map(
+        ([, requestOptions]) => requestOptions
+      );
+      expect(options).toEqual([
+        { idempotencyKey: `supporter-checkout:user-1:${checkoutAttemptId}` },
+        { idempotencyKey: `supporter-checkout:user-1:${checkoutAttemptId}` },
+        { idempotencyKey: `supporter-checkout:user-2:${checkoutAttemptId}` },
+      ]);
+    }
+  );
+  it('rejects malformed attempt IDs before checking eligibility or calling Stripe', async () => {
+    mockReadBody.mockResolvedValue({ mode: 'payment', amount: 5, checkoutAttemptId: 'invalid' });
+    const { default: handler } = await import('@/server/api/stripe/checkout.post');
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 400 });
+    expect(mockAdminSupabaseFetch).not.toHaveBeenCalled();
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+  it.each(['payment', 'subscription'])(
     'blocks disqualified %s checkout before Stripe calls',
     async (mode) => {
       mockAdminSupabaseFetch.mockResolvedValue(true);
