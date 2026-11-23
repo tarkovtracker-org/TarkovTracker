@@ -1,12 +1,14 @@
 <template>
-  <div>
-    <div class="px-3 pt-6 sm:px-6">
-      <div class="mx-auto max-w-350">
+  <div class="px-3 sm:px-6">
+    <div
+      class="mx-auto flex max-w-350 flex-col lg:has-data-hideout-map:min-h-[calc(100dvh-var(--shell-bar-h))] lg:has-data-hideout-map:max-w-none"
+    >
+      <div class="pt-6">
         <PageHeader v-bind="header" />
         <PublicHideoutRequirements />
       </div>
+      <ClientOnly><HideoutPage /></ClientOnly>
     </div>
-    <ClientOnly><HideoutPage /></ClientOnly>
   </div>
 </template>
 <script setup lang="ts">
