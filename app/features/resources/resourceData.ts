@@ -41,7 +41,7 @@ export interface ResourceAction {
   kind: 'internal' | 'external';
   href: string;
   labelKey: string;
-  labelFallback?: string;
+  labelFallback: string;
   icon: string;
   external: boolean;
 }
@@ -280,6 +280,7 @@ export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
       kind: 'internal',
       href: '/resources/seasonal-modifiers',
       labelKey: 'page.resources.actions.open_planner',
+      labelFallback: '',
       icon: 'i-mdi-calculator-variant-outline',
       external: false,
     };

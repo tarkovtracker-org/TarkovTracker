@@ -6,7 +6,11 @@ import { getResourceBySlug, type Resource } from '@/features/resources/resourceD
 vi.mock('vue-i18n', async (importOriginal) => {
   const i18n = await importOriginal<typeof import('vue-i18n')>();
   const { default: english } = await import('@/locales/en.json');
-  const { t } = i18n.createI18n({ legacy: false, locale: 'en', messages: { en: english } }).global;
+  const { t } = i18n.createI18n({
+    legacy: false,
+    locale: 'en-US',
+    messages: { 'en-US': english },
+  }).global;
   return {
     ...i18n,
     useI18n: () => ({
