@@ -6,7 +6,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 ### CI (`ci.yml`)
 
-**Trigger:** Push to `main` and `wip/**` branches, PRs targeting `main`, manual dispatch
+**Trigger:** Push to `main`, PRs targeting `main`, merge-queue checks, and manual dispatch
 **Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
 **Jobs:**
 
@@ -151,18 +151,17 @@ for this workflow: the upstream Action prints its environment in debug mode.
 
 ### Crowdin locale PRs
 
-`CI`, `PR Checks`, and `Security` report for translation-only PRs. The classifier selects
-formatting, i18n, and systems drift for locale-only pull requests; the aggregate `CI Result` still
-reports, and Crowdin dispatches a preview so `Preview Result` reports on the PR head; both are
-required. Non-English locale formatting exclusions remain
-intact. See the rollout record in `docs/workflow-automation.md`.
+`CI` (including its reusable `Security` jobs) and `PR Checks` report for translation-only PRs. The
+classifier selects formatting, i18n, and systems drift. `CI Result` still reports, and Crowdin
+dispatches a preview so the required `Preview Result` reports on the PR head. Non-English locale
+formatting exclusions remain intact. See the rollout record in `docs/workflow-automation.md`.
 
 Crowdin Sync creates PRs using `GITHUB_TOKEN`. It explicitly dispatches and awaits full CI in addition to
 direct validation before auto-merging safe translation updates.
 
 ### Security (`security.yml`)
 
-**Trigger:** Push to `main`, PRs, weekly schedule
+**Trigger:** Reusable call from CI and a standalone weekly schedule
 **Jobs:** `Security Scan` (audit + checksum-verified Gitleaks CLI), `CodeQL` (static analysis)
 
 ### Release (`release.yml`)
@@ -191,7 +190,8 @@ edit the title to re-run it.
 **Trigger:** PR opened/updated/reopened
 **Jobs:** `PR Meta` (labels, size), `Lighthouse scope` (lightweight detection), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
 **Lighthouse server:** Builds the Cloudflare Pages app and serves it with `wrangler pages dev`
-so `/api/*` routes are available during audits. The build sets
+so `/api/*` routes are available during audits. Setup checks dependency security before
+installing the frozen workspace. The build sets
 `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=false` so audits measure the app itself rather than the
 promoted Twitch embed, whose heavy third-party iframe (script eval, layout shift, third-party
 cookies) loads only when the streamer is live and previously made scores non-deterministic.
@@ -210,7 +210,7 @@ performance/accessibility work instead of treating the current floors as long-te
 
 ### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
 
-**Trigger:** Dependabot PR opened/updated/reopened/ready for review
+**Trigger:** Completion of CI for a Dependabot PR
 **Jobs:** `Auto-merge safe Dependabot PR` (Dependabot-authored and Dependabot-triggered only, npm
 tooling allowlist gate, wait for check runs and legacy status contexts, verify and match the
 validated head SHA, then squash merge in `strict` mode or, in `queue`/`strict-queue`, await
