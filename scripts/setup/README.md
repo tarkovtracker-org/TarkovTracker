@@ -9,3 +9,4 @@ Local development setup. See the worktree section of
 | `wt.sh`                    | Creates, removes, and lists Git worktrees under `.wt/`.               | `bash scripts/setup/wt.sh add <branch>`             |
 | `setup-worktree.sh`        | Installs dependencies and Git hooks inside a new worktree.            | `wt.sh add`                                         |
 | `ensure-pnpm.sh`           | Installs the exact pnpm version pinned in `package.json`.             | CI setup action, `preview.yml`, `setup-worktree.sh` |
+| `prepare-nuxt.mjs`         | Prepares Nuxt files unless CI opts out.                               | `package.json` postinstall                          |
