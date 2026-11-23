@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createError, defineEventHandler, readBody } from 'h3';
 import Stripe from 'stripe';
 import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
@@ -10,7 +11,7 @@ import {
   getSupporterBillingState,
   SupporterCustomerLookupUnavailableError,
 } from '@/server/utils/supporterCustomerLookup';
-import type { SupporterBillingState } from '@/server/utils/supporterCustomerLookup';
+import type { CheckoutMode } from '@/server/utils/stripeCheckoutValidation';
 import type { H3Event } from 'h3';
 const logger = createLogger('StripeCheckout');
 export default defineEventHandler(async (event) => {
@@ -32,32 +33,15 @@ export default defineEventHandler(async (event) => {
   }
   const email = authUser?.email;
   const rawBody = await readBody(event);
-  const { mode, tier, interval, amount } = validateCheckoutBody(rawBody);
+  const { mode, tier, interval, amount, checkoutAttemptId } = validateCheckoutBody(rawBody);
+  const options = checkoutRequestOptions(userId, checkoutAttemptId);
   await requireSupporterBenefitsAvailable(event, userId);
   const stripe = new Stripe(stripeSecretKey);
   const appUrl = (config.public.appUrl as string) || 'https://tarkovtracker.org';
   // Reuse the existing Stripe Customer for returning supporters so refund and
   // dispute lookups against stripe_customer_id keep matching after re-subscribe.
   // Falls back to customer_email for first-time supporters (Stripe creates one).
-  let billingState: SupporterBillingState | null;
-  try {
-    billingState = await getSupporterBillingState(event, userId, {
-      throwOnUnavailable: mode === 'subscription',
-    });
-  } catch (error) {
-    if (error instanceof SupporterCustomerLookupUnavailableError) {
-      logger.error('[Stripe Checkout] Supporter customer lookup unavailable', {
-        userId,
-        mode,
-        error,
-      });
-      throw createError({
-        statusCode: 503,
-        message: 'Unable to verify existing subscription',
-      });
-    }
-    throw error;
-  }
+  const billingState = await getCheckoutBillingState(event, userId, mode, checkoutAttemptId);
   const existingCustomerId = billingState?.stripeCustomerId;
   const customerFields: { customer?: string; customer_email?: string } = existingCustomerId
     ? { customer: existingCustomerId }
@@ -67,26 +51,29 @@ export default defineEventHandler(async (event) => {
   if (mode === 'payment') {
     const amountCents = validateOneTimeAmount(amount);
     try {
-      const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        client_reference_id: userId,
-        ...customerFields,
-        ...(existingCustomerId ? {} : { customer_creation: 'always' as const }),
-        metadata: { tier: 'supporter', type: 'one_time', user_id: userId },
-        payment_intent_data: { metadata: { user_id: userId } },
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: { name: 'TarkovTracker One-Time Support' },
-              unit_amount: amountCents,
+      const session = await stripe.checkout.sessions.create(
+        {
+          mode: 'payment',
+          client_reference_id: userId,
+          ...customerFields,
+          ...(existingCustomerId ? {} : { customer_creation: 'always' as const }),
+          metadata: { tier: 'supporter', type: 'one_time', user_id: userId },
+          payment_intent_data: { metadata: { user_id: userId } },
+          line_items: [
+            {
+              price_data: {
+                currency: 'usd',
+                product_data: { name: 'TarkovTracker One-Time Support' },
+                unit_amount: amountCents,
+              },
+              quantity: 1,
             },
-            quantity: 1,
-          },
-        ],
-        success_url: `${appUrl}/supporter?thanks=one_time`,
-        cancel_url: `${appUrl}/supporter`,
-      });
+          ],
+          success_url: `${appUrl}/supporter?thanks=one_time`,
+          cancel_url: `${appUrl}/supporter`,
+        },
+        options
+      );
       return { url: session.url };
     } catch (err: unknown) {
       logger.error('[Stripe Checkout] One-time session creation failed', { userId, err });
@@ -119,16 +106,19 @@ export default defineEventHandler(async (event) => {
     });
   }
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      client_reference_id: userId,
-      ...customerFields,
-      metadata: { tier, interval, type: 'subscription', user_id: userId },
-      subscription_data: { metadata: { tier, interval, user_id: userId } },
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${appUrl}/supporter?thanks=${tier}`,
-      cancel_url: `${appUrl}/supporter`,
-    });
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'subscription',
+        client_reference_id: userId,
+        ...customerFields,
+        metadata: { tier, interval, type: 'subscription', user_id: userId },
+        subscription_data: { metadata: { tier, interval, user_id: userId } },
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${appUrl}/supporter?thanks=${tier}`,
+        cancel_url: `${appUrl}/supporter`,
+      },
+      options
+    );
     return { url: session.url };
   } catch (err: unknown) {
     logger.error('[Stripe Checkout] Subscription session creation failed', {
@@ -140,6 +130,37 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 502, message: 'Failed to create subscription' });
   }
 });
+async function getCheckoutBillingState(
+  event: H3Event,
+  userId: string,
+  mode: CheckoutMode,
+  checkoutAttemptId?: string
+) {
+  try {
+    return await getSupporterBillingState(event, userId, {
+      // Preserve the legacy fallback for unkeyed one-time checkout only.
+      throwOnUnavailable: mode === 'subscription' || Boolean(checkoutAttemptId),
+    });
+  } catch (error) {
+    if (!(error instanceof SupporterCustomerLookupUnavailableError)) throw error;
+    logger.error('[Stripe Checkout] Supporter customer lookup unavailable', {
+      userId,
+      mode,
+      error,
+    });
+    throw createError({
+      statusCode: 503,
+      message: 'Unable to verify Stripe billing state',
+    });
+  }
+}
+function checkoutRequestOptions(userId: string, attemptId?: string): Stripe.RequestOptions {
+  if (!attemptId) return {};
+  const digest = createHash('sha256')
+    .update(JSON.stringify([userId, attemptId]))
+    .digest('hex');
+  return { idempotencyKey: `supporter-checkout:${digest}` };
+}
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

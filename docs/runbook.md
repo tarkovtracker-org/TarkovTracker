@@ -16,6 +16,11 @@ is explicitly set to a `cloudflare*` preset.
 See the canonical map for `STRIPE_SECRET_KEY` and the nine `STRIPE_PRICE_*` IDs used by the Nuxt
 `/api/stripe/checkout` route to create Checkout Sessions.
 
+The supporter page allows one Checkout request at a time across all tiers and the one-time form.
+For up to 24 hours, retrying a failed request with the same selection in the same page uses the
+same attempt ID. The route scopes that ID to the signed-in user before passing it to Stripe as
+an idempotency key. Clients served before this change can still omit the ID.
+
 ### Stripe webhook (Supabase Edge Function `stripe-webhook`)
 
 Receipt completion, fenced retries, migration-before-handler rollout and historical receipt
