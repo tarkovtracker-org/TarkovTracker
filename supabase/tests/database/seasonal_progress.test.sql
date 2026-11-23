@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(16);
+SELECT plan(17);
 
 SELECT is(
   private.active_season_ends_at(),
@@ -8,7 +8,7 @@ SELECT is(
   'the Season 1 end metadata matches the in-game boundary'
 );
 
--- Exercise the existing sync and rollover checks after the end metadata has elapsed.
+-- Put only the end metadata in the past so an end-time write gate would fail this test.
 CREATE OR REPLACE FUNCTION private.active_season_ends_at()
 RETURNS TIMESTAMPTZ
 LANGUAGE sql
@@ -18,6 +18,7 @@ SET search_path = ''
 AS $$
   SELECT now() - interval '1 hour';
 $$;
+SELECT ok(private.active_season_ends_at() < now(), 'the fixture end timestamp has elapsed');
 
 CREATE TEMP TABLE seasonal_progress_fixture AS
 SELECT
