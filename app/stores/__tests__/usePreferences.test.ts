@@ -891,10 +891,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       expect(store.getNeededItemsHideOwned).toBe(false);
     });
-    it('should return default "expanded" for neededItemsCardStyle', () => {
-      const store = usePreferencesStore();
-      expect(store.getNeededItemsCardStyle).toBe('expanded');
-    });
   });
   describe('Getters - Hide Settings', () => {
     it('should return hideGlobalTasks state', () => {
@@ -1250,11 +1246,9 @@ describe('usePreferencesStore', () => {
       store.setNeededTypeView({ value: 'hideout' } as unknown as NeededItemsFilterType);
       store.setNeededItemsSortBy({ value: 'count' } as unknown as 'priority');
       store.setNeededItemsSortDirection('invalid' as unknown as 'asc');
-      store.setNeededItemsCardStyle('invalid' as unknown as 'compact');
       expect(store.neededTypeView).toBe('hideout');
       expect(store.neededItemsSortBy).toBe('count');
       expect(store.neededItemsSortDirection).toBe('desc');
-      expect(store.neededItemsCardStyle).toBe('expanded');
     });
     it('should set needed items sort direction', () => {
       const store = usePreferencesStore();
@@ -1265,11 +1259,6 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.setNeededItemsHideOwned(true);
       expect(store.neededItemsHideOwned).toBe(true);
-    });
-    it('should set needed items card style', () => {
-      const store = usePreferencesStore();
-      store.setNeededItemsCardStyle('compact');
-      expect(store.neededItemsCardStyle).toBe('compact');
     });
   });
   describe('Actions - Hide Settings', () => {
