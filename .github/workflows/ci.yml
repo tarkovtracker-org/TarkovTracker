@@ -1,6 +1,13 @@
 name: CI
+run-name: ${{ format('Hosted shard pilot ({0})', inputs.shard_split || 'baseline') }}
 on:
   workflow_dispatch:
+    inputs:
+      shard_split:
+        description: Split to benchmark on the pilot branch
+        type: choice
+        default: baseline
+        options: [baseline, balanced]
   push:
     branches: [main]
   pull_request:
@@ -224,6 +231,7 @@ jobs:
     env:
       CI: 'true'
       VITEST_SHARD: ${{ matrix.shard }}/${{ matrix.total }}
+      TARKOVTRACKER_SHARD_PILOT: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/ci/hosted-shard-pilot' && inputs.shard_split || 'baseline' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

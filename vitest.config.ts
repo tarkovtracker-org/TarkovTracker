@@ -1,6 +1,9 @@
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { defineVitestConfig } from '@nuxt/test-utils/config';
 import { configDefaults } from 'vitest/config';
+import { BaseSequencer } from 'vitest/node';
+import assignment from './scripts/ci/pilot-shards.json' with { type: 'json' };
+import type { TestSpecification } from 'vitest/node';
 const versionedApi = process.env.TARKOV_VERSIONED_API_DIRECTORY;
 const logLevel = process.env.NUXT_PUBLIC_LOG_LEVEL || 'warn';
 const isSharded = Boolean(process.env.VITEST_SHARD);
@@ -8,6 +11,24 @@ const isMergingReports = process.argv.some((arg) => arg.startsWith('--merge-repo
 const ciReporters = isSharded
   ? ['default', 'junit', 'github-actions', 'blob']
   : ['default', 'junit'];
+const pilotShards: Record<string, number> = assignment;
+function selectPilotShard(files: TestSpecification[], root: string, index: number) {
+  const assigned = files.map((file) => ({
+    file,
+    shard: pilotShards[relative(root, file.moduleId).replaceAll('\\', '/')],
+  }));
+  if (assigned.length !== Object.keys(pilotShards).length || assigned.some((entry) => !entry.shard))
+    throw new Error('Hosted pilot assignment does not match the discovered Vitest files');
+  return assigned.filter((entry) => entry.shard === index).map((entry) => entry.file);
+}
+class PilotSequencer extends BaseSequencer {
+  override async shard(files: TestSpecification[]) {
+    const { root, shard } = this.ctx.config;
+    if (shard?.count !== 4) throw new Error('Hosted pilot requires the standard four shards');
+    return selectPilotShard(files, root, shard.index);
+  }
+}
+const usePilotSplit = process.env.TARKOVTRACKER_SHARD_PILOT === 'balanced';
 export default defineVitestConfig({
   resolve: {
     alias: {
@@ -22,6 +43,7 @@ export default defineVitestConfig({
     'import.meta.env.NUXT_PUBLIC_LOG_LEVEL': JSON.stringify(logLevel),
   },
   test: {
+    ...(usePilotSplit ? { sequence: { sequencer: PilotSequencer } } : {}),
     environment: 'nuxt',
     globals: true,
     setupFiles: ['./tests/test-setup.ts'],
