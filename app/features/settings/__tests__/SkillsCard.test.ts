@@ -26,17 +26,6 @@ vi.mock('@/stores/usePreferences', () => ({
     setSkillSortMode: vi.fn(),
   }),
 }));
-vi.mock('@vueuse/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@vueuse/core')>();
-  return {
-    ...actual,
-    useBreakpoints: () => ({
-      greaterOrEqual: () => ref(true),
-      smaller: () => ref(false),
-    }),
-    breakpointsTailwind: {},
-  };
-});
 mockNuxtImport('useToast', () => () => ({
   add: vi.fn(),
   remove: vi.fn(),
@@ -328,7 +317,7 @@ describe('SkillsCard', () => {
       'settings.skills.requirement_met'
     );
     expect(findSkillInput(wrapper).attributes('aria-describedby')).toBe(
-      'skill-range-Strength skill-requirement-Strength'
+      'skill-range-Strength skill-requirement-Strength skill-breakdown-Strength'
     );
   });
   it('marks elite skills', () => {
@@ -374,7 +363,7 @@ describe('SkillsCard', () => {
     const wrapper = createWrapper({
       allGameSkills: computed(() => [makeSkill('Strength'), makeSkill('StressResistance')]),
     });
-    const search = wrapper.find('input[type="search"]');
+    const search = wrapper.find('#skills-search-input');
     await search.setValue('stress res');
     expect(wrapper.find('#settings-skill-StressResistance').exists()).toBe(true);
     expect(wrapper.find('#settings-skill-Strength').exists()).toBe(false);
@@ -406,7 +395,7 @@ describe('SkillsCard', () => {
     expect(wrapper.find('.modal').exists()).toBe(false);
   });
   it('keeps the edited row visible under the Adjusted filter until blur', async () => {
-    const offsets = ref<Record<string, number>>({ Strength: 3 });
+    const offsets = ref<Record<string, number>>({ Strength: 3, Endurance: 2 });
     const wrapper = createWrapper({
       allGameSkills: computed(() => [makeSkill('Strength'), makeSkill('Endurance')]),
       getSkillOffset: (key: string) => offsets.value[key] ?? 0,
@@ -414,11 +403,92 @@ describe('SkillsCard', () => {
     await findButton(wrapper, 'settings.skills.filter.adjusted')!.trigger('click');
     const input = findSkillInput(wrapper);
     await input.trigger('focus');
-    offsets.value = { Strength: 0 };
+    offsets.value = { Strength: 0, Endurance: 2 };
     await nextTick();
     expect(wrapper.find('#settings-skill-Strength').exists()).toBe(true);
     await input.trigger('blur');
     expect(wrapper.find('#settings-skill-Strength').exists()).toBe(false);
+  });
+  it('matches search against the raw skill key', async () => {
+    const wrapper = createWrapper({
+      allGameSkills: computed(() => [makeSkill('AimDrills'), makeSkill('Strength')]),
+    });
+    await wrapper.find('#skills-search-input').setValue('aimdrills');
+    expect(wrapper.find('#settings-skill-AimDrills').exists()).toBe(true);
+    expect(wrapper.find('#settings-skill-Strength').exists()).toBe(false);
+  });
+  it('clamps pasted levels to the valid range', async () => {
+    const setTotalSkillLevel = vi.fn(() => true);
+    const wrapper = createWrapper({ setTotalSkillLevel });
+    await findSkillInput(wrapper).trigger('paste', { clipboardData: { getData: () => ' 75 ' } });
+    expect(setTotalSkillLevel).toHaveBeenCalledWith('Strength', MAX_SKILL_LEVEL);
+  });
+  it('returns to All once the last adjusted skill is reset', async () => {
+    const offsets = ref<Record<string, number>>({ Strength: 3 });
+    const wrapper = createWrapper({
+      allGameSkills: computed(() => [makeSkill('Strength'), makeSkill('Endurance')]),
+      getSkillOffset: (key: string) => offsets.value[key] ?? 0,
+    });
+    await findButton(wrapper, 'settings.skills.filter.adjusted')!.trigger('click');
+    expect(wrapper.find('#settings-skill-Endurance').exists()).toBe(false);
+    offsets.value = {};
+    await nextTick();
+    await nextTick();
+    expect(wrapper.find('#settings-skill-Endurance').exists()).toBe(true);
+  });
+  it('reveals and highlights a deep-linked skill hidden by the current search', async () => {
+    const allGameSkills = ref<GameSkill[]>([]);
+    const strength = makeSkill('Strength');
+    const wrapper = createWrapper({
+      allGameSkills: computed(() => allGameSkills.value),
+      getSkillMetadata: (key: string) => (key === 'Strength' ? strength : null),
+    });
+    document.body.appendChild(wrapper.element);
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      allGameSkills.value = [strength, makeSkill('Endurance')];
+      await nextTick();
+      await wrapper.find('#skills-search-input').setValue('endurance');
+      expect(wrapper.find('#settings-skill-Strength').exists()).toBe(false);
+      const router = useRouter();
+      await router.push({ path: router.currentRoute.value.path, query: { skill: 'Strength' } });
+      allGameSkills.value = [strength, makeSkill('Endurance'), makeSkill('Health')];
+      await vi.waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+      expect(wrapper.find('#settings-skill-Strength').classes()).toContain('ring-2');
+      await vi.waitFor(() => expect(router.currentRoute.value.query.skill).toBeUndefined());
+    } finally {
+      wrapper.unmount();
+      wrapper.element.remove();
+    }
+  });
+  it('waits for the pointer release before dropping a pinned row', async () => {
+    const offsets = ref<Record<string, number>>({ Strength: 3, Endurance: 2 });
+    const wrapper = createWrapper({
+      allGameSkills: computed(() => [makeSkill('Strength'), makeSkill('Endurance')]),
+      getSkillOffset: (key: string) => offsets.value[key] ?? 0,
+    });
+    await findButton(wrapper, 'settings.skills.filter.adjusted')!.trigger('click');
+    const input = findSkillInput(wrapper);
+    await input.trigger('focus');
+    offsets.value = { Strength: 0, Endurance: 2 };
+    window.dispatchEvent(new Event('pointerdown'));
+    await input.trigger('blur');
+    expect(wrapper.find('#settings-skill-Strength').exists()).toBe(true);
+    window.dispatchEvent(new Event('pointerup'));
+    await vi.waitFor(() => expect(wrapper.find('#settings-skill-Strength').exists()).toBe(false));
+  });
+  it('moves focus to the level input after resetting a row', async () => {
+    const wrapper = createWrapper();
+    document.body.appendChild(wrapper.element);
+    try {
+      await wrapper.find('#settings-skill-Strength button').trigger('click');
+      await nextTick();
+      expect(document.activeElement?.id).toBe('skill-input-Strength');
+    } finally {
+      wrapper.unmount();
+      wrapper.element.remove();
+    }
   });
   it('hides the reset-all action when nothing is adjusted', () => {
     const wrapper = createWrapper({ getSkillOffset: () => 0 });

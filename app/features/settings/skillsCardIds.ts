@@ -7,3 +7,5 @@ export const getSkillRangeId = (skillKey: string): string =>
   `skill-range-${sanitizeSkillKey(skillKey)}`;
 export const getSkillRequirementId = (skillKey: string): string =>
   `skill-requirement-${sanitizeSkillKey(skillKey)}`;
+export const getSkillBreakdownId = (skillKey: string): string =>
+  `skill-breakdown-${sanitizeSkillKey(skillKey)}`;

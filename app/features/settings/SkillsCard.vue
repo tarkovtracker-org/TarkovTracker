@@ -34,8 +34,10 @@
             class="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center"
           >
             <UInput
+              :id="SEARCH_INPUT_ID"
               v-model="searchQuery"
-              type="search"
+              type="text"
+              autocomplete="off"
               icon="i-mdi-magnify"
               size="sm"
               class="w-full md:w-60"
@@ -77,25 +79,21 @@
               variant="ghost"
               color="neutral"
               class="md:ml-auto"
-              @click="showResetAllDialog = true"
+              @click="openResetAllDialog"
             >
               {{ $t('settings.skills.reset_all') }}
             </UButton>
           </div>
-          <div v-if="visibleSkills.length > 0" class="space-y-5">
-            <section
-              v-for="group in skillGroups"
-              :key="group.category ?? 'all'"
-              :aria-label="group.label"
-            >
+          <div v-if="visibleSkills.length > 0" class="@container space-y-5">
+            <div v-for="group in skillGroups" :key="group.category ?? 'all'">
               <h3
                 v-if="group.label"
                 class="text-surface-400 mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase"
               >
                 {{ group.label }}
-                <span class="bg-surface-700 h-px flex-1" aria-hidden="true" />
+                <span class="bg-surface-700 light:bg-surface-600 h-px flex-1" aria-hidden="true" />
               </h3>
-              <div class="grid grid-cols-1 gap-2 lg:grid-cols-2">
+              <div class="grid grid-cols-1 gap-2 @[44rem]:grid-cols-2">
                 <SkillLevelRow
                   v-for="skill in group.skills"
                   :key="skill.key"
@@ -107,12 +105,12 @@
                   @input-keydown="preventInvalidInput"
                   @input-paste="(event: ClipboardEvent) => onPaste(event, skill.key)"
                   @input-focus="onSkillInputFocus(skill.key)"
-                  @input-blur="onSkillInputBlur"
+                  @input-blur="onSkillInputBlur(skill.key)"
                   @update-level="(value: string | number) => updateSkillLevel(skill.key, value)"
                   @reset="resetOffset(skill.key)"
                 />
               </div>
-            </section>
+            </div>
           </div>
           <div
             v-else-if="allGameSkills.length > 0"
@@ -132,7 +130,8 @@
     <UModal
       v-model:open="showResetAllDialog"
       :title="$t('settings.skills.reset_all_title')"
-      :description="$t('settings.skills.reset_all_body', { count: adjustedSkills.length })"
+      :description="$t('settings.skills.reset_all_body', { count: resetAllCount })"
+      @after:leave="onResetAllDialogAfterLeave"
     >
       <template #content>
         <div class="p-5">
@@ -140,12 +139,14 @@
             <div class="bg-error-500/15 rounded-full p-2">
               <UIcon name="i-mdi-restore" class="text-error-400 h-5 w-5" />
             </div>
-            <h3 class="text-surface-100 text-base font-semibold">
+            <!-- Nuxt UI renders the title/description props as the dialog's accessible name and
+              description, so the visible copies are hidden from assistive technology. -->
+            <h3 class="text-surface-100 text-base font-semibold" aria-hidden="true">
               {{ $t('settings.skills.reset_all_title') }}
             </h3>
           </div>
-          <p class="text-surface-300 mb-5 text-sm">
-            {{ $t('settings.skills.reset_all_body', { count: adjustedSkills.length }) }}
+          <p class="text-surface-300 mb-5 text-sm" aria-hidden="true">
+            {{ $t('settings.skills.reset_all_body', { count: resetAllCount }) }}
           </p>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" @click="showResetAllDialog = false">
@@ -161,10 +162,11 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useEventListener } from '@vueuse/core';
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useSkillCalculation } from '@/composables/useSkillCalculation';
   import SkillLevelRow from '@/features/settings/SkillLevelRow.vue';
-  import { getSkillCardId } from '@/features/settings/skillsCardIds';
+  import { getSkillCardId, getSkillInputId } from '@/features/settings/skillsCardIds';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import {
     getSkillCategory,
@@ -193,6 +195,7 @@
   const searchQuery = ref('');
   const skillFilter = ref<SkillFilter>('all');
   const showResetAllDialog = ref(false);
+  const SEARCH_INPUT_ID = 'skills-search-input';
   // The row being edited stays visible even if the edit stops matching the active filter,
   // so clearing an input under 'Adjusted' does not unmount it mid-edit.
   const editingSkillKey = ref<string | null>(null);
@@ -243,7 +246,9 @@
   const matchesSearch = (skill: GameSkill): boolean => {
     const query = normalizedSearch.value;
     if (!query) return true;
-    return formatSkillName(skill.name).toLocaleLowerCase().includes(query);
+    return [formatSkillName(skill.name), skill.name, skill.key].some((value) =>
+      value.toLocaleLowerCase().includes(query)
+    );
   };
   const visibleSkills = computed(() =>
     allGameSkills.value.filter(
@@ -361,9 +366,30 @@
     editingSkillKey.value = skillKey;
     resetSkillLimitToast();
   };
-  const onSkillInputBlur = () => {
-    editingSkillKey.value = null;
+  // Blur fires on pointerdown, before the click lands. Releasing the pin right away could
+  // unmount the row and shift the layout under the pointer, so wait for the pointer release.
+  const pointerIsDown = ref(false);
+  useEventListener(window, 'pointerdown', () => (pointerIsDown.value = true), { capture: true });
+  useEventListener(window, ['pointerup', 'pointercancel'], () => (pointerIsDown.value = false));
+  const afterPointerRelease = (callback: () => void) => {
+    const run = () => {
+      window.removeEventListener('pointerup', run);
+      window.removeEventListener('pointercancel', run);
+      setTimeout(callback, 0);
+    };
+    window.addEventListener('pointerup', run);
+    window.addEventListener('pointercancel', run);
+  };
+  const releaseEditingPin = (skillKey: string) => {
+    if (editingSkillKey.value === skillKey) editingSkillKey.value = null;
+  };
+  const onSkillInputBlur = (skillKey: string) => {
     resetSkillLimitToast();
+    if (!pointerIsDown.value) {
+      releaseEditingPin(skillKey);
+      return;
+    }
+    afterPointerRelease(() => releaseEditingPin(skillKey));
   };
   const onPaste = (e: ClipboardEvent, skillName: string) => {
     e.preventDefault();
@@ -375,14 +401,34 @@
       setTotalSkillLevel(skillName, clamped);
     }
   };
+  const focusElementById = async (elementId: string) => {
+    await nextTick();
+    document.getElementById(elementId)?.focus();
+  };
+  // The reset button unmounts once the offset is cleared, so move focus to the row's input
+  // instead of letting it fall back to the document body.
   const resetOffset = (skillName: string) => {
     skillCalculation.resetSkillOffset(skillName);
+    void focusElementById(getSkillInputId(skillName));
+  };
+  const resetAllCount = ref(0);
+  const openResetAllDialog = () => {
+    resetAllCount.value = adjustedSkills.value.length;
+    showResetAllDialog.value = true;
   };
   const resetAllAdjustments = () => {
     adjustedSkills.value.forEach((skill) => skillCalculation.resetSkillOffset(skill.key));
     showResetAllDialog.value = false;
-    if (skillFilter.value === 'adjusted') skillFilter.value = 'all';
   };
+  const onResetAllDialogAfterLeave = () => {
+    if (adjustedSkills.value.length === 0) void focusElementById(SEARCH_INPUT_ID);
+  };
+  // Leave the Adjusted filter once nothing is adjusted, but never while a row is being edited.
+  watch([() => adjustedSkills.value.length, editingSkillKey], ([adjustedCount, editingKey]) => {
+    if (adjustedCount === 0 && !editingKey && skillFilter.value === 'adjusted') {
+      skillFilter.value = 'all';
+    }
+  });
   const clearSkillHighlight = () => {
     if (skillHighlightTimeout.value) {
       clearTimeout(skillHighlightTimeout.value);
