@@ -2,7 +2,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { reactive, nextTick } from 'vue';
 import DrawerLinks from '@/features/drawer/DrawerLinks.vue';
 const routeState = reactive({
   path: '/tasks',
@@ -112,6 +112,20 @@ describe('DrawerLinks Resources navigation', () => {
     expect(resourcesLink.element.parentElement?.classList.contains('border-primary-500')).toBe(
       true
     );
+    const toggle = wrapper.get('button[aria-label="navigation_drawer.resources_toggle"]');
+    expect(toggle.attributes('aria-expanded')).toBe('true');
+    const modifierLink = wrapper.get(
+      '#drawer-resources-sublinks a[href="/resources/seasonal-modifiers"]'
+    );
+    expect(modifierLink.attributes('aria-current')).toBe('page');
+    expect(modifierLink.classes()).toContain('bg-surface-800/60');
+    wrapper.unmount();
+  });
+  it('auto-expands the sub-list when navigating to /resources/seasonal-modifiers after mount', async () => {
+    const wrapper = mountDrawerLinks(false);
+    expect(wrapper.find('#drawer-resources-sublinks').exists()).toBe(false);
+    routeState.path = '/resources/seasonal-modifiers';
+    await nextTick();
     const toggle = wrapper.get('button[aria-label="navigation_drawer.resources_toggle"]');
     expect(toggle.attributes('aria-expanded')).toBe('true');
     const modifierLink = wrapper.get(
