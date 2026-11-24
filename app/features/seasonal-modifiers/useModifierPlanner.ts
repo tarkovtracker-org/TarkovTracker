@@ -1,5 +1,9 @@
 import { useEventListener } from '@vueuse/core';
 import {
+  readLocalModifierPlan,
+  writeGuestModifierPlan,
+} from '@/features/seasonal-modifiers/modifierPlanStorage';
+import {
   lowestNetCost,
   netCostOf,
   suggestBalance,
@@ -7,21 +11,22 @@ import {
 } from '@/features/seasonal-modifiers/planner';
 import { logger } from '@/utils/logger';
 import { seasonTwoModifiersStorageKey } from '@/utils/storageKeys';
-function readSelection(key: string): string[] {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
-    return Array.isArray(value) ? value.filter((id) => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
-}
+import type { useAccountModifierPlanStore } from '@/features/seasonal-modifiers/accountModifierPlan';
+type AccountPlan = Pick<
+  ReturnType<typeof useAccountModifierPlanStore>,
+  'modifierIds' | 'status' | 'saving' | 'saveFailed' | 'load' | 'save' | 'retrySave'
+>;
 export function useModifierPlanner(
   items: ComputedRef<ModifierDisplay[]>,
-  userId: Readonly<Ref<string | null>>
+  userId: Readonly<Ref<string | null>>,
+  account: AccountPlan
 ) {
-  const storageKey = computed(() => seasonTwoModifiersStorageKey(userId.value));
-  const selectedIds = ref(new Set<string>());
-  const saveFailed = ref(false);
+  const guestIds = shallowRef<string[]>([]);
+  const guestSaveFailed = ref(false);
+  const selectedIds = computed(() => new Set(userId.value ? account.modifierIds : guestIds.value));
+  const status = computed(() => (userId.value ? account.status : 'ready'));
+  const saving = computed(() => !!userId.value && account.saving);
+  const saveFailed = computed(() => (userId.value ? account.saveFailed : guestSaveFailed.value));
   const picked = computed(() => items.value.filter((item) => selectedIds.value.has(item.id)));
   const selected = computed(() => new Set(picked.value.map((item) => item.id)));
   const available = computed(() => items.value.filter((item) => !selectedIds.value.has(item.id)));
@@ -31,31 +36,43 @@ export function useModifierPlanner(
   const floor = computed(() => lowestNetCost(net.value, available.value));
   const suggestion = computed(() => suggestBalance(net.value, available.value));
   const blocked = ref<{ name: string; attempted: number; minimum: number } | null>(null);
-  function restoreSelection() {
-    selectedIds.value = new Set(readSelection(storageKey.value));
-    saveFailed.value = false;
+  function restoreGuest() {
+    guestIds.value = readLocalModifierPlan();
+    guestSaveFailed.value = false;
     blocked.value = null;
   }
   onMounted(() => {
-    watch(storageKey, restoreSelection, { immediate: true, flush: 'sync' });
+    watch(
+      userId,
+      (owner) => {
+        blocked.value = null;
+        if (owner) void account.load();
+        else restoreGuest();
+      },
+      { immediate: true, flush: 'sync' }
+    );
   });
   useEventListener('storage', (event) => {
-    if (saveFailed.value) return;
-    if (event.key === storageKey.value || event.key === null) restoreSelection();
+    if (userId.value || guestSaveFailed.value) return;
+    if (event.key === seasonTwoModifiersStorageKey(null) || event.key === null) restoreGuest();
   });
-  function saveSelection(ids: Set<string>) {
-    selectedIds.value = ids;
+  function saveGuest(ids: string[]) {
+    guestIds.value = ids;
     try {
-      if (ids.size) localStorage.setItem(storageKey.value, JSON.stringify([...ids]));
-      else localStorage.removeItem(storageKey.value);
-      saveFailed.value = false;
+      writeGuestModifierPlan(ids);
+      guestSaveFailed.value = false;
     } catch (error) {
-      saveFailed.value = true;
+      guestSaveFailed.value = true;
       logger.warn('[ModifierPlanner] Could not save modifier selections', error);
     }
   }
+  function saveSelection(ids: Set<string>) {
+    if (userId.value) account.save([...ids]);
+    else saveGuest([...ids]);
+  }
   function retrySave() {
-    saveSelection(selectedIds.value);
+    if (userId.value) void account.retrySave();
+    else saveGuest(guestIds.value);
   }
   function toggle(item: ModifierDisplay, event: Event) {
     blocked.value = null;
@@ -91,7 +108,10 @@ export function useModifierPlanner(
     floor,
     suggestion,
     blocked,
+    status,
+    saving,
     saveFailed,
+    reloadPlan: account.load,
     retrySave,
     toggle,
     clear,

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { computed, defineComponent, ref, unref } from 'vue';
+import { computed, defineComponent, reactive, ref, unref } from 'vue';
+import { createAccountModifierPlan } from '@/features/seasonal-modifiers/accountModifierPlan';
 import { useModifierPlanner } from '@/features/seasonal-modifiers/useModifierPlanner';
 import { seasonTwoModifiersStorageKey } from '@/utils/storageKeys';
 import type { ModifierDisplay } from '@/features/seasonal-modifiers/planner';
@@ -17,12 +18,27 @@ const drawback = modifier('drawback', -5);
 const replacement = modifier('replacement', 3);
 function openPlanner(owner = ref<string | null>(null), catalog = ref([perk, drawback])) {
   let planner!: ReturnType<typeof useModifierPlanner>;
+  const cloud = new Map<string, string[]>();
   const wrapper = mount(
     defineComponent({
       setup() {
+        const account = reactive(
+          createAccountModifierPlan(
+            owner,
+            {
+              read: async (id) => cloud.get(id) ?? null,
+              initialize: async () => null,
+              save: async (id, picks) => {
+                cloud.set(id, picks);
+              },
+            },
+            () => []
+          )
+        );
         planner = useModifierPlanner(
           computed(() => catalog.value),
-          owner
+          owner,
+          account
         );
         return () => null;
       },
@@ -70,16 +86,19 @@ describe('seasonal modifier selection persistence', () => {
     expect([...unref(fourth.selected)]).toEqual([]);
     fourth.close();
   });
-  it('keeps plans separate when switching accounts and returning as a guest', () => {
+  it('keeps plans separate when switching accounts and returning as a guest', async () => {
     const owner = ref<string | null>(null);
     const planner = openPlanner(owner);
     toggle(planner, drawback);
     owner.value = 'account-a';
+    await flushPromises();
     expect([...unref(planner.selected)]).toEqual([]);
     toggle(planner, perk);
     owner.value = 'account-b';
+    await flushPromises();
     expect([...unref(planner.selected)]).toEqual([]);
     owner.value = 'account-a';
+    await flushPromises();
     expect([...unref(planner.selected)]).toEqual([perk.id]);
     owner.value = null;
     expect([...unref(planner.selected)]).toEqual([drawback.id]);
