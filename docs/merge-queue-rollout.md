@@ -1,275 +1,47 @@
-# Merge queue rollout
-
-Owner: [CI and release](systems/ci-and-release.md). Preview security remains owned by
-[previews](systems/previews.md).
-
-## Candidate validation
-
-CI handles `merge_group: checks_requested` using the exact event base and checked-out integration
-head. The new docs-only queue reduction reuses the existing path classifier. A complete
-single-parent delta containing only inert documentation keeps formatting, systems drift and
-security required, while skipping app build and tests. Agent policy files, GitHub configuration, mixed changes and uncertain evidence stay full.
-Deployment necessity is independent of full CI selection. Admission tooling, tests and the
-Crowdin locale-sync workflow can keep every queue CI/security job while skipping deployment;
-PR #1316's seven-file inventory is a regression fixture. The trusted Preview State controller
-independently classifies the complete exact integration comparison using the same central rules,
-then publishes `Preview Result: success` as not applicable without expecting a build artifact.
-Build/dependency inputs, application/assets/locales, `scripts/preview/**`, setup scripts and shared
-actions still require previews. Workflow files other than Crowdin's locale sync also retain
-previews, including unknown/new workflows; there is no blanket workflow exemption. A mix
-containing any deployable path, unknown paths, malformed/capped comparisons and explicit full
-runs cannot establish a preview exemption. All-inert mixes can still skip deployment. Stale revisions and changed CI attempts cannot publish success. Deployable integrations
-retain the anonymous credential-isolated preview deployment/smoke pipeline after their exact CI
-attempt succeeds. Live queue N/A validation remains a rollout item after authorized merge.
-
-The preview status targets the queue commit, not any member PR head. Before planning, upload and
-success publication, the controller verifies the same-repository `gh-readonly-queue/main/` ref,
-its exact SHA, first-parent base equal to current main, tree, run and successful attempt-specific
-CI Result. Missing/deleted refs, changed bases, altered artifacts and failed smoke tests cannot
-publish success. No candidate deployment credentials or production bindings are added.
-
-Initial queue configuration permits one build and one merge at a time. This bounds deployment
-load and makes the first-parent/current-main proof explicit; increasing concurrency requires a
-new proof for cumulative queue groups, not just changing the ruleset limit.
-
-## Provisioning checkpoint
-
-The organization-owned Review Admission App (`5328610`) has only commit-status write and
-metadata read access, installed on TarkovTracker alone. Its signing key is isolated in the
-`review-admission` environment, whose branch policy allows only `main`.
-
-[Run 38687620665](https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/38687620665)
-proved a non-main workflow was denied before credential provisioning.
-[Run 38726052506](https://github.com/tarkovtracker-org/TarkovTracker/actions/runs/38726052506)
-produced the authenticated exact-head receipt used before the guarded merge of
-[#1237](https://github.com/tarkovtracker-org/TarkovTracker/pull/1237).
-These provisioning receipts complement the group-specific integration and removal/reformation
-proofs required below; they do not establish native queue behavior.
+# Merge queue operations
 
 ## Current state
 
-Main is queue-only as of 2026-10-16:
+Main requires the native squash queue. The active ruleset `25157234` requires `CI Result` and
+`Preview Result` from GitHub Actions (`15368`), plus `Review Admission` from its dedicated App
+(`5328610`). It uses `ALLGREEN`, one entry at a time, a 60-minute response timeout, resolved
+review threads and no bypass actors. Main ruleset `11256377` still protects deletion and
+non-fast-forwards. Strict freshness ruleset `23539975` is disabled, so the policy is `queue`.
 
-- Ruleset `Main merge queue (staged)` (ID `25157234`) has been active since 2026-10-15 ~13:12 UTC.
-  It requires `CI Result` and `Preview Result` from GitHub Actions (integration `15368`) and
-  `Review Admission` from the Review Admission App (`5328610`), without strict freshness. Its squash
-  `ALLGREEN` queue builds and merges one entry at a time (minimum group size 1) with a 60-minute
-  check response timeout. A `pull_request` rule requires review-thread resolution with zero
-  approvals. There are no bypass actors.
-- `Main CI freshness` (ID `23539975`) was disabled on 2026-10-16 at 04:34 UTC, so
-  `main_policy_mode` in `scripts/ci/github-ci-gate.sh` reports `queue`. Ruleset `Main`
-  (`11256377`) keeps deletion and non-fast-forward protection.
-- Proven live: #1240, #1236, #1246, #1247, #1250, #1253, #1254, #1255 and #1256 merged through the
-  native queue with `CI Result`, `Preview Result` and App-issued `Review Admission` on the queue
-  commit. #1243 exercised removal and re-formation. #1254 was enqueued while #1255 was building;
-  after #1255 merged, #1254 was behind main, built on the new main and merged without a branch
-  update.
-- Done: job-token (`GITHUB_TOKEN`) enqueue starts no `merge_group` CI. Dependabot (#1349) and
-  Crowdin (#1314) entries sat at `AWAITING_CHECKS` until a maintainer re-enqueued them.
-  Automation is wired to submit through the Queue Submitter App
-  ([provisioning](#queue-submitter-provisioning)) and fails closed without it; no ruleset bypass
-  was added. Open: the first App-submitted automation entry must show `merge_group` CI starting.
-  Queue preview retention (`PREVIEW_QUEUE_RETENTION_ENABLED`) is not enabled. Flaky smoke tests
-  that remove otherwise healthy queue entries remain to be fixed.
+The [disabled queue template](../.github/main-merge-queue-ruleset.json) and
+[strict freshness template](../.github/main-ci-ruleset.json) are references. Committing them
+does not update GitHub. [Preview retention](systems/previews.md#queue-preview-retention) has its
+own dry-run and activation controls.
 
-[`main-merge-queue-ruleset.json`](../.github/main-merge-queue-ruleset.json) remains the reviewed,
-disabled queue template; [`render-merge-queue-ruleset.mjs`](../scripts/ci/render-merge-queue-ruleset.mjs)
-owns rendering it ([provisioning](#admission-publisher-provisioning)).
-[`main-ci-ruleset.json`](../.github/main-ci-ruleset.json) remains the `Main CI freshness` rollback
-template. Committing either file changes no live ruleset.
+### Rollback
 
-**Rollback:** re-enable strict freshness before touching the queue ruleset or retention switch:
+With explicit authorization, restore strict freshness and read back the live rulesets. Confirm
+`strict-queue`, all three required contexts, and review-thread resolution.
 
 ```sh
 gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 -f enforcement=active
 ```
 
-The policy mode then returns to `strict-queue`. Never leave main without equivalent required checks.
+This rollback keeps the queue active. The strict freshness ruleset alone lacks App-pinned
+`Review Admission` and thread resolution. Queue retirement requires a separately approved
+replacement that preserves those gates, `CI Result`, and `Preview Result` before disabling
+the queue ruleset. Roll back preview retention independently through the preview procedure.
 
-## Activation gates (history)
+## Review Admission
 
-These gates preceded activation; the live state above records their outcome. Gates 5 and 6
-correspond to [activation procedure](#activation-procedure-history) steps 5 and 6.
+Trusted main verifies the current PR head and its native queue integration separately. Completed
+exact-head CodeRabbit/Cubic evidence, an independent collaborator review, or a valid admin
+attestation can admit an ordinary PR. Sensitive changes also need exact-head approval.
+Unresolved findings or threads, changes requested, drafts and closed PRs hold admission.
+A green provider check alone is insufficient. Scope and provider provenance are enforced in
+[`review-admission-policy.mjs`](../scripts/ci/review-admission-policy.mjs).
 
-1. Done: queue-aware CI/controller code merged with independent review of the credential boundary.
-2. Done: queue canaries passed full CI, deployed preview and smoke checks, including a removed entry.
-3. Done: release no longer pushes to `main`. `scripts/release/release-commit.sh` pushes only
-   `wip/release-*` staging refs, the promotion controller enqueues the reviewed version PR, and
-   finalization creates tags through the API after the actual merge.
-4. Done: required review admission is App-pinned. Bot comments are not GitHub approval rules;
-   enqueue only after reviews are complete and findings resolved. Never use `--admin`.
-5. Open: Crowdin's policy validator, Dependabot merge-state handling and release promotion are
-   queue-aware in code, and queue submission does not dispatch main CI. They submit through the
-   Queue Submitter App; live proof of App submission and version promotion is pending (above).
-6. Open: queue-preview Pages retention runs dry-run only. Each re-formed queue group has its own
-   branch, and GitHub ref deletion does not remove its Pages deployment.
-7. Done: with explicit maintainer authorization, the queue was activated and strict freshness was
-   disabled while gates 5 and 6 remained open, because both fail closed. The three issuer-pinned
-   contexts, `ALLGREEN`, no bypass actors, and `Main` were kept.
-
-## Integrated automation and review admission
-
-The staged integration implements the compatibility gates; it does not activate live rulesets.
-`Review Admission` is a third required context pinned to a dedicated GitHub App. Its trusted-main
-controller verifies a completed exact-head CodeRabbit/Cubic review or an independent collaborator
-approval, complete review-thread evidence, and no outstanding changes requested. A bot comment or
-green provider check without completed review evidence is insufficient.
-CodeRabbit completion may also come from its GitHub-authenticated bot issue comment: one clean
-recent-review section, minimal-risk section, and a unique `reviewed` coverage marker whose source
-and covered commits both equal the current head. The observed marker schema is checked strictly;
-quoted/fenced, stale, malformed, duplicate, incomplete, or conflicting evidence does not qualify.
-The REST comment list only locates candidates. One GraphQL `IssueComment` response supplies the
-body, author, editor, and edit time together; missing provenance or a last edit by anyone other
-than CodeRabbit rejects the evidence. Never-edited comments require explicit null edit metadata.
-Comment identity uses GraphQL `fullDatabaseId`, matched as a decimal string against a positive safe
-REST integer; the receipt preserves that REST number without a lossy numeric conversion.
-Line endings are normalized; positive counts (including leading zeros) and contradictory
-merge-risk statements anywhere in the full body reject admission.
-Receipts identify this evidence as `kind: issue-comment`; the id is the issue-comment id. Provider
-check failures, current review findings, unresolved threads, and sensitive-change approval still
-apply. No new token permissions are needed. Creation, edits, and deletion of these authenticated
-provider comment sections recheck admission,
-including edits that withdraw the previous completion body. Other ordinary comments remain
-filtered before serialization. The existing admission-only dispatch can also recheck evidence.
-Cubic completion requires one marked summary with a clean overall result, including its
-`No issues found` wording; quoted clean text and conflicting issue counts do not grant admission.
-
-Native resolved-thread enforcement remains required alongside Review Admission. The queue ruleset
-uses a `pull_request` rule with `required_review_thread_resolution: true` and zero required human
-approvals, so a newly reopened thread blocks the server-side merge even when no workflow event
-was emitted. Low-risk bot admission does not create a human approving review.
-
-The controller serializes relevant events at job scope, after its event filter. Ordinary issue
-comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
-including withdrawal of a command with leading whitespace.
-
-The read-only filter authenticates successful signal attempts, their jobs, locators and target
-identity before serialization. It skips only the publisher's existing proven-obsolete cases:
-merged review targets and provider suites on canonical queue commits without a linked PR.
-Missing or ambiguous identity, receipt and API failures fail the filter; active targets retain
-their events even for stale signal SHAs, drafts, findings or withdrawn approval. The filter has
-Actions, checks, contents and pull-request read scopes, without a protected environment or App key.
-The publisher repeats source/target authentication after waiting in the unchanged global
-`queue: max` lock, and initializes its App only when the target still needs evaluation.
-Each stage reuses its authenticated run record for target resolution; no run proof is cached
-between preflight, evaluation and publication.
-
-Permission lookups consider only current-head human approval reviews and exact-head approval
-commands. Every review, finding and comment still reaches policy evaluation; current roles are
-reread for each evaluation/publication, without a cross-event cache. This keeps discussion size
-from multiplying collaborator API calls across repeated head/queue evidence reads.
-
-An intake condition also skips ordinary comments before allocating the read-only filter runner.
-It is a coarse selector, never approval evidence: trusted main still verifies retained events.
-Both current and previous comment bodies are checked so approval edits/deletions and provider
-withdrawals still reach revocation.
-Review Admission dispatches release promotion only after publishing approval for a canonical
-generated version PR without a queue-integration receipt. Ordinary, held and integration admissions
-create no promotion workflow run and take no promotion lock. Completed Release runs retain their
-fallback wakeup. The serialized controller authenticates the successful same-repository source
-attempt and receipts, then rechecks live head, main and approval before submission.
-Post-merge main CI remains required by release provenance checks even when queue CI used the same
-commit; it must not be removed without updating and validating those consumers.
-
-The `Review Admission` commit status is the gate. An expected policy hold (draft or closed PR,
-missing exact-head review, unresolved findings or changes requested, missing sensitive approval) publishes
-`failure` on the PR head and any live queue commit, then ends the controller run green with a
-notice, so a denial does not create a failed run for every review event. Integrity, identity,
-publisher and API errors still fail the run. A hold found after a receipt output was recorded also
-fails the run, so no receipt can be uploaded or published. Consumers still require a `success`
-status, a successful run and an approving receipt. The publisher retries an empty exact-receipt
-lookup after 1, 2, 4 and 8 seconds to allow for delayed artifact visibility. It rejects duplicate
-or expired receipts immediately and rechecks live admission evidence before publishing success.
-
-Ordinary changes, translations and verified safe dependency/version metadata changes may
-enter after bot review. Ordinary paths include `app/{components,pages,features,layouts,assets}/`,
-docs, root Markdown, locales and supported test paths. Sensitive paths always take precedence,
-including `AGENTS.md`, `CLAUDE.md`, `SECURITY.md` and `code_review.md` policy controls.
-Docs, root Markdown and locales skip patch-pattern scanning; other ordinary files must avoid
-credential, session, storage and network patterns in the complete diff hunk, including unchanged
-context. Fetch references, typed wrappers and absolute URLs remain sensitive. Generic helpers under
-`app/{composables,utils,types,stores}/` remain unclassified unless they match a supported test path:
-their diff alone cannot establish whether sensitive capabilities are imported or passed in elsewhere.
-The size limit is 500 changed lines outside docs, root Markdown, locales, `__tests__/` directories
-and supported test files. Sensitive and unclassified changes require an exact-head approving review
-from an independent write collaborator, or a write collaborator's single-line command (it approves
-the sensitive change only; it replaces the review requirement only when posted by a current admin):
-
-```text
-/approve <40-character-reviewed-PR-head-SHA>
-```
-
-(`/approve-sensitive <head>` is the older, equivalent spelling; see
-[approval commands](#approval-commands).) Agents may record that command only after receiving the specific merge authority required by
-`AGENTS.md`; admission never supplies authorization itself. Changed heads invalidate approval.
-Queue admission re-proves the member PR, live queue ref, current-main parent and single-entry
-squash `ALLGREEN` configuration. A squash queue commit has current main as its only parent and is
-exactly one commit ahead of it; it does not contain the PR head as an ancestor, so GitHub's queue
-entry (exact PR head and exact queue commit) is the PR binding. Configuration is re-proved from
-the one repository-owned effective main queue rule through the public REST branch-rules endpoint;
-this removes GraphQL queue configuration reads without broadening job/App permissions.
-Missing, ambiguous, foreign or changed queue policy fails closed. With one build slot, a later
-entry stays `QUEUED` with no integration commit or `gh-readonly-queue/` ref; admission then
-evaluates only the PR head, and the group's own `merge_group` signal re-runs it once built. Any
-other entry without a provable integration commit still fails closed. Read-only signal workflows cannot publish approval. Consumers authenticate
-the controller run, attempt, trusted policy source and uploaded `review-admission-<SHA>` receipt.
-
-Review and review-comment wakeups resolve the service-owned PR link from the authenticated
-signal attempt, then reread its current head and queue. A provider-suite signal supplies only a
-bounded locator: the controller fetches the known completed provider suite from this repository
-and resolves exactly one PR before evaluating live evidence. Provider suites on
-`gh-readonly-queue/` commits are not review evidence and do not run the signal job, because that
-group's own `merge_group` signal drives queue admission. If one still reaches the controller, an
-authenticated provider suite on a canonical main queue ref with no linked PR records a notice and
-changes no status. Missing or ambiguous mappings hold
-admission; an explicit trusted-main dispatch can recover once review evidence is complete. The
-controller never assumes a signal SHA equals the live PR head. Prove provider wakeup delivery
-and ordering in the live canary; [GitHub restricts check-suite event delivery](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#check_suite).
-
-Late review signals for a service-linked, merged PR record an obsolete notice without changing
-statuses or producing receipts or promotion requests. If GitHub omits the link (`pull_requests: []`),
-recovery requires one merged PR from the full source-branch PR history, matching the authenticated
-run's exact source repository, branch and SHA and this repository's `main` base. The controller
-rejects active PRs sharing that source branch or SHA, then rereads the merged target. Missing,
-ambiguous, mismatched or unmerged targets and API failures remain errors. Run, attempt, workflow,
-event and signal-job authentication still precede recovery; branch names alone never authorize it.
-
-Review and review-comment signals run independently without cancellation groups or a debounce
-delay. In particular, later contributor edits cannot suppress an approval withdrawal. Each
-successful signal wakes the trusted controller, which serializes publication and rereads live
-evidence for the exact PR head and queue commit. Queue and provider-suite signals retain their
-existing identity checks. Release Promotion Queue no longer subscribes to
-Review Admission completion: a release-only job explicitly dispatches the trusted main controller
-after publication. Display titles do not affect promotion. The controller waits at most 60 seconds
-for the requesting attempt to complete successfully and authenticates its receipts as before;
-[release automation](../scripts/release/README.md#queue-promotion) owns retry and race handling.
-
-Crowdin validates its immutable translation diff without updating a behind branch when queue
-policy is active, as it is now. In `strict-queue` mode (strict freshness and the queue both
-active, as during rollout or after rollback), validation remains strict while admission and
-pending queue reporting still work. Crowdin and
-Dependabot explicitly request authenticated admission and submit a
-head-pinned native enqueue through `enqueuePullRequest` with `expectedHeadOid` in the mutation input. This does not depend
-on the repository auto-merge setting. They report queued entries without dispatching main CI early; direct
-job-token merges dispatch main CI only after the PR is actually merged. Existing dependency,
-translation, fork and credential controls remain enforced.
-
-Release preparation creates a reviewed version-assets PR and finishes without tagging or pushing
-main. The promotion controller submits the admitted immutable PR; later finalization publishes
-only the actual merged SHA after verifying source-run receipt, generated assets, source parent,
-review admission and CI/preview. Interleaved main changes fail closed. An authenticated unchanged,
-unqueued, unmerged version PR may be regenerated by a normal Release run; an already merged stale
-snapshot requires reviewed recovery before fresh preparation. Commands and recovery guarantees
-are owned by
-[release automation](../scripts/release/README.md).
-
-Queue-only Pages retention is dry-run by default. Its independent activation switch and protected
-deployment lifecycle are described in [previews](systems/previews.md#queue-preview-retention).
-Native queue previews serialize with retention using `queue: max`. Ordinary and fork previews
-keep their own per-CI-run lock, so fork approval waits do not block the shared queue lifecycle.
-The dispatch profile is verified before approval and upload. The queue remains one build/merge at a time, with a
-60-minute response bound. Only proven inert docs integrations and narrowly verified lockfile-only Prettier refreshes use the reduced validation and
-not-applicable preview described above; other integrations keep full CI and a deployed preview.
+A policy hold publishes failure on the head and live queue commit while the controller run can
+succeed. Integrity, identity and API failures fail the run. Consumers require the successful
+App-pinned status, trusted source run and authenticated receipt. Approval edits or deletions
+and relevant provider changes re-evaluate live evidence. Obsolete signals cannot authorize a
+replacement head or queue entry. [CI and release](systems/ci-and-release.md) owns release promotion
+and CI provenance.
 
 ### Approval commands
 
@@ -305,24 +77,9 @@ manifest version and `CHANGELOG.md`, verified by
 release. Threads, changes requested, CI, preview and queue proof still apply, and release
 promotion still authenticates its source run receipt.
 
-PR previews are requested with `/preview` and stopped with `/preview stop`
-([previews](systems/previews.md)). The former PR Controls panel and its checkbox, journal and
-structured-dispatch operations were removed; existing `TarkovTracker Controls #<PR>` statuses on
-the old anchor commit are inert history.
-
 ## Admission publisher provisioning
 
-Dependabot waits for CI, security and preview gates before explicitly refreshing its exact-head
-admission. In queue mode, older admission controller checks and a failure or pending status
-cannot prevent that refresh. The authenticated receipt must succeed before mergeability is checked; other
-failed checks/statuses still block. A policy-mode change during validation requires a retry.
-
-An obsolete merge-group signal is rejected before publishing to the current PR or replacement
-group. Current review/approval revocations still invalidate both live statuses, and queue
-discovery failures remain fail-closed.
-
-As of 2026-10-14, the organization uses GitHub Free; organization ruleset workflow enforcement is
-unavailable. Generic GitHub Actions identity cannot secure native queue admission: a candidate
+Generic GitHub Actions identity cannot secure native queue admission: a candidate
 workflow can request status-write permission and publish the same context. Receipt validation
 protects automation consumers but is not evaluated by GitHub's native merge gate.
 
@@ -349,12 +106,7 @@ manifest is [`.github/review-admission-app-manifest.json`](../.github/review-adm
 
 ## Queue submitter provisioning
 
-GitHub starts no workflows for events caused by the job token (`GITHUB_TOKEN`). A queue entry
-that Crowdin Sync, Dependabot Auto Merge or Release Promotion Queue submits with the job token
-therefore never receives `merge_group` CI and times out after 60 minutes (observed on #1349 and
-#1314, 2026-10-29). Those workflows submit through a second, isolated App instead, so the
-entry behaves like a maintainer-submitted one. The App only submits entries: GitHub's required
-checks, Review Admission and the queue ruleset still decide what merges. The registration
+The scoped App submits native queue entries because the job token cannot start merge-group CI. The registration
 manifest is [`.github/queue-submitter-app-manifest.json`](../.github/queue-submitter-app-manifest.json):
 
 - Register an organization-owned App with repository **Contents: write** and **Pull requests:
@@ -384,85 +136,22 @@ The renderer rejects GitHub Actions ID `15368`, zero, bypass actors and active t
 App/key/environment provisioning is a separate approved credential/access change; committing
 these files does not create an App, install it, set a variable, or store a credential.
 
-## Activation procedure (history)
-
-Steps 1-4 and 7 are complete; steps 5 and 6 remain open. Evidence is in [Current state](#current-state).
-Activation gates 5 and 6 above track the same open steps.
-
-1. Done. Merge the reviewed integration changes and verify their exact main CI/deployment. Run the
-   `Preview Retention` workflow on main with `apply=false`; retain its authenticated dry-run report.
-   Check live API pagination, protected production/latest IDs and unknown-record retention.
-2. Done. Obtain explicit authorization for App/environment credential provisioning and the live
-   queue/retention rollout. Complete the publisher provisioning above. Keep the existing `Main`
-   deletion/non-fast-forward rules. Do not add bypass actors or use an admin merge.
-3. Done 2026-10-15 (ruleset `25157234`). Activate the reviewed, rendered App-pinned queue template for main while leaving `Main CI freshness` active. Use one
-   current, reviewed low-risk canary PR. Record the real merge-group ref/SHA/parents, source PR
-   head, GraphQL entry and job-token event delivery. Confirm the queue commit has one parent and
-   that the building entry reports `position` 1; admission denies any other shape. Prove all full CI jobs, admission, deployed
-   preview, smoke tests and authoritative result succeed on the queue SHA. Confirm a generic
-   Actions-issued admission status cannot satisfy the App-pinned gate.
-4. Done (#1243). Enqueue and remove a second isolated canary before completion. Prove its deleted/re-formed ref
-   cannot publish success or delete a deployment needed by pending jobs. Close its unmerged PR
-   and remove only owned canary branches afterward.
-5. Open. Job-token enqueue was disproven (it starts no `merge_group` CI); automation submits
-   through the [Queue Submitter App](#queue-submitter-provisioning) instead of a ruleset bypass.
-   Still pending: live proof that an App-submitted automation entry starts `merge_group` CI, and
-   that the version-promotion staging path does not tag.
-6. Open. Enable the separately approved `PREVIEW_QUEUE_RETENTION_ENABLED=true` variable in the protected
-   `preview` environment only after dry-run/lifecycle proofs. Cleanup remains limited to proven,
-   obsolete queue previews at least 48 hours old; production, normal PR previews and unknown
-   historical deployments are excluded.
-7. Done 2026-10-16 04:34 UTC: `Main CI freshness` was disabled with explicit maintainer
-   authorization after steps 1-4 passed. Steps 5 and 6 were not prerequisites: they remained open
-   because both fail closed (a bot entry that starts no CI times out and is removed, and retention
-   stays dry-run). The active queue kept its three required contexts with their separate issuer
-   pins and single-entry `ALLGREEN` policy. A behind reviewed PR (#1254) merged through the queue
-   without a branch update. Live ruleset IDs and evidence are in [Current state](#current-state).
-
-Rollback is described under [Current state](#current-state).
-
 ## Agent lifecycle after activation
 
-An agent reviews the immutable PR head, resolves findings, records validation and obtains any
-required independent review. It does not need to wait for CI, previews or review admission
-before handing off. When the `AGENTS.md` merge class allows merging, it enables head-pinned
-auto-merge right after pushing the reviewed head; high-risk PRs stop at **READY** instead:
+Follow [AGENTS.md](../AGENTS.md) for merge authority and review. For an authorized merge, submit
+the reviewed SHA using head-pinned auto-merge. For a head with green admission, trusted main can
+submit directly through the enqueue helper.
 
 ```sh
 gh pr merge <PR> --auto --match-head-commit <reviewed-head>
-```
-
-GitHub adds the PR to the native queue once `CI Result`, `Preview Result` and `Review Admission`
-pass on the PR head and every review thread is resolved; if they already pass, it queues the PR
-at once. The queue then requires the same three contexts again on its own integration commit
-before merging. The queue's squash method applies, so no merge-method flag is needed, and
-auto-merge never bypasses a required context. A later push needs its own exact-head review
-admission before the queue accepts it, and a push from an account without write access disables
-auto-merge. When no provider review covers the head, a current repository admin with the required
-merge authority posts `/approve <40-character reviewed head SHA>` alone in a comment
-([approval commands](#approval-commands)); that also approves a sensitive change. A non-admin
-write collaborator's `/approve` approves only the sensitive change. An agent posts the command only
-after its own review of that exact head.
-
-Automation and agents whose admission is already green can still submit directly from a trusted
-checkout of main; this native enqueue does not depend on the auto-merge setting:
-
-```sh
 node scripts/ci/enqueue-pr-cli.mjs tarkovtracker-org/TarkovTracker <PR> <reviewed-head>
 ```
 
-The helper pins the native enqueue mutation to the reviewed head and validates the returned
-entry. An auto-merge request or queue entry proves submission; report a merge only after
-observing it. Do not update a behind branch merely for freshness, and do not loop on
-`gh pr checks --watch` or review an unchanged diff again.
-
-The PR handoff records: reviewed head, findings/review state, validation evidence, auto-merge or
-queue entry (or the blocking check), branch/worktree, and next command. Report **QUEUED** when
-GitHub queued it, **AUTO-MERGE ON** while it waits for checks, never MERGED. End the agent turn immediately; Actions owns CI, previews and the merge
-wait. Resume only for a failure that needs a code decision, a new review finding, or an explicit
-follow-up request. On resumption read the handoff and changed evidence, not the entire previous
-review. Provider cache retention and billing are outside GitHub's control; no cache or token
-saving is guaranteed.
+GitHub queues the head after required contexts and threads pass, then checks the queue commit
+before squash merge. Keep a behind branch unchanged unless there is a separate reason to update
+it. A changed head requires fresh admission. Report the reviewed SHA, findings, validation and
+queue state or blocker. Report `QUEUED` for an observed queue entry and `AUTO-MERGE ON` for a
+pending auto-merge request. Actions owns the remaining checks.
 
 ### Reusing identical PR validation in the queue
 
@@ -493,43 +182,8 @@ Receipt helpers run in Ubuntu/WSL and require Node and `unzip`; workflow tests a
 
 ### Crowdin translation admission
 
-In `queue`/`strict-queue` mode, verified Crowdin translation PRs are exempt from requesting
-independent review through Review Admission. This admission exemption
-requires the numeric repository identity and same-repository `locales` -> `main` branch, the actual
-GitHub Actions bot ID/type/login, a complete unique PR changed-file inventory restricted to the pinned non-English locales in `review-admission-policy.mjs`, and an immutable
-GitHub compare plus non-truncated tree proving regular JSON blobs. Renames, deletions, executable
-modes, English source, nested paths, mixed changes and incomplete inventories fail back to normal
-review. The policy additionally requires a head-owned validation receipt uploaded by this
-repository's main-owned Crowdin Sync workflow after format, i18n and systems checks. The publisher
-authenticates the service-owned artifact/run/path/event/repository, exact run attempt and source on
-trusted main history; titles, labels and author display names cannot grant the exemption. A live
-sync may supply its already-uploaded validation receipt before its final merge step finishes.
-
-The admission receipt records `crowdin-policy` / `review-exempt`, rather than claiming that a
-review occurred. Open review threads, changes requested and authenticated substantive provider
-findings remain blockers. CI, syntax/placeholders/key checks, preview, sensitive-change policy,
-current-head fences and native queue integration are unchanged. Other candidates retain the
-existing provider, independent collaborator review or valid exact-head admin-attestation routes.
-Unchanged locales need not appear in the changed-file inventory. A changed head needs a new trusted Crowdin validation receipt; historical PRs are not grandfathered.
-There are no provider requests or billing/configuration changes.
-
-Crowdin Sync retains its existing main-only schedule/manual orchestration and token permissions.
-After uploading validation provenance, its existing merge step dispatches candidate CI and preview,
-in `queue`/`strict-queue` mode requests one protected Review Admission publication, authenticates
-that accepted dispatch and its exact-head receipt, then performs normal guarded native enqueue.
-Legacy `strict` mode is unchanged: its merge step uses the broader flat non-English JSON scope, does not
-wait for Review Admission, and retains guarded `gh pr merge --match-head-commit` plus post-merge main-CI
-dispatch. It does not enforce or attest the new queue-admission exemption described above; it must
-not be used as its commissioning path. Locales outside the pinned list in `review-admission-policy.mjs` retain normal review in queue modes.
-The list can include a Crowdin target the app does not load yet: `tr` is listed while its
-translations are in progress and joins `SUPPORTED_LOCALES` separately. The admission helper allows at most 120 pending polls with five-second sleeps,
-plus each poll's existing API deadlines; it fails closed on terminal errors. This is a retry-count
-bound rather than an exact ten-minute wall-clock deadline. CI and preview keep their existing
-limits. No additional privileged trigger, promotion workflow or scanner exception is needed.
-
-If findings, changed revisions or infrastructure failures hold a sync after its bounded wait,
-resolve the cause and rerun Crowdin Sync on main, or let its existing schedule try again. This does
-not promise an immediate enqueue when a finding is resolved after the job has ended. A rerun may
-download fresh translations, so fix material locale wording in Crowdin upstream as well. To roll
-back the review exemption, remove the narrow `crowdinExemption` admission route; ordinary review
-requirements resume without changing queue rules, publisher permissions or credentials.
+The queue admission exception is limited to verified same-repository `locales` → `main` changes
+from the Actions bot, with a complete immutable diff of permitted non-English locale blobs and a
+head-owned trusted Crowdin validation receipt. It does not bypass findings, threads, sensitive
+approval, CI, preview or queue integration. [CI and release](systems/ci-and-release.md#crowdin-automatic-merges)
+owns submission, retry and rollback.

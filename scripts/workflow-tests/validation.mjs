@@ -134,7 +134,7 @@ test('only change sets that cannot reach the deployed app skip the preview', () 
     ['.github/workflows/crowdin.yml'],
     ['scripts/workflow-tests/dispatched-status.mjs'],
     ['scripts/ci/README.md'],
-    ['docs/eft-log-reference/audit_2026-08-29_signatures.json'],
+    ['docs/archive/retired-evidence.json'],
     ['tests/test-setup.ts'],
     ['.coderabbit.yaml'],
     ['supabase/README.md'],

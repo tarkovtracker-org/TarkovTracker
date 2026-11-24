@@ -71,9 +71,8 @@ Pages output needs no deployable preview — Markdown outside `public/`, `.githu
 Translations, build configuration, dependencies, application code, `public/`, `shared/`,
 Supabase, Workers, and unknown or unreadable paths require one, so translation-only pull requests
 keep the reduced test selection but add the `validate` build job. The `security` job (reusable
-`.github/workflows/security.yml`: production dependency audit at the critical threshold, Gitleaks,
-CodeQL) is selected on every CI run. See
-`docs/workflow-automation.md` for the recorded rollout evidence and local/full execution profiles.
+`.github/workflows/security.yml`: production dependency audit, Gitleaks,
+CodeQL) is selected on every CI run. See the [workflow inventory](../../.github/workflows/README.md#ci-ciyml) for the job map.
 
 ### Invariants
 
