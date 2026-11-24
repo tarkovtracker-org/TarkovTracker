@@ -31,7 +31,14 @@
           : t('page.seasonal_modifiers.catalog_pending')
       "
     />
-    <template v-else>
+    <ModifierPlanStatus
+      v-else
+      :status="planStatus"
+      :saving="saving"
+      :save-failed="saveFailed"
+      @reload="reloadPlan"
+      @retry="retrySave"
+    >
       <details
         v-if="rules.length"
         class="border-surface-700 bg-surface-900/70 rounded-lg border px-3 py-2 text-sm"
@@ -109,7 +116,7 @@
         :floor="floor"
         @toggle="toggle"
       />
-    </template>
+    </ModifierPlanStatus>
     <p class="text-surface-400 text-xs">
       {{ t('page.seasonal_modifiers.sign_note') }}
       <ULink
@@ -125,14 +132,19 @@
 </template>
 <script setup lang="ts">
   import PageHeader from '@/components/ui/PageHeader.vue';
+  import { useAccountModifierPlanStore } from '@/features/seasonal-modifiers/accountModifierPlan';
   import ModifierBoards from '@/features/seasonal-modifiers/ModifierBoards.vue';
   import ModifierBudget from '@/features/seasonal-modifiers/ModifierBudget.vue';
+  import ModifierPlanStatus from '@/features/seasonal-modifiers/ModifierPlanStatus.vue';
   import { modifierCategories, type ModifierOrder } from '@/features/seasonal-modifiers/planner';
   import { previewModifiers, previewRules } from '@/features/seasonal-modifiers/seasonTwo';
   import { useModifierPlanner } from '@/features/seasonal-modifiers/useModifierPlanner';
   import { UNTAR_CONTROL_POSTER_URL as posterUrl } from '@/types/seasonPreview';
   import type { SeasonPreview } from '@/types/seasonPreview';
   const { t, locale } = useI18n({ useScope: 'global' });
+  const { $supabase } = useNuxtApp();
+  const userId = computed(() => $supabase.user.id ?? null);
+  const accountPlan = useAccountModifierPlanStore();
   definePageMeta({ layout: 'default' });
   const query = ref('');
   const category = ref('all');
@@ -153,10 +165,15 @@
     floor,
     suggestion,
     blocked,
+    status: planStatus,
+    saving,
+    saveFailed,
+    reloadPlan,
+    retrySave,
     toggle,
     clear,
     applySuggestion,
-  } = useModifierPlanner(items);
+  } = useModifierPlanner(items, userId, accountPlan);
   const signed = (value: number) =>
     new Intl.NumberFormat(locale.value, { signDisplay: 'exceptZero' }).format(value);
   const categoryOptions = computed(() => [
@@ -177,7 +194,7 @@
   const matches = computed(() => {
     const term = normalize(query.value.trim());
     return items.value
-      .filter((item) => !onlySelected.value || selected.has(item.id))
+      .filter((item) => !onlySelected.value || selected.value.has(item.id))
       .filter((item) => category.value === 'all' || item.category === category.value)
       .filter((item) =>
         [item.name, item.effect, t(`page.seasonal_modifiers.categories.${item.category}`)].some(
