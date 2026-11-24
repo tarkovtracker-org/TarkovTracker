@@ -4,8 +4,6 @@
     "zod": "Pinned to 4.6.7 for GHSA-mrhx-c7xc-m3w5. Zod 4.6.7 retains the one-argument record API used by @codecov/bundler-plugin-core 2.0.1; native CommonJS and ESM compatibility tests exercise the actual GitHub job-response parser. @google/design.md bundles its own Zod 3 for local DESIGN.md linting; it is not included in production output.",
     "deepmerge": "Replaced Nitro's transitive deepmerge 4.3.1 with the exact npm alias @stackline/deepmerge 1.1.0 for GHSA-gcqx-w48m-w2h4. Published 2026-10-13 with source-matching npm provenance; no runtime dependencies or install hooks. The security test resolves the actual Rollup consumer and covers prototype poisoning and deepmerge 4 compatibility. Remove the override only after upstream publishes a vetted patched version and the same regressions pass.",
     "picomatch": "GHSA-fc5q-39xc-vjpf affects both resolved transitive lines. The exact alias @ryotsu/picomatch 4.0.7-a matches the verified npm provenance and source tag at 3ab5a7627d480259e3d9ca67fbc14c125d374f0e. Its only executable change from the upstream parent is the repeated-extglob parser guard. It adds no runtime dependencies or install hooks. Compatibility tests exercise Nitro's existing anymatch, micromatch and Rollup consumers. Replace the alias once upstream ships compatible fixes for both lines.",
-    "@nuxt/test-utils": "Unpinned to ^4.0.2 on 2026-04-23 after vitest-environment-nuxt@2.0.0 was published and the upstream workspace dependency issue was fixed.",
-    "@vueuse/core": "Previously pinned to 13.9.0 due to Nuxt/@nuxt/ui/reka-ui compatibility; updated to ^14.1.0 after upgrading Nuxt/@nuxt/ui.",
     "fast-xml-parser": "Pinned fast-xml-parser to the patched v5 line on 2026-02-18 to avoid potential v6 API regressions in @nuxtjs/sitemap dependency paths; remediation: remove this override after @nuxtjs/sitemap officially supports fast-xml-parser v6 and confirm sitemap generation in CI.",
     "glob": "Pinned to 14.0.3 for GHSA-3g3m-2fjr-6pw4. The pnpm patch redirects upstream minified default exports to the published raw modules compared against the immutable source tag. Nitro/@vercel/nft CommonJS and ESM consumer tests enforce the reviewed raw entry points. Remove this patch only after vetting the replacement default artifacts or obtaining equivalent provenance."
   },
@@ -138,11 +136,6 @@
   },
   "type": "module",
   "lint-staged": {
-    "shared/**/*.{js,ts,tsx}": [
-      "prettier --write",
-      "eslint --fix",
-      "node scripts/checks/lint-blank-lines.mjs --fix"
-    ],
     "app/**/*.{js,ts,tsx}": [
       "prettier --write",
       "eslint --fix",
@@ -201,7 +194,7 @@
       "prettier --write",
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
-    "!(app|scripts|supabase|workers|.cubic)/**/*.json": [
+    "!(app|scripts|supabase|workers)/**/*.json": [
       "prettier --write",
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
@@ -232,9 +225,6 @@
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "workers/**/*.{sh,ts,tsx}": [
-      "node scripts/checks/lint-blank-lines.mjs --fix"
-    ],
-    ".cubic/**/*.json": [
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "**/*.{yaml,yml}": [

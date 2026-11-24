@@ -184,8 +184,6 @@ const createPreferencesStore = () => ({
   setNeededItemsSortDirection: vi.fn(),
   getNeededItemsHideOwned: false,
   setNeededItemsHideOwned: vi.fn(),
-  getNeededItemsCardStyle: 'compact',
-  setNeededItemsCardStyle: vi.fn(),
   itemsTeamAllHidden: false,
   setItemsTeamHideAll: vi.fn(),
   itemsTeamNonFIRHidden: false,

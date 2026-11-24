@@ -11,7 +11,7 @@ describe('useAppStore', () => {
   it('keeps device drawer settings when the SSR payload hydrates the store', async () => {
     localStorage.setItem('app_drawerRail', 'true');
     const pinia = createPinia();
-    pinia.state.value.app = { drawerRail: false, drawerShow: true };
+    pinia.state.value.app = { drawerRail: false };
     setActivePinia(pinia);
     const store = useAppStore();
     expect(store.drawerRail).toBe(true);
