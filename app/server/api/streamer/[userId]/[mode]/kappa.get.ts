@@ -2,7 +2,6 @@ import {
   createError,
   defineEventHandler,
   getRequestHeader,
-  getRouterParam,
   setResponseHeader,
   type H3Event,
 } from 'h3';
@@ -11,8 +10,9 @@ import { fetchLocalizedCatalogs } from '@/server/utils/localizedCatalogs';
 import { createLogger } from '@/server/utils/logger';
 import { overlayAuthHeaders } from '@/server/utils/overlayAuth';
 import { getSharedCache, resolveSharedCacheOrigin } from '@/server/utils/sharedEdgeStore';
+import { requireStreamerProfileParams } from '@/server/utils/sharedProfileHandle';
 import { computeStreamerKappaMetrics } from '@/server/utils/streamerKappa';
-import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
+import { API_GAME_MODES, type GameMode } from '@/utils/constants';
 import type {
   GameEdition,
   TarkovTaskObjectivesQueryResult,
@@ -41,7 +41,6 @@ async function fetchStreamerCatalog(
   });
   return { data: response.data, release };
 }
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EDITIONS_CACHE_TTL_MS = 60 * 60 * 1000;
 const EDITIONS_SHARED_CACHE_PREFIX = 'streamer-kappa-editions';
 const EDITIONS_CACHE_KEY = 'overlay-editions';
@@ -70,9 +69,6 @@ type SharedProgressData = {
   pmcFaction: 'BEAR' | 'USEC';
   taskCompletions: Record<string, RawTaskCompletion>;
   taskObjectives: Record<string, TaskObjectiveProgress>;
-};
-const normalizeMode = (value: string | undefined): GameMode | null => {
-  return isGameMode(value) ? value : null;
 };
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -259,14 +255,7 @@ const getEditions = async (): Promise<GameEdition[]> => {
 export default defineEventHandler(async (event) => {
   setResponseHeader(event, 'Cache-Control', 'no-store, max-age=0');
   const forwardedHeaders = buildSharedProfileRequestHeaders(event);
-  const userId = (getRouterParam(event, 'userId') || '').trim();
-  const mode = normalizeMode(getRouterParam(event, 'mode'));
-  if (!mode) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid profile mode' });
-  }
-  if (!UUID_REGEX.test(userId)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid profile id' });
-  }
+  const { userId, mode } = requireStreamerProfileParams(event);
   let sharedProfile: SharedProfileResponse;
   try {
     sharedProfile = await $fetch<SharedProfileResponse>(`/api/profile/${userId}/${mode}`, {

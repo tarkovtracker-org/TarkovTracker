@@ -524,3 +524,16 @@ export const actions = {
   },
 } as const;
 export type UserActions = typeof actions;
+export const patchProgressState = (
+  store: { $patch: (mutate: (state: UserState) => void) => void },
+  nextState: UserState
+) => {
+  store.$patch((state) => {
+    state.currentGameMode = nextState.currentGameMode;
+    state.gameEdition = nextState.gameEdition;
+    state.tarkovUid = nextState.tarkovUid;
+    state.pvp = nextState.pvp;
+    state.pve = nextState.pve;
+    state.seasonal = nextState.seasonal;
+  });
+};

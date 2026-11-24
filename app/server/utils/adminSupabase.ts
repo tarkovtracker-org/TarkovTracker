@@ -28,6 +28,10 @@ export function normalizeSupabaseUrl(value: unknown): string {
     return '';
   }
 }
+export function readSupabaseServiceKey(runtime: Record<string, unknown>): string {
+  const value = runtime.supabaseServiceKey;
+  return typeof value === 'string' ? value : '';
+}
 /**
  * Shared Supabase REST helper for admin server routes. Uses the service-role
  * key, bounds the request with an AbortController timeout so a stalled upstream

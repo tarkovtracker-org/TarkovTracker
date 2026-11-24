@@ -1,5 +1,6 @@
 import { useStorage } from '@vueuse/core';
 import { logger } from '@/utils/logger';
+import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { ComputedRef, Ref } from '#imports';
 export type AnalyticsConsentStatus = 'unknown' | 'accepted' | 'declined';
@@ -118,4 +119,18 @@ if (import.meta.hot) {
     analyticsConsentState = null;
     analyticsPromptOpen.value = false;
   });
+}
+export function isAnalyticsConfigured(
+  config: ReturnType<typeof useRuntimeConfig>['public']
+): boolean {
+  return (
+    shouldEnableAnalyticsIntegrations({
+      appUrl: config.appUrl,
+      hostname: import.meta.client ? window.location.hostname : undefined,
+      isProduction: import.meta.env.PROD,
+    }) &&
+    [config.googleAnalyticsMeasurementId, config.microsoftClarityProjectId].some(
+      (value) => String(value || '').trim().length > 0
+    )
+  );
 }

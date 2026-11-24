@@ -1,3 +1,4 @@
+import { readErrorBodySnippet } from '@/server/utils/fetchWithTimeout';
 import { TASK_OBJECTIVES_PURGE_CHECK_TTL_MS } from '@/utils/taskCatalogCache';
 import type { H3Event } from 'h3';
 import { normalizeSupabaseUrl } from '~/server/utils/adminSupabase';
@@ -63,15 +64,7 @@ export async function readTarkovCacheMeta(event: H3Event) {
 }
 async function readAuditResponse(response: Response, url: URL) {
   if (!response.ok) {
-    let bodySnippet: string;
-    try {
-      bodySnippet = await response.text();
-      if (bodySnippet.length > 200) {
-        bodySnippet = bodySnippet.slice(0, 200) + '...';
-      }
-    } catch {
-      bodySnippet = '[unable to read response body]';
-    }
+    const bodySnippet = await readErrorBodySnippet(response);
     logger.error('Non-OK response from Supabase.', {
       url: url.toString(),
       status: response.status,

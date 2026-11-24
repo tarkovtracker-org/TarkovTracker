@@ -1,5 +1,6 @@
 import { hasMaterializedProgress } from '@tarkovtracker/progress-contracts/modeProgress';
 import { useToastI18n } from '@/composables/useToastI18n';
+import { patchProgressState, type UserProgressData, type UserState } from '@/stores/progressState';
 import { blockAccountRecoveryRetentionForOwner } from '@/stores/tarkov/accountRecovery';
 import {
   noteRemoteProgressApplied,
@@ -55,7 +56,6 @@ import {
   subscribeRealtimeChannel,
 } from '@/utils/realtimeVisibility';
 import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
-import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
 let stopLiveUpdates: (() => void) | null = null;
 const stopProgressRecovery = (): void => {
@@ -456,14 +456,7 @@ async function runSetupRealtimeListener(
       isLikelySelfOrigin,
     });
     pauseRegisteredSyncController();
-    tarkovStore.$patch((state) => {
-      state.currentGameMode = nextState.currentGameMode;
-      state.gameEdition = nextState.gameEdition;
-      state.tarkovUid = nextState.tarkovUid;
-      state.pvp = nextState.pvp;
-      state.pve = nextState.pve;
-      state.seasonal = nextState.seasonal;
-    });
+    patchProgressState(tarkovStore, nextState);
     scheduleSyncResume();
   };
   const handleModeProgressChange = (

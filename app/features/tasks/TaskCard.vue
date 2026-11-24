@@ -386,6 +386,7 @@
   import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
   import { countIncompleteSuccessors, resolveImpactTeamIds } from '@/utils/taskImpact';
   import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
+  import { hasCompletionStatus } from '@/utils/taskStatus';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { TaskRequirementRow } from '@/features/tasks/composables/useTaskRequirements';
   import type { ActionButtonState } from '@/features/tasks/types';
@@ -509,11 +510,6 @@
     () => props.task,
     (payload) => emit('on-task-action', payload)
   );
-  // Helper for status array checks
-  const hasStatus = (status: string[] | undefined, statuses: string[]) => {
-    const normalized = (status ?? []).map((entry) => entry.toLowerCase());
-    return statuses.some((value) => normalized.includes(value));
-  };
   const getStatusSourceTooltipText = (source: FailureSource): string => {
     const status = formatExpectedStatuses(t, source.triggerStatuses);
     if (isFailed.value) {
@@ -639,9 +635,7 @@
     if (!isFailed.value) return [];
     const sources = new Map<string, FailureSource>();
     (props.task.failConditions ?? [])
-      .filter(
-        (objective) => objective?.task?.id && hasStatus(objective.status, ['complete', 'completed'])
-      )
+      .filter((objective) => objective?.task?.id && hasCompletionStatus(objective.status))
       .filter((objective) => isTaskSuccessful(objective.task!.id))
       .forEach((objective) => {
         const id = objective.task!.id;

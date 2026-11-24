@@ -1,3 +1,4 @@
+import { SPECIAL_STATIONS } from '@/utils/constants';
 import type { GameEdition } from '@/types/tarkov';
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -104,4 +105,17 @@ export function getExcludedTaskIdsForEdition(
     userEdition.exclusiveTaskIds.forEach((id) => excludedIds.delete(id));
   }
   return excludedIds;
+}
+type EditionStationLevels = Pick<GameEdition, 'defaultCultistCircleLevel' | 'defaultStashLevel'>;
+const editionStationLevelKeys = new Map<string | undefined, keyof EditionStationLevels>([
+  [SPECIAL_STATIONS.STASH, 'defaultStashLevel'],
+  [SPECIAL_STATIONS.CULTIST_CIRCLE, 'defaultCultistCircleLevel'],
+]);
+export function getEditionStationDefault(
+  stationName: string | undefined,
+  levelCount: number,
+  edition?: EditionStationLevels
+): number | null {
+  const key = editionStationLevelKeys.get(stationName);
+  return key ? Math.min(edition?.[key] ?? 0, levelCount) : null;
 }
