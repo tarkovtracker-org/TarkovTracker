@@ -9,232 +9,185 @@
       title-classes="text-lg font-semibold"
     >
       <template #title-right>
-        <div class="flex flex-wrap items-center gap-1">
+        <div
+          class="flex flex-wrap items-center gap-1"
+          role="group"
+          :aria-label="$t('settings.skills.sort_label')"
+        >
           <UButton
+            v-for="option in sortOptions"
+            :key="option.value"
             size="xs"
-            :label="$t('common.priority')"
-            :variant="skillSortMode === 'priority' ? 'solid' : 'outline'"
-            :color="skillSortMode === 'priority' ? 'primary' : 'neutral'"
-            @click="setSkillSortMode('priority')"
-          />
-          <UButton
-            size="xs"
-            :label="$t('settings.skills.sort.ingame')"
-            :variant="skillSortMode === 'ingame' ? 'solid' : 'outline'"
-            :color="skillSortMode === 'ingame' ? 'primary' : 'neutral'"
-            @click="setSkillSortMode('ingame')"
+            :label="option.label"
+            v-bind="getToggleProps(skillSortMode === option.value, 'solid', 'outline')"
+            @click="setSkillSortMode(option.value)"
           />
         </div>
       </template>
       <template #content>
         <div class="space-y-4 px-4 py-4">
-          <div class="space-y-1">
-            <p class="text-surface-400 text-xs">
-              {{
-                $t(
-                  'settings.skills.explanation',
-                  `Quest rewards are auto-calculated. Enter your total skill level (max ${MAX_SKILL_LEVEL}) to adjust the offset.`
-                )
-              }}
-            </p>
-            <p v-if="hasShowAllToggle && !showAllSkills" class="text-surface-400 text-xs">
-              {{
-                $t('settings.skills.collapsed_hint', {
-                  shown: visibleSkills.length,
-                  total: allGameSkills.length,
-                })
-              }}
-            </p>
-          </div>
+          <p class="text-surface-400 text-xs">
+            {{ $t('settings.skills.intro', { max: MAX_SKILL_LEVEL }) }}
+          </p>
           <div
             v-if="allGameSkills.length > 0"
-            class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            class="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center"
           >
-            <div
-              v-for="skill in visibleSkills"
-              :id="getSkillCardId(skill.key)"
-              :key="skill.key"
-              class="rounded-lg border p-3 transition-colors"
-              :class="skillCardClasses(skill.key)"
+            <UInput
+              v-model="searchQuery"
+              type="search"
+              icon="i-mdi-magnify"
+              size="sm"
+              class="w-full md:w-60"
+              :placeholder="$t('settings.skills.search_placeholder')"
+              :aria-label="$t('settings.skills.search_placeholder')"
             >
-              <!-- The header row doubles as the level input's label: clicking anywhere in
-                it natively focuses the input (no JS click handler, no button role), and
-                keyboard users reach the input directly through Tab order. The label is
-                aria-hidden and the input carries a stable aria-label, so the accessible
-                name stays concise instead of reading the whole changing header. Inner
-                wrappers are spans to respect the label phrasing content model. -->
-              <label
-                :for="getSkillInputId(skill.key)"
-                aria-hidden="true"
-                class="mb-2 flex cursor-pointer items-center gap-2"
-              >
-                <span class="group relative block shrink-0">
-                  <img
-                    v-if="skill.imageLink"
-                    :src="skill.imageLink"
-                    :alt="skill.name"
-                    class="relative z-10 h-10 w-10 rounded object-contain transition-transform duration-200 ease-out group-hover:z-50 group-hover:scale-[2.5] group-hover:rounded-md group-hover:shadow-xl"
-                    loading="lazy"
-                  />
-                  <span
-                    v-else
-                    class="bg-surface-700 flex h-10 w-10 items-center justify-center rounded text-xs"
-                  >
-                    ?
-                  </span>
-                </span>
-                <span class="min-w-0 flex-1">
-                  <span class="flex items-center gap-1">
-                    <span class="text-surface-100 truncate text-sm font-semibold">
-                      {{ formatSkillName(skill.name) }}
-                    </span>
-                    <UTooltip
-                      v-if="skill.requiredByTasks.length > 0"
-                      :text="$t('skills.required_for', { items: skill.requiredByTasks.join(', ') })"
-                    >
-                      <UBadge color="warning" variant="soft" size="xs">
-                        {{ $t('skills.req') }}
-                      </UBadge>
-                    </UTooltip>
-                    <UTooltip
-                      v-if="skill.requiredLevels.length > 0"
-                      :text="
-                        $t('skills.required_levels', { items: skill.requiredLevels.join(', ') })
-                      "
-                    >
-                      <UBadge color="accent" variant="soft" size="xs">
-                        {{ $t('common.lv') }} {{ formatRequiredLevels(skill.requiredLevels) }}
-                      </UBadge>
-                    </UTooltip>
-                  </span>
-                  <span class="text-surface-400 block truncate text-xs">
-                    <span v-if="skill.requiredByTasks.length > 0">
-                      {{ $t('settings.skills.req_count') }} {{ skill.requiredByTasks.length }}
-                    </span>
-                    <span
-                      v-if="skill.requiredByTasks.length > 0 && skill.rewardedByTasks.length > 0"
-                      class="mx-1"
-                    >
-                      •
-                    </span>
-                    <span v-if="skill.rewardedByTasks.length > 0">
-                      {{ $t('settings.skills.reward_count') }}
-                      {{ skill.rewardedByTasks.length }}
-                    </span>
-                  </span>
-                </span>
-                <span
-                  class="shrink-0 text-lg font-bold"
-                  :class="
-                    getSkillLevel(skill.key) >= MAX_SKILL_LEVEL
-                      ? 'text-warning-500 light:text-warning-800'
-                      : 'text-primary-400'
-                  "
-                >
-                  {{ getDisplayLevel(skill.key) }}
-                </span>
-              </label>
-              <div class="mb-2 flex gap-3 text-xs">
-                <UTooltip
-                  :text="
-                    $t(
-                      'settings.skills.quest_tooltip',
-                      'Skill level granted automatically by completed quest rewards.'
-                    )
-                  "
-                  class="flex-1"
-                >
-                  <div class="text-surface-400 cursor-default">
-                    {{ $t('settings.skills.quest') }}
-                    <span class="text-surface-200 font-medium">
-                      {{ getQuestSkillLevel(skill.key) }}
-                    </span>
-                  </div>
-                </UTooltip>
-                <UTooltip
-                  :text="
-                    $t(
-                      'settings.skills.offset_tooltip',
-                      'Manual adjustment on top of the quest reward level. Positive means you trained the skill above quest rewards.'
-                    )
-                  "
-                  class="flex-1"
-                >
-                  <div class="text-surface-400 cursor-default">
-                    {{ $t('settings.skills.offset') }}
-                    <span class="text-surface-200 font-medium">
-                      {{ formatSkillOffset(getSkillOffset(skill.key)) }}
-                    </span>
-                  </div>
-                </UTooltip>
-              </div>
-              <div class="flex items-center gap-2">
-                <UInput
-                  :id="getSkillInputId(skill.key)"
-                  :model-value="getSkillLevel(skill.key)"
-                  type="text"
-                  inputmode="decimal"
-                  :min="0"
-                  placeholder="0"
-                  size="sm"
-                  class="flex-1"
-                  :aria-label="`${formatSkillName(skill.name)} ${$t('common.level')}`"
-                  :aria-describedby="getSkillRangeId(skill.key)"
-                  @keydown="preventInvalidInput"
-                  @paste="(event: ClipboardEvent) => onPaste(event, skill.key)"
-                  @focus="resetSkillLimitToast"
-                  @blur="resetSkillLimitToast"
-                  @update:model-value="(value) => updateSkillLevel(skill.key, value)"
-                />
-                <span :id="getSkillRangeId(skill.key)" class="sr-only">
-                  {{ $t('settings.skills.valid_range', `Valid range: 0 to ${MAX_SKILL_LEVEL}`) }}
-                </span>
+              <template v-if="searchQuery" #trailing>
                 <UButton
-                  icon="i-mdi-refresh"
-                  size="sm"
-                  variant="soft"
+                  icon="i-mdi-close"
+                  size="xs"
+                  variant="link"
                   color="neutral"
-                  class="min-w-20"
-                  :disabled="getSkillOffset(skill.key) === 0"
-                  @click="resetOffset(skill.key)"
-                >
-                  {{ $t('common.reset') }}
-                </UButton>
-              </div>
+                  :aria-label="$t('common.clear_search')"
+                  @click="searchQuery = ''"
+                />
+              </template>
+            </UInput>
+            <div
+              class="flex flex-wrap items-center gap-1"
+              role="group"
+              :aria-label="$t('settings.skills.filter_label')"
+            >
+              <UButton
+                v-for="option in filterOptions"
+                :key="option.value"
+                size="xs"
+                v-bind="getToggleProps(skillFilter === option.value, 'soft', 'ghost')"
+                :disabled="option.disabled"
+                @click="skillFilter = option.value"
+              >
+                {{ option.label }}
+                <span class="text-surface-400 tabular-nums">{{ option.count }}</span>
+              </UButton>
             </div>
-          </div>
-          <div v-if="hasShowAllToggle" class="flex justify-center pt-2">
             <UButton
-              :label="
-                showAllSkills ? $t('settings.skills.show_less') : $t('settings.skills.show_all')
-              "
-              variant="soft"
+              v-if="adjustedSkills.length > 0"
+              icon="i-mdi-restore"
+              size="xs"
+              variant="ghost"
               color="neutral"
-              @click="showAllSkills = !showAllSkills"
-            />
+              class="md:ml-auto"
+              @click="showResetAllDialog = true"
+            >
+              {{ $t('settings.skills.reset_all') }}
+            </UButton>
           </div>
-          <div v-if="allGameSkills.length === 0" class="text-surface-400 py-6 text-center text-sm">
+          <div v-if="visibleSkills.length > 0" class="space-y-5">
+            <section
+              v-for="group in skillGroups"
+              :key="group.category ?? 'all'"
+              :aria-label="group.label"
+            >
+              <h3
+                v-if="group.label"
+                class="text-surface-400 mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase"
+              >
+                {{ group.label }}
+                <span class="bg-surface-700 h-px flex-1" aria-hidden="true" />
+              </h3>
+              <div class="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                <SkillLevelRow
+                  v-for="skill in group.skills"
+                  :key="skill.key"
+                  :skill="skill"
+                  :level="getSkillLevel(skill.key)"
+                  :quest-level="getQuestSkillLevel(skill.key)"
+                  :offset="getSkillOffset(skill.key)"
+                  :highlighted="highlightedSkillKey === skill.key"
+                  @input-keydown="preventInvalidInput"
+                  @input-paste="(event: ClipboardEvent) => onPaste(event, skill.key)"
+                  @input-focus-change="resetSkillLimitToast"
+                  @update-level="(value: string | number) => updateSkillLevel(skill.key, value)"
+                  @reset="resetOffset(skill.key)"
+                />
+              </div>
+            </section>
+          </div>
+          <div
+            v-else-if="allGameSkills.length > 0"
+            class="text-surface-400 flex flex-col items-center gap-2 py-6 text-center text-sm"
+          >
+            {{ $t('settings.skills.no_matches') }}
+            <UButton size="xs" variant="soft" color="neutral" @click="clearFilters">
+              {{ $t('settings.skills.clear_filters') }}
+            </UButton>
+          </div>
+          <div v-else class="text-surface-400 py-6 text-center text-sm">
             {{ $t('settings.skills.no_skills') }}
           </div>
         </div>
       </template>
     </GenericCard>
+    <UModal v-model:open="showResetAllDialog">
+      <template #content>
+        <div class="p-5">
+          <div class="mb-4 flex items-center gap-3">
+            <div class="bg-error-500/15 rounded-full p-2">
+              <UIcon name="i-mdi-restore" class="text-error-400 h-5 w-5" />
+            </div>
+            <h3 class="text-surface-100 text-base font-semibold">
+              {{ $t('settings.skills.reset_all_title') }}
+            </h3>
+          </div>
+          <p class="text-surface-300 mb-5 text-sm">
+            {{ $t('settings.skills.reset_all_body', { count: adjustedSkills.length }) }}
+          </p>
+          <div class="flex justify-end gap-2">
+            <UButton color="neutral" variant="ghost" @click="showResetAllDialog = false">
+              {{ $t('common.cancel') }}
+            </UButton>
+            <UButton color="error" variant="soft" @click="resetAllAdjustments">
+              {{ $t('settings.skills.reset_all_confirm') }}
+            </UButton>
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useSkillCalculation } from '@/composables/useSkillCalculation';
+  import SkillLevelRow from '@/features/settings/SkillLevelRow.vue';
+  import { getSkillCardId } from '@/features/settings/skillsCardIds';
   import { usePreferencesStore } from '@/stores/usePreferences';
-  import { MAX_SKILL_LEVEL, type SkillSortMode } from '@/utils/constants';
+  import {
+    getSkillCategory,
+    MAX_SKILL_LEVEL,
+    SKILL_CATEGORY_ORDER,
+    type SkillCategory,
+    type SkillSortMode,
+  } from '@/utils/constants';
   import { getQueryString } from '@/utils/routeHelpers';
+  import { formatSkillName } from '@/utils/skillHelpers';
+  type GameSkill = ReturnType<typeof useSkillCalculation>['allGameSkills']['value'][number];
+  type SkillFilter = 'all' | 'needed' | 'adjusted';
+  type ButtonVariant = 'solid' | 'outline' | 'soft' | 'ghost';
+  interface SkillGroup {
+    category: SkillCategory | null;
+    label?: string;
+    skills: GameSkill[];
+  }
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
   const skillCalculation = useSkillCalculation();
   const preferencesStore = usePreferencesStore();
   const allGameSkills = computed(() => skillCalculation.allGameSkills.value);
-  const showAllSkills = ref(false);
   const skillSortMode = computed(() => preferencesStore.getSkillSortMode);
+  const searchQuery = ref('');
+  const skillFilter = ref<SkillFilter>('all');
+  const showResetAllDialog = ref(false);
   const highlightedSkillKey = ref<string | null>(null);
   const skillHighlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   const setSkillSortMode = (mode: SkillSortMode) => {
@@ -242,81 +195,66 @@
   };
   const toast = useToast();
   const skillLimitToastShown = ref(false);
-  const { lgAndUp, smAndUp, xlAndUp } = useSharedBreakpoints();
-  const columnsPerRow = computed(() => {
-    if (xlAndUp.value) return 4;
-    if (lgAndUp.value) return 3;
-    if (smAndUp.value) return 2;
-    return 1;
-  });
-  const collapsedSkills = computed(() => {
-    const requiredSkills = allGameSkills.value.filter(
-      (skill) => (skill.requiredLevels?.length ?? 0) > 0
-    );
-    const optionalSkills = allGameSkills.value.filter(
-      (skill) => (skill.requiredLevels?.length ?? 0) === 0
-    );
-    return [...requiredSkills, ...optionalSkills];
-  });
-  const skillsWithRequirementsCount = computed(() => {
-    return allGameSkills.value.filter((skill) => (skill.requiredLevels?.length ?? 0) > 0).length;
-  });
-  const collapsedVisibleCount = computed(() => {
-    const total = allGameSkills.value.length;
-    const requiredCount = skillsWithRequirementsCount.value;
-    if (total === 0) return 0;
-    if (requiredCount === 0) return total;
-    return Math.min(total, Math.ceil(requiredCount / columnsPerRow.value) * columnsPerRow.value);
-  });
-  const hasShowAllToggle = computed(() => {
-    return collapsedVisibleCount.value < allGameSkills.value.length;
-  });
-  const visibleSkills = computed(() => {
-    if (showAllSkills.value) return allGameSkills.value;
-    return collapsedSkills.value.slice(0, collapsedVisibleCount.value);
-  });
-  const getSkillCardId = (skillKey: string): string =>
-    `settings-skill-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-  const skillCardClasses = (skillKey: string) => {
-    return [
-      'border-surface-700 hover:border-surface-500',
-      highlightedSkillKey.value === skillKey
-        ? 'ring-primary-500 ring-offset-surface-950 border-primary-500/60 ring-2 ring-offset-2'
-        : '',
-    ];
-  };
-  const skillAliasesForMigration = computed(() => {
-    return Array.from(
-      new Set(
-        allGameSkills.value.flatMap((skill) =>
-          [skill.key, skill.id, skill.name].filter((alias): alias is string => Boolean(alias))
-        )
-      )
-    ).sort((a, b) => a.localeCompare(b));
-  });
-  const formatSkillName = (skillName: string): string => {
-    return skillName
-      .split(/(?=[A-Z])/)
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  };
-  const formatRequiredLevels = (levels: number[]): string => {
-    if (levels.length === 0) return '';
-    if (levels.length === 1) return String(levels[0]);
-    return levels.join(',');
-  };
-  const getSkillInputId = (skillKey: string): string =>
-    `skill-input-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-  const getSkillRangeId = (skillKey: string): string =>
-    `skill-range-${skillKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
   const getSkillLevel = (skillKey: string) => skillCalculation.getSkillLevel(skillKey);
   const getQuestSkillLevel = (skillKey: string) => skillCalculation.getQuestSkillLevel(skillKey);
   const getSkillOffset = (skillKey: string) => skillCalculation.getSkillOffset(skillKey);
-  const formatSkillOffset = (offset: number): string =>
-    offset > 0 ? `+${offset}` : String(offset);
-  const getDisplayLevel = (skillKey: string) => {
-    const level = getSkillLevel(skillKey);
-    return level >= MAX_SKILL_LEVEL ? t('skills.elite_level') : level;
+  const getToggleProps = (active: boolean, activeVariant: ButtonVariant, idle: ButtonVariant) => ({
+    variant: active ? activeVariant : idle,
+    color: active ? ('primary' as const) : ('neutral' as const),
+    'aria-pressed': active,
+  });
+  const sortOptions = computed<{ value: SkillSortMode; label: string }[]>(() => [
+    { value: 'ingame', label: t('settings.skills.sort.ingame') },
+    { value: 'priority', label: t('common.priority') },
+  ]);
+  const isNeededSkill = (skill: GameSkill): boolean => skill.requiredLevels.length > 0;
+  const isAdjustedSkill = (skill: GameSkill): boolean => getSkillOffset(skill.key) !== 0;
+  const neededSkillCount = computed(() => allGameSkills.value.filter(isNeededSkill).length);
+  const adjustedSkills = computed(() => allGameSkills.value.filter(isAdjustedSkill));
+  const createFilterOption = (value: SkillFilter, label: string, count: number) => ({
+    value,
+    label,
+    count,
+    disabled: count === 0 && skillFilter.value !== value,
+  });
+  const filterOptions = computed(() => [
+    createFilterOption('all', t('common.all'), allGameSkills.value.length),
+    createFilterOption('needed', t('settings.skills.filter.needed'), neededSkillCount.value),
+    createFilterOption(
+      'adjusted',
+      t('settings.skills.filter.adjusted'),
+      adjustedSkills.value.length
+    ),
+  ]);
+  const FILTER_PREDICATES: Record<SkillFilter, (skill: GameSkill) => boolean> = {
+    all: () => true,
+    needed: isNeededSkill,
+    adjusted: isAdjustedSkill,
+  };
+  const normalizedSearch = computed(() => searchQuery.value.trim().toLocaleLowerCase());
+  const matchesSearch = (skill: GameSkill): boolean => {
+    const query = normalizedSearch.value;
+    if (!query) return true;
+    return formatSkillName(skill.name).toLocaleLowerCase().includes(query);
+  };
+  const visibleSkills = computed(() =>
+    allGameSkills.value.filter(
+      (skill) => FILTER_PREDICATES[skillFilter.value](skill) && matchesSearch(skill)
+    )
+  );
+  const skillGroups = computed<SkillGroup[]>(() => {
+    if (skillSortMode.value !== 'ingame') {
+      return [{ category: null, skills: visibleSkills.value }];
+    }
+    return SKILL_CATEGORY_ORDER.map((category) => ({
+      category,
+      label: t(`settings.skills.categories.${category}`),
+      skills: visibleSkills.value.filter((skill) => getSkillCategory(skill) === category),
+    })).filter((group) => group.skills.length > 0);
+  });
+  const clearFilters = () => {
+    searchQuery.value = '';
+    skillFilter.value = 'all';
   };
   const showInvalidSkillValueToast = () => {
     toast.add({
@@ -422,6 +360,11 @@
   const resetOffset = (skillName: string) => {
     skillCalculation.resetSkillOffset(skillName);
   };
+  const resetAllAdjustments = () => {
+    adjustedSkills.value.forEach((skill) => skillCalculation.resetSkillOffset(skill.key));
+    showResetAllDialog.value = false;
+    if (skillFilter.value === 'adjusted') skillFilter.value = 'all';
+  };
   const clearSkillHighlight = () => {
     if (skillHighlightTimeout.value) {
       clearTimeout(skillHighlightTimeout.value);
@@ -429,25 +372,29 @@
     }
     highlightedSkillKey.value = null;
   };
-  const focusSkillFromRoute = async () => {
+  const resolveRouteSkill = () => {
     const skillQuery = getQueryString(route.query.skill);
-    if (!skillQuery || allGameSkills.value.length === 0) return;
-    const targetSkill = skillCalculation.getSkillMetadata(skillQuery);
-    if (!targetSkill) return;
-    if (!visibleSkills.value.some((skill) => skill.key === targetSkill.key)) {
-      showAllSkills.value = true;
+    if (!skillQuery || allGameSkills.value.length === 0) return null;
+    return skillCalculation.getSkillMetadata(skillQuery);
+  };
+  const revealSkillCard = async (skillKey: string): Promise<HTMLElement | null> => {
+    if (!visibleSkills.value.some((skill) => skill.key === skillKey)) {
+      clearFilters();
       await nextTick();
     }
     await nextTick();
-    const targetElement = document.getElementById(getSkillCardId(targetSkill.key));
-    if (!targetElement) return;
+    return document.getElementById(getSkillCardId(skillKey));
+  };
+  const highlightSkillCard = (skillKey: string, element: HTMLElement) => {
     clearSkillHighlight();
-    highlightedSkillKey.value = targetSkill.key;
-    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    highlightedSkillKey.value = skillKey;
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     skillHighlightTimeout.value = setTimeout(() => {
       highlightedSkillKey.value = null;
       skillHighlightTimeout.value = null;
     }, 2500);
+  };
+  const clearSkillQuery = () => {
     const nextQuery = { ...route.query };
     delete nextQuery.skill;
     router.replace({
@@ -456,6 +403,23 @@
       query: nextQuery,
     });
   };
+  const focusSkillFromRoute = async () => {
+    const targetSkill = resolveRouteSkill();
+    if (!targetSkill) return;
+    const targetElement = await revealSkillCard(targetSkill.key);
+    if (!targetElement) return;
+    highlightSkillCard(targetSkill.key, targetElement);
+    clearSkillQuery();
+  };
+  const skillAliasesForMigration = computed(() => {
+    return Array.from(
+      new Set(
+        allGameSkills.value.flatMap((skill) =>
+          [skill.key, skill.id, skill.name].filter((alias): alias is string => Boolean(alias))
+        )
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  });
   let lastSkillAliasMigrationSignature = '';
   watch(
     () => skillAliasesForMigration.value.join('|'),

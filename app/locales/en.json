@@ -2858,23 +2858,40 @@
     },
     "skills": {
       "title": "Skills Management",
-      "explanation": "Quest rewards are auto-calculated. Enter your total skill level to adjust the offset.",
+      "intro": "Levels from completed quests are added automatically. Enter your in-game level (0-{max}) to override it.",
       "no_skills": "No skills found in game data.",
-      "show_all": "Show all",
-      "show_less": "Show less",
-      "quest": "Quest:",
-      "offset": "Offset:",
-      "req_count": "Req:",
-      "reward_count": "Reward:",
+      "no_matches": "No skills match your search or filter.",
+      "clear_filters": "Clear filters",
+      "search_placeholder": "Search skills",
+      "filter_label": "Filter skills",
+      "sort_label": "Skill order",
+      "filter": {
+        "needed": "Needed for quests",
+        "adjusted": "Adjusted"
+      },
+      "categories": {
+        "physical": "Physical",
+        "mental": "Mental",
+        "combat": "Combat",
+        "practical": "Practical",
+        "other": "Other"
+      },
+      "elite": "Elite",
+      "requirement_needed": "Quest needs Lv {level}",
+      "requirement_met": "Quest req. met",
+      "from_quests": "{level} from quests",
+      "manual_adjustment": "{offset} manual",
+      "reset_to_quest": "Reset to quest level ({level})",
+      "reset_all": "Reset all adjustments",
+      "reset_all_title": "Reset all skill adjustments?",
+      "reset_all_body": "Skills to reset: {count}. Each one returns to the level granted by your completed quests. This cannot be undone.",
+      "reset_all_confirm": "Reset skills",
       "limit_exceeded": "Limit Exceeded",
       "max_level": "Maximum skill level is 51.",
       "valid_range": "Valid range: 0-51",
       "sort": {
         "ingame": "In-Game"
-      },
-      "quest_tooltip": "Skill level granted automatically by completed quest rewards.",
-      "offset_tooltip": "Manual adjustment on top of the quest reward level. Positive means you trained the skill above quest rewards.",
-      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
+      }
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -3133,10 +3150,8 @@
     "collect": "Collect"
   },
   "skills": {
-    "req": "Req",
     "required_for": "Required for: {items}",
-    "required_levels": "Required levels: {items}",
-    "elite_level": "ELITE Level"
+    "required_levels": "Required levels: {items}"
   },
   "game_settings": {
     "seasonal_label": "Seasonal",
