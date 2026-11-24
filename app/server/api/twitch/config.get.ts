@@ -1,6 +1,10 @@
 import { defineEventHandler, getRequestURL, setResponseHeaders } from 'h3';
 import { useRuntimeConfig } from '#imports';
-import { adminSupabaseFetch, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
+import {
+  adminSupabaseFetch,
+  normalizeSupabaseUrl,
+  readSupabaseServiceKey,
+} from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 const logger = createLogger('twitch-config');
 const CACHE_TAG = 'promoted-twitch-config';
@@ -74,16 +78,9 @@ function resolveConfig(
     enabled: boolOr(override.enabled, base.enabled),
   };
 }
-function readSupabaseUrl(runtime: Record<string, unknown>): string {
-  return normalizeSupabaseUrl(runtime.supabaseUrl);
-}
-function readServiceKey(runtime: Record<string, unknown>): string {
-  const value = runtime.supabaseServiceKey;
-  return typeof value === 'string' ? value : '';
-}
 async function readOverride(runtime: Record<string, unknown>): Promise<OverrideResult> {
-  const supabaseUrl = readSupabaseUrl(runtime);
-  const serviceKey = readServiceKey(runtime);
+  const supabaseUrl = normalizeSupabaseUrl(runtime.supabaseUrl);
+  const serviceKey = readSupabaseServiceKey(runtime);
   if (!supabaseUrl || !serviceKey) return { failed: true };
   return fetchSetting(supabaseUrl, serviceKey);
 }

@@ -66,10 +66,10 @@
   </footer>
 </template>
 <script setup lang="ts">
+  import { isAnalyticsConfigured } from '@/composables/useAnalyticsConsent';
   import AppFooterColumn from '@/shell/AppFooterColumn.vue';
   import { normalizeBuildCommit } from '@/utils/buildCommit';
   import { logger } from '@/utils/logger';
-  import { shouldEnableAnalyticsIntegrations } from '@/utils/runtimeConfig';
   import type { FooterNavItem } from '@/shell/footerNavigation';
   const { t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
@@ -90,16 +90,7 @@
   const buildCommitUrl = computed(() =>
     buildCommit && repositoryUrl.value ? `${repositoryUrl.value}/commit/${buildCommit}` : ''
   );
-  const analyticsConfigured =
-    shouldEnableAnalyticsIntegrations({
-      appUrl: runtimeConfig.public.appUrl,
-      hostname: import.meta.client ? window.location.hostname : undefined,
-      isProduction: import.meta.env.PROD,
-    }) &&
-    [
-      runtimeConfig.public.googleAnalyticsMeasurementId,
-      runtimeConfig.public.microsoftClarityProjectId,
-    ].some((value) => String(value || '').trim().length > 0);
+  const analyticsConfigured = isAnalyticsConfigured(runtimeConfig.public);
   const analyticsConsentApi = shallowRef<ReturnType<typeof useAnalyticsConsent> | null>(null);
   try {
     const consentApi = useAnalyticsConsent();

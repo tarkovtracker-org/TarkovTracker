@@ -1,5 +1,5 @@
 import { logger } from '@/utils/logger';
-import type { Task, TaskObjective } from '@/types/tarkov';
+import type { SkillLevelReward, Task, TaskObjective } from '@/types/tarkov';
 export const normalizeSkillToken = (value: string | null | undefined): string | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -33,6 +33,10 @@ export const readSkillObjective = (objective: TaskObjective): SkillObjectiveDeta
     imageLink: skillLevel.skill?.imageLink,
   };
 };
+const getSkillRewardKey = (reward: SkillLevelReward | undefined): string | null =>
+  getCanonicalSkillKey(reward?.name, reward?.skill?.id);
+export const getNamedSkillRewardKey = (reward: SkillLevelReward): string | null =>
+  reward?.name ? getSkillRewardKey(reward) : null;
 export const buildSkillKeyAliases = (tasks: Task[]): Map<string, string> => {
   const aliases = new Map<string, string>();
   tasks.forEach((task) => {
@@ -46,11 +50,10 @@ export const buildSkillKeyAliases = (tasks: Task[]): Map<string, string> => {
       }
     });
     task.finishRewards?.skillLevelReward?.forEach((reward) => {
-      if (!reward?.name) return;
-      const skillName = reward.name;
-      const skillId = reward.skill?.id;
-      const skillKey = getCanonicalSkillKey(skillName, skillId);
+      const skillKey = getNamedSkillRewardKey(reward);
       if (!skillKey) return;
+      const { name: skillName, skill } = reward;
+      const skillId = skill?.id;
       aliases.set(skillKey, skillKey);
       aliases.set(skillName, skillKey);
       if (skillId) {
@@ -116,3 +119,20 @@ export const collapseSkillOffsets = (
   }
   return collapsed;
 };
+export function sumQuestSkillRewards(
+  tasks: Task[],
+  isTaskSuccessful: (taskId: string) => boolean
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  tasks
+    .filter((task) => isTaskSuccessful(task.id))
+    .forEach((task) => {
+      const rewards = task.finishRewards?.skillLevelReward || [];
+      rewards.forEach((reward) => {
+        const skillKey = getSkillRewardKey(reward);
+        if (!skillKey) return;
+        totals[skillKey] = (totals[skillKey] || 0) + (reward.level || 0);
+      });
+    });
+  return totals;
+}

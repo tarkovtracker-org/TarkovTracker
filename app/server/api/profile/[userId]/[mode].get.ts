@@ -35,6 +35,7 @@ import {
   withSharedProfileSupporterBadge,
 } from '@/server/utils/sharedProfileSupporterBadge';
 import { fetchTarkovJsonEndpoint, type JsonTasksPayload } from '@/server/utils/tarkov-json';
+import { toPositiveInteger } from '@/server/utils/tarkovAccessConfig';
 import { API_GAME_MODES, isGameMode, type GameMode } from '@/utils/constants';
 import { isProfileHandle } from '@/utils/profileHandle';
 import {
@@ -436,14 +437,6 @@ const enrichProgressTaskFailures = async (
     ...progressData,
     taskCompletions: value,
   };
-};
-const toPositiveInteger = (value: unknown, fallback: number): number => {
-  const numeric = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(numeric)) {
-    return fallback;
-  }
-  const integer = Math.trunc(numeric);
-  return integer > 0 ? integer : fallback;
 };
 const isSharedProfilePayload = (value: unknown): value is SharedProfilePayload => {
   if (!value || typeof value !== 'object') {

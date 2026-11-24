@@ -15,9 +15,10 @@ import { logger } from '@/utils/logger';
 import {
   buildSkillKeyAliases,
   collapseSkillOffsets,
-  getCanonicalSkillKey,
+  getNamedSkillRewardKey,
   readSkillObjective,
   resolveSkillKey as resolveSkillAliasKey,
+  sumQuestSkillRewards,
 } from '@/utils/skillHelpers';
 interface SkillMetadata {
   key: string;
@@ -66,12 +67,11 @@ export function useSkillCalculation() {
         }
       });
       task.finishRewards?.skillLevelReward?.forEach((reward) => {
-        if (!reward?.name) return;
-        const skillName = reward.name;
-        const skillId = reward.skill?.id;
-        const skillKey = getCanonicalSkillKey(skillName, skillId);
+        const skillKey = getNamedSkillRewardKey(reward);
         if (!skillKey) return;
-        const imageLink = reward.skill?.imageLink;
+        const { name: skillName, skill } = reward;
+        const skillId = skill?.id;
+        const imageLink = skill?.imageLink;
         if (!skillsMap.has(skillKey)) {
           skillsMap.set(skillKey, {
             key: skillKey,
@@ -112,21 +112,9 @@ export function useSkillCalculation() {
   const resolveSkillKey = (skillKeyOrName: string): string => {
     return resolveSkillAliasKey(skillKeyOrName, skillKeyAliases.value);
   };
-  const calculatedQuestSkills = computed(() => {
-    const skills: { [skillName: string]: number } = {};
-    metadataStore.tasks
-      .filter((task) => isTaskSuccessful(task.id))
-      .forEach((task) => {
-        const skillRewards = task.finishRewards?.skillLevelReward || [];
-        skillRewards.forEach((reward) => {
-          const skillKey = getCanonicalSkillKey(reward?.name, reward?.skill?.id);
-          if (!skillKey) return;
-          const level = reward.level || 0;
-          skills[skillKey] = (skills[skillKey] || 0) + level;
-        });
-      });
-    return skills;
-  });
+  const calculatedQuestSkills = computed(() =>
+    sumQuestSkillRewards(metadataStore.tasks, isTaskSuccessful)
+  );
   const totalSkills = computed(() => {
     const result: { [skillName: string]: number } = {};
     const offsets = tarkovStore.getAllSkillOffsets();

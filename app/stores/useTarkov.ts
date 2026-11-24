@@ -3,6 +3,7 @@ import { useToastI18n, type LocalIgnoredReason } from '@/composables/useToastI18
 import {
   actions,
   defaultState,
+  patchProgressState,
   getters,
   migrateToGameModeStructure,
   type UserActions,
@@ -126,16 +127,6 @@ const requirePrestigeSession = () => {
     throw new Error('User not logged in. Cannot prestige profile.');
   }
   return { $supabase, userId };
-};
-const patchProgressState = (store: TarkovStoreInstance, nextState: UserState) => {
-  store.$patch((state) => {
-    state.currentGameMode = nextState.currentGameMode;
-    state.gameEdition = nextState.gameEdition;
-    state.tarkovUid = nextState.tarkovUid;
-    state.pvp = nextState.pvp;
-    state.pve = nextState.pve;
-    state.seasonal = nextState.seasonal;
-  });
 };
 const throwSyncError = (error: { message: string } | null, message: string) => {
   if (error) throw new Error(`${message}: ${error.message}`);

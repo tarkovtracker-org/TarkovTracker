@@ -1,13 +1,14 @@
 import { defaultState, type UserProgressData } from '@/stores/progressState';
 import { getNextProgressEpoch } from '@/stores/tarkov/progressMerge';
-import { GAME_MODES, SPECIAL_STATIONS, type GameMode } from '@/utils/constants';
+import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { getEditionStationDefault } from '@/utils/editionHelpers';
 import { logger } from '@/utils/logger';
 import { inferNewBeginningPrestigeLevel } from '@/utils/prestige';
 import {
   buildSkillKeyAliases,
   collapseSkillOffsets,
-  getCanonicalSkillKey,
   resolveSkillKey as resolveSkillAliasKey,
+  sumQuestSkillRewards,
 } from '@/utils/skillHelpers';
 import { effectiveStoryProgress } from '@/utils/storylineCompletion';
 import { getCompletionFlags } from '@/utils/taskStatus';
@@ -112,20 +113,10 @@ const buildModeSkillLevels = (
   modeData: UserProgressData,
   tasks: Task[]
 ): Record<string, number> => {
-  const totals: Record<string, number> = {};
   const skillAliases = buildSkillKeyAliases(tasks);
   const resolveSkillKey = (skillName: string): string =>
     resolveSkillAliasKey(skillName, skillAliases);
-  tasks
-    .filter((task) => isTaskSuccessful(modeData, task.id))
-    .forEach((task) => {
-      const rewards = task.finishRewards?.skillLevelReward || [];
-      rewards.forEach((reward) => {
-        const skillKey = getCanonicalSkillKey(reward?.name, reward?.skill?.id);
-        if (!skillKey) return;
-        totals[skillKey] = (totals[skillKey] || 0) + (reward.level || 0);
-      });
-    });
+  const totals = sumQuestSkillRewards(tasks, (taskId) => isTaskSuccessful(modeData, taskId));
   const collapsedOffsets = collapseSkillOffsets(modeData.skillOffsets || {}, resolveSkillKey);
   collapsedOffsets.forEach((entry, skillName) => {
     totals[skillName] = (totals[skillName] || 0) + entry.offset;
@@ -139,22 +130,12 @@ const buildHideoutStationLevels = (
 ): Map<string, number> => {
   const stationLevels = new Map<string, number>();
   for (const station of stations) {
-    const maxLevel = station.levels?.length ?? 0;
-    const defaultStashLevel =
-      station.normalizedName === SPECIAL_STATIONS.STASH
-        ? Math.min(edition?.defaultStashLevel ?? 0, maxLevel)
-        : 0;
-    const defaultCultistCircleLevel =
-      station.normalizedName === SPECIAL_STATIONS.CULTIST_CIRCLE
-        ? Math.min(edition?.defaultCultistCircleLevel ?? 0, maxLevel)
-        : 0;
+    const levels = station.levels ?? [];
+    const editionLevel = getEditionStationDefault(station.normalizedName, levels.length, edition);
     let currentLevel = 0;
-    for (const level of station.levels ?? []) {
+    for (const level of levels) {
       const isManualComplete = hideoutModules[level.id]?.complete === true;
-      const isEditionComplete =
-        (station.normalizedName === SPECIAL_STATIONS.STASH && level.level <= defaultStashLevel) ||
-        (station.normalizedName === SPECIAL_STATIONS.CULTIST_CIRCLE &&
-          level.level <= defaultCultistCircleLevel);
+      const isEditionComplete = editionLevel !== null && level.level <= editionLevel;
       if (isManualComplete || isEditionComplete) {
         currentLevel = Math.max(currentLevel, level.level);
       }

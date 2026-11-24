@@ -2,14 +2,12 @@ import { createErrorResponse, createSuccessResponse } from '../_shared/auth.ts';
 import { authenticateMutation } from '../_shared/authenticated-mutation.ts';
 import {
   isDiscordNotInGuildError,
+  readDiscordAccountLink,
   removeAllTierRoles,
   removeSupporterRole,
   syncLinkedAccountRole,
   syncRolesForSupporter,
 } from '../_shared/discord.ts';
-type DiscordAccountLink = {
-  discord_user_id: string;
-};
 type Supporter = {
   expires_at: string | null;
   has_ever_supported: boolean;
@@ -29,11 +27,7 @@ function activeTier(supporter: Supporter | null): Supporter['tier'] | null {
 Deno.serve(async (req: Request) => {
   const auth = await authenticateMutation(req, 'discord-role-sync');
   if (auth.response) return auth.response;
-  const { data: link, error: linkError } = await auth.supabase
-    .from('discord_account_links')
-    .select('discord_user_id')
-    .eq('user_id', auth.user.id)
-    .maybeSingle<DiscordAccountLink>();
+  const { data: link, error: linkError } = await readDiscordAccountLink(auth);
   if (linkError) {
     console.error('[discord-role-sync] Discord account lookup failed:', linkError);
     return createErrorResponse('Unable to load linked Discord account', 502, req);

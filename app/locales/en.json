@@ -1539,7 +1539,6 @@
         }
       },
       "loading": "Loading hideout data",
-      "station_link_label": "Go to {name}",
       "no_stations_found": "No stations found. Try changing your filters.",
       "prereq_filters": {
         "title": "Availability requirements",
