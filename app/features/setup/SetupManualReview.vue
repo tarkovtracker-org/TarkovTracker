@@ -17,21 +17,12 @@
         @change="setChoice"
         @remove="choices.delete($event)"
       />
-      <section class="border-surface-700 space-y-3 rounded-lg border p-4">
-        <h3 class="font-semibold">{{ $t('setup.hideout_title') }}</h3>
-        <p class="text-surface-400 text-sm">{{ $t('setup.hideout_help') }}</p>
-        <div class="grid gap-x-4 gap-y-2 sm:grid-cols-2">
-          <UFormField v-for="station in stations" :key="station.id" :label="station.name">
-            <USelect
-              class="w-full"
-              :model-value="levels.get(station.id) ?? station.current"
-              :items="station.options"
-              :disabled="station.disabled"
-              @update:model-value="levels.set(station.id, $event)"
-            />
-          </UFormField>
-        </div>
-      </section>
+      <SetupHideoutPicker
+        :stations="stations"
+        :levels="levels"
+        :blocked-tiers="blockedTiers"
+        @select-level="levels.set($event.id, $event.level)"
+      />
       <div class="flex flex-wrap items-center gap-3">
         <UButton :disabled="!canSave" :loading="saving" icon="i-mdi-check" @click="apply">
           {{ $t(saveFailed ? 'setup.retry_save' : 'setup.save_changes') }}
@@ -57,8 +48,10 @@
 </template>
 <script setup lang="ts">
   import PlayerLevelField from '@/features/settings/PlayerLevelField.vue';
+  import SetupHideoutPicker from '@/features/setup/SetupHideoutPicker.vue';
   import { planSetupHideout, planSetupQuests } from '@/features/setup/setupProgress';
   import SetupQuestPicker from '@/features/setup/SetupQuestPicker.vue';
+  import { previewBlockedHideoutTiers } from '@/stores/tarkov/hideoutPrereqs';
   import { flushActiveProgressWrites } from '@/stores/tarkov/localStorage';
   import { progressSaveStatus } from '@/stores/tarkov/progressSaveStatus';
   import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
@@ -102,7 +95,13 @@
           label: t(value ? 'setup.station_level' : 'setup.station_unbuilt', { level: value }),
           value,
         }));
-        return { ...station, current, options, disabled: saving.value || options.length < 2 };
+        return {
+          id: station.id,
+          name: station.name,
+          current,
+          options,
+          disabled: saving.value || options.length < 2,
+        };
       })
       .sort((left, right) => left.name.localeCompare(right.name))
   );
@@ -120,7 +119,25 @@
       (changes) => changes.length > 0
     )
   );
-  const canSave = computed(() => !saving.value && (hasChanges.value || saveFailed.value));
+  const blockedTiers = computed(() => {
+    const blocked = new Set(
+      previewBlockedHideoutTiers(tarkov, {
+        moduleIds: upgrades.value.map((level) => level.id),
+        questIds: questCompletions.value,
+      })
+    );
+    return metadata.hideoutStations.flatMap((station) =>
+      station.levels
+        .filter((level) => blocked.has(level.id))
+        .map((level) => ({
+          id: level.id,
+          label: t('setup.hideout_blocked_tier', { station: station.name, level: level.level }),
+        }))
+    );
+  });
+  const canSave = computed(
+    () => !saving.value && !blockedTiers.value.length && (hasChanges.value || saveFailed.value)
+  );
   function clearDraft() {
     choices.clear();
     levels.clear();

@@ -98,6 +98,7 @@
 </template>
 <script setup lang="ts">
   import GameModeBadge from '@/components/GameModeBadge.vue';
+  import { useGameModeSwitchLock } from '@/composables/useGameModeSwitch';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
   import { useDataManagementSession } from '@/features/settings/useDataManagementSession';
   import SetupManualReview from '@/features/setup/SetupManualReview.vue';
@@ -134,6 +135,16 @@
   const isApplying = computed(
     () => session.eftLogs.isImporting.value || session.tarkovDev.isImporting.value
   );
+  const modeSwitchLocked = useGameModeSwitchLock();
+  watchEffect(
+    () => {
+      modeSwitchLocked.value = manualBlocked.value || isApplying.value;
+    },
+    { flush: 'sync' }
+  );
+  onScopeDispose(() => {
+    modeSwitchLocked.value = false;
+  });
   const importBusy = computed(
     () =>
       isApplying.value ||

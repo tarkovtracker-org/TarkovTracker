@@ -287,28 +287,43 @@ const getHideoutRequirementOptions = (): HideoutEnforcementContext['options'] | 
   };
   return Object.values(options).some(Boolean) ? options : null;
 };
+type PlannedHideoutProgress = { moduleIds: readonly string[]; questIds: readonly string[] };
+const withPlannedQuestCompletions = (
+  progress: UserProgressData,
+  questIds: readonly string[]
+): UserProgressData => ({
+  ...progress,
+  taskCompletions: {
+    ...progress.taskCompletions,
+    ...Object.fromEntries(questIds.map((id) => [id, { complete: true, failed: false }])),
+  },
+});
 const buildProgressEnforcementContext = (
   store: TarkovStoreInstance,
   metadataStore: ReturnType<typeof useMetadataStore>,
   stations: HideoutStation[],
-  options: HideoutEnforcementContext['options']
+  options: HideoutEnforcementContext['options'],
+  planned?: PlannedHideoutProgress
 ): HideoutEnforcementContext | null => {
-  const currentData = store[coerceGameMode(store.currentGameMode)];
+  const progress = store[coerceGameMode(store.currentGameMode)];
+  const currentData = planned ? withPlannedQuestCompletions(progress, planned.questIds) : progress;
   const completedModuleIds = collectCompletedModuleIds(currentData);
+  planned?.moduleIds.forEach((id) => completedModuleIds.add(id));
   if (!completedModuleIds.size) return null;
   const modules = buildHideoutModuleMeta(stations);
   if (!modules.length) return null;
   return { completedModuleIds, currentData, metadataStore, modules, options, stations };
 };
 const buildHideoutEnforcementContext = (
-  store: TarkovStoreInstance
+  store: TarkovStoreInstance,
+  planned?: PlannedHideoutProgress
 ): HideoutEnforcementContext | null => {
   const metadataStore = useMetadataStore();
   const stations = metadataStore.hideoutStations;
   if (!stations.length) return null;
   const options = getHideoutRequirementOptions();
   if (!options) return null;
-  return buildProgressEnforcementContext(store, metadataStore, stations, options);
+  return buildProgressEnforcementContext(store, metadataStore, stations, options, planned);
 };
 export const notifyHideoutPrereqEnforcement = (removedCount: number) => {
   if (!removedCount || !import.meta.client) return;
@@ -319,11 +334,12 @@ export const notifyHideoutPrereqEnforcement = (removedCount: number) => {
     logger.warn('[TarkovStore] Could not show hideout enforcement toast:', error);
   }
 };
-export const enforceHideoutPrereqs = (store: TarkovStoreInstance): string[] => {
-  const context = buildHideoutEnforcementContext(store);
-  if (!context) return [];
+const resolveRemovedModules = (
+  context: HideoutEnforcementContext,
+  gameEdition: number
+): Set<string> => {
   const { completedModuleIds, currentData, metadataStore, modules, options, stations } = context;
-  const edition = metadataStore.editions.find((entry) => entry.value === store.gameEdition);
+  const edition = metadataStore.editions.find((entry) => entry.value === gameEdition);
   const skillKeyAliases = buildSkillKeyAliases(metadataStore.tasks);
   const validModules = resolveValidHideoutModules(modules, stations, completedModuleIds, edition, {
     ...options,
@@ -331,8 +347,24 @@ export const enforceHideoutPrereqs = (store: TarkovStoreInstance): string[] => {
     skillKeyAliases,
     traders: currentData.traders ?? {},
   });
-  const removedModules = collectRemovedModules(completedModuleIds, validModules);
+  return collectRemovedModules(completedModuleIds, validModules);
+};
+/** Checks setup candidates with the same rules used by persisted hideout progress. */
+export function previewBlockedHideoutTiers(
+  store: TarkovStoreInstance,
+  planned: PlannedHideoutProgress
+): string[] {
+  if (!planned.moduleIds.length) return [];
+  const context = buildHideoutEnforcementContext(store, planned);
+  if (!context) return [];
+  const removed = resolveRemovedModules(context, store.gameEdition);
+  return planned.moduleIds.filter((id) => removed.has(id));
+}
+export const enforceHideoutPrereqs = (store: TarkovStoreInstance): string[] => {
+  const context = buildHideoutEnforcementContext(store);
+  if (!context) return [];
+  const removedModules = resolveRemovedModules(context, store.gameEdition);
   if (!removedModules.size) return [];
-  resetHideoutPartItems(store, uncompleteModules(store, removedModules, modules));
+  resetHideoutPartItems(store, uncompleteModules(store, removedModules, context.modules));
   return Array.from(removedModules);
 };

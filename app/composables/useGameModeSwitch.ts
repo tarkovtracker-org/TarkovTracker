@@ -3,12 +3,14 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
 import type { GameMode } from '@/utils/constants';
+export const useGameModeSwitchLock = () => useState('game-mode-switch-locked', () => false);
 export function useGameModeSwitch() {
   const metadata = useMetadataStore();
   const tarkov = useTarkovStore();
   const { loading } = storeToRefs(metadata);
   const switching = useState('game-mode-switching', () => false);
-  const dataLoading = computed(() => switching.value || loading.value);
+  const locked = useGameModeSwitchLock();
+  const dataLoading = computed(() => switching.value || loading.value || locked.value);
   const switchModeError = ref('');
   async function refreshMode() {
     metadata.updateLanguageAndGameMode();

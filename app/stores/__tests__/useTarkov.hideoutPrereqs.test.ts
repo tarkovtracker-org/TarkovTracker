@@ -1,5 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { previewBlockedHideoutTiers } from '@/stores/tarkov/hideoutPrereqs';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -52,6 +53,22 @@ describe('useTarkovStore hideout skill prerequisites', () => {
         traderRepBonus: {},
       },
     ] as GameEdition[];
+  });
+  it('previews blocked tiers and planned quest rewards without changing saved progress', () => {
+    const metadata = useMetadataStore();
+    const quest = metadata.tasks[0]!;
+    const level = metadata.hideoutStations[0]!.levels[0]!;
+    quest.finishRewards!.skillLevelReward![0]!.level = 10;
+    const store = useTarkovStore();
+    const draft = { moduleIds: [level.id], questIds: [] };
+    expect(previewBlockedHideoutTiers(store, draft)).toEqual([level.id]);
+    expect(previewBlockedHideoutTiers(store, { ...draft, questIds: [quest.id] })).toEqual([]);
+    expect(store.isTaskComplete(quest.id)).toBe(false);
+    expect(store.isHideoutModuleComplete(level.id)).toBe(false);
+    store.setTaskComplete(quest.id);
+    store.setHideoutModuleComplete(level.id);
+    expect(store.enforceHideoutPrereqsNow()).toBe(0);
+    expect(store.isHideoutModuleComplete(level.id)).toBe(true);
   });
   it.each([
     ['<', 3, true],
