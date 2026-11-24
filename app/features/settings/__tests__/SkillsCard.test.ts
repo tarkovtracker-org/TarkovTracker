@@ -44,7 +44,7 @@ mockNuxtImport('useToast', () => () => ({
 const _GenericCard = { template: '<div><slot name="title-right" /><slot name="content" /></div>' };
 const UInput = {
   template:
-    '<input type="text" :value="modelValue" @keydown="$emit(\'keydown\', $event)" @input="$emit(\'update:model-value\', $event.target.value)" />',
+    '<input type="text" :value="modelValue" @keydown="$emit(\'keydown\', $event)" @focus="$emit(\'focus\')" @blur="$emit(\'blur\')" @input="$emit(\'update:model-value\', $event.target.value)" />',
   props: ['modelValue'],
 };
 const _UButton = {
@@ -404,6 +404,21 @@ describe('SkillsCard', () => {
     expect(resetSkillOffset).toHaveBeenCalledWith('Strength');
     expect(resetSkillOffset).toHaveBeenCalledWith('Endurance');
     expect(wrapper.find('.modal').exists()).toBe(false);
+  });
+  it('keeps the edited row visible under the Adjusted filter until blur', async () => {
+    const offsets = ref<Record<string, number>>({ Strength: 3 });
+    const wrapper = createWrapper({
+      allGameSkills: computed(() => [makeSkill('Strength'), makeSkill('Endurance')]),
+      getSkillOffset: (key: string) => offsets.value[key] ?? 0,
+    });
+    await findButton(wrapper, 'settings.skills.filter.adjusted')!.trigger('click');
+    const input = findSkillInput(wrapper);
+    await input.trigger('focus');
+    offsets.value = { Strength: 0 };
+    await nextTick();
+    expect(wrapper.find('#settings-skill-Strength').exists()).toBe(true);
+    await input.trigger('blur');
+    expect(wrapper.find('#settings-skill-Strength').exists()).toBe(false);
   });
   it('hides the reset-all action when nothing is adjusted', () => {
     const wrapper = createWrapper({ getSkillOffset: () => 0 });

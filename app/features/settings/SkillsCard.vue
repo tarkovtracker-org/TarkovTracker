@@ -106,7 +106,8 @@
                   :highlighted="highlightedSkillKey === skill.key"
                   @input-keydown="preventInvalidInput"
                   @input-paste="(event: ClipboardEvent) => onPaste(event, skill.key)"
-                  @input-focus-change="resetSkillLimitToast"
+                  @input-focus="onSkillInputFocus(skill.key)"
+                  @input-blur="onSkillInputBlur"
                   @update-level="(value: string | number) => updateSkillLevel(skill.key, value)"
                   @reset="resetOffset(skill.key)"
                 />
@@ -128,7 +129,11 @@
         </div>
       </template>
     </GenericCard>
-    <UModal v-model:open="showResetAllDialog">
+    <UModal
+      v-model:open="showResetAllDialog"
+      :title="$t('settings.skills.reset_all_title')"
+      :description="$t('settings.skills.reset_all_body', { count: adjustedSkills.length })"
+    >
       <template #content>
         <div class="p-5">
           <div class="mb-4 flex items-center gap-3">
@@ -188,6 +193,9 @@
   const searchQuery = ref('');
   const skillFilter = ref<SkillFilter>('all');
   const showResetAllDialog = ref(false);
+  // The row being edited stays visible even if the edit stops matching the active filter,
+  // so clearing an input under 'Adjusted' does not unmount it mid-edit.
+  const editingSkillKey = ref<string | null>(null);
   const highlightedSkillKey = ref<string | null>(null);
   const skillHighlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   const setSkillSortMode = (mode: SkillSortMode) => {
@@ -239,7 +247,9 @@
   };
   const visibleSkills = computed(() =>
     allGameSkills.value.filter(
-      (skill) => FILTER_PREDICATES[skillFilter.value](skill) && matchesSearch(skill)
+      (skill) =>
+        skill.key === editingSkillKey.value ||
+        (FILTER_PREDICATES[skillFilter.value](skill) && matchesSearch(skill))
     )
   );
   const skillGroups = computed<SkillGroup[]>(() => {
@@ -346,6 +356,14 @@
   const resetSkillLimitToast = () => {
     skillLimitToastShown.value = false;
     toast.remove('skill-limit-error');
+  };
+  const onSkillInputFocus = (skillKey: string) => {
+    editingSkillKey.value = skillKey;
+    resetSkillLimitToast();
+  };
+  const onSkillInputBlur = () => {
+    editingSkillKey.value = null;
+    resetSkillLimitToast();
   };
   const onPaste = (e: ClipboardEvent, skillName: string) => {
     e.preventDefault();

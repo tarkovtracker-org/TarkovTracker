@@ -43,9 +43,6 @@
               {{ requirement.label }}
             </UBadge>
           </UTooltip>
-          <span v-if="breakdown" class="text-surface-400 ml-auto shrink-0 text-xs">
-            {{ breakdown }}
-          </span>
         </span>
         <span class="bg-surface-700 mt-1.5 block h-1 overflow-hidden rounded-full">
           <span
@@ -53,6 +50,9 @@
             :class="progressBarClass"
             :style="{ width: progressWidth }"
           />
+        </span>
+        <span v-if="breakdown" class="text-surface-400 mt-1 block truncate text-xs">
+          {{ breakdown }}
         </span>
       </span>
     </label>
@@ -70,8 +70,8 @@
       :aria-describedby="describedBy"
       @keydown="(event: KeyboardEvent) => emit('input-keydown', event)"
       @paste="(event: ClipboardEvent) => emit('input-paste', event)"
-      @focus="emit('input-focus-change')"
-      @blur="emit('input-focus-change')"
+      @focus="emit('input-focus')"
+      @blur="emit('input-blur')"
       @update:model-value="(value: string | number) => emit('update-level', value)"
     >
       <template #trailing>
@@ -120,7 +120,8 @@
     'update-level': [value: string | number];
     'input-keydown': [event: KeyboardEvent];
     'input-paste': [event: ClipboardEvent];
-    'input-focus-change': [];
+    'input-focus': [];
+    'input-blur': [];
     reset: [];
   }>();
   const { t } = useI18n({ useScope: 'global' });
