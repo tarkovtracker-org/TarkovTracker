@@ -195,7 +195,7 @@
       "prettier --write",
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
-    "!(app|scripts|supabase|workers|.cubic)/**/*.json": [
+    "!(app|scripts|supabase|workers)/**/*.json": [
       "prettier --write",
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
@@ -226,9 +226,6 @@
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "workers/**/*.{sh,ts,tsx}": [
-      "node scripts/checks/lint-blank-lines.mjs --fix"
-    ],
-    ".cubic/**/*.json": [
       "node scripts/checks/lint-blank-lines.mjs --fix"
     ],
     "**/*.{yaml,yml}": [

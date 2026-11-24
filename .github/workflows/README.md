@@ -119,8 +119,7 @@ If the PR head changes during validation (or, with strict freshness active, main
 Crowdin Sync; do not bypass the guard. The gate is copied from trusted main before
 synchronization, and both trusted gate scripts are preserved before checkout changes. The
 [Crowdin automatic merges](../../docs/systems/ci-and-release.md#crowdin-automatic-merges) spec owns
-the invariants; see `docs/workflow-automation.md` for the repository-wide policy and release
-compatibility.
+the invariants and compatibility.
 
 Cloudflare Git deployments run independently of GitHub Actions. Release eligibility still requires
 successful push or dispatched CI for current main, and semantic-release decides whether a version is warranted;
@@ -154,7 +153,7 @@ for this workflow: the upstream Action prints its environment in debug mode.
 `CI` (including its reusable `Security` jobs) and `PR Checks` report for translation-only PRs. The
 classifier selects formatting, i18n, and systems drift. `CI Result` still reports, and Crowdin
 dispatches a preview so the required `Preview Result` reports on the PR head. Non-English locale
-formatting exclusions remain intact. See the rollout record in `docs/workflow-automation.md`.
+formatting exclusions remain intact. See [Crowdin admission](../../docs/merge-queue-rollout.md#crowdin-translation-admission).
 
 Crowdin Sync creates PRs using `GITHUB_TOKEN`. It explicitly dispatches and awaits full CI in addition to
 direct validation before auto-merging safe translation updates.
@@ -176,7 +175,7 @@ The workflow reuses CI's test shards and database checks. It rejects other refs 
 or unfinished CI, a moved main, and automation-skip directives before publishing. Releases batch
 every commit since the previous tag; conventional commits outside internal scopes determine
 whether a version is warranted (`scripts/release/release-scope.mjs`). Publication is serialized without
-cancelling an active release. See `docs/workflow-automation.md` for details.
+cancelling an active release. See [release validation](../../docs/systems/ci-and-release.md#release-validation-and-publication).
 
 ### PR Title (`pr-title.yml`)
 
