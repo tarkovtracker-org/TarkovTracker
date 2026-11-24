@@ -379,6 +379,75 @@ export const getGuidePrimaryAction = (resource: Resource): ResourceAction | null
 };
 export const getGuideQuickActions = (resource: Resource): ResourceAction[] =>
   resource.hasGuide ? (resource.guide.quickActions ?? []) : [];
+export const getGuideStepsHeading = (
+  resource: Resource | undefined
+): { key: string; fallback: string } => {
+  if (resource?.hasGuide && resource.guide.stepsHeadingKey) {
+    return {
+      key: resource.guide.stepsHeadingKey,
+      fallback: resource.guide.stepsHeadingFallback ?? '',
+    };
+  }
+  return {
+    key: 'common.getting_started',
+    fallback: 'Getting Started',
+  };
+};
+export interface GuideTocEntry {
+  id: string;
+  labelKey: string;
+  labelFallback: string;
+}
+export const getGuideTocEntries = (resource: Resource | undefined): GuideTocEntry[] => {
+  if (!resource?.hasGuide) return [];
+  const { guide, videoId } = resource;
+  const stepsHeading = getGuideStepsHeading(resource);
+  const optionalSections: Array<GuideTocEntry & { enabled: boolean }> = [
+    {
+      id: 'setup',
+      labelKey: stepsHeading.key,
+      labelFallback: stepsHeading.fallback,
+      enabled: guide.steps > 0,
+    },
+    {
+      id: 'video',
+      labelKey: 'page.resources.guide_sections.video_walkthrough',
+      labelFallback: 'Video Walkthrough',
+      enabled: Boolean(videoId),
+    },
+    {
+      id: 'troubleshooting',
+      labelKey: 'page.resources.guide_sections.troubleshooting',
+      labelFallback: 'Troubleshooting',
+      enabled: Boolean(guide.troubleshooting),
+    },
+    {
+      id: 'tips',
+      labelKey: 'page.resources.guide_sections.tips',
+      labelFallback: 'Tips & Tricks',
+      enabled: guide.tips > 0,
+    },
+    {
+      id: 'faq',
+      labelKey: 'page.resources.guide_sections.faq',
+      labelFallback: 'Common Questions',
+      enabled: guide.faq > 0,
+    },
+  ];
+  return [
+    { id: 'overview', labelKey: 'common.overview', labelFallback: 'Overview' },
+    ...optionalSections
+      .filter((entry) => entry.enabled)
+      .map(({ id, labelKey, labelFallback }) => ({ id, labelKey, labelFallback })),
+  ];
+};
+export const resolveActiveSectionId = (
+  sections: ReadonlyArray<{ id: string; top: number }>,
+  threshold: number
+): string => {
+  const current = sections.findLast((section) => section.top <= threshold);
+  return current?.id ?? sections[0]?.id ?? 'overview';
+};
 export const getGuideSecondaryLinks = (resource: Resource): ResourceAction[] => {
   const primary = getGuidePrimaryAction(resource);
   return resource.links

@@ -6,10 +6,13 @@ import {
   getGuidePrimaryAction,
   getGuideQuickActions,
   getGuideSecondaryLinks,
+  getGuideStepsHeading,
+  getGuideTocEntries,
   getPrimaryAction,
   getSecondaryActions,
   isResourceCategory,
   matchesResourceSearch,
+  resolveActiveSectionId,
   RESOURCE_CATEGORIES,
   RESOURCES,
   splitSecondaryActions,
@@ -167,6 +170,46 @@ describe('resourceData locale parity', () => {
       }
       expect.fail(`unrecognized guide locale key ${slug}.${key}`);
     }
+  });
+  it('returns custom or default steps headings for guides', () => {
+    const orgGuide = RESOURCES.find((entry) => entry.slug === 'tarkovtracker_org_vs_io');
+    const monitorGuide = RESOURCES.find((entry) => entry.slug === 'tarkovmonitor');
+    expect(getGuideStepsHeading(orgGuide)).toEqual({
+      key: 'page.resources.guide_sections.migration_steps',
+      fallback: 'Move Your Progress to TarkovTracker.org',
+    });
+    expect(getGuideStepsHeading(monitorGuide)).toEqual({
+      key: 'common.getting_started',
+      fallback: 'Getting Started',
+    });
+    expect(getGuideStepsHeading(undefined)).toEqual({
+      key: 'common.getting_started',
+      fallback: 'Getting Started',
+    });
+  });
+  it('builds ordered guide TOC entries and resolves active scroll sections', () => {
+    const monitor = RESOURCES.find((entry) => entry.slug === 'tarkovmonitor');
+    expect(getGuideTocEntries(monitor).map((entry) => entry.id)).toEqual([
+      'overview',
+      'setup',
+      'video',
+      'troubleshooting',
+      'tips',
+      'faq',
+    ]);
+    expect(getGuideTocEntries(undefined)).toEqual([]);
+    expect(
+      resolveActiveSectionId(
+        [
+          { id: 'overview', top: -100 },
+          { id: 'setup', top: 40 },
+          { id: 'faq', top: 300 },
+        ],
+        80
+      )
+    ).toBe('setup');
+    expect(resolveActiveSectionId([{ id: 'setup', top: 200 }], 80)).toBe('setup');
+    expect(resolveActiveSectionId([], 80)).toBe('overview');
   });
   it('assigns distinct fallback icons to resources without a logo', () => {
     const seasonal = RESOURCES.find((entry) => entry.slug === 'seasonal_modifiers');

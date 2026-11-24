@@ -4,6 +4,7 @@ import { defineComponent, h } from 'vue';
 import { RESOURCES } from '@/features/resources/resourceData';
 import ResourceGuideArticle from '@/features/resources/ResourceGuideArticle.vue';
 import ResourceGuideHeader from '@/features/resources/ResourceGuideHeader.vue';
+import ResourceGuideToc from '@/features/resources/ResourceGuideToc.vue';
 import type { ResourceWithGuide } from '@/features/resources/resourceData';
 const getResource = (slug: string): ResourceWithGuide => {
   const resource = RESOURCES.find((entry) => entry.slug === slug);
@@ -115,5 +116,17 @@ describe('resource guide content', () => {
     const hrefs = wrapper.findAll('a').map((link) => link.attributes('href'));
     expect(hrefs).toContain('/resources?category=companion_apps');
     expect(hrefs).toContain('/settings#api');
+  });
+  it('constrains the mobile TOC aside within the grid column', async () => {
+    const wrapper = await mountSuspended(ResourceGuideToc, {
+      props: {
+        items: [
+          { id: 'overview', label: 'Overview' },
+          { id: 'setup', label: 'Getting Started' },
+        ],
+        activeId: 'overview',
+      },
+    });
+    expect(wrapper.get('aside').classes()).toContain('min-w-0');
   });
 });

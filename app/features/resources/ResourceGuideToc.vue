@@ -1,5 +1,5 @@
 <template>
-  <aside class="order-first lg:order-last">
+  <aside class="order-first min-w-0 lg:order-last">
     <div class="space-y-2 lg:hidden">
       <p class="text-surface-400 text-xs font-semibold tracking-[0.2em] uppercase">
         {{ t('page.resources.on_this_page', 'On this page') }}

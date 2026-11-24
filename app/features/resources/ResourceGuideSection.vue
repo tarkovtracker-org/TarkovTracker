@@ -1,5 +1,5 @@
 <template>
-  <section :id="id" class="scroll-mt-16 space-y-3">
+  <section :id="id" tabindex="-1" class="scroll-mt-16 space-y-3 focus:outline-none">
     <div class="flex items-center gap-2 border-b border-white/10 pb-2">
       <UIcon v-if="icon" :name="icon" class="text-primary-400 h-5 w-5 shrink-0" />
       <h2 class="light:text-surface-50 text-lg font-semibold tracking-wide text-white sm:text-xl">

@@ -65,7 +65,9 @@
 <script setup lang="ts">
   import {
     CATEGORY_LABEL_FALLBACKS,
+    getGuideTocEntries,
     getResourceBySlug,
+    resolveActiveSectionId,
     RESOURCE_META_ITEMS,
   } from '@/features/resources/resourceData';
   import ResourceGuideArticle from '@/features/resources/ResourceGuideArticle.vue';
@@ -116,45 +118,12 @@
       ? t(`page.resources.guides.${slug.value}.compatibility`, '')
       : ''
   );
-  const setupSectionLabel = computed(() => {
-    const guide = resource.value?.guide;
-    if (guide?.stepsHeadingKey) {
-      return t(guide.stepsHeadingKey, guide.stepsHeadingFallback ?? '');
-    }
-    return t('common.getting_started', 'Getting Started');
-  });
-  const tocItems = computed<ResourceGuideTocItem[]>(() => {
-    const guide = resource.value?.guide;
-    const candidates: Array<ResourceGuideTocItem & { enabled: boolean }> = [
-      { id: 'overview', label: t('common.overview', 'Overview'), enabled: true },
-      {
-        id: 'setup',
-        label: setupSectionLabel.value,
-        enabled: Boolean(guide?.steps),
-      },
-      {
-        id: 'video',
-        label: t('page.resources.guide_sections.video_walkthrough', 'Video Walkthrough'),
-        enabled: Boolean(resource.value?.videoId),
-      },
-      {
-        id: 'troubleshooting',
-        label: t('page.resources.guide_sections.troubleshooting', 'Troubleshooting'),
-        enabled: Boolean(guide?.troubleshooting),
-      },
-      {
-        id: 'tips',
-        label: t('page.resources.guide_sections.tips', 'Tips & Tricks'),
-        enabled: Boolean(guide?.tips),
-      },
-      {
-        id: 'faq',
-        label: t('page.resources.guide_sections.faq', 'Common Questions'),
-        enabled: Boolean(guide?.faq),
-      },
-    ];
-    return candidates.filter((item) => item.enabled).map(({ id, label }) => ({ id, label }));
-  });
+  const tocItems = computed<ResourceGuideTocItem[]>(() =>
+    getGuideTocEntries(resource.value).map((entry) => ({
+      id: entry.id,
+      label: t(entry.labelKey, entry.labelFallback),
+    }))
+  );
   const activeSectionId = ref('overview');
   const SCROLL_OFFSET = 72;
   const onTocClick = (id: string, event: MouseEvent) => {
@@ -164,16 +133,19 @@
     if (!target) return;
     const top = target.getBoundingClientRect().top + window.scrollY - SCROLL_OFFSET;
     window.scrollTo({ top, behavior: 'smooth' });
+    if (!target.hasAttribute('tabindex')) {
+      target.setAttribute('tabindex', '-1');
+    }
+    target.focus({ preventScroll: true });
     history.replaceState(null, '', `#${id}`);
   };
-  const getSectionPosition = (item: ResourceGuideTocItem) => {
+  const readSectionPosition = (item: ResourceGuideTocItem) => {
     const element = document.getElementById(item.id);
     return element ? { id: item.id, top: element.getBoundingClientRect().top } : null;
   };
   const updateActiveSection = () => {
-    const sections = tocItems.value.map(getSectionPosition).filter((entry) => entry !== null);
-    const current = sections.findLast((section) => section.top <= SCROLL_OFFSET + 8);
-    activeSectionId.value = current?.id ?? sections[0]?.id ?? 'overview';
+    const sections = tocItems.value.map(readSectionPosition).filter((entry) => entry !== null);
+    activeSectionId.value = resolveActiveSectionId(sections, SCROLL_OFFSET + 8);
   };
   onMounted(() => {
     updateActiveSection();

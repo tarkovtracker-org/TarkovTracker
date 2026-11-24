@@ -24,13 +24,12 @@
   </ResourceGuideSection>
 </template>
 <script setup lang="ts">
+  import { getGuideStepsHeading, type Resource } from '@/features/resources/resourceData';
   import ResourceGuideSection from '@/features/resources/ResourceGuideSection.vue';
-  import type { Resource } from '@/features/resources/resourceData';
   const props = defineProps<{ resource: Resource }>();
   const { t } = useI18n({ useScope: 'global' });
   const sectionTitle = computed(() => {
-    const key = props.resource.guide?.stepsHeadingKey;
-    const fallback = props.resource.guide?.stepsHeadingFallback;
-    return key ? t(key, fallback ?? '') : t('common.getting_started', 'Getting Started');
+    const heading = getGuideStepsHeading(props.resource);
+    return t(heading.key, heading.fallback);
   });
 </script>
