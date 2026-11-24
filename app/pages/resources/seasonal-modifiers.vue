@@ -133,6 +133,8 @@
   import { UNTAR_CONTROL_POSTER_URL as posterUrl } from '@/types/seasonPreview';
   import type { SeasonPreview } from '@/types/seasonPreview';
   const { t, locale } = useI18n({ useScope: 'global' });
+  const { $supabase } = useNuxtApp();
+  const userId = computed(() => $supabase.user.id ?? null);
   definePageMeta({ layout: 'default' });
   const query = ref('');
   const category = ref('all');
@@ -156,7 +158,7 @@
     toggle,
     clear,
     applySuggestion,
-  } = useModifierPlanner(items);
+  } = useModifierPlanner(items, userId);
   const signed = (value: number) =>
     new Intl.NumberFormat(locale.value, { signDisplay: 'exceptZero' }).format(value);
   const categoryOptions = computed(() => [
@@ -177,7 +179,7 @@
   const matches = computed(() => {
     const term = normalize(query.value.trim());
     return items.value
-      .filter((item) => !onlySelected.value || selected.has(item.id))
+      .filter((item) => !onlySelected.value || selected.value.has(item.id))
       .filter((item) => category.value === 'all' || item.category === category.value)
       .filter((item) =>
         [item.name, item.effect, t(`page.seasonal_modifiers.categories.${item.category}`)].some(

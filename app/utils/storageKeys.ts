@@ -34,6 +34,8 @@ export const STORAGE_KEYS = {
   supportBannerDismissedAt: `${STORAGE_PREFIX}support_banner_dismissed_at`,
   changelogLastSeen: `${STORAGE_PREFIX}changelog_last_seen`,
 } as const;
+export const seasonTwoModifiersStorageKey = (userId: string | null): string =>
+  `${STORAGE_PREFIX}season_2_modifiers:${userId === null ? 'guest' : `account:${userId}`}`;
 export const LEGACY_STORAGE_KEYS = {
   progress: 'progress',
   preferences: 'preferences',

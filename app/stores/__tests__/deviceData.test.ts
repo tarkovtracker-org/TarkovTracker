@@ -19,7 +19,11 @@ import {
   invalidateActiveProgressWrites,
 } from '@/stores/tarkov/localStorage';
 import * as progressAuthority from '@/stores/tarkov/progressAuthority';
-import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
+import {
+  LEGACY_STORAGE_KEYS,
+  seasonTwoModifiersStorageKey,
+  STORAGE_KEYS,
+} from '@/utils/storageKeys';
 const auth = vi.hoisted(() => ({ owner: null as string | null }));
 vi.mock('@/utils/userScopedStorage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/utils/userScopedStorage')>()),
@@ -444,6 +448,18 @@ describe('device data removal', () => {
     expect(localStorage.getItem(STORAGE_KEYS.activityLogLastRead)).toBeNull();
     expect(localStorage.getItem(LEGACY_STORAGE_KEYS.activityLogManual)).toBe(owned(null));
     expect(localStorage.getItem(LEGACY_STORAGE_KEYS.activityLogLastRead)).toBe(owned('user-2'));
+  });
+  it('removes the owner modifier plan and preserves other plans', async () => {
+    const ownerKey = seasonTwoModifiersStorageKey('user-1');
+    const otherKey = seasonTwoModifiersStorageKey('user-2');
+    const guestKey = seasonTwoModifiersStorageKey(null);
+    localStorage.setItem(ownerKey, '["owner-modifier"]');
+    localStorage.setItem(otherKey, '["other-modifier"]');
+    localStorage.setItem(guestKey, '["guest-modifier"]');
+    expect(await removeAccountDeviceData('user-1')).toBe(true);
+    expect(localStorage.getItem(ownerKey)).toBeNull();
+    expect(localStorage.getItem(otherKey)).toBe('["other-modifier"]');
+    expect(localStorage.getItem(guestKey)).toBe('["guest-modifier"]');
   });
   it('re-reads ownership when another tab replaces a shared key before removal', async () => {
     localStorage.setItem(STORAGE_KEYS.preferences, owned('user-1'));
