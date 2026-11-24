@@ -16,7 +16,9 @@
     "app/server/middleware/**/*.ts",
     "app/**/*.test.ts",
     "scripts/**/*.test.mjs",
-    "scripts/workflow-tests/*.mjs",
+    "scripts/workflow-tests/**/*.mjs",
+    "scripts/codex-review/codex-review.mjs",
+    "scripts/codex-review/*-tests.mjs",
     "scripts/ci/workflow-metrics.mjs",
     "scripts/ci/check-ci-result.mjs",
     "scripts/ci/actionlint-queue.mjs",
@@ -37,7 +39,6 @@
     "scripts/checks/precomputed-response-worker.ts"
   ],
   "ignoreDependencies": [
-    "shared",
     "@iconify-json/heroicons",
     "@iconify-json/lucide",
     "@nuxt/image",
@@ -45,7 +46,9 @@
     "@nuxtjs/sitemap",
     "@pinia/nuxt",
     "@codecov/nuxt-plugin",
-    "@nuxt/eslint"
+    "@nuxt/eslint",
+    "postcss",
+    "vue-tsc"
   ],
   "ignoreDependencyOverrides": [
     {
@@ -73,7 +76,11 @@
       "source": "pnpm-workspace.yaml"
     }
   ],
-  "ignoreUnresolvedImports": ["@/data/maps.json", "./.nuxt/eslint.config.mjs"],
+  "ignoreUnresolvedImports": [
+    "@/data/maps.json",
+    "./.nuxt/eslint.config.mjs",
+    "nitropack/presets/cloudflare/runtime/cloudflare-pages"
+  ],
   "rules": {
     "circular-dependency": "warn"
   },

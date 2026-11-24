@@ -1,33 +1,18 @@
 import { removeActiveProgressValue } from '@/stores/tarkov/localStorage';
 import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
-const isSupabaseAuthStorageKey = (key: string): boolean => {
+export const isSupabaseAuthStorageKey = (key: string): boolean => {
   return key.endsWith('-auth-token') || key.endsWith('-code-verifier');
 };
-type StorageKeySource = Pick<Storage, 'key' | 'length'> | Record<string, unknown>;
-const getStorageKeys = (storage: StorageKeySource): string[] => {
-  if ('key' in storage && typeof storage.key === 'function' && typeof storage.length === 'number') {
-    const keys: string[] = [];
-    for (let index = 0; index < storage.length; index += 1) {
-      const key = storage.key(index);
-      if (key) {
-        keys.push(key);
-      }
-    }
-    return keys;
-  }
-  return Object.keys(storage);
-};
-const getProgressBackupKeys = (storage: Storage): string[] => {
+type StorageKeyReader = Pick<Storage, 'key' | 'length'>;
+type StorageKeySource = StorageKeyReader | Record<string, unknown>;
+const isStorageKeyReader = (storage: StorageKeySource): storage is StorageKeyReader =>
+  'key' in storage && typeof storage.key === 'function' && typeof storage.length === 'number';
+export const getStorageKeys = (storage: StorageKeyReader | null): string[] => {
   const keys: string[] = [];
+  if (!storage) return keys;
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
-    if (
-      key &&
-      (key.startsWith(STORAGE_KEYS.progressBackupPrefix) ||
-        key.startsWith(LEGACY_STORAGE_KEYS.progressBackupPrefix))
-    ) {
-      keys.push(key);
-    }
+    if (key) keys.push(key);
   }
   return keys;
 };
@@ -41,7 +26,8 @@ export const hasSupabaseAuthSessionHint = (
   if (!storage) {
     return false;
   }
-  return getStorageKeys(storage).some((key) => isSupabaseAuthStorageKey(key));
+  const keys = isStorageKeyReader(storage) ? getStorageKeys(storage) : Object.keys(storage);
+  return keys.some(isSupabaseAuthStorageKey);
 };
 const clearSessionMigrationKeys = (sessionStorageArea: Storage | null): void => {
   sessionStorageArea?.removeItem(STORAGE_KEYS.sessionDataMigrated);
@@ -54,7 +40,13 @@ export const clearProgressStorage = async (storage?: Storage | null): Promise<vo
   }
   await removeActiveProgressValue(undefined, undefined, storage);
   storage.removeItem(LEGACY_STORAGE_KEYS.progress);
-  getProgressBackupKeys(storage).forEach((key) => storage.removeItem(key));
+  getStorageKeys(storage)
+    .filter(
+      (key) =>
+        key.startsWith(STORAGE_KEYS.progressBackupPrefix) ||
+        key.startsWith(LEGACY_STORAGE_KEYS.progressBackupPrefix)
+    )
+    .forEach((key) => storage.removeItem(key));
 };
 export const clearPreferencesStorage = (storage?: Storage | null): void => {
   storage ??= getDefaultLocalStorageArea();
@@ -102,12 +94,7 @@ export const clearUserScopedAppStorage = async (
   if (!includeAuthSessions) {
     return;
   }
-  const authKeys: string[] = [];
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index);
-    if (key && isSupabaseAuthStorageKey(key)) {
-      authKeys.push(key);
-    }
-  }
-  authKeys.forEach((key) => storage.removeItem(key));
+  getStorageKeys(storage)
+    .filter(isSupabaseAuthStorageKey)
+    .forEach((key) => storage.removeItem(key));
 };

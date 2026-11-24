@@ -77,6 +77,11 @@ describe('failed task repair', () => {
     state.completions = { repair: { failed: true }, source: { complete: true } };
     expect(useTaskRepair({ requestRepairConfirm: confirm }).failedTasksCount.value).toBe(1);
   });
+  it('preserves a failure caused by completing an alternative task', () => {
+    state.tasks = [task('source', { alternatives: ['blocked'] }), task('blocked')];
+    state.completions = { source: { complete: true }, blocked: { failed: true } };
+    expect(useTaskRepair({ requestRepairConfirm: confirm }).failedTasksCount.value).toBe(0);
+  });
   it('resets only repairable tasks and their objectives after confirmation', async () => {
     state.tasks = [
       task('repair', { objectives: [{ id: 'objective', type: 'visit' }] }),

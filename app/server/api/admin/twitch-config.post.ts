@@ -1,6 +1,11 @@
 import { defineEventHandler, getRequestHeader } from 'h3';
 import { createAdminError, readAdminBody } from '@/server/utils/adminError';
-import { adminSupabaseFetch, getIsAdmin, normalizeSupabaseUrl } from '@/server/utils/adminSupabase';
+import {
+  adminSupabaseFetch,
+  getIsAdmin,
+  normalizeSupabaseUrl,
+  readSupabaseServiceKey,
+} from '@/server/utils/adminSupabase';
 import { createLogger } from '@/server/utils/logger';
 import { ADMIN_ERROR_CODES } from '@/utils/adminErrors';
 import type { H3Event } from 'h3';
@@ -46,8 +51,8 @@ export default defineEventHandler(async (event): Promise<UpdateResult> => {
 });
 async function handleUpdate(event: H3Event): Promise<UpdateResult> {
   const runtime = useRuntimeConfig(event) as Record<string, unknown>;
-  const supabaseUrl = readSupabaseUrl(runtime);
-  const serviceKey = readServiceKey(runtime);
+  const supabaseUrl = normalizeSupabaseUrl(runtime.supabaseUrl);
+  const serviceKey = readSupabaseServiceKey(runtime);
   if (!supabaseUrl || !serviceKey) {
     throw createAdminError(
       500,
@@ -73,7 +78,7 @@ async function purgeConfigCache(
   event: H3Event
 ): Promise<boolean> {
   try {
-    const supabaseUrl = readSupabaseUrl(runtime);
+    const supabaseUrl = normalizeSupabaseUrl(runtime.supabaseUrl);
     if (!supabaseUrl) throw new Error('Cache purge config missing');
     await invokeCachePurge(supabaseUrl, readAnonKey(runtime), readAuthHeader(event));
     return true;
@@ -193,13 +198,6 @@ function readInput(body: AdminTwitchConfigBody): TwitchConfig {
     displayName: readDisplayName(body.displayName, channel),
     enabled: readEnabled(body.enabled),
   };
-}
-function readSupabaseUrl(runtime: Record<string, unknown>): string {
-  return normalizeSupabaseUrl(runtime.supabaseUrl);
-}
-function readServiceKey(runtime: Record<string, unknown>): string {
-  const value = runtime.supabaseServiceKey;
-  return typeof value === 'string' ? value : '';
 }
 function readChannel(value: unknown): string {
   if (typeof value !== 'string') {

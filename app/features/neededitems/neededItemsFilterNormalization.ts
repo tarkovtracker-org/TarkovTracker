@@ -7,20 +7,12 @@ import {
   type NeededItemsSortBy,
   type NeededItemsSortDirection,
 } from '@/features/neededitems/neededitems-constants';
+import { readSelectValue } from '@/utils/selectValue';
 const NEEDED_ITEMS_CARD_STYLES = ['compact', 'expanded'] as const;
 const NEEDED_ITEMS_FIR_FILTERS = ['all', 'fir', 'non-fir'] as const;
 const NEEDED_ITEMS_VIEW_MODES = ['list', 'grid'] as const;
-const extractNormalizationCandidate = (value: unknown): unknown => {
-  if (typeof value === 'string') {
-    return value;
-  }
-  if (value && typeof value === 'object' && 'value' in value) {
-    return (value as { value?: unknown }).value;
-  }
-  return null;
-};
 const normalizeEnum = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T => {
-  const candidate = extractNormalizationCandidate(value);
+  const candidate = readSelectValue(value);
   if (typeof candidate === 'string' && allowed.includes(candidate as T)) {
     return candidate as T;
   }

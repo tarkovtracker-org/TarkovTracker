@@ -2,6 +2,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { MANUAL_FAIL_TASK_IDS } from '@/utils/constants';
 import { logger } from '@/utils/logger';
+import { hasCompletionStatus } from '@/utils/taskStatus';
 import type { Ref } from '#imports';
 export type RequestRepairConfirm = () => Promise<boolean>;
 export interface RepairableTask {
@@ -25,10 +26,6 @@ export function useTaskRepair({ requestRepairConfirm }: UseTaskRepairOptions): U
   const tarkovStore = useTarkovStore();
   const isTaskSuccessful = (taskId: string) =>
     tarkovStore.isTaskComplete(taskId) && !tarkovStore.isTaskFailed(taskId);
-  const hasStatus = (status: string[] | undefined, statuses: string[]) => {
-    const normalized = (status ?? []).map((entry) => entry.toLowerCase());
-    return statuses.some((value) => normalized.includes(value));
-  };
   const isTaskManuallyFailed = (taskId: string) => {
     const completion = tarkovStore.getCurrentProgressData().taskCompletions?.[taskId];
     if (!completion) return false;
@@ -53,7 +50,7 @@ export function useTaskRepair({ requestRepairConfirm }: UseTaskRepairOptions): U
     const failConditions = task.failConditions ?? [];
     const failedByCondition = failConditions.some((objective) => {
       if (!objective?.task?.id) return false;
-      if (!hasStatus(objective.status, ['complete', 'completed'])) return false;
+      if (!hasCompletionStatus(objective.status)) return false;
       return isTaskSuccessful(objective.task.id);
     });
     if (failedByCondition) return true;

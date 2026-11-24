@@ -311,16 +311,13 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 EFT log import restores explicit quest notification states in PvP, PvE, and active Seasonal
 PvP. Message types 10/11/12 identify started/failed/completed tasks; rewards, backend requests,
 diagnostics, and group-member snapshots do not establish additional player progress. See
-`docs/eft-log-reference/` for the historical format inventory and latest re-audit (through observed
-build `1.2.0.0.47965`) and
 [TarkovMonitor's message type contract](https://github.com/the-hideout/TarkovMonitor/blob/master/TarkovMonitor/GameWatcher.cs).
 The importer accepts legacy/rotated notification and backend filenames, and application/output
 context, in folders, individual files, and ZIPs. Explicit `output|notifications|` and
 `output|push-notifications|` mirrors are another source of the same quest evidence; their
 application/backend source prefixes are also unwrapped for routing. Generic output chatter is
 not a notification. Dedicated and mirrored deliveries share identity/time deduplication.
-Folder files and ZIP members are read incrementally under the selection-wide
-[resource budgets](../eft-log-reference/README.md#import-resource-budgets).
+Folder files and ZIP members are read incrementally under the [selection-wide budgets](#eft-log-import-resource-budgets).
 Raw reads and decoded batches use 256 KiB buffers; compressed ZIP inflation uses 1 KiB slices.
 These buffer sizes are separate from the import budgets.
 Supported members are consumed immediately; unsupported members use a discard decoder so
@@ -373,7 +370,7 @@ not an authenticated game-server attestation. There is no new cross-account or A
 `/api/tarkov/tasks-import` reads one English precomputed snapshot for each requested upstream mode.
 The producer combines core fields, objectives and fail conditions from one raw task set, then applies
 the private overlay once. Import never joins the independently cached UI core/objective projections.
-Snapshot validation follows the [producer contract](./overlay-and-precompute.md#key-contract). Missing provenance,
+Snapshot validation follows the [producer contract](./overlay-and-precompute.md#key-and-activation-contract). Missing provenance,
 duplicate task/objective IDs, invalid counts, wrong scope, corrupt data or a
 snapshot older than seven days rejects the preview before any progress or mode change. Failed
 refreshes retain each mode's last-good entry. Runtime use of a whole last-good snapshot does not
@@ -404,6 +401,14 @@ retained selection also remain available in the `unidentified` bucket, alongside
 no recorded selection: it joins the only identified account, but stays
 separate when two or more accounts exist. Account IDs stay in memory and are shown only as a
 four-character suffix. Switching accounts resets version and data selection to that account's defaults.
+
+### EFT log import resource budgets
+
+`app/utils/eftLogImportBudget.ts` caps a selection at 1 GiB supported input, 1 GiB actual expanded bytes, 100,000 evidence items, 16 Mi UTF-16 evidence characters, 8,192 files and archive entries, and 1 Mi UTF-16 characters in aggregate names. Count ignored entries and duplicate events and mode signals before retention. Charge expanded bytes before decoding and copy retained strings to release decoded batches.
+
+Filesystem reads and decoded batches are 256 KiB, with 1 KiB compressed inflation slices and an independent 8 Mi-character unfinished-record ceiling. Yield after expanded batches and check cancellation between slices. Ignore unsupported entries without inflating them. An exceeded budget aborts the whole selection without a partial preview or progress write. Retry with fewer sessions or only relevant files.
+
+Use privacy-normalized fixtures. Never commit raw logs. An October 2026 sample through build `1.2.0.0.47965` verified started and completed notifications, with mirrored output as a recovery source. Failure coverage comes from fixtures. No usable self-XP, prestige reset, partial handover, or hideout completion evidence was established.
 
 ### Preview selection and reset history
 

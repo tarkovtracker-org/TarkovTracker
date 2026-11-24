@@ -3,10 +3,6 @@
  * All values are in seconds
  */
 import { logger } from './logger';
-// 12 hours - for data that changes with game updates
-export const CACHE_TTL_DEFAULT = 43200 as const;
-// 24 hours - for relatively static data like items catalog
-export const CACHE_TTL_EXTENDED = 86400 as const;
 // Valid game modes for API requests
 export const VALID_GAME_MODES = ['regular', 'pve', 'pvp-season'] as const;
 export type ValidGameMode = (typeof VALID_GAME_MODES)[number];

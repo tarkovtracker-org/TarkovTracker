@@ -11,6 +11,7 @@ import {
   writeSharedCache,
   type SharedCacheHandle,
 } from '@/server/utils/sharedEdgeStore';
+import { toPositiveInteger } from '@/server/utils/tarkovAccessConfig';
 import { isGameMode, type GameMode } from '@/utils/constants';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 const logger = createLogger('TeamMembers');
@@ -76,14 +77,6 @@ function mapProfile(p: ProfileRow, gameMode: GameMode, gameEdition: unknown): Me
     tasksCompleted: tasksCompleted !== null ? Math.max(0, Math.trunc(tasksCompleted)) : null,
   };
 }
-const toPositiveInteger = (value: unknown, fallback: number): number => {
-  const numeric = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(numeric)) {
-    return fallback;
-  }
-  const integer = Math.trunc(numeric);
-  return integer > 0 ? integer : fallback;
-};
 const isTeamMembersPayload = (value: unknown): value is TeamMembersPayload => {
   if (!value || typeof value !== 'object') {
     return false;

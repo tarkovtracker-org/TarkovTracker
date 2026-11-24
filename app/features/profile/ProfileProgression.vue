@@ -258,11 +258,8 @@
     isCurrentProfileVisibilityRequest,
     loadCurrentProfileVisibility,
   } from '@/utils/profileVisibility';
-  import { effectiveStoryProgress, isAutomaticStoryObjective } from '@/utils/storylineCompletion';
-  import {
-    orderedStoryObjectives,
-    toggleStoryChapterWithLinearObjectives,
-  } from '@/utils/storylineObjectives';
+  import { effectiveStoryProgress } from '@/utils/storylineCompletion';
+  import { orderedStoryObjectives, createStoryProgressToggles } from '@/utils/storylineObjectives';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   import { projectDuplicateObjectiveProgress } from '@/utils/taskNormalization';
   import { getCompletionFlags, type RawTaskCompletion } from '@/utils/taskStatus';
@@ -956,45 +953,27 @@
       .filter(([, objective]) => objective?.complete === true)
       .map(([objectiveId]) => objectiveId);
   };
+  const storyToggles = createStoryProgressToggles(
+    tarkovStore,
+    (chapterId, objectiveId) =>
+      storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true
+  );
   const handleStoryChapterToggle = (chapterId: string) => {
-    if (!canEditStoryProgress()) {
-      return;
-    }
+    if (!canEditStoryProgress()) return;
     const chapter = profileChapters.value.find((value) => value.id === chapterId);
-    toggleStoryChapterWithLinearObjectives({
+    storyToggles.toggleChapter(
       chapterId,
-      isChapterComplete: storyChapterCompletionState.value[chapterId] === true,
-      objectives: chapter?.objectives,
-      mutuallyExclusiveQuestPairs: chapter?.mutuallyExclusiveQuestPairs,
-      isObjectiveComplete: (objectiveId) =>
-        storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true,
-      setChapterComplete: (id) => tarkovStore.setStoryChapterComplete(id),
-      setChapterUncomplete: (id) => tarkovStore.setStoryChapterUncomplete(id),
-      setObjectiveComplete: (id, objectiveId) =>
-        tarkovStore.setStoryObjectiveComplete(id, objectiveId),
-      setObjectiveUncomplete: (id, objectiveId) =>
-        tarkovStore.setStoryObjectiveUncomplete(id, objectiveId),
-    });
+      chapter,
+      storyChapterCompletionState.value[chapterId] === true
+    );
   };
   const handleStoryObjectiveToggle = (chapterId: string, objectiveId: string) => {
-    if (!canEditStoryProgress()) {
-      return;
-    }
+    if (!canEditStoryProgress()) return;
     const chapter = profileChapters.value.find((value) => value.id === chapterId);
     const objective = orderedStoryObjectives(chapter?.objectives).find(
       (value) => value.id === objectiveId
     );
-    if (isAutomaticStoryObjective(objective)) return;
-    const objectiveState = storyObjectiveCompletionState.value[chapterId]?.[objectiveId] === true;
-    if (objectiveState) {
-      tarkovStore.setStoryObjectiveUncomplete(chapterId, objectiveId);
-      return;
-    }
-    const linkedIds = objective?.mutuallyExclusiveWith ?? [];
-    if (linkedIds.some((linkedId) => storyObjectiveCompletionState.value[chapterId]?.[linkedId])) {
-      return;
-    }
-    tarkovStore.setStoryObjectiveComplete(chapterId, objectiveId);
+    storyToggles.toggleObjective(chapterId, objectiveId, objective);
   };
   const totalStoryChapters = computed(() => profileChapters.value.length);
   const completedStoryChapters = computed(() => {

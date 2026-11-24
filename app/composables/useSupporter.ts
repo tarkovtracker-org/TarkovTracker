@@ -11,7 +11,7 @@ import {
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
 import { subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
-import { refreshSupabaseSession } from '@/utils/supabaseAuth';
+import { getOrRefreshSupabaseAccessToken } from '@/utils/supabaseAuth';
 import type { SupabaseClient } from '@supabase/supabase-js';
 export interface SupporterStatus {
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
@@ -298,15 +298,7 @@ export function useSupporter() {
       // Stripe endpoints require authentication: the server reads the user id
       // from the session, not the request body, so we must forward the
       // bearer token. Refresh once if the cached session is missing/stale.
-      let token: string | null = null;
-      const sessionResp = await $supabase.client.auth.getSession();
-      token = sessionResp.data.session?.access_token ?? null;
-      if (!token) {
-        // A failed refresh means no usable token; fall through to the
-        // sign-in message rather than surfacing a raw Supabase error.
-        const refreshed = await refreshSupabaseSession($supabase.client).catch(() => null);
-        token = refreshed?.access_token ?? null;
-      }
+      const token = await getOrRefreshSupabaseAccessToken($supabase.client);
       if (!token) {
         const message = 'You must be signed in to support TarkovTracker.';
         reportSupporterRequestError(message, signal);

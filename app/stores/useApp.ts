@@ -5,7 +5,6 @@ import { SHELL_DRAWER_RAIL_STORAGE_KEY } from '@/utils/shellConfig';
 // `useStorage` refs would never bind to localStorage on the client.
 export const useAppStore = defineStore('app', () => {
   const drawerRail = skipHydrate(useStorage<boolean>(SHELL_DRAWER_RAIL_STORAGE_KEY, false));
-  const drawerShow = skipHydrate(useStorage<boolean>('app_drawerShow', true));
   const mobileDrawerExpanded = ref(false);
   const toggleDrawerRail = () => {
     drawerRail.value = !drawerRail.value;
@@ -18,7 +17,6 @@ export const useAppStore = defineStore('app', () => {
   };
   return {
     drawerRail,
-    drawerShow,
     mobileDrawerExpanded,
     toggleDrawerRail,
     setMobileDrawerExpanded,

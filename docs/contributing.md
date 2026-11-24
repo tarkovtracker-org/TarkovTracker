@@ -1,9 +1,11 @@
 # Contributing Guide
 
-Local setup, coding standards, and the pull-request process for TarkovTracker. For the
-contribution workflow overview (issues, branches, labels, project board), see
-[`../.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md). Canonical agent conventions live in
-[`../AGENTS.md`](../AGENTS.md) — that file outranks this one.
+The agent contract lives in [AGENTS.md](../AGENTS.md).
+
+## Finding work
+
+Search existing issues, use the matching issue template, and request assignment before starting.
+Look for `good-first-issue`, consult [labels](../.github/LABELS.md) and the [project board](../.github/PROJECT_BOARD.md), or ask in [Discord](https://discord.gg/M8nBgA2sT6). See [support](../SUPPORT.md), [security reporting](../SECURITY.md), and the [code of conduct](../CODE_OF_CONDUCT.md) for the appropriate private channels.
 
 ## Development setup
 
@@ -49,8 +51,7 @@ source — do not duplicate its rules here. Key reminders for new contributors:
   keys with no possible reference in `app/` and on broken locales (invalid JSON or message syntax,
   unknown placeholders, structure mismatches). Untranslated keys fall back to English and never
   fail it.
-- **Tarkov.dev import/linking:** follow the rules in [`./architecture.md`](./architecture.md)
-  (persist only `tarkovUid`; the import destination mode is chosen at import time, not stored).
+- **Tarkov.dev import/linking:** follow the rules in [profile import spec](systems/imports.md).
 
 ### Debugging
 
@@ -172,6 +173,3 @@ asks for the following sections. Complete every section:
 
 > The full review gate, including rate-limit handling, is in [`../AGENTS.md`](../AGENTS.md) under
 > "Workflow and review".
-
-For finding and claiming work, see
-[`../.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) ("How to Find and Claim Work").

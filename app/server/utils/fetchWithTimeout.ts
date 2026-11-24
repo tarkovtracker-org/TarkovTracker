@@ -44,3 +44,11 @@ export const fetchWithTimeout = async (
     clearTimeout(timeout);
   }
 };
+export const readErrorBodySnippet = async (response: Response): Promise<string> => {
+  try {
+    const body = await response.text();
+    return body.length > 200 ? body.slice(0, 200) + '...' : body;
+  } catch {
+    return '[unable to read response body]';
+  }
+};
