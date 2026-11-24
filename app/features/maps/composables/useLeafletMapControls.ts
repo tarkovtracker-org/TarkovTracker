@@ -1,13 +1,12 @@
 import { currentExtractRuleData } from '@/features/maps/composables/useExtractRuleData';
 import { isDrawableMapPosition } from '@/features/maps/utils/mapLocations';
 import { extractRulesForMode } from '@/utils/extractRuleData';
-import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
 import type {
   SavedMapLayerKey,
   SavedMapLayerVisibility,
 } from '@/features/maps/utils/mapLayerVisibility';
 import type { MapExtract, MapPosition, MapSpawn, MapTransit, TarkovMap } from '@/types/tarkov';
-type TranslateFn = (key: string, fallback?: string) => string;
+import type { MapMarkerColorKey } from '@/utils/theme-colors';
 type RefLike<T> = { value: T };
 type UseLeafletMapControlsOptions = {
   map: RefLike<TarkovMap>;
@@ -19,7 +18,6 @@ type UseLeafletMapControlsOptions = {
     /** Layers rows the user turned on or off on an earlier visit. */
     getMapLayerVisibility?: SavedMapLayerVisibility;
     mapPanSpeed?: number;
-    setMapMarkerColor: (key: MapMarkerColorKey, value: string) => void;
     setMapPanSpeed: (value: number) => void;
     setMapTooltipDensity: (density: 'default' | 'compact') => void;
     setMapZoneOpacity: (value: number) => void;
@@ -31,7 +29,6 @@ type UseLeafletMapControlsOptions = {
   showScavExtracts?: boolean;
   /** App game mode (pvp, pve, seasonal); co-op classification follows its rules. */
   gameMode?: RefLike<string | undefined>;
-  t: TranslateFn;
 };
 export const ZOOM_SPEED_MIN = 0.5;
 export const ZOOM_SPEED_MAX = 3;
@@ -68,7 +65,6 @@ export function useLeafletMapControls({
   showPmcSpawns: initialShowPmcSpawns = false,
   showScavExtracts: initialShowScavExtracts,
   gameMode,
-  t,
 }: UseLeafletMapControlsOptions) {
   const isCoop = (extract: MapExtract) => isCoopExtract(extract, gameMode?.value ?? 'pvp');
   const mapColors = computed(() => preferencesStore.getMapMarkerColors);
@@ -160,12 +156,6 @@ export function useLeafletMapControls({
       preferencesStore.setMapZoneOpacity(clamped);
     },
   });
-  const mapColorOptions = computed(() => getMapColorOptions(t));
-  const onMapColorInput = (key: MapMarkerColorKey, event: Event) => {
-    const input = event.target as HTMLInputElement | null;
-    if (!input) return;
-    preferencesStore.setMapMarkerColor(key, input.value);
-  };
   const zoomSpeedLabel = computed(() => `${mapZoomSpeed.value.toFixed(1)}x`);
   const panSpeedLabel = computed(() => `${mapPanSpeed.value.toFixed(1)}x`);
   const zoneOpacityLabel = computed(() => `${Math.round(mapZoneOpacity.value * 100)}%`);
@@ -186,14 +176,12 @@ export function useLeafletMapControls({
     hasSharedExtracts,
     hasUnknownFactionExtracts,
     mapColors,
-    mapColorOptions,
     mapExtracts,
     mapPanSpeed,
     mapPmcSpawns,
     mapTooltipDensity,
     mapZoneOpacity,
     mapZoomSpeed,
-    onMapColorInput,
     panSpeedLabel,
     showPmcExtracts,
     showPmcSpawns,

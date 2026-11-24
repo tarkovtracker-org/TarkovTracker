@@ -10,26 +10,14 @@ import {
   supabaseAuthStorageKey,
 } from '@/utils/supabaseAuthFence';
 import { SupabaseCallbackPendingError } from '@/utils/supabaseReadiness';
-import { hydrateUserFromSession } from '@/utils/userHydration';
+import { hydrateUserFromSession, type HydratableUser } from '@/utils/userHydration';
 /**
  * `signed_out_locally`: this browser's session ended, but the server did not confirm
  * revocation (for example while offline), so other sessions may remain active.
  */
 type SupabaseSignOutOutcome = 'signed_out' | 'signed_out_locally';
 type OAuthProvider = 'twitch' | 'discord' | 'google' | 'github';
-type SupabaseUser = {
-  id: string | null;
-  loggedIn: boolean;
-  email: string | null;
-  displayName: string | null;
-  username: string | null;
-  avatarUrl: string | null;
-  photoURL: string | null; // Alias for avatarUrl (backward compatibility)
-  lastLoginAt: string | null;
-  createdAt: string | null;
-  provider: string | null; // 'discord', 'twitch', etc.
-  providers: string[] | null; // All linked OAuth providers
-};
+type SupabaseUser = Required<HydratableUser>;
 type OAuthCallbackCode = { code: string; flowId?: string };
 /**
  * How long app start-up waits for the initial session read before continuing.
