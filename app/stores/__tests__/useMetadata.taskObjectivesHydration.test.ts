@@ -1,8 +1,11 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMetadataStore } from '@/stores/useMetadata';
+import * as asyncUtils from '@/utils/async';
 import { GAME_MODES } from '@/utils/constants';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import * as cacheUtils from '@/utils/tarkovCache';
+import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
 import type { Task } from '@/types/tarkov';
 const progressStoreMock = vi.hoisted(() => ({
   migrateDuplicateObjectiveProgress: vi.fn(),
@@ -18,16 +21,40 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => tarkovStoreMock,
 }));
 describe('useMetadataStore fetchTaskObjectivesData', () => {
+  it('hydrates grouped equipment and legacy scalars on objectives and fail conditions', () => {
+    setActivePinia(createPinia());
+    const store = useMetadataStore();
+    store.items = [{ id: 'known', name: 'Known item', iconLink: 'https://example.com/item.png' }];
+    const objective = {
+      id: 'obj',
+      usingWeapon: [{ id: 'known' }, { id: 'unknown' }],
+      usingWeaponMods: [[{ id: 'known' }, { id: '' }], []],
+      wearing: { id: 'known' },
+      notWearing: [[{ id: 'unknown' }]],
+    };
+    store.tasks = [{ id: 'task', objectives: [objective], failConditions: [objective] }] as Task[];
+    store.hydrateTaskItems({ rebuildDerivedData: false });
+    const expected = {
+      ...objective,
+      usingWeapon: [store.items[0], { id: 'unknown' }],
+      usingWeaponMods: [[store.items[0], { id: '' }], []],
+      wearing: store.items[0],
+    };
+    expect(store.tasks[0]?.objectives?.[0]).toMatchObject(expected);
+    expect(store.tasks[0]?.failConditions?.[0]).toMatchObject(expected);
+  });
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
+    localStorage.removeItem(STORAGE_KEYS.cachePurgeAt);
     vi.restoreAllMocks();
   });
   it('rebuilds derived task data when objectives load before items', async () => {
     const store = useMetadataStore();
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
     store.tasks = [
       {
         id: 'task-1',
@@ -59,6 +86,121 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     expect(store.objectiveMaps).toEqual({
       'task-1': [{ mapID: 'map-1', objectiveID: 'obj-1' }],
     });
+    expect(store.tasksObjectivesHydrated).toBe(true);
+  });
+  it('exposes a load error and shares a retry for the current objective catalog', async () => {
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const store = useMetadataStore();
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
+    store.tasks = [{ id: 'task-1', objectives: [] }] as Task[];
+    const tasks = [{ id: 'task-1', objectives: [{ id: 'obj-1', count: 2 }] }];
+    const response = Promise.withResolvers<{ data: { tasks: typeof tasks } }>();
+    const failure = new Error('Objectives unavailable');
+    const fetchMock = vi.fn().mockRejectedValueOnce(failure).mockReturnValueOnce(response.promise);
+    vi.stubGlobal('$fetch', fetchMock);
+    await store.fetchTaskObjectivesData();
+    expect(store.tasksObjectivesError).toBe(failure);
+    expect(store.tasksObjectivesPending).toBe(false);
+    expect(store.tasksObjectivesHydrated).toBe(false);
+    const first = store.fetchTaskObjectivesData();
+    const second = store.fetchTaskObjectivesData();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(store.tasksObjectivesError).toBeNull();
+    expect(store.tasksObjectivesPending).toBe(true);
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/tarkov/tasks-objectives',
+      expect.objectContaining({
+        query: { gameMode: 'regular', version: TASK_OBJECTIVES_CACHE_VERSION },
+      })
+    );
+    response.resolve({ data: { tasks } });
+    await Promise.all([first, second]);
+    expect(store.tasksObjectivesError).toBeNull();
+    expect(store.tasksObjectivesPending).toBe(false);
+    expect(store.tasksObjectivesHydrated).toBe(true);
+    expect(store.getTaskById('task-1')?.objectives?.[0]?.count).toBe(2);
+  });
+  it('does not persist objective data that predates an observed cache purge', async () => {
+    const retry = Promise.withResolvers<undefined>();
+    const wait = vi.spyOn(asyncUtils, 'delay').mockReturnValue(retry.promise);
+    const setCached = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const store = useMetadataStore();
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
+    store.tasks = [{ id: 'task-1', objectives: [{ id: 'obj-1', count: 1 }] }] as Task[];
+    const catalog = {
+      data: {
+        tasks: [{ id: 'task-1', failConditions: [], objectives: [{ id: 'obj-1', count: 3 }] }],
+      },
+    };
+    const oldResponse = Promise.withResolvers<
+      typeof catalog & { dataOverlay: { fetchedAt: string } }
+    >();
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(oldResponse.promise)
+      .mockResolvedValueOnce({
+        ...catalog,
+        dataOverlay: { fetchedAt: '2026-11-18T14:02:00Z' },
+      });
+    vi.stubGlobal('$fetch', fetchMock);
+    const pending = store.fetchTaskObjectivesData(true);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    const purge = '2026-11-18T14:01:00Z';
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, purge);
+    oldResponse.resolve({ ...catalog, dataOverlay: { fetchedAt: '2026-11-18T14:00:00Z' } });
+    await vi.waitFor(() => expect(wait).toHaveBeenCalledOnce());
+    expect(setCached).not.toHaveBeenCalled();
+    expect(store.tasks[0]?.objectives?.[0]?.count).toBe(1);
+    retry.resolve(undefined);
+    await pending;
+    expect(store.tasks[0]?.objectives?.[0]?.count).toBe(3);
+    expect(setCached).toHaveBeenCalledWith(
+      'tasks-objectives',
+      `neutral-v2-regular-${Date.parse(purge)}`,
+      'en',
+      catalog.data,
+      expect.any(Number),
+      expect.any(Function)
+    );
+  });
+  it('shares the retry and only merges the current objective catalog', async () => {
+    const retry = Promise.withResolvers<undefined>();
+    const wait = vi.spyOn(asyncUtils, 'delay').mockReturnValue(retry.promise);
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, '2025-01-03T00:00:00Z');
+    const store = useMetadataStore();
+    store.tasks = [{ id: 'task-1', objectives: [] }] as Task[];
+    vi.spyOn(store, 'fetchObjectiveModeCountDifferences').mockResolvedValue(undefined);
+    const merge = vi.spyOn(store, 'mergeTaskObjectives');
+    const objectives = [{ id: 'bunker', count: 3 }];
+    const tasks = [{ id: 'task-1', failConditions: [], objectives }];
+    const oldTasks = [{ ...tasks[0], objectives: [{ id: 'old-bunker', count: 1 }] }];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: { tasks: oldTasks },
+        dataOverlay: { fetchedAt: '2025-01-02T00:00:00Z' },
+      })
+      .mockResolvedValueOnce({
+        data: { tasks },
+        dataOverlay: { fetchedAt: '2025-01-04T00:00:00Z' },
+      });
+    vi.stubGlobal('$fetch', fetchMock);
+    const first = store.fetchTaskObjectivesData();
+    await vi.waitFor(() => expect(wait).toHaveBeenCalledOnce());
+    const finished = vi.fn();
+    const second = store.fetchTaskObjectivesData().then(finished);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(merge).not.toHaveBeenCalled();
+    expect(finished).not.toHaveBeenCalled();
+    retry.resolve(undefined);
+    await Promise.all([first, second]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(merge).toHaveBeenCalledExactlyOnceWith(tasks, expect.anything());
+    expect(store.tasks[0]?.objectives?.[0]?.id).toBe('bunker');
     expect(store.tasksObjectivesHydrated).toBe(true);
   });
   it('reports handled count failures without marking them stale', async () => {
@@ -152,7 +294,8 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 1, pve: 3 } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/tarkov/tasks-objectives', {
-      query: { gameMode: 'pve', lang: 'en', version: 'json-v4' },
+      query: { gameMode: 'pve', version: 'neutral-v2', view: 'counts' },
+      onResponse: expect.any(Function),
     });
     // A language switch reloads the catalog; the counts come from the session memo.
     store.languageCode = 'fr';
@@ -160,6 +303,46 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     await store.fetchObjectiveModeCountDifferences();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 1, pve: 3 } });
+  });
+  it('reloads memoized other-mode counts after the local purge generation changes', async () => {
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const store = useMetadataStore();
+    const catalog = { data: { tasks: [] }, dataOverlay: { fetchedAt: '2025-01-04T00:00:00Z' } };
+    const fetchMock = vi.fn().mockResolvedValue(catalog);
+    vi.stubGlobal('$fetch', fetchMock);
+    await store.loadModeObjectiveCounts('pve');
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, '2025-01-03T00:00:00Z');
+    await store.loadModeObjectiveCounts('pve');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('discards stale other-mode counts and retries in the same purge generation', async () => {
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    localStorage.setItem(STORAGE_KEYS.cachePurgeAt, '2025-01-03T00:00:00Z');
+    const store = useMetadataStore();
+    const catalog = { data: { tasks: [] } };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ...catalog, dataOverlay: { fetchedAt: '2025-01-02T00:00:00Z' } })
+      .mockResolvedValueOnce({ ...catalog, dataOverlay: { fetchedAt: '2025-01-04T00:00:00Z' } });
+    vi.stubGlobal('$fetch', fetchMock);
+    await expect(store.loadModeObjectiveCounts('pve')).rejects.toThrow(
+      'Objective catalog predates the latest cache purge'
+    );
+    await expect(store.loadModeObjectiveCounts('pve')).resolves.toEqual({});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('can fetch objectives when local storage is blocked', async () => {
+    const store = useMetadataStore();
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new DOMException('Blocked', 'SecurityError');
+      },
+    });
+    const fetch = vi.spyOn(store, 'fetchWithCache').mockResolvedValue();
+    await store.fetchTaskObjectivesData(true);
+    expect(fetch).toHaveBeenCalledWith(expect.objectContaining({ cacheKey: 'neutral-v2-regular' }));
   });
   it('reads persisted other-mode counts without a request', async () => {
     const getCached = vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue({ 'obj-1': 5 });
@@ -170,7 +353,7 @@ describe('useMetadataStore fetchTaskObjectivesData', () => {
     vi.stubGlobal('$fetch', fetchMock);
     await store.fetchObjectiveModeCountDifferences();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(getCached).toHaveBeenCalledWith('tasks-objectives', 'json-v4-counts-regular', 'en');
+    expect(getCached).toHaveBeenCalledWith('tasks-objectives', 'neutral-v2-counts-regular', 'en');
     expect(store.objectiveModeCountDifferences).toEqual({ 'obj-1': { pvp: 5, pve: 2 } });
   });
   it('retries other-mode counts after a failed load', async () => {

@@ -11,6 +11,8 @@
       <div class="relative px-4 py-4">
         <template v-if="isLoggedIn">
           <div class="space-y-4">
+            <ProfileHandleSettings v-model="handle" :has-public-mode="hasPublicMode" />
+            <ProfileSupporterBadgeSettings />
             <p class="text-surface-400 text-sm">
               {{
                 t(
@@ -41,7 +43,10 @@
                       {{ getVisibilityLabel(option.mode) }}
                     </span>
                   </div>
-                  <div class="flex min-w-0 items-center gap-1.5">
+                  <div
+                    v-if="visibility[option.mode] && !saving[option.mode]"
+                    class="flex min-w-0 items-center gap-1.5"
+                  >
                     <a
                       :href="option.url"
                       target="_blank"
@@ -104,6 +109,8 @@
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
   import LoginRequiredAlert from '@/components/ui/LoginRequiredAlert.vue';
+  import ProfileHandleSettings from '@/features/settings/ProfileHandleSettings.vue';
+  import ProfileSupporterBadgeSettings from '@/features/settings/ProfileSupporterBadgeSettings.vue';
   import {
     GAME_MODE_VALUES,
     GAME_MODE_UI,
@@ -112,6 +119,7 @@
     type GameMode,
   } from '@/utils/constants';
   import { logger } from '@/utils/logger';
+  import { profileHandlePath } from '@/utils/profileHandle';
   import {
     createProfileVisibility,
     fetchProfileVisibilityRows,
@@ -122,6 +130,9 @@
   const { t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
   const { copyToClipboard } = useCopyToClipboard();
+  const preferencesStore = usePreferencesStore();
+  const streamerMode = computed(() => preferencesStore.getStreamerMode);
+  const handle = ref<string | null>(null);
   const typedUser = computed<SupabaseUser | null>(() => $supabase.user ?? null);
   const isLoggedIn = computed(() => Boolean(typedUser.value?.loggedIn && typedUser.value?.id));
   const profileUserId = computed(() => {
@@ -132,6 +143,11 @@
     Object.fromEntries(GAME_MODE_VALUES.map((mode) => [mode, false])) as Record<GameMode, boolean>;
   const visibility = reactive(createProfileVisibility());
   const saving = reactive(createModeFlags());
+  const hasPublicMode = computed(() =>
+    GAME_MODE_VALUES.some((mode) => visibility[mode] && !saving[mode])
+  );
+  const absoluteUrl = (path: string): string =>
+    import.meta.client ? `${window.location.origin}${path}` : path;
   const visibilitySaveIds = Object.fromEntries(GAME_MODE_VALUES.map((mode) => [mode, 0])) as Record<
     GameMode,
     number
@@ -140,8 +156,9 @@
   let visibilityLoadId = 0;
   const buildShareUrl = (mode: GameMode): string => {
     if (!profileUserId.value) return `/profile?mode=${mode}`;
-    const path = `/profile/${profileUserId.value}/${mode}`;
-    return import.meta.client ? `${window.location.origin}${path}` : path;
+    if (handle.value && !streamerMode.value)
+      return absoluteUrl(profileHandlePath(handle.value, mode));
+    return absoluteUrl(`/profile/${profileUserId.value}/${mode}`);
   };
   const sharingOptions = computed(() => [
     {

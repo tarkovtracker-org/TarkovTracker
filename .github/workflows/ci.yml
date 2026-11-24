@@ -87,6 +87,12 @@ jobs:
             args+=(--full)
           fi
           node scripts/ci/validate-changes.mjs "${args[@]}"
+      - name: Observe Supabase DB selection
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          VALIDATION_PLAN: ${{ steps.plan.outputs.plan }}
+        run: node scripts/ci/supabase-shadow.mjs
   fallow:
     needs: changes
     if: needs.changes.outputs.full == 'true'
@@ -121,12 +127,6 @@ jobs:
         env:
           FALLOW_BASE: ${{ steps.fallow-base.outputs.base }}
         run: pnpm run lint:fallow --base "$FALLOW_BASE"
-      # Advisory: reports base-to-head size and Fallow health deltas in the job summary.
-      - name: Codebase metrics
-        continue-on-error: true
-        env:
-          FALLOW_BASE: ${{ steps.fallow-base.outputs.base }}
-        run: pnpm run metrics --base "$FALLOW_BASE" --summary "$GITHUB_STEP_SUMMARY"
   lint-format:
     needs: changes
     name: Lint & Format
@@ -137,6 +137,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
+        with:
+          prepare-nuxt: 'false'
       - name: Lint
         if: needs.changes.outputs.tooling == 'true'
         run: pnpm run lint
@@ -201,12 +203,17 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
+        with:
+          prepare-nuxt: 'false'
       - name: Type check
         run: pnpm run typecheck
   test:
     needs: changes
     if: needs.changes.outputs.full == 'true'
     name: Test (shard ${{ matrix.shard }}/${{ matrix.total }})
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
@@ -223,14 +230,6 @@ jobs:
           fetch-depth: 2
           persist-credentials: false
       - uses: ./.github/actions/setup-project
-      - name: Setup Deno
-        if: matrix.shard == 1
-        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-        with:
-          deno-version: v2.9.4
-      - name: Run Deno tests
-        if: matrix.shard == 1
-        run: pnpm run test:deno
       - name: Run shard ${{ matrix.shard }}/${{ matrix.total }}
         run: pnpm exec vitest run --coverage --shard="$VITEST_SHARD"
       - name: Upload blob report
@@ -243,19 +242,19 @@ jobs:
           retention-days: 1
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
+        continue-on-error: true
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
+          use_oidc: true
           files: ./coverage/lcov.info
           flags: unittests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
       - name: Upload test results to Codecov
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && !cancelled()
+        continue-on-error: true
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
+          use_oidc: true
           report_type: test_results
           files: ./test-report.junit.xml
           flags: unittests-shard-${{ matrix.shard }}
@@ -280,18 +279,14 @@ jobs:
           merge-multiple: true
       - name: Merge shards and enforce thresholds
         run: pnpm exec vitest run --merge-reports --coverage
-      - name: Upload merged coverage
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-final
-          path: coverage/coverage-final.json
-          if-no-files-found: error
-          retention-days: 30
   validate:
     needs: changes
     # Translation-only pull requests keep the reduced test selection but still build a preview.
     if: needs.changes.outputs.full == 'true' || needs.changes.outputs.preview == 'true'
     name: Validate
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -314,7 +309,6 @@ jobs:
           GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || secrets.SUPABASE_ANON_KEY }}
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: node scripts/preview/build-profile.mjs
       - name: Build
         run: pnpm run build
@@ -361,8 +355,10 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
+        with:
+          prepare-nuxt: 'false'
       - name: Validate Supabase migrations
-        run: pnpm run supabase:check
+        run: node scripts/checks/check-supabase-ci.mjs
   systems-drift:
     name: Systems drift check
     runs-on: ubuntu-24.04
@@ -392,6 +388,15 @@ jobs:
         run: pnpm run check:progress-contracts
       - name: Check versioned API and frontend parity in every mode
         run: pnpm run verify:api-parity
+      # Kept off the Vitest shards so shard 1 carries no extra work.
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.9.4
+      - name: Run Deno tests
+        run: pnpm run test:deno
+      - name: Verify private diagnostic collector in workerd
+        run: pnpm run test:progress-diagnostics
   # Dependency audit, Gitleaks, and CodeQL run for every CI event and gate `CI Result`. The reusable
   # workflow's scanner errors, cancellations, or missing jobs surface as a non-success result here.
   security:
@@ -402,6 +407,10 @@ jobs:
       contents: read
       security-events: write
   ci-result:
+    concurrency:
+      group: ci-result-${{ github.event_name == 'workflow_dispatch' && 'publication' || github.run_id }}
+      queue: max
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: read
@@ -423,7 +432,7 @@ jobs:
         security,
       ]
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - name: Checkout trusted CI aggregation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -449,4 +458,4 @@ jobs:
         with:
           script: |
             const { reportDispatchedCi } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/ci/report-dispatched-ci.mjs`);
-            await reportDispatchedCi({ github, context, outcome: process.env.VALIDATION_OUTCOME });
+            await reportDispatchedCi({ github, context, outcome: process.env.VALIDATION_OUTCOME, serialized: true });

@@ -32,12 +32,12 @@
     translate: (key: string) => string;
   }>();
   const emit = defineEmits<{ close: [] }>();
-  const buttonClass = computed(() =>
-    props.compact
-      ? 'inline-flex h-5 w-5 items-center justify-center rounded border border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
-      : 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5 text-gray-200 hover:bg-white/10'
-  );
-  const iconClass = computed(() => (props.compact ? 'h-3 w-3' : 'h-4 w-4'));
+  // Matches the popup's footer buttons; compact density keeps them square and slightly smaller.
+  const buttonClass = computed(() => [
+    'inline-flex items-center justify-center rounded-md border border-white/12 bg-white/5 text-surface-200 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+    props.compact ? 'h-7 w-7' : 'h-8 w-8',
+  ]);
+  const iconClass = 'h-4 w-4';
   const showOnlyLabel = computed(() => props.translate('page.tasks.map.raid_plan.show_only_quest'));
   const hideLabel = computed(() => props.translate('page.tasks.map.raid_plan.hide_quest'));
   // Hiding removes this marker, so close the popup first rather than leave it orphaned.

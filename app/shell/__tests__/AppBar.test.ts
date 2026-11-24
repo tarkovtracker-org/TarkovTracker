@@ -57,8 +57,16 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const windowWidthRef = ref(1280);
+const appBarWidthRef = ref(1700);
+const drawerRailRef = ref(false);
+beforeEach(() => {
+  appBarWidthRef.value = 1700;
+  drawerRailRef.value = false;
+  windowWidthRef.value = 1280;
+});
 vi.mock('@vueuse/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@vueuse/core')>()),
+  useElementSize: () => ({ width: appBarWidthRef }),
   useWindowSize: () => ({
     width: windowWidthRef,
   }),
@@ -108,7 +116,9 @@ vi.mock('@/stores/useActivityLogStore', () => ({
 vi.mock('@/stores/useApp', () => ({
   useAppStore: () => ({
     mobileDrawerExpanded: false,
-    drawerRail: false,
+    get drawerRail() {
+      return drawerRailRef.value;
+    },
     toggleMobileDrawerExpanded: vi.fn(),
     toggleDrawerRail: vi.fn(),
     setMobileDrawerExpanded: vi.fn(),
@@ -144,9 +154,10 @@ const mountAppBar = async () => {
         AppTooltip: {
           template: '<span><slot /></span>',
         },
-        DiscordIcon: true,
         GlobalHelpLauncher: {
-          template: '<div data-testid="global-help-launcher" />',
+          props: ['open', 'showTrigger', 'reference'],
+          template:
+            '<div data-testid="global-help-launcher" :data-open="String(open)" :data-direct="String(showTrigger)" :data-anchored="String(Boolean(reference))" />',
         },
         NuxtLink: {
           template: '<a><slot /></a>',
@@ -160,9 +171,20 @@ const mountAppBar = async () => {
             '<button :data-icon="icon" :disabled="disabled || undefined" @click="$emit(\'click\')"><slot /></button>',
         },
         UDropdownMenu: {
-          props: ['items'],
-          data: () => ({ expandedSubmenu: '' }),
-          template: `<div data-dropdown-menu><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><template v-for="item in group" :key="item.label"><button type="button" :disabled="item.disabled" :data-menu-item="item.label" :data-checked="item.type === 'checkbox' ? String(Boolean(item.checked)) : undefined" :data-locale-item="item.type === 'checkbox' ? '' : undefined" @click="item.children ? expandedSubmenu = item.label : item.onSelect?.()">{{ item.label }}</button><div v-if="item.children && expandedSubmenu === item.label" data-submenu><template v-for="(children, childGroupIndex) in item.children" :key="childGroupIndex"><button v-for="child in children" :key="child.label" type="button" :disabled="child.disabled" :data-menu-item="child.label" :data-checked="String(Boolean(child.checked))" @click="child.onSelect?.()">{{ child.label }}</button></template></div></template></template></div>`,
+          props: { items: Array, content: Object, modal: { type: Boolean, default: true } },
+          data: () => ({ expandedSubmenu: '', preventedCloseFocus: false }),
+          methods: {
+            selectItem(
+              item: { onSelect?: () => void },
+              content?: { onCloseAutoFocus?: (event: Event) => void }
+            ) {
+              item.onSelect?.();
+              const event = new Event('close-auto-focus', { cancelable: true });
+              content?.onCloseAutoFocus?.(event);
+              return event.defaultPrevented;
+            },
+          },
+          template: `<div data-dropdown-menu :data-modal="String(modal)" :data-prevented-close-focus="String(preventedCloseFocus)"><slot /><template v-for="(group, groupIndex) in (items || [])" :key="groupIndex"><template v-for="item in group" :key="item.label"><button type="button" :disabled="item.disabled" :data-menu-item="item.label" :data-to="item.to" :data-target="item.target" :data-rel="item.rel" :data-checked="item.type === 'checkbox' ? String(Boolean(item.checked)) : undefined" :data-locale-item="item.type === 'checkbox' ? '' : undefined" @click="item.children ? expandedSubmenu = item.label : preventedCloseFocus = selectItem(item, content)">{{ item.label }}</button><div v-if="item.children && expandedSubmenu === item.label" data-submenu><template v-for="(children, childGroupIndex) in item.children" :key="childGroupIndex"><button v-for="child in children" :key="child.label" type="button" :disabled="child.disabled" :data-menu-item="child.label" :data-checked="String(Boolean(child.checked))" @click="child.onSelect?.()">{{ child.label }}</button></template></div></template></template></div>`,
         },
         UIcon: {
           props: ['name'],
@@ -170,7 +192,9 @@ const mountAppBar = async () => {
         },
         UKbd: true,
         UPopover: {
-          template: '<div><slot /><slot name="content" /></div>',
+          props: ['open', 'reference'],
+          template:
+            '<div data-testid="activity-popover" :data-open="String(open)" :data-anchored="String(Boolean(reference))"><slot /><slot name="content" /></div>',
         },
       },
     },
@@ -293,10 +317,11 @@ describe('AppBar locale switching', () => {
     expect(wrapper.get('[data-menu-item="Deutsch"]').attributes('data-checked')).toBe('false');
     const trigger = wrapper.get('[data-testid="app-locale-menu"]');
     expect(trigger.attributes('aria-label')).toBe('settings.locale: English');
-    expect(trigger.classes()).toEqual(expect.arrayContaining(['h-8', 'w-8', 'hidden']));
+    expect(trigger.classes()).toContain('size-10');
     wrapper.unmount();
   });
   it('switches language through the mobile More submenu', async () => {
+    appBarWidthRef.value = 311;
     windowWidthRef.value = 375;
     const wrapper = await mountAppBar();
     const moreMenu = wrapper
@@ -334,7 +359,11 @@ describe('AppBar locale switching', () => {
     await flushPromises();
     const trigger = wrapper.get('[data-testid="app-locale-menu"]');
     expect(trigger.attributes('disabled')).toBeDefined();
+    appBarWidthRef.value = 311;
+    await flushPromises();
     expect(wrapper.get('[data-menu-item="settings.locale"]').attributes('disabled')).toBeDefined();
+    appBarWidthRef.value = 1700;
+    await flushPromises();
     for (const item of wrapper.findAll('[data-locale-item]')) {
       expect(item.attributes('disabled')).toBeDefined();
     }
@@ -343,7 +372,7 @@ describe('AppBar locale switching', () => {
     expect(setLocale.mock.calls.map(([value]) => value)).toEqual(['de']);
     pendingFetch.resolve(undefined);
     await flushPromises();
-    expect(trigger.attributes('disabled')).toBeUndefined();
+    expect(wrapper.get('[data-testid="app-locale-menu"]').attributes('disabled')).toBeUndefined();
     await chooseLocale(wrapper, 'Français');
     await flushPromises();
     expect(setLocale.mock.calls.map(([value]) => value)).toEqual(['de', 'fr']);
@@ -430,12 +459,6 @@ describe('AppBar supporter badge', () => {
   beforeEach(() => {
     supporterTierRef.value = null;
   });
-  it('renders the green Support Development CTA when there is no active tier', async () => {
-    const wrapper = await mountAppBar();
-    expect(wrapper.text()).toContain('common.support');
-    expect(wrapper.text()).not.toContain('page.supporter.tier_chad_name');
-    wrapper.unmount();
-  });
   it('renders the chad tier badge for active chad subscribers', async () => {
     supporterTierRef.value = 'chad';
     const wrapper = await mountAppBar();
@@ -462,37 +485,109 @@ describe('AppBar responsive layout', () => {
     mockSupabase.user.loggedIn = false;
     supporterTierRef.value = null;
   });
-  it('renders the More menu with Language, Support, Discord, and GitHub items', async () => {
+  it('moves utilities into More as the app bar narrows', async () => {
     const wrapper = await mountAppBar();
-    const moreMenuItems = wrapper.findAll('[data-menu-item]');
-    const labels = moreMenuItems.map((el) => el.attributes('data-menu-item'));
-    expect(labels).toContain('settings.locale');
-    expect(labels).toContain('common.support');
-    expect(labels).toContain('footer.call_to_action.discord');
-    expect(labels).toContain('footer.call_to_action.github');
+    const localeTrigger = () => wrapper.find('[data-testid="app-locale-menu"]');
+    const showThemeItem = () => wrapper.find('[data-menu-item="app_bar.switch_to_light_theme"]');
+    const activityTrigger = () => wrapper.find('button[aria-label="common.activity_log"]');
+    expect(localeTrigger().exists()).toBe(true);
+    expect(showThemeItem().exists()).toBe(false);
+    expect(activityTrigger().exists()).toBe(true);
+    appBarWidthRef.value = 1200;
+    await flushPromises();
+    expect(localeTrigger().exists()).toBe(false);
+    expect(wrapper.find('[data-menu-item="settings.locale"]').exists()).toBe(true);
+    expect(showThemeItem().exists()).toBe(true);
+    expect(activityTrigger().exists()).toBe(true);
+    appBarWidthRef.value = 311;
+    await flushPromises();
+    expect(activityTrigger().exists()).toBe(false);
+    expect(wrapper.find('[data-menu-item="common.activity_log"]').exists()).toBe(true);
+    expect(wrapper.find('[data-menu-item="app_bar.help_community_aria"]').exists()).toBe(true);
     wrapper.unmount();
   });
-  it('renders Discord and GitHub as top-level external links with safe rel attributes', async () => {
+  it('keeps Support and safe community links in More on a wide app bar', async () => {
     const wrapper = await mountAppBar();
-    const discord = wrapper.find('a[aria-label="footer.call_to_action.discord"]');
-    expect(discord.exists()).toBe(true);
-    expect(discord.attributes('href')).toBe('https://discord.gg/M8nBgA2sT6');
-    expect(discord.attributes('target')).toBe('_blank');
-    expect(discord.attributes('rel')).toContain('noopener');
-    const github = wrapper.find('a[aria-label="footer.call_to_action.github"]');
-    expect(github.exists()).toBe(true);
-    expect(github.attributes('href')).toBe('https://github.com/tarkovtracker-org/TarkovTracker');
-    expect(github.attributes('target')).toBe('_blank');
-    expect(github.attributes('rel')).toContain('noopener');
+    expect(wrapper.get('[data-menu-item="common.support"]').attributes('data-to')).toBe(
+      '/supporter'
+    );
+    const discord = wrapper.get('[data-menu-item="footer.call_to_action.discord"]');
+    expect(discord.attributes('data-to')).toBe('https://discord.gg/M8nBgA2sT6');
+    expect(discord.attributes('data-target')).toBe('_blank');
+    expect(discord.attributes('data-rel')).toContain('noopener');
+    const github = wrapper.get('[data-menu-item="footer.call_to_action.github"]');
+    expect(github.attributes('data-to')).toBe('https://github.com/tarkovtracker-org/TarkovTracker');
+    expect(github.attributes('data-target')).toBe('_blank');
+    expect(github.attributes('data-rel')).toContain('noopener');
     wrapper.unmount();
   });
-  it('hides top-level Discord and GitHub links below sm (the More menu covers them)', async () => {
+  it('opens activity anchored to More when the activity trigger is hidden', async () => {
+    appBarWidthRef.value = 311;
     const wrapper = await mountAppBar();
-    for (const label of ['footer.call_to_action.discord', 'footer.call_to_action.github']) {
-      const classAttr = wrapper.find(`a[aria-label="${label}"]`).attributes('class') || '';
-      expect(classAttr.split(/\s+/)).toContain('hidden');
-      expect(classAttr).toContain('sm:inline-flex');
-    }
+    const panel = wrapper.get('[data-testid="activity-popover"]');
+    expect(panel.attributes('data-open')).toBe('false');
+    const item = wrapper.get('[data-menu-item="common.activity_log"]');
+    await item.trigger('click');
+    expect(
+      item.element.closest('[data-dropdown-menu]')?.getAttribute('data-prevented-close-focus')
+    ).toBe('true');
+    await flushPromises();
+    expect(panel.attributes('data-open')).toBe('true');
+    expect(panel.attributes('data-anchored')).toBe('true');
+    wrapper.unmount();
+  });
+  it('opens the existing help launcher from More when the help trigger is hidden', async () => {
+    appBarWidthRef.value = 1200;
+    const wrapper = await mountAppBar();
+    const launcher = wrapper.get('[data-testid="global-help-launcher"]');
+    expect(launcher.attributes('data-open')).toBe('false');
+    const item = wrapper.get('[data-menu-item="app_bar.help_community_aria"]');
+    await item.trigger('click');
+    expect(
+      item.element.closest('[data-dropdown-menu]')?.getAttribute('data-prevented-close-focus')
+    ).toBe('true');
+    await flushPromises();
+    expect(launcher.attributes('data-open')).toBe('true');
+    expect(launcher.attributes('data-anchored')).toBe('true');
+    wrapper.unmount();
+  });
+  it('switches Help between the direct icon and More at the toolbar breakpoint', async () => {
+    appBarWidthRef.value = 1280;
+    const wrapper = await mountAppBar();
+    const launcher = wrapper.get('[data-testid="global-help-launcher"]');
+    expect(launcher.attributes('data-direct')).toBe('true');
+    expect(wrapper.find('[data-menu-item="app_bar.help_community_aria"]').exists()).toBe(false);
+    appBarWidthRef.value = 1279;
+    await flushPromises();
+    expect(launcher.attributes('data-direct')).toBe('false');
+    expect(wrapper.find('[data-menu-item="app_bar.help_community_aria"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+  it('uses the current sidebar width as the cap for the right gutter', async () => {
+    const wrapper = await mountAppBar();
+    const header = wrapper.get('header').element;
+    expect(header.style.getPropertyValue('--app-bar-gutter')).toBe('224px');
+    drawerRailRef.value = true;
+    await flushPromises();
+    expect(header.style.getPropertyValue('--app-bar-gutter')).toBe('64px');
+    wrapper.unmount();
+  });
+  it('keeps the supporter link inside More when the badge no longer fits', async () => {
+    appBarWidthRef.value = 1200;
+    supporterTierRef.value = 'chad';
+    const wrapper = await mountAppBar();
+    expect(wrapper.find('a[aria-label="app_bar.supporter_badge_aria"]').exists()).toBe(false);
+    expect(wrapper.get('[data-menu-item="Chad"]').attributes('data-to')).toBe('/supporter');
+    wrapper.unmount();
+  });
+  it('groups the cloud save indicator with the utilities after search', async () => {
+    const wrapper = await mountAppBar();
+    const search = wrapper.get('[data-testid="app-search"]').element;
+    const status = wrapper.get('progress-save-status-indicator-stub').element;
+    const more = wrapper.get('button[aria-label="common.more"]').element;
+    expect(search.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(status.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(status.parentElement?.contains(more)).toBe(true);
     wrapper.unmount();
   });
   it('renders the inline app search with the configured shortcut', async () => {
@@ -502,40 +597,21 @@ describe('AppBar responsive layout', () => {
     expect(search.attributes('data-aria')).toBe('Control+K');
     wrapper.unmount();
   });
-  it('renders Log In as icon-only below sm while keeping its accessible label', async () => {
+  it('renders Log In as icon-only on a narrow app bar while keeping its accessible label', async () => {
     const wrapper = await mountAppBar();
     const login = wrapper.find('a[aria-label="app_bar.login_aria"]');
     const classes = (login.attributes('class') || '').split(/\s+/);
-    expect(classes).toEqual(expect.arrayContaining(['w-8', 'sm:w-auto']));
+    expect(classes).toEqual(expect.arrayContaining(['w-10', '@min-[561px]:w-auto']));
     const label = login.findAll('span').find((s) => s.text() === 'navigation_drawer.login');
-    expect(label?.classes()).toEqual(expect.arrayContaining(['hidden', 'sm:inline']));
+    expect(label?.classes()).toEqual(expect.arrayContaining(['hidden', '@min-[561px]:inline']));
     wrapper.unmount();
   });
-  it('wraps the Support CTA in a hidden sm:inline-flex container for CSS responsive visibility', async () => {
-    const wrapper = await mountAppBar();
-    const supportWrappers = wrapper.findAll('span.hidden').filter((span) => {
-      const classAttr = span.attributes('class') || '';
-      return classAttr.includes('sm:inline-flex');
-    });
-    expect(supportWrappers.length).toBeGreaterThanOrEqual(1);
-    wrapper.unmount();
-  });
-  it('wraps the More menu in a sm:hidden container for CSS responsive visibility', async () => {
-    const wrapper = await mountAppBar();
-    const moreWrappers = wrapper.findAll('span').filter((span) => {
-      const classAttr = span.attributes('class') || '';
-      return classAttr.includes('sm:hidden');
-    });
-    expect(moreWrappers.length).toBe(1);
-    wrapper.unmount();
-  });
-  it('gives the bell a 32x32 hit target with aria-label and tooltip', async () => {
+  it('gives the bell a 40x40 hit target with aria-label and tooltip', async () => {
     const wrapper = await mountAppBar();
     const bell = wrapper.find('button[aria-label="common.activity_log"]');
     expect(bell.exists()).toBe(true);
     const classAttr = bell.attributes('class') || '';
-    expect(classAttr).toContain('h-8');
-    expect(classAttr).toContain('w-8');
+    expect(classAttr).toContain('size-10');
     wrapper.unmount();
   });
   it('renders the Log In button with an accessible primary treatment', async () => {
@@ -546,7 +622,7 @@ describe('AppBar responsive layout', () => {
     expect(classAttr).toContain('bg-primary-500');
     expect(classAttr).toContain('hover:bg-primary-400');
     expect(classAttr).toContain('text-surface-950');
-    expect(classAttr).toContain('h-8');
+    expect(classAttr).toContain('h-10');
     wrapper.unmount();
   });
 });
@@ -560,14 +636,17 @@ describe('AppBar authenticated state', () => {
     mockTarkovStore.getDisplayName.mockReturnValue('');
     mockPreferencesStore.getStreamerMode = false;
   });
-  it('renders the account menu trigger with avatar and chevron', async () => {
+  it('renders the account trigger in a non-modal dropdown to preserve page scrolling', async () => {
     const wrapper = await mountAppBar();
     const trigger = wrapper.find('button[aria-label="navigation_drawer.account_menu"]');
     expect(trigger.exists()).toBe(true);
     const classAttr = trigger.attributes('class') || '';
-    expect(classAttr).toContain('h-8');
+    expect(classAttr).toContain('h-10');
     expect(trigger.find('img').exists()).toBe(true);
-    expect(trigger.find('.i-mdi-chevron-down').exists()).toBe(true);
+    expect(trigger.find('.i-lucide-chevron-down').exists()).toBe(true);
+    expect(trigger.element.closest('[data-dropdown-menu]')?.getAttribute('data-modal')).toBe(
+      'false'
+    );
     wrapper.unmount();
   });
   it('truncates long display names and exposes the full name as a tooltip', async () => {
@@ -579,7 +658,7 @@ describe('AppBar authenticated state', () => {
     expect(nameSpan.exists()).toBe(true);
     const classAttr = nameSpan.attributes('class') || '';
     expect(classAttr).toContain('hidden');
-    expect(classAttr).toContain('sm:inline');
+    expect(classAttr).toContain('@min-[1041px]:inline');
     expect(classAttr).toContain('truncate');
     expect(nameSpan.attributes('title')).toBe(displayName);
     wrapper.unmount();
@@ -627,7 +706,7 @@ describe('AppBar theme toggle', () => {
   });
   it('renders sun icon and switch-to-light label in dark mode and calls toggleThemeMode on click', async () => {
     const wrapper = await mountAppBar();
-    const themeBtn = wrapper.find('button[data-icon="i-heroicons-sun"]');
+    const themeBtn = wrapper.find('button[data-icon="i-lucide-sun"]');
     expect(themeBtn.exists()).toBe(true);
     expect(themeBtn.attributes('aria-label')).toBe('app_bar.switch_to_light_theme');
     await themeBtn.trigger('click');
@@ -638,21 +717,15 @@ describe('AppBar theme toggle', () => {
     mockThemeModeRef.value = 'light';
     mockIsLightThemeRef.value = true;
     const wrapper = await mountAppBar();
-    const themeBtn = wrapper.find('button[data-icon="i-heroicons-moon"]');
+    const themeBtn = wrapper.find('button[data-icon="i-lucide-moon"]');
     expect(themeBtn.exists()).toBe(true);
     expect(themeBtn.attributes('aria-label')).toBe('app_bar.switch_to_dark_theme');
     await themeBtn.trigger('click');
     expect(mockToggleThemeMode).toHaveBeenCalledOnce();
     wrapper.unmount();
   });
-  it('wraps the header theme button in hidden sm:inline-flex for responsive visibility', async () => {
-    const wrapper = await mountAppBar();
-    const themeBtn = wrapper.find('button[data-icon="i-heroicons-sun"]');
-    expect(themeBtn.classes()).toContain('hidden');
-    expect(themeBtn.classes()).toContain('sm:inline-flex');
-    wrapper.unmount();
-  });
   it('includes the theme toggle in the mobile More dropdown items', async () => {
+    appBarWidthRef.value = 311;
     const wrapper = await mountAppBar();
     const moreMenuItems = wrapper.findAll('[data-menu-item]');
     const labels = moreMenuItems.map((el) => el.attributes('data-menu-item'));

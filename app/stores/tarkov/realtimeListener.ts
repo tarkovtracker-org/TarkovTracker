@@ -49,7 +49,11 @@ import {
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
 import { startRealtimeRecovery } from '@/utils/realtimeRecovery';
-import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
+import {
+  isRealtimeBackgroundSuspended,
+  isRealtimeSuspended,
+  subscribeRealtimeChannel,
+} from '@/utils/realtimeVisibility';
 import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
 import type { UserProgressData, UserState } from '@/stores/progressState';
 const SYNC_RESUME_DELAY_MS = 1000;
@@ -83,6 +87,7 @@ const archiveProgressDisplacedByRemoteReset = (
 export type SyncControllerHandle = {
   hasPendingChanges?: () => boolean;
   acknowledgeExternalSave?: (saved: UserState) => void;
+  requireReconciliation?: () => void;
   captureRemoteMerge?: () => RemoteStateMerge;
   withSnapshot?: WithRemoteSnapshot;
   pause: () => void;
@@ -97,6 +102,7 @@ type TarkovStoreLike = {
 type RealtimeModeProgress = {
   mode: GameMode;
   progress: UserProgressData;
+  hasPrestigeLevel: boolean;
   updateTime: number;
   progressTime: number;
   /** Raw candidates live only for this merge; applied and acknowledged state stay bounded. */
@@ -154,13 +160,17 @@ const parseProgressTime = (value: unknown): number => {
   const parsed = typeof value === 'string' ? Date.parse(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : 0;
 };
+const resolveRemotePrestigeLevel = (remote: RealtimeModeProgress, fallback: number): number =>
+  remote.hasPrestigeLevel ? remote.progress.prestigeLevel : fallback;
 const parseRealtimeModeProgress = (value: unknown): RealtimeModeProgress | null => {
   if (!value || typeof value !== 'object') return null;
   const row = value as Record<string, unknown>;
   if (!isMaterializedActiveModeRow(row)) return null;
+  const prestigeLevel = (row.progress_data as Partial<UserProgressData>).prestigeLevel;
   return {
     mode: row.game_mode,
     progress: sanitizeOwnedProgressData(row.progress_data),
+    hasPrestigeLevel: Number.isFinite(prestigeLevel),
     taskAvailability: (row.progress_data as UserProgressData).taskAvailability,
     updateTime: parseRealtimeUpdateTime(row.updated_at),
     progressTime: parseProgressTime(row.progress_updated_at),
@@ -405,9 +415,7 @@ async function runSetupRealtimeListener(
     latestLegacyMetadataUpdateTime = updateTime;
     return true;
   };
-  const isCurrentRealtimeUser = () =>
-    stillOwnsSetup(currentUserId, generation) &&
-    !($supabase.client.realtime && isRealtimeSuspended($supabase.client.realtime));
+  const isCurrentRealtimeUser = () => stillOwnsSetup(currentUserId, generation);
   logger.debug('[TarkovStore] Setting up realtime listener for multi-device sync');
   const handleProgressChange = (
     payload: { new: unknown; old: unknown },
@@ -476,8 +484,9 @@ async function runSetupRealtimeListener(
     }
     const merged = mergeProgressData(localState[mode], remoteProgress, true);
     if (toProgressEpoch(localState[mode]) === toProgressEpoch(remoteProgress)) {
-      // Level is an editable scalar; the three-way merge below preserves only pending local edits.
+      // Editable scalars accept remote corrections; the three-way merge preserves pending edits.
       merged.level = remoteProgress.level;
+      merged.prestigeLevel = resolveRemotePrestigeLevel(remote, merged.prestigeLevel);
       merged.taskAvailability = mergeTaskAvailability(
         localState[mode].taskAvailability,
         remote.taskAvailability
@@ -526,7 +535,8 @@ async function runSetupRealtimeListener(
   const topic = progressTopic(currentUserId);
   const createProgressChannel = () => {
     const channel = client.channel(topic);
-    const acceptsPayload = () => channel === owned.channel && !replacing;
+    const acceptsPayload = () =>
+      channel === owned.channel && !replacing && !isRealtimeSuspended(client.realtime);
     return channel
       .on(
         'postgres_changes' as const,
@@ -568,8 +578,9 @@ async function runSetupRealtimeListener(
   let refreshGeneration = 0;
   // The refresh is stale once a newer reconnect starts, the user changes, or the
   // socket is suspended.
+  const isBackgroundSuspended = () => isRealtimeBackgroundSuspended(client.realtime);
   const snapshotIsStale = (request: number): boolean =>
-    !isCurrentRealtimeUser() || request !== refreshGeneration;
+    !isCurrentRealtimeUser() || request !== refreshGeneration || isBackgroundSuspended();
   const readProgressSnapshotRows = (signal: AbortSignal) =>
     Promise.all([
       client
@@ -691,7 +702,7 @@ async function runSetupRealtimeListener(
       subscribeOwnedChannel();
     },
     isCurrent: () => setupStillOwnsChannel(owned, currentUserId, generation),
-    isSuspended: () => Boolean(client.realtime && isRealtimeSuspended(client.realtime)),
+    isSuspended: isBackgroundSuspended,
     onDegraded: (degraded) => {
       liveUpdatesDegraded.value = degraded;
     },
@@ -703,7 +714,7 @@ async function runSetupRealtimeListener(
   const subscribeOwnedChannel = () => {
     const subscribing = owned;
     try {
-      subscribing.channel.subscribe((status, error) => {
+      subscribeRealtimeChannel(client.realtime, subscribing.channel, (status, error) => {
         if (replacing || !setupStillOwnsChannel(subscribing, currentUserId, generation)) return;
         recovery.onStatus(status, error);
       });

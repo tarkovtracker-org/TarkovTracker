@@ -22,7 +22,11 @@ export const isNavigationRouteActive = (
   }
   return routePath === targetPath;
 };
+/**
+ * Image icons keep their own artwork colors, so opacity carries the inactive and hover states for
+ * them; icon-font glyphs also follow the text color.
+ */
 export const getDrawerIconClass = (isActive: boolean): string =>
   isActive
-    ? 'text-white light:text-surface-50'
-    : 'text-surface-300 group-hover:text-white light:group-hover:text-surface-50';
+    ? 'text-white transition-opacity light:text-surface-50'
+    : 'text-surface-300 opacity-75 transition-opacity group-hover:text-white group-hover:opacity-100 light:group-hover:text-surface-50';

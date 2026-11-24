@@ -2,8 +2,8 @@
 
 Deploys a pull request to a Cloudflare Pages preview when a maintainer comments `/preview`. The
 PR's own build is untrusted; everything it produces is re-verified by trusted code from `main`
-before deploying. Workflows: `preview.yml`, `preview-request.yml`, `preview-state.yml`,
-`finalization-shadow.yml`. See the previews section of
+before deploying. Workflows: `preview.yml`, `preview-request.yml`, `preview-state.yml`. See the
+previews section of
 [`docs/workflow-automation.md`](../../docs/workflow-automation.md).
 
 | File                        | What it does                                                            |
@@ -19,8 +19,6 @@ before deploying. Workflows: `preview.yml`, `preview-request.yml`, `preview-stat
 | `profile.mjs`               | Fixed Cloudflare Pages project identity for previews.                   |
 | `deployment.mjs`            | Parses Wrangler output and compares the deploy with the plan.           |
 | `verify-deployment.mjs`     | Confirms the live Cloudflare deploy matches the plan before publishing. |
-| `finalization-shadow.mjs`   | Read-only planner for an opt-in final build rehearsal.                  |
-| `shadow-container.sh`       | Runs that rehearsal build in a container with no host credentials.      |
 | `smoke/`                    | Playwright smoke tests against the deployed preview URL.                |
 
-Tests live in [`../workflow-tests/`](../workflow-tests/) (`preview*.mjs`, `finalization-shadow.mjs`).
+Tests live in [`../workflow-tests/`](../workflow-tests/) (`preview*.mjs`).

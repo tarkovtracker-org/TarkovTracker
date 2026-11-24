@@ -2,15 +2,31 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { reactive } from 'vue';
 import DashboardTraderCard from '@/features/dashboard/DashboardTraderCard.vue';
+import DashboardTraderEditor from '@/features/dashboard/DashboardTraderEditor.vue';
 import type { Trader, TraderLoyaltyLevel } from '@/types/tarkov';
-const mockState = {
+const mockState = reactive({
   traderLevel: 1,
-  gameMode: 'pvp',
-};
+  reputation: 0,
+  locale: 'en',
+});
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+const setTraderLevel = vi.fn((_id: string, value: number) => {
+  mockState.traderLevel = value;
+});
+const setTraderReputation = vi.fn((_id: string, value: number) => {
+  mockState.reputation = value;
+});
 mockNuxtImport('useRouter', () => () => ({
   push: pushMock,
+}));
+mockNuxtImport('useI18n', () => () => ({
+  t: (key: string, params?: Record<string, string | number>) =>
+    [
+      mockState.locale === 'en' ? key : `${mockState.locale} ${key}`,
+      ...Object.values(params ?? {}),
+    ].join(' '),
 }));
 vi.mock('@/stores/usePreferences', () => ({
   usePreferencesStore: () => ({
@@ -20,14 +36,10 @@ vi.mock('@/stores/usePreferences', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
-    getCurrentGameMode: () => mockState.gameMode,
     getTraderLevel: () => mockState.traderLevel,
-    getTraderReputation: () => 0.5,
-    isTaskComplete: () => false,
-    setTraderLevel: vi.fn(),
-    // Mirror the interface the component uses: commitReputationInput calls this on
-    // reputation-input blur, so any future test exercising that path has a spy.
-    setTraderReputation: vi.fn(),
+    getTraderReputation: () => mockState.reputation,
+    setTraderLevel,
+    setTraderReputation,
   }),
 }));
 const mockTheme = {
@@ -44,6 +56,8 @@ vi.mock('@/composables/useTheme', () => ({
 describe('DashboardTraderCard', () => {
   beforeEach(() => {
     mockState.traderLevel = 1;
+    mockState.reputation = 0;
+    mockState.locale = 'en';
     mockTheme.themeMode = 'dark';
     document.documentElement.removeAttribute('data-theme');
     vi.clearAllMocks();
@@ -98,6 +112,7 @@ describe('DashboardTraderCard', () => {
           $t: (key: string) => key,
         },
         stubs: {
+          UButton: true,
           NuxtLink: {
             props: ['to'],
             template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
@@ -114,25 +129,19 @@ describe('DashboardTraderCard', () => {
             props: ['name'],
             template: '<i :data-icon="name" />',
           },
-          ReputationInput: {
-            template: '<div data-testid="reputation-input" />',
-          },
         },
       },
     });
-  it('wires the light theme tokens onto the active and inactive loyalty buttons', () => {
+  it('shows loyalty, reputation and task progress before the editor is opened', async () => {
     const wrapper = createWrapper();
-    const buttons = wrapper.findAll(
-      'button[aria-label*="page.dashboard.traders.set_loyalty_level"]'
-    );
-    expect(buttons).toHaveLength(4);
-    const btn1 = buttons[0]!;
-    const btn2 = buttons[1]!;
-    // Level 1 should be active
-    expect(btn1.classes()).toContain('light:text-surface-50');
-    expect(btn1.classes()).toContain('bg-surface-600');
-    // Level 2 should be inactive
-    expect(btn2.classes()).toContain('text-surface-300');
+    const summary = wrapper.get('button');
+    expect(summary.attributes('aria-expanded')).toBe('false');
+    expect(summary.text()).toContain('loyalty_short 1');
+    expect(summary.text()).toContain('reputation_short 0.00');
+    expect(summary.text()).toContain('5/20');
+    await summary.trigger('click');
+    expect(wrapper.emitted('toggle')).toHaveLength(1);
+    expect(pushMock).not.toHaveBeenCalled();
   });
   it('renders a storyline requirement for a story-locked trader', () => {
     const wrapper = createWrapper({
@@ -142,7 +151,6 @@ describe('DashboardTraderCard', () => {
         objective: { id: 'talk-to-prapor', name: 'Talk to Prapor' },
       },
     });
-    expect(wrapper.find('div').classes()).toContain('bg-surface-950/80');
     const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
     expect(requirement.text()).toContain('Talk to Prapor');
     expect(JSON.parse(requirement.attributes('data-to')!)).toEqual({
@@ -150,8 +158,8 @@ describe('DashboardTraderCard', () => {
       query: { chapter: 'tour', objective: 'talk-to-prapor' },
     });
   });
-  it('opens the traders view on this trader', async () => {
-    const wrapper = createWrapper();
+  it('opens the tasks view directly for a trader without standing controls', async () => {
+    const wrapper = createWrapper({ trader: { ...baseTrader, normalizedName: 'lightkeeper' } });
     await wrapper.get('[aria-label="page.dashboard.traders.view_tasks"]').trigger('click');
     expect(pushMock).toHaveBeenCalledWith({ path: '/tasks/traders', query: { trader: 'prapor' } });
   });
@@ -160,25 +168,39 @@ describe('DashboardTraderCard', () => {
       unlock: { kind: 'task', task: { id: 'task-1', name: 'Getting Acquainted' } },
     });
     const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
+    expect(requirement.text()).toContain('Prapor');
+    expect(requirement.text()).toContain('common.locked');
     expect(requirement.text()).toContain('Getting Acquainted');
+    expect(requirement.get('img').attributes('src')).toBe(baseTrader.imageLink);
     expect(JSON.parse(requirement.attributes('data-to')!)).toEqual({
       path: '/tasks',
       query: { task: 'task-1' },
     });
   });
-  it('shows an unlinked lock notice while the unlock task is loading', () => {
-    const wrapper = createWrapper({ unlock: { kind: 'task', task: null } });
+  it('shows an unlinked warning when the unlock requirement is unconfirmed', () => {
+    const wrapper = createWrapper({ unlock: { kind: 'unknown' } });
     const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
     expect(requirement.element.tagName).toBe('DIV');
-    expect(requirement.text()).toBe('page.dashboard.traders.unlock_via_task');
+    expect(requirement.text()).toContain('common.locked');
+    expect(requirement.get('[data-testid="trader-unlock-message"]').text()).toBe(
+      'page.dashboard.traders.unlock_unconfirmed'
+    );
+  });
+  it('shows a neutral status when unlock data is unavailable', () => {
+    const wrapper = createWrapper({ unlock: { kind: 'pending' } });
+    const requirement = wrapper.get('[data-testid="trader-unlock-requirement"]');
+    expect(requirement.element.tagName).toBe('DIV');
+    expect(requirement.text()).toContain('common.locked');
+    expect(requirement.get('[data-testid="trader-unlock-message"]').text()).toBe(
+      'page.dashboard.traders.unlock_unavailable'
+    );
   });
   it('hides progress and loyalty controls while locked', () => {
     const wrapper = createWrapper({
       unlock: { kind: 'task', task: { id: 'task-1', name: 'Getting Acquainted' } },
     });
     expect(wrapper.find('[role="progressbar"]').exists()).toBe(false);
-    expect(wrapper.find('button[aria-label*="set_loyalty_level"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="reputation-input"]').exists()).toBe(false);
+    expect(wrapper.find('button').exists()).toBe(false);
     expect(wrapper.find('.tabular-nums').exists()).toBe(false);
   });
   it('shows no requirement for an open trader', () => {
@@ -189,32 +211,102 @@ describe('DashboardTraderCard', () => {
   it('renders completed trader state', () => {
     mockState.traderLevel = 4;
     const wrapper = createWrapper({ percentage: 100 });
-    const container = wrapper.find('div');
+    const container = wrapper.get('button');
     expect(container.classes()).toContain('border-success-500/15');
   });
-  it('keeps the in-progress percentage hue gradient readable in both themes', () => {
-    // Dark keeps the authored bright gradient: inline color wins over classes.
-    const darkWrapper = createWrapper({ percentage: 50 });
-    const darkPct = darkWrapper.find('.tabular-nums');
-    expect(darkPct.attributes('style')).toContain('hsl(60, 70%, 55%)');
-    // Light mode keeps the same hue identity but drops to 22% lightness, which
-    // clears AA across the whole 0-120 degree range including the yellow mid-range
-    // that cannot pass on paper surfaces at the dark lightness.
-    mockTheme.themeMode = 'light';
-    const lightWrapper = createWrapper({ percentage: 50 });
-    const lightPct = lightWrapper.find('.tabular-nums');
-    expect(lightPct.attributes('style')).toContain('hsl(60, 70%, 22%)');
-    darkWrapper.unmount();
-    lightWrapper.unmount();
+  const createEditor = (trader: Trader = baseTrader) =>
+    mount(DashboardTraderEditor, {
+      props: { trader },
+      global: {
+        mocks: { $t: (key: string) => key },
+        stubs: { UButton: true },
+      },
+    });
+  it('commits loyalty immediately and raises reputation before applying the new level', async () => {
+    const editor = createEditor();
+    const summary = createWrapper();
+    await editor.get('select').setValue('2');
+    expect(setTraderReputation).toHaveBeenCalledWith('prapor', 0.2);
+    expect(setTraderLevel).toHaveBeenCalledWith('prapor', 2);
+    expect(setTraderReputation.mock.invocationCallOrder[0]).toBeLessThan(
+      setTraderLevel.mock.invocationCallOrder[0]!
+    );
+    expect(summary.get('button').text()).toContain('reputation_short 0.20');
+    expect(editor.get('[role="status"]').text()).toContain('rep_raised 0.20');
   });
-  it('keeps the gradient endpoints deep enough for AA in light mode', () => {
-    mockTheme.themeMode = 'light';
-    // Hue 0 (red, ~0%) and hue 120 (green, ~100%) still encode progress.
-    const low = createWrapper({ percentage: 1 });
-    const high = createWrapper({ percentage: 99 });
-    expect(low.find('.tabular-nums').attributes('style')).toContain('hsl(1.2, 70%, 22%)');
-    expect(high.find('.tabular-nums').attributes('style')).toContain('hsl(118.8, 70%, 22%)');
-    low.unmount();
-    high.unmount();
+  it('preserves sufficient reputation when changing loyalty and rejects lower edits on blur', async () => {
+    mockState.reputation = 0.6;
+    const editor = createEditor();
+    await editor.get('select').setValue('3');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+    const rep = editor.get('input');
+    await rep.setValue('0.34');
+    await rep.trigger('blur');
+    expect(rep.attributes('aria-invalid')).toBe('true');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+    await rep.setValue('0,42');
+    await rep.trigger('blur');
+    expect(setTraderReputation).toHaveBeenCalledWith('prapor', 0.42);
+    expect(rep.attributes('aria-invalid')).toBe('false');
+  });
+  it('supports signed Scav Karma without a loyalty selector', async () => {
+    const editor = createEditor({ ...baseTrader, id: 'fence', normalizedName: 'fence' });
+    expect(editor.find('select').exists()).toBe(false);
+    const karma = editor.get('input');
+    await karma.setValue('-0.25');
+    await karma.trigger('blur');
+    expect(setTraderReputation).toHaveBeenCalledWith('fence', -0.25);
+  });
+  it('updates an untouched focused field when reputation syncs and skips the blur write', async () => {
+    const editor = createEditor();
+    const rep = editor.get('input');
+    await rep.trigger('focus');
+    mockState.reputation = 0.5;
+    await editor.vm.$nextTick();
+    expect(rep.element.value).toBe('0.50');
+    await rep.trigger('blur');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+  });
+  it('preserves a changed draft through sync and commits it when focus leaves', async () => {
+    const editor = createEditor();
+    const rep = editor.get('input');
+    await rep.trigger('focus');
+    await rep.setValue('0.70');
+    mockState.reputation = 0.5;
+    await editor.vm.$nextTick();
+    expect(rep.element.value).toBe('0.70');
+    await rep.trigger('blur');
+    expect(setTraderReputation).toHaveBeenCalledExactlyOnceWith('prapor', 0.7);
+  });
+  it('avoids a write for equivalent input, even when reputation synced during editing', async () => {
+    mockState.reputation = 0.2;
+    const editor = createEditor();
+    const rep = editor.get('input');
+    await rep.setValue('0,2');
+    mockState.reputation = 0.5;
+    await editor.vm.$nextTick();
+    await rep.trigger('blur');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+    expect(rep.element.value).toBe('0.50');
+    await rep.setValue('0.5');
+    await rep.trigger('blur');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+    expect(rep.element.value).toBe('0.50');
+  });
+  it('retranslates the current update feedback when the locale changes', async () => {
+    const editor = createEditor();
+    const status = editor.get('[role="status"]');
+    await editor.get('select').setValue('2');
+    expect(status.text()).toBe('page.dashboard.traders.rep_raised 0.20');
+    mockState.locale = 'de';
+    await editor.vm.$nextTick();
+    expect(status.text()).toBe('de page.dashboard.traders.rep_raised 0.20');
+    const rep = editor.get('input');
+    await rep.setValue('0.50');
+    await rep.trigger('blur');
+    expect(status.text()).toBe('de page.dashboard.traders.standing_saved');
+    mockState.locale = 'en';
+    await editor.vm.$nextTick();
+    expect(status.text()).toBe('page.dashboard.traders.standing_saved');
   });
 });

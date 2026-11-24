@@ -1,5 +1,7 @@
 import { fuzzyMatch } from '@/utils/fuzzySearch';
 import type { NeededItemHideoutModule, NeededItemTaskObjective, TarkovItem } from '@/types/tarkov';
+export const neededCountOf = (need: NeededItemTaskObjective | NeededItemHideoutModule) =>
+  need.count || 1;
 /**
  * Type guard to check if a needed item has needType === 'taskObjective'.
  */

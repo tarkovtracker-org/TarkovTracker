@@ -1,7 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
-import { readdirSync, readFileSync, writeFileSync, type Dirent } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveTrustProxySetting } from './app/utils/apiProtectionConfig';
 import { resolveBuildCommit } from './app/utils/buildCommit';
@@ -29,9 +29,9 @@ import {
   SHELL_DRAWER_EXPANDED_WIDTH,
   SHELL_DRAWER_RAIL_STORAGE_KEY,
 } from './app/utils/shellConfig';
-import { stripBareNodeImports } from './app/utils/stripBareNodeImports';
 import { THEME_BOOT_SCRIPT } from './app/utils/theme';
 import { TURNSTILE_TEST_SECRET_KEY, TURNSTILE_TEST_SITE_KEY } from './app/utils/turnstileKeys';
+import { cleanCloudflareOutput, filterAutoImports } from './scripts/nuxt/buildHooks';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const appDir = resolve(__dirname, 'app');
 const nuxtRequire = createRequire(createRequire(import.meta.url).resolve('nuxt/package.json'));
@@ -187,7 +187,7 @@ export default defineNuxtConfig({
       // e.g., "/api/tarkov/*" for public data endpoints
       publicRoutes:
         process.env.API_PUBLIC_ROUTES?.trim() ||
-        '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/security/tarkov-verify,/api/profile/*,/api/streamer/*,/api/twitch/*',
+        '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/logs/progress,/api/security/tarkov-verify,/api/profile/*,/api/streamer/*,/api/twitch/*',
       // Whether to trust proxy headers (X-Forwarded-For, etc.)
       // ONLY enable this if the server is behind a trusted proxy like Cloudflare
       trustProxy: resolveTrustProxySetting({
@@ -239,7 +239,7 @@ export default defineNuxtConfig({
       pages: {
         defaultRoutes: false,
         routes: {
-          include: ['/api/*', '/overlay/*', '/profile/*'],
+          include: ['/api/*', '/overlay/*', '/profile/*', '/@*'],
           exclude: [],
         },
       },
@@ -252,33 +252,7 @@ export default defineNuxtConfig({
     },
     hooks: {
       async compiled(nitro) {
-        if (!String(nitro.options.preset || '').includes('cloudflare')) {
-          return;
-        }
-        const walk = (dir: string) => {
-          let entries: Dirent[];
-          try {
-            entries = readdirSync(dir, { withFileTypes: true, encoding: 'utf8' });
-          } catch {
-            return;
-          }
-          for (const entry of entries) {
-            const full = join(dir, entry.name);
-            if (entry.isDirectory()) {
-              walk(full);
-              continue;
-            }
-            if (!/\.(m?js|cjs)$/.test(entry.name)) continue;
-            try {
-              const source = readFileSync(full, 'utf8');
-              const next = stripBareNodeImports(source);
-              if (next !== source) writeFileSync(full, next);
-            } catch {
-              // Skip if the path vanished mid-walk (should not happen mid-build).
-            }
-          }
-        };
-        walk(nitro.options.output.serverDir);
+        cleanCloudflareOutput(nitro.options.preset, nitro.options.output.serverDir);
       },
     },
   },
@@ -308,11 +282,16 @@ export default defineNuxtConfig({
     baseURL: '/',
     buildAssetsDir: '/_nuxt/',
     head: {
-      link: [{ rel: 'icon', href: '/favicon.ico', sizes: 'any' }],
+      link: [
+        { rel: 'icon', href: '/favicon.ico', sizes: 'any' },
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png', sizes: '180x180' },
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+      ],
       style: [
         {
           textContent: [
-            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH}}`,
+            `:root{--shell-w:${SHELL_DRAWER_EXPANDED_WIDTH};--shell-bar-h:3.5rem}`,
+            '@media(width >= 640px){:root{--shell-bar-h:4rem}}',
             'body{background:var(--color-surface-950,hsl(0 0% 4%))}',
             // Light theme pre-hydration: match the warm-paper surface values from
             // tailwind.css so the skeleton never flashes dark for light-theme users.
@@ -338,7 +317,7 @@ export default defineNuxtConfig({
             'top:0;',
             'left:var(--shell-w);',
             'right:0;',
-            'height:44px;',
+            'height:var(--shell-bar-h);',
             'background:var(--color-surface-900,hsl(0 0% 9%));',
             'border-bottom:1px solid var(--color-surface-700,hsl(0 0% 25%));',
             'z-index:40',
@@ -371,6 +350,7 @@ export default defineNuxtConfig({
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'theme-color', content: '#c8a882' },
+        { name: 'apple-mobile-web-app-title', content: 'TarkovTracker' },
       ],
     },
   },
@@ -389,16 +369,16 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxtjs/i18n',
     process.env.NODE_ENV === 'test' ? undefined : '@nuxtjs/sitemap',
-    // A fork pull request has no org secrets, so `secrets.CODECOV_TOKEN`
-    // expands to an empty string rather than being absent. Require a non-empty
-    // value so the plugin cannot load without a usable upload token.
-    process.env.CODECOV_TOKEN
+    // Main Actions builds report with short-lived GitHub identity, never an upload token.
+    // Anonymous previews and local builds leave this flag empty.
+    process.env.CODECOV_USE_OIDC === 'true'
       ? ([
           '@codecov/nuxt-plugin',
           {
             enableBundleAnalysis: true,
             bundleName: 'tarkovtracker',
-            uploadToken: process.env.CODECOV_TOKEN,
+            gitService: 'github',
+            oidc: { useGitHubOIDC: true },
             uploadOverrides: {
               slug: 'tarkovtracker-org/TarkovTracker',
             },
@@ -447,7 +427,6 @@ export default defineNuxtConfig({
         '/tasks': 'tasks',
         '/hideout': 'hideout',
         '/needed-items': 'needed-items',
-        '/kappa': 'kappa',
         '/storyline': 'storyline',
         '/changelog': 'changelog',
       };
@@ -476,7 +455,7 @@ export default defineNuxtConfig({
         writeFileSync(
           resolve(nitro.options.output.dir, '_routes.json'),
           JSON.stringify(
-            { version: 1, include: ['/api/*', '/overlay/*', '/profile/*'], exclude: [] },
+            { version: 1, include: ['/api/*', '/overlay/*', '/profile/*', '/@*'], exclude: [] },
             null,
             2
           )
@@ -485,36 +464,12 @@ export default defineNuxtConfig({
           '/api/*',
           '/overlay/*',
           '/profile/*',
+          '/@*',
         ]);
         assertPrerenderedDocuments(nitro.options.output.publicDir);
       });
     },
-    'imports:extend': (imports: Array<{ as?: string; from?: string; name: string }>) => {
-      const blockedImports = [
-        { names: new Set(['meta']), sourcePattern: '/app/utils/perf' },
-        { names: new Set(['string']), sourcePattern: '/app/utils/constants' },
-        { names: new Set(['string']), sourcePattern: '/app/utils/mapTime' },
-        { names: new Set(['string']), sourcePattern: '/app/utils/skillHelpers' },
-        { names: new Set(['actions']), sourcePattern: '/app/stores/useApp' },
-        { names: new Set(['getters']), sourcePattern: '/app/stores/useApp' },
-        { names: new Set(['actions']), sourcePattern: '/app/stores/useTarkov' },
-        {
-          names: new Set(['options']),
-          sourcePattern: '@nuxt/ui/dist/runtime/composables/useResizable',
-        },
-      ];
-      for (let index = imports.length - 1; index >= 0; index -= 1) {
-        const imported = imports[index];
-        if (!imported) continue;
-        const source = imported.from ?? '';
-        const exposedName = imported.as ?? imported.name;
-        const shouldBlock = blockedImports.some(
-          ({ names, sourcePattern }) =>
-            source.includes(sourcePattern) && (names.has(imported.name) || names.has(exposedName))
-        );
-        if (shouldBlock) imports.splice(index, 1);
-      }
-    },
+    'imports:extend': filterAutoImports,
   },
   image: {
     domains: [...GITHUB_IMAGE_DOMAINS, ...TARKOV_IMAGE_DOMAINS, ...YOUTUBE_IMAGE_DOMAINS],

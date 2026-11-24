@@ -1,59 +1,83 @@
 <template>
   <div>
-    <div v-if="!props.isCollapsed" class="px-4 py-1">
-      <h3 class="text-surface-400 text-xs font-semibold tracking-wider uppercase">
-        {{ t('navigation_drawer.section_navigation') }}
-      </h3>
-    </div>
     <ul class="flex flex-col gap-0.5 px-1">
       <DrawerItem
-        icon="i-heroicons-squares-2x2"
+        icon-src="/img/sidebar/dashboard.svg"
         locale-key="common.dashboard"
         to="/"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
-        icon="i-mdi-book-open-variant"
+        icon-src="/img/sidebar/storyline.svg"
         locale-key="common.storyline"
         to="/storyline"
         :is-collapsed="props.isCollapsed"
         :badge="t('page.storyline.wip_badge')"
       ></DrawerItem>
       <DrawerItem
-        icon="i-heroicons-clipboard-document-list"
+        icon-src="/img/sidebar/tasks.svg"
         locale-key="common.tasks"
         to="/tasks"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
-        icon="i-heroicons-cube"
+        icon-src="/img/sidebar/stash.png"
         locale-key="common.needed_items"
         to="/needed-items"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
-        icon="i-heroicons-home"
+        icon-src="/img/sidebar/hideout.webp"
         locale-key="common.hideout"
         to="/hideout"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
       <DrawerItem
-        icon="i-heroicons-user-group"
+        icon-src="/img/sidebar/team.svg"
         locale-key="common.team"
         to="/team"
         :is-collapsed="props.isCollapsed"
       ></DrawerItem>
+    </ul>
+    <div class="bg-divider mx-3 my-2 h-px" aria-hidden="true"></div>
+    <ul class="flex flex-col gap-0.5 px-1 pb-2">
+      <li>
+        <AppTooltip
+          :text="t('navigation_drawer.resources')"
+          :disabled="!props.isCollapsed"
+          :content="{ side: 'right' }"
+        >
+          <UDropdownMenu
+            :items="resourceLinks"
+            :content="{ side: props.isCollapsed ? 'right' : 'bottom', align: 'start' }"
+          >
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-mdi-compass"
+              :trailing-icon="props.isCollapsed ? undefined : 'i-mdi-chevron-down'"
+              :label="props.isCollapsed ? undefined : t('navigation_drawer.resources')"
+              :aria-label="t('navigation_drawer.resources')"
+              class="min-h-10 w-full rounded-sm border-l-2 px-3 text-sm"
+              :class="resourceButtonClass"
+              :ui="{ trailingIcon: 'ms-auto' }"
+            />
+          </UDropdownMenu>
+        </AppTooltip>
+      </li>
       <DrawerItem
-        icon="i-mdi-trophy"
-        locale-key="common.kappa_lightkeeper"
-        to="/kappa"
+        icon="i-mdi-cog"
+        locale-key="common.settings"
+        to="/settings"
         :is-collapsed="props.isCollapsed"
-      ></DrawerItem>
+      />
     </ul>
   </div>
 </template>
 <script setup lang="ts">
+  import AppTooltip from '@/components/ui/AppTooltip.vue';
   import DrawerItem from '@/features/drawer/DrawerItem.vue';
+  import { isNavigationRouteActive } from '@/features/drawer/navigation';
   const props = defineProps({
     isCollapsed: {
       type: Boolean,
@@ -61,4 +85,15 @@
     },
   });
   const { t } = useI18n({ useScope: 'global' });
+  const route = useRoute();
+  const resourceLinks = computed(() => [
+    { label: t('navigation_drawer.resources_overview'), to: '/resources' },
+    { label: t('page.seasonal_modifiers.title'), to: '/resources/seasonal-modifiers' },
+  ]);
+  const resourceButtonClass = computed(() => [
+    props.isCollapsed && 'justify-center',
+    isNavigationRouteActive('/resources', route.path)
+      ? 'border-primary-500 bg-surface-800/50 text-surface-50'
+      : 'border-transparent text-surface-300',
+  ]);
 </script>

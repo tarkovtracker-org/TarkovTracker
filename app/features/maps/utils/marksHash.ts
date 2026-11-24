@@ -1,4 +1,5 @@
-export interface MapZone {
+import type { MapElevation } from '@/features/maps/utils/mapElevation';
+export interface MapZone extends MapElevation {
   map: { id: string };
   outline: Array<{ x: number; z: number }>;
 }
@@ -9,6 +10,12 @@ export interface MapMarkLocation {
 }
 export interface MapMark {
   id?: string;
+  /** Upstream objective type; it picks the glyph drawn on the marker. */
+  type?: string;
+  /** Task the objective belongs to, for the quest highlight. */
+  taskId?: string;
+  /** Chip fill from the quest or objective-type color mode; otherwise the category color. */
+  color?: string;
   zones: MapZone[];
   possibleLocations?: MapMarkLocation[];
   users?: string[];
@@ -43,6 +50,7 @@ const hashLocationPositions = (positions: Array<{ x: number; y?: number; z: numb
   for (const point of positions) {
     locationHash = updateFnv1a(locationHash, point.x);
     locationHash = updateFnv1a(locationHash, point.z);
+    locationHash = updateFnv1a(locationHash, point.y ?? 'unknown');
   }
   return locationHash;
 };
@@ -56,7 +64,15 @@ const hashSortedValues = (hash: number, values: Array<string | number>): number 
 const markZoneHashes = (mark: MapMark, mapId: string): number[] =>
   mark.zones
     .filter((zone) => zone.map.id === mapId)
-    .map((zone) => hashZoneOutline(zone.outline))
+    .map((zone) =>
+      hashSortedValues(hashZoneOutline(zone.outline), [
+        zone.position?.x ?? 'unknown',
+        zone.position?.y ?? 'unknown',
+        zone.position?.z ?? 'unknown',
+        zone.bottom ?? 'unknown',
+        zone.top ?? 'unknown',
+      ])
+    )
     .sort((a, b) => a - b);
 const markLocationHashes = (mark: MapMark, mapId: string): number[] =>
   (mark.possibleLocations ?? [])
@@ -65,6 +81,9 @@ const markLocationHashes = (mark: MapMark, mapId: string): number[] =>
     .sort((a, b) => a - b);
 const hashMark = (hash: number, mark: MapMark, mapId: string): number => {
   let next = updateFnv1a(hash, mark.id ?? '');
+  next = updateFnv1a(next, mark.type ?? '');
+  next = updateFnv1a(next, mark.taskId ?? '');
+  next = updateFnv1a(next, mark.color ?? '');
   next = updateFnv1a(next, mark.pinned ? '1' : '0');
   next = hashSortedValues(next, [...(mark.users ?? [])].sort(compareCodeUnits));
   next = hashSortedValues(next, markZoneHashes(mark, mapId));

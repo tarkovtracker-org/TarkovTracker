@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ACTIVE_SEASON } from '@/utils/constants';
 import {
   isEftBackendLogFileName,
@@ -516,6 +516,7 @@ describe('documented log formats and state history', () => {
     }
   });
   it('excludes Seasonal history before the active season and at its end boundary', () => {
+    const seasonEnd = Date.parse('2026-12-07T09:00:00.000Z');
     const result = parseEftLogsForQuestImport(
       [
         {
@@ -531,14 +532,15 @@ describe('documented log formats and state history', () => {
           text:
             event('old', 12, seasonDate(seasonStart - 1)) +
             event('start-boundary', 10, seasonDate(seasonStart)) +
-            event('end', 12, seasonDate(Date.parse(ACTIVE_SEASON.endsAt))) +
+            event('before-end', 10, seasonDate(seasonEnd - 1)) +
+            event('end', 12, seasonDate(seasonEnd)) +
             event('current', 10),
         },
       ],
       [quest]
     );
     expect(result.skippedSeasonalEventCount).toBe(2);
-    expect(result.dedupedStartedEventCount).toBe(2);
+    expect(result.dedupedStartedEventCount).toBe(3);
     expect(result.matchedTaskIds).toEqual([]);
     expect(result.matchedStartedTaskIdsByMode.seasonal).toEqual([quest]);
   });
@@ -547,6 +549,48 @@ describe('notification replays', () => {
   const quest = '61604635c725987e815b1a46';
   const notification = (id: string, type: number, original: string, received: string) =>
     `${received}|Info|notifications|Got notification | ChatMessageReceived\n${JSON.stringify({ eventId: id, message: { type, templateId: quest, dt: Date.parse(original) / 1000 } })}\n`;
+  it('applies the Seasonal cutoff to the original event time during a later import', () => {
+    const beforeEnd = '2026-12-07T08:59:59.999Z';
+    const end = '2026-12-07T09:00:00.000Z';
+    const received = '2026-12-07 09:05:00.000';
+    const files = [
+      {
+        name: 'log_seasonal/application.log',
+        text: '2026-12-07 08:00:00.000|Info|application|Session mode: PvpSeason',
+      },
+      {
+        name: 'log_seasonal/notifications.log',
+        text:
+          notification('seasonal-before-end', 12, beforeEnd, received) +
+          notification('seasonal-at-end', 12, end, received),
+      },
+      {
+        name: 'log_pve/application.log',
+        text: '2026-12-07 08:00:00.000|Info|application|Session mode: Pve',
+      },
+      {
+        name: 'log_pve/notifications.log',
+        text: notification('pve-at-end', 12, end, received),
+      },
+    ];
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-12-08T12:00:00.000Z'));
+      const result = parseEftLogsForQuestImport(files, [quest]);
+      expect(result.skippedSeasonalEventCount).toBe(1);
+      expect(result.events).toHaveLength(2);
+      expect(result.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ mode: 'seasonal', occurredAt: Date.parse(beforeEnd) }),
+          expect.objectContaining({ mode: 'pve', occurredAt: Date.parse(end) }),
+        ])
+      );
+      expect(result.matchedTaskIdsByMode.seasonal).toEqual([quest]);
+      expect(result.matchedTaskIdsByMode.pve).toEqual([quest]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('does not let a replayed completion override a later restart', () => {
     const result = parseEftLogsForQuestImport(
       [

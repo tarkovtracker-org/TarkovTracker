@@ -9,6 +9,7 @@
   import { useTaskGraphData } from '@/composables/useTaskGraphData';
   import TaskGraphNode from '@/features/tasks/TaskGraphNode.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import { isEditableTarget } from '@/utils/editableTarget';
   import { normalizeSecondaryView } from '@/utils/taskFilterNormalization';
   import { layoutTaskGraph } from '@/utils/taskGraphLayout';
   import { TASK_ROUTE_PATHS } from '@/utils/taskRouteView';
@@ -165,15 +166,6 @@
       default:
         return null;
     }
-  };
-  const isEditableTarget = (target: EventTarget | null): boolean => {
-    if (!(target instanceof HTMLElement)) return false;
-    if (target.isContentEditable) return true;
-    return Boolean(
-      target.closest(
-        'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]'
-      )
-    );
   };
   const isGraphKeyboardActive = () => {
     if (!hasNodes.value || !isLgAndUp.value) return false;

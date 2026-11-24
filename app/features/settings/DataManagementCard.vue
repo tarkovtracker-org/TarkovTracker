@@ -57,7 +57,8 @@
                       :disabled="isAnyImportActive || option.disabled"
                       @click="selectTarkovDevRefetchMode(option.value)"
                     >
-                      {{ option.label }}
+                      <GameModeBadge :mode="option.value" class="-my-1" />
+                      <span class="min-w-0 wrap-anywhere">{{ option.label }}</span>
                     </UButton>
                   </div>
                   <p class="text-surface-500 text-xs">
@@ -797,85 +798,6 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.backup_restore_section_description') }}
           </p>
-          <div class="bg-surface-900/80 space-y-2 rounded-md border border-white/10 p-3">
-            <p
-              v-if="legacyProgressRecoveryOverflow"
-              class="text-warning-300 text-sm"
-              data-testid="older-tab-recovery-overflow"
-            >
-              {{ $t('settings.data_management.older_tab_recovery_full') }}
-            </p>
-            <p v-if="legacyProgressRecoveryCount" class="text-warning-300 text-sm">
-              {{
-                $t('settings.data_management.older_tab_recovery_available', {
-                  count: legacyProgressRecoveryCount,
-                })
-              }}
-            </p>
-            <UButton
-              v-for="index in legacyProgressRecoveryCount"
-              :key="index"
-              color="neutral"
-              variant="soft"
-              :data-testid="`older-tab-review-${index}`"
-              :disabled="backupImportState === 'parsing'"
-              @click="reviewOlderTabProgress(index - 1)"
-            >
-              {{ $t('settings.data_management.review_older_edit', { index }) }}
-            </UButton>
-            <UButton
-              icon="i-mdi-download"
-              color="neutral"
-              variant="soft"
-              data-testid="device-progress-recovery-export"
-              @click="handleExportDeviceRecovery"
-            >
-              {{ $t('settings.data_management.export_device_recovery') }}
-            </UButton>
-            <UButton
-              v-if="
-                (legacyProgressRecoveryCount || legacyProgressRecoveryOverflow) &&
-                !confirmRecoveryCleanup
-              "
-              color="neutral"
-              variant="soft"
-              data-testid="older-tab-cleanup"
-              @click="confirmRecoveryCleanup = true"
-            >
-              {{ $t('settings.data_management.clear_older_copies') }}
-            </UButton>
-            <div v-if="confirmRecoveryCleanup" class="space-y-2">
-              <p class="text-surface-400 text-sm">
-                {{ $t('settings.data_management.clear_older_copies_confirmation') }}
-              </p>
-              <UButton
-                color="warning"
-                :loading="recoveryCleanupRunning"
-                :disabled="recoveryCleanupRunning"
-                data-testid="older-tab-cleanup-confirm"
-                @click="handleRecoveryCleanupDownload"
-              >
-                {{ $t('settings.data_management.export_device_recovery') }}
-              </UButton>
-              <UButton
-                v-if="recoveryExportPending"
-                color="warning"
-                :disabled="recoveryCleanupRunning"
-                data-testid="older-tab-cleanup-saved-confirm"
-                @click="handleRecoveryCleanup"
-              >
-                {{ $t('settings.data_management.saved_recovery_archive_confirmation') }}
-              </UButton>
-              <UButton
-                color="neutral"
-                variant="soft"
-                :disabled="recoveryCleanupRunning"
-                @click="confirmRecoveryCleanup = false"
-              >
-                {{ $t('common.cancel') }}
-              </UButton>
-            </div>
-          </div>
           <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
             <div class="grid gap-3 md:grid-cols-2">
               <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
@@ -937,6 +859,11 @@
               </div>
             </div>
           </template>
+          <RecoveryCopiesPanel
+            :backup="dataManagementSession.backup"
+            :parsing="backupImportState === 'parsing'"
+            :locked="isAnyImportActive"
+          />
           <div class="flex items-center gap-3">
             <output data-testid="backup-reading-status" class="text-surface-300 text-sm">
               {{ backupReadingLabel }}
@@ -1051,7 +978,10 @@
                   block
                   @click="importTarget = 'pvp'"
                 >
-                  {{ $t('settings.data_management.import_target_pvp') }}
+                  <GameModeBadge :mode="GAME_MODES.PVP" class="-my-1" />
+                  <span class="min-w-0 wrap-anywhere">
+                    {{ $t('settings.data_management.import_target_pvp') }}
+                  </span>
                 </UButton>
                 <UButton
                   :variant="importTarget === 'pve' ? 'solid' : 'soft'"
@@ -1060,7 +990,10 @@
                   block
                   @click="importTarget = 'pve'"
                 >
-                  {{ $t('settings.data_management.import_target_pve') }}
+                  <GameModeBadge :mode="GAME_MODES.PVE" class="-my-1" />
+                  <span class="min-w-0 wrap-anywhere">
+                    {{ $t('settings.data_management.import_target_pve') }}
+                  </span>
                 </UButton>
                 <UButton
                   :variant="importTarget === GAME_MODES.SEASONAL ? 'solid' : 'soft'"
@@ -1070,7 +1003,10 @@
                   :disabled="!backupPreview.seasonal"
                   @click="importTarget = GAME_MODES.SEASONAL"
                 >
-                  {{ $t('common.seasonal_pvp', 'Seasonal PvP') }}
+                  <GameModeBadge :mode="GAME_MODES.SEASONAL" class="-my-1" />
+                  <span class="min-w-0 wrap-anywhere">
+                    {{ $t('common.seasonal_pvp', 'Seasonal PvP') }}
+                  </span>
                 </UButton>
                 <UButton
                   :variant="importTarget === 'all' ? 'solid' : 'soft'"
@@ -1128,41 +1064,21 @@
         </div>
       </template>
     </GenericCard>
-    <GenericCard
+    <BugReportCard
       v-if="!isBlockedByOtherDataFlow"
-      icon="mdi-bug-outline"
-      icon-color="warning"
-      highlight-color="warning"
-      :fill-height="false"
-      :title="$t('settings.data_management.debug_section_title')"
-      title-classes="text-lg font-semibold"
-    >
-      <template #content>
-        <div class="space-y-3 px-4 py-4">
-          <p class="text-surface-400 text-sm">
-            {{ $t('settings.data_management.debug_export_description') }}
-          </p>
-          <UButton
-            icon="i-mdi-bug-outline"
-            block
-            :ui="{
-              base: 'bg-warning-900 light:bg-warning-50 hover:bg-warning-800 light:hover:bg-warning-100 active:bg-warning-700 light:active:bg-warning-100 text-warning-200 focus-visible:ring focus-visible:ring-warning-500',
-            }"
-            :disabled="isAnyImportActive"
-            @click="handleExportDebugSnapshot"
-          >
-            {{ $t('settings.data_management.debug_export_button') }}
-          </UButton>
-        </div>
-      </template>
-    </GenericCard>
+      :backup="dataManagementSession.backup"
+      :disabled="isAnyImportActive"
+    />
   </template>
 </template>
 <script setup lang="ts">
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import GenericCard from '@/components/ui/GenericCard.vue';
   import { useTurnstileWidget } from '@/composables/useTurnstile';
+  import BugReportCard from '@/features/settings/BugReportCard.vue';
   import EftLogImportControls from '@/features/settings/EftLogImportControls.vue';
   import GameModeToggle from '@/features/settings/GameModeToggle.vue';
+  import RecoveryCopiesPanel from '@/features/settings/RecoveryCopiesPanel.vue';
   import {
     useDataManagementSession,
     type DataManagementSession,
@@ -1218,18 +1134,11 @@
   const dataManagementSession = props.session ?? useDataManagementSession();
   const {
     exportProgress,
-    exportDeviceProgressRecovery,
-    confirmRecoveryArchiveSaved,
-    recoveryExportPending,
     recoveryArchiveEntries,
     selectedRecoveryArchiveEntry,
     reviewRecoveryArchiveEntry,
-    reviewOlderTabProgress,
-    legacyProgressRecoveryCount,
-    legacyProgressRecoveryOverflow,
+    recoveryCopiesImport,
     exportError: backupExportError,
-    exportDebugSnapshot,
-    debugExportError,
     importState: backupImportState,
     importPreview: backupPreview,
     importError: backupImportError,
@@ -1240,8 +1149,6 @@
   const backupReadingLabel = computed(() =>
     backupImportState.value === 'parsing' ? t('settings.data_management.reading_backup') : ''
   );
-  const confirmRecoveryCleanup = ref(false);
-  const recoveryCleanupRunning = ref(false);
   const backupFileInputRef = ref<HTMLInputElement | null>(null);
   const backupImportButtonRef = ref<{ $el?: HTMLElement } | null>(null);
   const importTarget = ref<GameMode | 'all'>('all');
@@ -1267,58 +1174,22 @@
       });
     }
   }
-  async function handleExportDeviceRecovery() {
-    try {
-      await exportDeviceProgressRecovery();
-      confirmRecoveryCleanup.value = true;
-    } catch (error) {
-      logger.error('DataManagementCard: recovery export failed', error);
-      toast.add({
-        title: t('settings.data_management.export_error_title'),
-        description:
-          error instanceof Error &&
-          error.message === t('settings.data_management.recovery_archive_too_large')
-            ? error.message
-            : t('settings.data_management.recovery_export_failed'),
-        color: 'error',
-      });
-    }
-  }
-  async function handleRecoveryCleanupDownload() {
-    await handleExportDeviceRecovery();
-  }
-  async function handleRecoveryCleanup() {
-    recoveryCleanupRunning.value = true;
-    try {
-      await confirmRecoveryArchiveSaved();
-      confirmRecoveryCleanup.value = false;
-    } catch (error) {
-      logger.error('DataManagementCard: recovery cleanup failed', error);
-      toast.add({
-        title: t('settings.data_management.export_error_title'),
-        description:
-          error instanceof Error &&
-          error.message === t('settings.data_management.recovery_owner_changed')
-            ? error.message
-            : t('settings.data_management.recovery_cleanup_failed'),
-        color: 'error',
-      });
-    } finally {
-      recoveryCleanupRunning.value = false;
-    }
-  }
-  async function handleExportDebugSnapshot() {
-    try {
-      await exportDebugSnapshot();
-    } catch (err) {
-      logger.error('DataManagementCard: exportDebugSnapshot failed', err, debugExportError.value);
-      if (!debugExportError.value) return;
-      toast.add({
-        title: t('settings.data_management.debug_export_error_title'),
-        description: debugExportError.value,
-        color: 'error',
-      });
-    }
+  /** A superseded-progress file adds copies to Recovery copies instead of opening a preview. */
+  function announceRecoveryCopiesImport() {
+    const result = recoveryCopiesImport.value;
+    if (!result) return;
+    toast.add(
+      result.added > 0
+        ? {
+            title: t(
+              'settings.data_management.recovery_copies_added',
+              { count: result.added },
+              result.added
+            ),
+            color: 'success',
+          }
+        : { title: t('settings.data_management.recovery_copies_already_present'), color: 'info' }
+    );
   }
   async function handleBackupFileChange(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -1327,6 +1198,7 @@
     importTarget.value = 'all';
     await parseBackupFile(file);
     input.value = '';
+    announceRecoveryCopiesImport();
   }
   const buildBackupImportSelection = (
     target: GameMode | 'all',

@@ -104,6 +104,12 @@ describe('useTurnstileWidget', () => {
     const { result, wrapper } = await mountHarness();
     expect(result.enabled).toBe(false);
     expect(result.ready.value).toBe(true);
+    expect(result.solved.value).toBe(true);
+    result.reset();
+    expect(result.ready.value).toBe(true);
+    expect(result.solved.value).toBe(true);
+    result.reset();
+    expect(result.solved.value).toBe(true);
     await expect(result.getToken()).resolves.toBeNull();
     wrapper.unmount();
   });

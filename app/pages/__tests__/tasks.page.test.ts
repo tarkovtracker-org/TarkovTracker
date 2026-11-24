@@ -2,9 +2,11 @@ import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, inject, isRef, nextTick, ref } from 'vue';
+import { TASK_DETAIL_WAIT_MS } from '@/composables/useTaskDetailReadiness';
 import { jumpToMapObjectiveKey } from '@/features/tasks/task-context';
 import { STORAGE_KEYS } from '@/utils/storageKeys';
 import type { Task, TaskObjective } from '@/types/tarkov';
+import type { GameMode } from '@/utils/constants';
 /**
  * Factory to create a default Task with all required properties.
  * Use this instead of type assertions to ensure compile-time safety.
@@ -67,6 +69,10 @@ const preferencesStoreMock = {
   getPinnedTaskIds: [] as string[],
   getHideCompletedMapObjectives: false,
   getMapHiddenTaskIds: [] as string[],
+  getMapObjectiveColorMode: 'category',
+  getMapObjectivePalette: 'okabe_ito',
+  getMapTaskColors: {} as Record<string, string>,
+  getShowMapExtracts: true,
   getHiddenTaskIds: [] as string[],
   unhideTasks: vi.fn(),
   mapTeamAllHidden: false,
@@ -76,11 +82,18 @@ const preferencesStoreMock = {
 };
 const metadataStoreMock = reactive({
   tasks: [defaultTask],
+  currentGameMode: 'pvp' as GameMode,
   loading: false,
+  setLoading: (loading: boolean) => {
+    metadataStoreMock.loading = loading;
+  },
+  updateLanguageAndGameMode: vi.fn(),
+  fetchAllData: vi.fn(async () => {}),
   hasInitialized: true,
   languageCode: 'en',
   tasksCoreRevision: 0,
   tasksCoreRefreshing: false,
+  tasksRewardsHydrated: true,
   editionsLoading: false,
   objectiveModeCountDifferencesHydrated: true,
   getApiGameMode: () => 'regular',
@@ -111,6 +124,12 @@ const clearPinnedTaskMock = vi.fn(() => {
   focusedTaskRef.value = null;
 });
 const handleTaskQueryParamMock = vi.fn();
+const switchGameModeMock = vi.fn(async (_mode: GameMode) => {});
+const fetchCatalogMock = vi.fn();
+vi.mock('@/utils/tarkovApiFetch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/tarkovApiFetch')>()),
+  tarkovApiFetch: (...args: unknown[]) => fetchCatalogMock(...args),
+}));
 const progressStoreMock = {
   visibleTeamStores: { self: {} } as Record<string, Record<string, never>>,
   tasksCompletions: {} as Record<string, Record<string, boolean>>,
@@ -182,6 +201,8 @@ vi.mock('@/stores/useProgress', () => ({
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     currentGameMode: 'pvp',
+    getCurrentGameMode: () => metadataStoreMock.currentGameMode,
+    switchGameMode: switchGameModeMock,
     getGameEdition: () => 1,
     pvp: {
       apiUpdateHistory: [],
@@ -221,6 +242,7 @@ vi.mock('@/stores/useTarkov', () => ({
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
+    n: (value: number) => value.toFixed(2),
     t: (_key: string, fallback?: string) => fallback ?? _key,
   }),
 }));
@@ -272,6 +294,10 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
         type: String,
         default: undefined,
       },
+      showExtracts: {
+        type: Boolean,
+        default: true,
+      },
       showFullscreenToggle: {
         type: Boolean,
         default: false,
@@ -280,8 +306,12 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
         type: Boolean,
         default: false,
       },
+      highlightedTaskId: {
+        type: String,
+        default: null,
+      },
     },
-    emits: ['toggle-fullscreen'],
+    emits: ['toggle-fullscreen', 'objective-hover'],
     setup(props, { expose }) {
       expose({
         activateObjectivePopup: () => true,
@@ -293,7 +323,12 @@ vi.mock('@/features/maps/LeafletMap.vue', () => ({
       });
       return { props };
     },
-    template: `<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" :data-initial-view="JSON.stringify(props.initialView ?? null)" :data-initial-floor="props.initialFloor ?? ''">
+    template: `<div data-testid="leaflet-map" :data-marks="JSON.stringify(props.marks ?? [])" :data-initial-view="JSON.stringify(props.initialView ?? null)" :data-initial-floor="props.initialFloor ?? ''" :data-show-extracts="String(props.showExtracts)" :data-highlighted-task="props.highlightedTaskId ?? ''">
+      <button
+        type="button"
+        data-testid="map-marker-hover"
+        @click="$emit('objective-hover', 'task-shown')"
+      />
       <button
         v-if="props.showFullscreenToggle"
         type="button"
@@ -322,11 +357,21 @@ const defaultGlobalStubs = {
     template:
       '<div data-testid="task-filter" :data-active-status="activeStatusView"><button data-testid="pin-status" @click="$emit(\'pin-status\', \'locked\')" /></div>',
   },
-  TaskEmptyState: true,
+  TaskEmptyState: {
+    props: ['reputationFiltered'],
+    emits: ['clear-reputation'],
+    template:
+      '<div data-testid="task-empty-state"><button v-if="reputationFiltered" data-testid="clear-map-reputation" @click="$emit(\'clear-reputation\')" /></div>',
+  },
   TaskLoadingState: true,
   Teleport: true,
   Transition: false,
-  UAlert: true,
+  UAlert: {
+    props: { title: String, description: String, close: Boolean },
+    emits: ['update:open'],
+    template:
+      '<div>{{ title }} {{ description }}<slot name="actions" /><button v-if="close" data-slot="close" @click="$emit(\'update:open\', false)" /></div>',
+  },
   UBadge: true,
   UButton: UButtonStub,
   UCard: true,
@@ -373,6 +418,10 @@ describe('tasks page', () => {
   beforeEach(async () => {
     metadataStoreMock.hasInitialized = true;
     metadataStoreMock.loading = false;
+    metadataStoreMock.currentGameMode = 'pvp';
+    fetchCatalogMock.mockReset();
+    switchGameModeMock.mockReset();
+    metadataStoreMock.fetchAllData.mockReset();
     visibleTasksRef.value = [defaultTask];
     focusedTaskRef.value = null;
     updateVisibleTasksMock.mockReset();
@@ -389,8 +438,11 @@ describe('tasks page', () => {
     preferencesStoreMock.getTaskMapView = 'all';
     preferencesStoreMock.getHideGlobalTasks = false;
     preferencesStoreMock.getPinnedTaskIds = [];
+    preferencesStoreMock.getShowMapExtracts = true;
     preferencesStoreMock.getHideCompletedMapObjectives = false;
     preferencesStoreMock.getMapHiddenTaskIds = [];
+    preferencesStoreMock.getMapObjectiveColorMode = 'category';
+    preferencesStoreMock.getMapTaskColors = {};
     preferencesStoreMock.getHiddenTaskIds = [];
     preferencesStoreMock.clearMapTaskVisibility.mockReset();
     preferencesStoreMock.mapTeamAllHidden = false;
@@ -403,6 +455,8 @@ describe('tasks page', () => {
     selfCompletedObjectiveIds.clear();
     selfCompletedTaskIds.clear();
     selfFailedTaskIds.clear();
+    metadataStoreMock.tasks = [defaultTask];
+    metadataStoreMock.tasksRewardsHydrated = true;
     metadataStoreMock.mapsWithSvg = [];
     metadataStoreMock.fetchMapSpawnsData.mockClear();
     mapTaskCountsMock.withHide = 0;
@@ -413,8 +467,59 @@ describe('tasks page', () => {
     await mountPage();
   });
   afterEach(async () => {
-    await setSearch('');
+    await wrapper.vm.$router.replace({ query: {} });
     wrapper?.unmount();
+  });
+  it('offers confirmed modes for a shared quest missing in Seasonal PvP and keeps its link on switch', async () => {
+    const id = '6745cbee909d2013670a4a55';
+    const linkedTask = createDefaultTask({ id });
+    metadataStoreMock.currentGameMode = 'seasonal';
+    fetchCatalogMock.mockResolvedValue({ data: { tasks: [linkedTask] } });
+    switchGameModeMock.mockImplementation(async (mode) => {
+      metadataStoreMock.currentGameMode = mode;
+    });
+    metadataStoreMock.fetchAllData.mockImplementation(async () => {
+      metadataStoreMock.tasks = [linkedTask];
+    });
+    await wrapper.vm.$router.replace({ query: { task: id } });
+    const notice = () => wrapper.get('[data-testid="task-link-unavailable"]');
+    await vi.waitFor(() =>
+      expect(notice().find('[data-testid="task-link-switch-pve"]').exists()).toBe(true)
+    );
+    expect(notice().find('[data-testid="task-link-switch-pvp"]').exists()).toBe(true);
+    expect(switchGameModeMock).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="task-list"]').exists()).toBe(true);
+    handleTaskQueryParamMock.mockClear();
+    const focusAttempts: Array<{ mode: GameMode; task: unknown; catalogHasTask: boolean }> = [];
+    handleTaskQueryParamMock.mockImplementationOnce(() => {
+      focusAttempts.push({
+        mode: metadataStoreMock.currentGameMode,
+        task: wrapper.vm.$router.currentRoute.value.query.task,
+        catalogHasTask: metadataStoreMock.tasks.some((task) => task.id === id),
+      });
+    });
+    await notice().get('[data-testid="task-link-switch-pve"]').trigger('click');
+    await vi.waitFor(() =>
+      expect(focusAttempts).toEqual([{ mode: 'pve', task: id, catalogHasTask: true }])
+    );
+    expect(switchGameModeMock).toHaveBeenCalledExactlyOnceWith('pve');
+    expect(wrapper.vm.$router.currentRoute.value.query.task).toBe(id);
+    expect(wrapper.find('[data-testid="task-link-unavailable"]').exists()).toBe(false);
+  });
+  it('keeps the notice dismissible when alternate catalogs are unavailable', async () => {
+    fetchCatalogMock.mockRejectedValue(new Error('offline'));
+    await wrapper.vm.$router.replace({
+      query: { task: 'unknown-task', highlightObjective: 'unknown-objective', q: 'sample' },
+    });
+    const notice = () => wrapper.get('[data-testid="task-link-unavailable"]');
+    await vi.waitFor(() => expect(notice().text()).toContain('page.tasks.shared_link.no_match'));
+    expect(notice().find('[data-testid^="task-link-switch-"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-list"]').exists()).toBe(true);
+    await notice().get('[data-slot="close"]').trigger('click');
+    const query = () => wrapper.vm.$router.currentRoute.value.query;
+    await vi.waitFor(() => expect(query().task).toBeUndefined());
+    expect(query().highlightObjective).toBeUndefined();
+    expect(query().q).toBe('sample');
   });
   it('defers deep links until cached detail readiness clears with unchanged task IDs', async () => {
     let release!: () => void;
@@ -424,14 +529,23 @@ describe('tasks page', () => {
           release = resolve;
         })
     );
-    metadataStoreMock.tasksCoreRevision += 1;
-    await nextTick();
-    handleTaskQueryParamMock.mockClear();
-    await wrapper.vm.$router.replace({ query: { task: defaultTask.id } });
-    await nextTick();
-    expect(handleTaskQueryParamMock).not.toHaveBeenCalled();
-    release();
-    await vi.waitFor(() => expect(handleTaskQueryParamMock).toHaveBeenCalled());
+    // Fake timers before the revision bump also hold the bounded detail wait, so only
+    // `release()` can clear readiness; the deep link then waits on the refresh debounce.
+    vi.useFakeTimers();
+    try {
+      metadataStoreMock.tasksCoreRevision += 1;
+      await nextTick();
+      handleTaskQueryParamMock.mockClear();
+      void wrapper.vm.$router.replace({ query: { task: defaultTask.id } });
+      await vi.advanceTimersByTimeAsync(ROUTE_NAVIGATION_MS + TASK_REFRESH_DEBOUNCE_MS);
+      expect(wrapper.vm.$router.currentRoute.value.query.task).toBe(defaultTask.id);
+      expect(handleTaskQueryParamMock).not.toHaveBeenCalled();
+      release();
+      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      expect(handleTaskQueryParamMock).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it.each([
     'fetchTaskObjectivesData',
@@ -478,12 +592,12 @@ describe('tasks page', () => {
       });
       await vi.waitFor(() => expect(updateVisibleTasksMock).toHaveBeenCalled());
       expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
-      expect(wrapper.find('task-empty-state-stub').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="task-empty-state"]').exists()).toBe(false);
       visibleTasksRef.value = hasTasks ? [defaultTask] : [];
       finishRefresh();
       await vi.waitFor(() => expect(wrapper.find('task-loading-state-stub').exists()).toBe(false));
       expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(hasTasks);
-      expect(wrapper.find('task-empty-state-stub').exists()).toBe(!hasTasks);
+      expect(wrapper.find('[data-testid="task-empty-state"]').exists()).toBe(!hasTasks);
     }
   );
   it('refreshes after initialization changes even when the task array is unchanged', async () => {
@@ -541,7 +655,7 @@ describe('tasks page', () => {
     metadataStoreMock.loading = false;
     await vi.waitFor(() => expect(updateVisibleTasksMock).toHaveBeenCalled());
     expect(wrapper.find('task-loading-state-stub').exists()).toBe(true);
-    expect(wrapper.find('task-empty-state-stub').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-empty-state"]').exists()).toBe(false);
     visibleTasksRef.value = [defaultTask];
     finishRefresh();
     await vi.waitFor(() => expect(wrapper.find('[data-testid="task-card"]').exists()).toBe(true));
@@ -704,6 +818,22 @@ describe('tasks page', () => {
     await jumpButton.trigger('click');
     await nextTick();
     expect(toggleButton.attributes('aria-expanded')).toBe('true');
+  });
+  it('opens both task maps with extracts following the saved preference', async () => {
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getShowMapExtracts = false;
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    await mountPage();
+    expect(wrapper.get('[data-testid="leaflet-map"]').attributes('data-show-extracts')).toBe(
+      'false'
+    );
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const fullscreenMap = wrapper.get(
+      '[data-testid="map-fullscreen-overlay"] [data-testid="leaflet-map"]'
+    );
+    expect(fullscreenMap.attributes('data-show-extracts')).toBe('false');
   });
   it('opens and closes the map full screen overlay', async () => {
     preferencesStoreMock.getTaskPrimaryView = 'maps';
@@ -1074,6 +1204,123 @@ describe('tasks page', () => {
     expect(section.findAll('[data-testid="task-card"]')).toHaveLength(1);
     await section.find('[data-testid="map-hidden-tasks-show-all"]').trigger('click');
     expect(preferencesStoreMock.clearMapTaskVisibility).toHaveBeenCalledWith(['task-hidden']);
+  });
+  it('filters map markers and cards by reputation, preserving manually hidden quests', async () => {
+    const trader = { id: 'trader-1', name: 'Test Trader' };
+    const quests = [
+      createDefaultTask({
+        id: 'task-gain',
+        objectives: [createMapObjective({ id: 'obj-gain', taskId: 'task-gain' })],
+        finishRewards: { traderStanding: [{ trader, standing: 0.2 }] },
+      }),
+      createDefaultTask({
+        id: 'task-no-gain',
+        objectives: [createMapObjective({ id: 'obj-no-gain', taskId: 'task-no-gain' })],
+      }),
+      createDefaultTask({
+        id: 'task-hidden',
+        objectives: [createMapObjective({ id: 'obj-hidden', taskId: 'task-hidden' })],
+      }),
+    ];
+    visibleTasksRef.value = quests;
+    const offMapQuest = createDefaultTask({
+      id: 'other-map',
+      finishRewards: { traderStanding: [{ trader, standing: 0.25 }] },
+    });
+    metadataStoreMock.tasks = [...quests, offMapQuest];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getMapHiddenTaskIds = ['task-hidden'];
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = Object.fromEntries(
+      quests.map(({ id }) => [id, { self: true }])
+    );
+    await mountPage();
+    const filter = () => wrapper.get('[data-testid="map-raid-plan"] select');
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
+    await filter().setValue('0.2');
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain']);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(1);
+    expect(wrapper.get('[data-testid="task-card"]').text()).toBe('task-gain');
+    let finishRewards!: () => void;
+    metadataStoreMock.fetchTaskRewardsData.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishRewards = resolve;
+        })
+    );
+    vi.useFakeTimers();
+    try {
+      metadataStoreMock.tasksCoreRevision += 1;
+      metadataStoreMock.tasksRewardsHydrated = false;
+      metadataStoreMock.tasks = quests.map((quest) => ({ ...quest, finishRewards: undefined }));
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(TASK_DETAIL_WAIT_MS);
+      metadataStoreMock.tasks = [...quests, offMapQuest];
+      metadataStoreMock.tasksRewardsHydrated = true;
+      finishRewards();
+      await vi.advanceTimersByTimeAsync(TASK_REFRESH_DEBOUNCE_MS);
+      expect((filter().element as HTMLSelectElement).value).toBe('0.2');
+      expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain']);
+    } finally {
+      vi.useRealTimers();
+    }
+    metadataStoreMock.tasks = [offMapQuest];
+    await nextTick();
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
+    await filter().setValue('0.25');
+    expect(getLeafletMarks()).toHaveLength(0);
+    await wrapper.get('[data-testid="map-collapse-toggle"]').trigger('click');
+    await wrapper.get('[data-testid="clear-map-reputation"]').trigger('click');
+    expect(getLeafletMarks().map((mark) => mark.id)).toEqual(['obj-gain', 'obj-no-gain']);
+    expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(true);
+  });
+  it('offers the completed-objective toggle when all remaining map quests are manually hidden', async () => {
+    const hiddenTask = createDefaultTask({
+      id: 'task-hidden',
+      objectives: [createMapObjective({ id: 'obj-hidden', taskId: 'task-hidden' })],
+    });
+    visibleTasksRef.value = [hiddenTask];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getHideCompletedMapObjectives = true;
+    preferencesStoreMock.getMapHiddenTaskIds = [hiddenTask.id];
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = { [hiddenTask.id]: { self: true } };
+    await mountPage();
+    expect(wrapper.find('[data-testid="map-hidden-tasks-section"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="task-card"]')).toHaveLength(0);
+    expect(
+      wrapper.find('button[aria-label="page.tasks.map.map_complete_tasks_toggle_show"]').exists()
+    ).toBe(true);
+  });
+  it('drops a marker hover when the full screen map opens or closes over it (#920)', async () => {
+    visibleTasksRef.value = [
+      createDefaultTask({
+        id: 'task-shown',
+        name: 'Shown Task',
+        objectives: [createMapObjective({ id: 'obj-shown', taskId: 'task-shown' })],
+      }),
+    ];
+    preferencesStoreMock.getTaskPrimaryView = 'maps';
+    preferencesStoreMock.getTaskMapView = 'map-1';
+    preferencesStoreMock.getMapObjectiveColorMode = 'task';
+    metadataStoreMock.mapsWithSvg = [{ id: 'map-1', name: 'Map One' }];
+    progressStoreMock.unlockedTasks = { 'task-shown': { self: true } };
+    await mountPage();
+    const inlineMap = () => wrapper.get('[data-testid="leaflet-map"]');
+    await inlineMap().get('[data-testid="map-marker-hover"]').trigger('click');
+    expect(inlineMap().attributes('data-highlighted-task')).toBe('task-shown');
+    await wrapper.find('[data-testid="map-fullscreen-toggle"]').trigger('click');
+    await flushTransition();
+    const fullscreenMap = () =>
+      wrapper.get('[data-testid="map-fullscreen-overlay"] [data-testid="leaflet-map"]');
+    expect(fullscreenMap().attributes('data-highlighted-task')).toBe('');
+    await fullscreenMap().get('[data-testid="map-marker-hover"]').trigger('click');
+    expect(fullscreenMap().attributes('data-highlighted-task')).toBe('task-shown');
+    await wrapper.get('[data-testid="map-fullscreen-exit"]').trigger('click');
+    await flushTransition();
+    expect(inlineMap().attributes('data-highlighted-task')).toBe('');
   });
   it('moves user-hidden tasks into their own section and off the map', async () => {
     const shownTask = createDefaultTask({

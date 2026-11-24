@@ -30,7 +30,7 @@ Changes to current player progress held in the current session without confirmat
 _Avoid_: Locally saved progress, account recovery copy
 
 **Superseded recovery copy**:
-An export-only record of unacknowledged progress changes displaced by a deliberate reset or Seasonal rollover.
+A record of unacknowledged progress changes displaced by a deliberate reset or Seasonal rollover. Its owner can export, discard, or explicitly restore it; it is never restored automatically.
 _Avoid_: Pending cloud changes, current progress, automatic restore
 
 ## Relationships
@@ -60,7 +60,8 @@ _Avoid_: Pending cloud changes, current progress, automatic restore
 - **Unsaved progress changes** must not be described as locally saved or recoverable after sign-out.
 - A deliberate reset or Seasonal rollover remains authoritative; older changes must not undo the fresh start or enter a different season.
 - Changes displaced by that reset or rollover stop being **Pending cloud changes**: stop retrying them and explain why they were superseded rather than reporting them as cloud-saved.
-- Retain superseded changes separately as an owner-only **Superseded recovery copy**, labeled with the original mode and season, for export rather than automatic restoration or synchronization.
+- Retain superseded changes separately as an owner-only **Superseded recovery copy**, labeled with the original mode and season. It is never restored or synchronized automatically.
+- The owner may restore a **Superseded recovery copy** after confirming the replacement. A restore replaces only the copy's mode, is refused for a Seasonal copy from another season, and first keeps that mode's current progress as another **Superseded recovery copy**; if that copy cannot be saved or active progress writes are blocked, nothing is restored.
 - A **Superseded recovery copy** is not a promise of durable recovery unless its local save succeeds; the same truthful-save policy applies as for current progress.
 - The app must not automatically expire or delete the only recovery copy of unacknowledged changes to free storage; automatic cleanup is limited to copies proven redundant or safely cloud-saved.
 - Storage or saving failures must explain which destination failed, what progress is affected, and whether a confirmed recoverable copy exists.
@@ -79,7 +80,7 @@ _Avoid_: Pending cloud changes, current progress, automatic restore
 > **Tracker maintainer:** "You can keep tracking, but those are **Unsaved progress changes**. Export your progress before leaving; we cannot promise to recover those changes after a reload or sign-out."
 >
 > **Player:** "I reset my progress on another device while this one was offline. Will these old completions undo my reset?"
-> **Tracker maintainer:** "No. The reset wins. Those completions stop retrying and remain separate in a **Superseded recovery copy** for you to export, subject to successful local storage."
+> **Tracker maintainer:** "No. The reset wins. Those completions stop retrying and remain separate in a **Superseded recovery copy**, subject to successful local storage. You can export it, or restore it yourself if the reset was a mistake."
 >
 > **Player:** "The browser cannot save more progress. Should I clear this site's data?"
 > **Tracker maintainer:** "Not while it holds your only recovery copy. We should explain what failed and help you export or retry saving before you decide whether to remove any data."
@@ -93,6 +94,6 @@ _Avoid_: Pending cloud changes, current progress, automatic restore
 - "Cloud sync pending" does not mean progress is lost or safely stored locally — resolved: local-save confirmation and cloud acknowledgement are separate facts.
 - "Sign out" could imply either ending account access or removing device data — resolved: ordinary sign-out retains the **Account recovery copy**; device-data removal is a separate explicit action.
 - "Cloud sync pending" alone does not distinguish locally recoverable changes from memory-only changes — resolved: **Unsaved progress changes** require an explicit warning about the lack of a confirmed save.
-- "Keep retrying until saved" conflicts with an intentional fresh start — resolved: superseded changes stop retrying and become export-only recovery data; supersession is not cloud-save acknowledgement.
+- "Keep retrying until saved" conflicts with an intentional fresh start — resolved: superseded changes stop retrying and become recovery data that only an explicit owner action can restore; supersession is not cloud-save acknowledgement.
 - "Free up storage" could mean removing disposable duplicates or destroying the only recovery copy — resolved: automatic cleanup must not discard otherwise-unrecoverable changes, and failure guidance must explain the risk and safe recovery options.
 - "Offline sign-out remains available" does not mean discarding memory-only changes without consent — resolved: deliberate sign-out requires an explicit loss-risk confirmation when those changes would be discarded.

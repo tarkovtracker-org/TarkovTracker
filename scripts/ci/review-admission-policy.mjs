@@ -15,9 +15,10 @@ export function isCrowdinRepository(repository) {
     repository?.id === CROWDIN_REPOSITORY.id,
   ].every(Boolean);
 }
-// Deliberately pinned: new locale codes require an explicit review of exemption scope.
+// Deliberately pinned: new locale codes require an explicit review of exemption scope. A code may
+// be listed before the app loads it (`tr` is a Crowdin target awaiting translations).
 const CROWDIN_TRANSLATIONS = new Set(
-  ['cs', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'uk', 'zh'].map(
+  ['cs', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'tr', 'uk', 'zh'].map(
     (code) => `app/locales/${code}.json`
   )
 );
@@ -84,6 +85,17 @@ export class AdmissionPending extends Error {}
 export class AdmissionHeld extends AdmissionDenied {}
 export function requireEvidence(condition, message) {
   if (!condition) throw new AdmissionDenied(message);
+}
+// A just-dispatched run can return 404 briefly before the API shows it. Treat that as pending so
+// the caller's bounded poll retries; every other read failure stays fatal.
+export function pendingWhileMissing(read) {
+  try {
+    return read();
+  } catch (error) {
+    if (/\(HTTP 404\)/.test(String(error?.stderr)))
+      throw new AdmissionPending('Admission run is not visible yet.');
+    throw error;
+  }
 }
 function requirePolicy(condition, message) {
   if (!condition) throw new AdmissionHeld(message);

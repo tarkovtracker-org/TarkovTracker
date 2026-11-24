@@ -38,6 +38,7 @@ vi.mock('@/stores/useProgress', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
+    getTraderReputation: () => 0.25,
     getTraderLevel: (id: string) => mockState.traderLevels[id] ?? 0,
   }),
 }));
@@ -149,6 +150,18 @@ describe('useHideoutStationStatus', () => {
     const { getStationStatus, isSkillReqMet } = useHideoutStationStatus();
     expect(isSkillReqMet(requirement)).toBe(true);
     expect(getStationStatus(station)).toBe('available');
+  });
+  it('checks trader reputation independently of loyalty level', () => {
+    mockState.traderLevels.mechanic = 4;
+    const { isTraderReqMet } = useHideoutStationStatus();
+    const req: TraderRequirement = {
+      id: 'standing',
+      trader: { id: 'mechanic', name: 'Mechanic' },
+      value: 0.3,
+      requirementType: 'reputation',
+    };
+    expect(isTraderReqMet(req)).toBe(false);
+    expect(isTraderReqMet({ ...req, value: 0.25 })).toBe(true);
   });
   it('returns locked when a trader requirement is unmet', () => {
     const { stationRequirement, skillRequirement, traderRequirement } = createRequirements();

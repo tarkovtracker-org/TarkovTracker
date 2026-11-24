@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ObjectiveCountControls from '@/features/tasks/ObjectiveCountControls.vue';
 import ObjectiveItemDisplay from '@/features/tasks/ObjectiveItemDisplay.vue';
+import ObjectiveRequiredItems from '@/features/tasks/ObjectiveRequiredItems.vue';
 import TaskObjective from '@/features/tasks/TaskObjective.vue';
 import type { TaskObjective as Objective } from '@/types/tarkov';
 const { toggle, setCount, fullObjectives, isComplete, isTaskComplete } = vi.hoisted(() => ({
@@ -119,6 +120,180 @@ describe('TaskObjective interaction boundaries', () => {
     const wrapper = createWrapper({ type: 'sellItem', item });
     expect(wrapper.getComponent(ObjectiveItemDisplay).props('primaryItem')).toEqual(item);
   });
+  it('shows all distinct weapon alternatives apart from the other required equipment', async () => {
+    const weapons = Array.from({ length: 55 }, (_, index) => ({
+      id: `weapon-${index}`,
+      name: `Weapon ${index}`,
+    }));
+    const mod = { id: 'mod' };
+    const gear = { id: 'gear' };
+    fullObjectives.push({
+      id: 'objective-1',
+      type: 'shoot',
+      usingWeapon: [...weapons, weapons[0]!, { id: '' }],
+      usingWeaponMods: [[mod]],
+      wearing: [[gear]],
+    });
+    const wrapper = createWrapper({ type: 'shoot', usingWeapon: [weapons[0]!] });
+    expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual(weapons);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([mod, gear]);
+    await wrapper.get('[data-testid="accepted-items"] button').trigger('click');
+    expect(toggle).not.toHaveBeenCalled();
+    expect(setCount).not.toHaveBeenCalled();
+  });
+  it('keeps a single required weapon and its mods visible inline', () => {
+    const weapon = { id: 'weapon' };
+    const mod = { id: 'mod' };
+    const wrapper = createWrapper({ type: 'shoot', usingWeapon: weapon, usingWeaponMods: [mod] });
+    expect(wrapper.findComponent(ObjectiveItemDisplay).exists()).toBe(false);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([weapon, mod]);
+  });
+  it('groups the hydrated stash pool and keeps independent equipment visible', async () => {
+    const items = Array.from({ length: 8 }, (_, index) => ({ id: `ammo-pack-${index}` }));
+    const equipment = { id: 'required-gear' };
+    fullObjectives.push({
+      id: 'objective-1',
+      type: 'plantItem',
+      items: [...items, items[0]!, { id: '' }],
+      wearing: [[equipment]],
+    });
+    const wrapper = createWrapper({ type: 'plantItem', items: [items[0]!] });
+    const display = wrapper.getComponent(ObjectiveItemDisplay);
+    expect(display.props('primaryItem')).toEqual(items[0]);
+    expect(display.props('acceptedItems')).toEqual(items);
+    expect(wrapper.findAllComponents(ObjectiveRequiredItems)).toHaveLength(1);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([equipment]);
+    await wrapper.get('[data-testid="accepted-items"] button').trigger('click');
+    expect(toggle).not.toHaveBeenCalled();
+    await wrapper.get('[data-objective-controls] button').trigger('click');
+    expect(toggle).toHaveBeenCalledExactlyOnceWith('objective-1');
+  });
+  it('keeps a single stash item inline', () => {
+    const item = { id: 'rifle' };
+    const wrapper = createWrapper({ type: 'plantItem', items: [item] });
+    expect(wrapper.findComponent(ObjectiveItemDisplay).exists()).toBe(false);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([item]);
+  });
+  it('groups use-any items without removing the equipment requirement', () => {
+    const useAny = [{ id: 'yellow-flare' }, { id: 'green-flare' }];
+    const equipment = { id: 'flare-pistol' };
+    const wrapper = createWrapper({ type: 'useItem', useAny, usingWeapon: [equipment] });
+    expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual(useAny);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([equipment]);
+  });
+  it('keeps use-any equipment inline on other objective types', () => {
+    const useAny = [{ id: 'first' }, { id: 'second' }];
+    const wrapper = createWrapper({ type: 'shoot', useAny });
+    expect(wrapper.findComponent(ObjectiveItemDisplay).exists()).toBe(false);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual(useAny);
+  });
+  it('keeps alternative weapon mods and wearable items in separate lists', () => {
+    const mods = [{ id: 'mod-1' }, { id: 'mod-2' }];
+    const headsets = ['headset-1', 'headset-2'].map((id) => ({
+      id,
+      properties: { propertiesType: 'ItemPropertiesHeadphone' },
+    }));
+    const weapon = { id: 'weapon' };
+    const wrapper = createWrapper({
+      type: 'shoot',
+      usingWeapon: weapon,
+      usingWeaponMods: mods.map((mod) => [mod]),
+      wearing: headsets.map((headset) => [headset]),
+    });
+    const equipment = wrapper.getComponent(ObjectiveRequiredItems);
+    expect(equipment.props()).toMatchObject({
+      equipment: [weapon],
+      acceptedEquipment: [mods, headsets],
+    });
+  });
+  it('keeps equipment that must be worn or mounted together visible', () => {
+    const mods = [{ id: 'suppressor' }, { id: 'scope' }];
+    const beanie = { id: 'beanie', properties: { propertiesType: 'ItemPropertiesHelmet' } };
+    const glasses = { id: 'glasses', properties: { propertiesType: 'ItemPropertiesGlasses' } };
+    const wrapper = createWrapper({
+      type: 'shoot',
+      usingWeaponMods: [mods],
+      wearing: [[beanie], [glasses]],
+    });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([
+      ...mods,
+      beanie,
+      glasses,
+    ]);
+  });
+  it('keeps named gear with unknown kinds inline', () => {
+    const hat = { id: 'hat', name: 'Hat' };
+    const glasses = { id: 'glasses', name: 'Glasses' };
+    const wrapper = createWrapper({ type: 'shoot', wearing: [[hat], [glasses]] });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props()).toMatchObject({
+      equipment: [hat, glasses],
+      acceptedEquipment: [],
+    });
+  });
+  it('groups the verified face covers whose lite data omits the equipment kind', () => {
+    const respirator = { id: '59e7715586f7742ee5789605' };
+    const gasMask = { id: '5b432c305acfc40019478128' };
+    const wrapper = createWrapper({ type: 'shoot', wearing: [[respirator], [gasMask]] });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props()).toMatchObject({
+      equipment: [],
+      acceptedEquipment: [[respirator, gasMask]],
+    });
+  });
+  it('shows each independent slot of an outfit as its own choice', () => {
+    const hats = [{ id: 'ushanka' }, { id: 'domont' }];
+    const rigs = [{ id: 'vest' }, { id: 'jaypc' }];
+    const wearing = hats.flatMap((hat) => rigs.map((rig) => [hat, rig]));
+    const wrapper = createWrapper({ type: 'shoot', wearing });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props()).toMatchObject({
+      equipment: [],
+      acceptedEquipment: [hats, rigs],
+    });
+  });
+  it('does not offer independent choices for restricted outfits', () => {
+    const first = [{ id: 'hat-1' }, { id: 'rig-1' }];
+    const second = [{ id: 'hat-2' }, { id: 'rig-2' }];
+    const wrapper = createWrapper({ type: 'shoot', wearing: [first, second] });
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props()).toMatchObject({
+      equipment: [...first, ...second],
+      acceptedEquipment: [],
+    });
+  });
+  it('keeps overlapping use-any items out of the equipment strip', () => {
+    const first = { id: 'first' };
+    const second = { id: 'second' };
+    const otherItem = { id: 'other-item' };
+    const equipment = { id: 'required-gear' };
+    const wrapper = createWrapper({
+      type: 'useItem',
+      useAny: [first, second],
+      items: [first, otherItem, second],
+      wearing: [[equipment]],
+    });
+    expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual([
+      first,
+      second,
+    ]);
+    expect(wrapper.getComponent(ObjectiveRequiredItems).props('equipment')).toEqual([
+      otherItem,
+      equipment,
+    ]);
+  });
+  it.each([false, true])(
+    'groups use objectives backed by items (duplicate use-any entries: %s)',
+    (hasUseAny) => {
+      const items = [{ id: 'first' }, { id: 'second' }];
+      const required = { id: 'required' };
+      const wrapper = createWrapper({
+        type: 'useItem',
+        items,
+        useAny: hasUseAny ? [required, required] : undefined,
+      });
+      expect(wrapper.getComponent(ObjectiveItemDisplay).props('acceptedItems')).toEqual(items);
+      expect(
+        wrapper.findAllComponents(ObjectiveRequiredItems).map((row) => row.props('equipment'))
+      ).toEqual(hasUseAny ? [[required]] : []);
+    }
+  );
   it('lets display clicks reach outside-dismissal listeners without changing progress', async () => {
     const wrapper = createWrapper({ type: 'sellItem', items: [{ id: 'a' }, { id: 'b' }] });
     const host = document.createElement('div');

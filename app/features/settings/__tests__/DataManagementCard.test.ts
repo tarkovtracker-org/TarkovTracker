@@ -30,6 +30,11 @@ const {
   backupFns: {
     confirmBackupImport: vi.fn(async () => undefined),
     exportDebugSnapshot: vi.fn(async () => undefined),
+    serializeDebugSnapshot: vi.fn(async () => '{"_format":"tarkovtracker-debug-export"}'),
+    copyToClipboard: vi.fn(async (text: string | Promise<string>, _options?: unknown) => {
+      await text;
+      return true;
+    }),
     exportProgress: vi.fn(async () => undefined),
     exportDeviceProgressRecovery: vi.fn(async () => {
       backupState.recoveryExportPending.value = true;
@@ -46,6 +51,10 @@ const {
     selectedRecoveryArchiveEntry: {} as Ref<number | null>,
     legacyProgressRecoveryCount: { __v_isRef: true as const, value: 0 },
     legacyProgressRecoveryOverflow: { __v_isRef: true as const, value: false },
+    recoveryCopiesImport: {
+      __v_isRef: true as const,
+      value: null as { added: number; alreadyPresent: number } | null,
+    },
     debugExportError: { __v_isRef: true as const, value: null as string | null },
     exportError: { __v_isRef: true as const, value: null as string | null },
     importError: { __v_isRef: true as const, value: null as string | null },
@@ -133,6 +142,7 @@ vi.mock('@/composables/useTurnstile', () => ({
 vi.mock('@/composables/useDataBackup', () => ({
   useDataBackup: () => ({
     exportDebugSnapshot: backupFns.exportDebugSnapshot,
+    serializeDebugSnapshot: backupFns.serializeDebugSnapshot,
     debugExportError: backupState.debugExportError,
     exportProgress: backupFns.exportProgress,
     exportDeviceProgressRecovery: backupFns.exportDeviceProgressRecovery,
@@ -144,6 +154,7 @@ vi.mock('@/composables/useDataBackup', () => ({
     reviewOlderTabProgress: backupFns.reviewOlderTabProgress,
     legacyProgressRecoveryCount: backupState.legacyProgressRecoveryCount,
     legacyProgressRecoveryOverflow: backupState.legacyProgressRecoveryOverflow,
+    recoveryCopiesImport: backupState.recoveryCopiesImport,
     exportError: backupState.exportError,
     importState: backupState.importState,
     importPreview: backupState.importPreview,
@@ -152,6 +163,9 @@ vi.mock('@/composables/useDataBackup', () => ({
     confirmBackupImport: backupFns.confirmBackupImport,
     resetImport: backupFns.resetImport,
   }),
+}));
+vi.mock('@/composables/useCopyToClipboard', () => ({
+  useCopyToClipboard: () => ({ copyToClipboard: backupFns.copyToClipboard }),
 }));
 vi.mock('@/composables/useTarkovDevImport', () => ({
   useTarkovDevImport: () => ({
@@ -239,6 +253,10 @@ describe('DataManagementCard', () => {
   beforeEach(() => {
     backupFns.confirmBackupImport.mockReset();
     backupFns.exportDebugSnapshot.mockReset();
+    backupFns.serializeDebugSnapshot
+      .mockReset()
+      .mockResolvedValue('{"_format":"tarkovtracker-debug-export"}');
+    backupFns.copyToClipboard.mockClear();
     backupFns.exportProgress.mockReset();
     backupState.recoveryExportPending = ref(false);
     backupState.recoveryArchiveEntries = ref([]);
@@ -249,6 +267,7 @@ describe('DataManagementCard', () => {
     });
     backupState.legacyProgressRecoveryCount.value = 0;
     backupState.legacyProgressRecoveryOverflow.value = false;
+    backupState.recoveryCopiesImport.value = null;
     backupFns.parseBackupFile.mockReset();
     backupFns.resetImport.mockReset();
     tarkovDevFns.confirmImport.mockReset();
@@ -584,13 +603,14 @@ describe('DataManagementCard', () => {
     ).toBeTruthy();
     expect(findButtonByText(wrapper, 'settings.data_management.export_button')).toBeUndefined();
     expect(
-      findButtonByText(wrapper, 'settings.data_management.debug_export_button')
+      findButtonByText(wrapper, 'settings.data_management.bug_report_download')
     ).toBeUndefined();
   });
   it('limits the backup view to backup and debug actions', () => {
     const wrapper = createWrapper({ view: 'backup' });
     expect(findButtonByText(wrapper, 'settings.data_management.export_button')).toBeTruthy();
-    expect(findButtonByText(wrapper, 'settings.data_management.debug_export_button')).toBeTruthy();
+    expect(findButtonByText(wrapper, 'settings.data_management.bug_report_download')).toBeTruthy();
+    expect(findButtonByText(wrapper, 'settings.data_management.bug_report_copy')).toBeTruthy();
     expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
     expect(
       findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
@@ -619,16 +639,68 @@ describe('DataManagementCard', () => {
       throw new Error('debug export failed');
     });
     const wrapper = createWrapper();
-    const exportButton = findButtonByText(wrapper, 'settings.data_management.debug_export_button');
+    const exportButton = findButtonByText(wrapper, 'settings.data_management.bug_report_download');
     expect(exportButton).toBeTruthy();
     await exportButton!.trigger('click');
     expect(toastAddMock).toHaveBeenCalledWith(
       expect.objectContaining({
         color: 'error',
         description: 'Debug export failed',
-        title: 'settings.data_management.debug_export_error_title',
+        title: 'settings.data_management.bug_report_error_title',
       })
     );
+  });
+  it('copies the sanitized bug report without revealing it in a toast', async () => {
+    const wrapper = createWrapper({ view: 'backup' });
+    await findButtonByText(wrapper, 'settings.data_management.bug_report_copy')!.trigger('click');
+    await vi.waitFor(() => expect(backupFns.copyToClipboard).toHaveBeenCalledOnce());
+    const [text, options] = backupFns.copyToClipboard.mock.calls[0]!;
+    // Passed unresolved so Safari keeps the clipboard write inside the click.
+    expect(text).toBeInstanceOf(Promise);
+    await expect(text).resolves.toBe('{"_format":"tarkovtracker-debug-export"}');
+    expect(options).toEqual({ revealValue: false });
+    expect(backupFns.exportDebugSnapshot).not.toHaveBeenCalled();
+  });
+  it('shows toast when copying the bug report fails', async () => {
+    backupState.debugExportError.value = 'Debug export failed';
+    backupFns.serializeDebugSnapshot.mockRejectedValue(new Error('debug export failed'));
+    const wrapper = createWrapper({ view: 'backup' });
+    await findButtonByText(wrapper, 'settings.data_management.bug_report_copy')!.trigger('click');
+    await vi.waitFor(() =>
+      expect(toastAddMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          color: 'error',
+          description: 'Debug export failed',
+          title: 'settings.data_management.bug_report_error_title',
+        })
+      )
+    );
+  });
+  it('disables both bug report actions during an import', () => {
+    backupState.importState.value = 'parsing';
+    const wrapper = createWrapper({ view: 'backup' });
+    for (const label of ['bug_report_download', 'bug_report_copy']) {
+      const button = findButtonByText(wrapper, `settings.data_management.${label}`);
+      expect(button?.attributes('disabled')).toBeDefined();
+    }
+  });
+  it('runs one bug report action at a time', async () => {
+    let finish!: () => void;
+    backupFns.exportDebugSnapshot.mockImplementation(
+      () => new Promise<undefined>((resolve) => (finish = () => resolve(undefined)))
+    );
+    const wrapper = createWrapper({ view: 'backup' });
+    await findButtonByText(wrapper, 'settings.data_management.bug_report_download')!.trigger(
+      'click'
+    );
+    const copy = findButtonByText(wrapper, 'settings.data_management.bug_report_copy')!;
+    expect(copy.attributes('disabled')).toBeDefined();
+    // Exercise the in-flight guard itself, not only the disabled attribute.
+    copy.element.removeAttribute('disabled');
+    await copy.trigger('click');
+    expect(backupFns.serializeDebugSnapshot).not.toHaveBeenCalled();
+    finish();
+    await vi.waitFor(() => expect(copy.attributes('disabled')).toBeUndefined());
   });
   it('confirms backup import and shows success toast', async () => {
     backupState.importState.value = 'preview';
@@ -1319,6 +1391,46 @@ describe('DataManagementCard', () => {
     const wrapper = createWrapper({ view: 'backup' });
     await wrapper.get('[data-testid="recovery-archive-entry-1"]').trigger('click');
     expect(backupFns.reviewRecoveryArchiveEntry).toHaveBeenCalledWith(1);
+  });
+  it('keeps the device archive behind a quiet link until older edits need recovery', async () => {
+    const wrapper = createWrapper({ view: 'backup' });
+    expect(wrapper.find('[data-testid="recovery-copies"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="device-progress-recovery-export"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="device-recovery-archive-download"]').trigger('click');
+    expect(backupFns.exportDeviceProgressRecovery).toHaveBeenCalledOnce();
+    expect(wrapper.find('[data-testid="older-tab-cleanup-confirm"]').exists()).toBe(false);
+  });
+  it('announces recovery copies added from a superseded-progress file', async () => {
+    backupFns.parseBackupFile.mockImplementation(async () => {
+      backupState.recoveryCopiesImport.value = { added: 2, alreadyPresent: 0 };
+    });
+    const wrapper = createWrapper({ view: 'backup' });
+    await asVm<{ handleBackupFileChange: (event: Event) => Promise<void> }>(
+      wrapper.vm
+    ).handleBackupFileChange({
+      target: { files: [new File(['{}'], 'copies.json')], value: 'selected' },
+    } as unknown as Event);
+    expect(toastAddMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        color: 'success',
+        title: 'settings.data_management.recovery_copies_added:{"count":2}',
+      })
+    );
+  });
+  it('says so when a superseded-progress file adds nothing new', async () => {
+    backupFns.parseBackupFile.mockImplementation(async () => {
+      backupState.recoveryCopiesImport.value = { added: 0, alreadyPresent: 3 };
+    });
+    const wrapper = createWrapper({ view: 'backup' });
+    await asVm<{ handleBackupFileChange: (event: Event) => Promise<void> }>(
+      wrapper.vm
+    ).handleBackupFileChange({
+      target: { files: [new File(['{}'], 'copies.json')], value: 'selected' },
+    } as unknown as Event);
+    expect(toastAddMock).toHaveBeenCalledWith({
+      color: 'info',
+      title: 'settings.data_management.recovery_copies_already_present',
+    });
   });
   it('offers export and cleanup when uncaptured older edits fill recovery', async () => {
     backupState.legacyProgressRecoveryOverflow.value = true;

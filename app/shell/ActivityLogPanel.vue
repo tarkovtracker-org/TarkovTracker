@@ -1,8 +1,8 @@
 <template>
-  <div class="w-80 p-4">
+  <div class="w-[min(20rem,calc(100vw-1rem))] p-4">
     <div class="border-surface-700 mb-3 flex items-center justify-between border-b pb-2">
       <div class="flex items-center gap-2">
-        <UIcon name="i-heroicons-bell" class="text-primary-400 h-4 w-4" />
+        <UIcon name="i-lucide-bell" class="text-primary-400 h-4 w-4" />
         <h3 class="text-surface-50 text-sm font-semibold">
           {{ t('common.activity_log', 'Activity Log') }}
         </h3>

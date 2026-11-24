@@ -92,6 +92,25 @@ export function gameToLatLng(x: number, z: number): { lat: number; lng: number }
   return { lat: z, lng: x };
 }
 /**
+ * Converts a Leaflet LatLng back to game coordinates; the inverse of {@link gameToLatLng}.
+ * The map CRS already undoes the map rotation, so no rotation is applied here.
+ * @param latLng Leaflet lat/lng from the map's CRS
+ * @returns Game X and Z coordinates (the map has no height, so Y is unknown)
+ */
+export function latLngToGame(latLng: { lat: number; lng: number }): { x: number; z: number } {
+  return { x: latLng.lng, z: latLng.lat };
+}
+/**
+ * Formats a game coordinate for display and bug reports: two decimals, like the task data,
+ * with a dot separator in every locale so the value can be pasted into data files.
+ * @param value Game coordinate
+ * @returns Coordinate with two decimals, never "-0.00"
+ */
+export function formatGameCoordinate(value: number): string {
+  const fixed = value.toFixed(2);
+  return fixed === '-0.00' ? '0.00' : fixed;
+}
+/**
  * Converts an array of outline points (zone polygon) to Leaflet LatLng array.
  * @param outline Array of {x, z} points defining the zone boundary
  * @returns Array of Leaflet LatLng coordinates
@@ -183,6 +202,9 @@ export function getLeafletMapOptions(
   const crs = config ? createMapCRS(L, config) : L.CRS.Simple;
   return {
     crs,
+    // ResizeObserver owns invalidation/refitting; Leaflet's window handler can shift
+    // the center first and make an untouched map appear user-panned.
+    trackResize: false,
     minZoom: config?.minZoom ?? 1,
     maxZoom: config?.maxZoom ?? 6,
     zoomSnap: 0.25,
@@ -200,11 +222,13 @@ export function getLeafletMapOptions(
     scrollWheelZoom: false, // Disabled default scroll zoom to allow Shift+Scroll interaction
   } as L.MapOptions;
 }
-/**
- * Validates map SVG configuration.
- * @param svg Map SVG configuration object
- * @returns True if configuration is valid
- */
+function isBoundPair(pair: unknown): boolean {
+  return Array.isArray(pair) && pair.length === 2 && [pair[0], pair[1]].every(Number.isFinite);
+}
+function isMapBounds(bounds: unknown): boolean {
+  return Array.isArray(bounds) && bounds.length === 2 && [bounds[0], bounds[1]].every(isBoundPair);
+}
+/** Validates the complete SVG bounds before any coordinate consumer indexes them. */
 export function isValidMapSvgConfig(svg: unknown): svg is MapSvgConfig {
   if (!svg || typeof svg !== 'object') return false;
   const config = svg as Record<string, unknown>;
@@ -214,8 +238,7 @@ export function isValidMapSvgConfig(svg: unknown): svg is MapSvgConfig {
     config.floors.length > 0 &&
     typeof config.defaultFloor === 'string' &&
     typeof config.coordinateRotation === 'number' &&
-    Array.isArray(config.bounds) &&
-    config.bounds.length >= 2
+    isMapBounds(config.bounds)
   );
 }
 export function isValidMapTileConfig(tile: unknown): tile is MapTileConfig {
@@ -228,8 +251,7 @@ export function isValidMapTileConfig(tile: unknown): tile is MapTileConfig {
   return (
     typeof config.tilePath === 'string' &&
     typeof config.coordinateRotation === 'number' &&
-    Array.isArray(config.bounds) &&
-    config.bounds.length >= 2 &&
+    isMapBounds(config.bounds) &&
     hasValidFallbacks
   );
 }

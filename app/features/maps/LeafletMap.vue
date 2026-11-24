@@ -26,7 +26,7 @@
     </div>
     <template v-else>
       <div
-        class="pointer-events-none absolute inset-x-2 top-2 z-1000 flex flex-wrap items-start justify-between gap-2"
+        class="pointer-events-none absolute inset-2 z-1000 flex flex-wrap content-start items-start justify-between gap-2 @max-[30rem]:static @max-[30rem]:mb-2"
       >
         <AppTooltip
           v-if="hasMultipleFloors"
@@ -34,18 +34,20 @@
           :content="{ side: 'right' }"
         >
           <div
-            class="bg-surface-850/95 pointer-events-auto flex shrink-0 flex-col gap-1 rounded-lg border border-white/8 p-1.5 shadow-lg"
+            class="bg-surface-850/95 pointer-events-auto flex shrink-0 flex-col gap-1 rounded-lg border border-white/8 p-1.5 shadow-lg @max-[30rem]:w-full @max-[30rem]:flex-row @max-[30rem]:items-center"
           >
             <span class="text-surface-400 px-1 text-[10px] font-medium tracking-wide uppercase">
               {{ t('maps.floors') }}
             </span>
-            <div class="flex flex-col-reverse gap-0.5">
+            <div
+              class="flex flex-col-reverse gap-0.5 @max-[30rem]:min-w-0 @max-[30rem]:flex-row @max-[30rem]:flex-wrap"
+            >
               <button
                 v-for="floor in floors"
                 :key="floor"
                 type="button"
                 :aria-pressed="floor === selectedFloor"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-full items-center rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-full items-center rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 @max-[30rem]:w-auto"
                 :class="
                   floor === selectedFloor
                     ? 'bg-primary-500/15 text-surface-50'
@@ -63,340 +65,268 @@
           </div>
         </AppTooltip>
         <div
-          class="bg-surface-850/95 pointer-events-auto order-first ml-auto flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-white/8 p-1 shadow-lg @min-[30rem]:order-last"
-          data-testid="map-toolbar"
+          class="pointer-events-none order-first ml-auto flex max-h-full min-h-0 max-w-full flex-col items-end gap-2 pb-40 @max-[30rem]:w-full @max-[30rem]:pb-0 @min-[30rem]:order-last"
         >
-          <div class="flex flex-wrap items-center gap-1">
+          <div
+            class="bg-surface-850/95 pointer-events-auto flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-white/8 p-1 shadow-lg"
+            data-testid="map-toolbar"
+          >
             <button
-              v-if="props.showExtractToggle"
+              v-if="layerGroups.length > 0"
               type="button"
-              :aria-pressed="showPmcExtracts"
+              data-testid="map-layers-toggle"
+              :aria-expanded="isLayersPanelOpen"
+              :aria-controls="layersPanelId"
               class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="showPmcExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-              @click="showPmcExtracts = !showPmcExtracts"
+              :class="isLayersPanelOpen ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
+              @click="isLayersPanelOpen = !isLayersPanelOpen"
             >
-              <UIcon name="i-mdi-shield-account-outline" class="h-4 w-4 shrink-0" />
-              <span class="whitespace-nowrap">{{ t('maps.factions.pmc') }}</span>
-            </button>
-            <button
-              v-if="props.showExtractToggle"
-              type="button"
-              :aria-pressed="showScavExtracts"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="showScavExtracts ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-              @click="showScavExtracts = !showScavExtracts"
-            >
-              <UIcon name="i-mdi-skull-outline" class="h-4 w-4 shrink-0" />
-              <span class="whitespace-nowrap">{{ t('common.scav') }}</span>
-            </button>
-            <button
-              v-if="props.showSpawnToggle && hasPmcSpawns"
-              type="button"
-              :aria-pressed="showPmcSpawns"
-              class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              :class="showPmcSpawns ? MAP_BUTTON_ACTIVE_CLASS : MAP_BUTTON_INACTIVE_CLASS"
-              @click="showPmcSpawns = !showPmcSpawns"
-            >
-              <UIcon name="i-mdi-crosshairs-gps" class="h-4 w-4 shrink-0" />
-              <span class="whitespace-nowrap">{{ t('maps.layers.pmc_spawns') }}</span>
-            </button>
-          </div>
-          <div class="mx-1 h-6 w-px bg-white/10" />
-          <div class="flex items-center gap-1">
-            <AppTooltip
-              :text="t('settings.interface.maps.colors.title')"
-              :disabled="mapColorsOpen"
-              :content="{ side: 'bottom' }"
-            >
-              <UPopover
-                v-model:open="mapColorsOpen"
-                arrow
-                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-                @update:open="onPopoverOpenChange('colors', $event)"
+              <UIcon name="i-mdi-layers-outline" class="h-4 w-4 shrink-0" />
+              <span class="whitespace-nowrap">{{ t('maps.layers.title') }}</span>
+              <span
+                v-if="hiddenLayerCount > 0"
+                data-testid="map-layers-hidden-count"
+                class="bg-surface-700 text-surface-200 rounded-full px-1.5 py-px text-[10px] leading-4 tabular-nums"
               >
-                <button
-                  :ref="(el) => (popoverTriggers.colors = el as HTMLElement | null)"
-                  type="button"
-                  :aria-label="t('settings.interface.maps.colors.title')"
-                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  :class="
-                    mapColorsOpen
-                      ? MAP_BUTTON_ACTIVE_CLASS
-                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
-                  "
+                {{ t('maps.layers.hidden_count', { count: hiddenLayerCount }) }}
+              </span>
+              <UIcon
+                :name="isLayersPanelOpen ? 'i-mdi-chevron-up' : 'i-mdi-chevron-down'"
+                class="h-4 w-4 shrink-0 opacity-70"
+              />
+            </button>
+            <div v-if="layerGroups.length > 0" class="mx-1 h-6 w-px bg-white/10" />
+            <div class="flex items-center gap-1">
+              <AppTooltip
+                :text="t('settings.interface.maps.colors.title')"
+                :disabled="mapColorsOpen"
+                :content="{ side: 'bottom' }"
+              >
+                <UPopover
+                  v-model:open="mapColorsOpen"
+                  arrow
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                  @update:open="onPopoverOpenChange('colors', $event)"
                 >
-                  <UIcon name="i-mdi-palette" class="h-4 w-4" />
-                </button>
-                <template #content>
-                  <div class="w-80 space-y-3 p-3 md:w-96">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="space-y-0.5">
-                        <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                          {{ t('settings.interface.maps.colors.title') }}
-                        </p>
-                        <p class="text-surface-400 text-xs">
-                          {{ t('settings.interface.maps.colors.description') }}
-                        </p>
+                  <button
+                    :ref="(el) => (popoverTriggers.colors = el as HTMLElement | null)"
+                    type="button"
+                    :aria-label="t('settings.interface.maps.colors.title')"
+                    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    :class="
+                      mapColorsOpen
+                        ? MAP_BUTTON_ACTIVE_CLASS
+                        : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                    "
+                  >
+                    <UIcon name="i-mdi-palette" class="h-4 w-4" />
+                  </button>
+                  <template #content>
+                    <div class="w-80 space-y-3 p-3 md:w-96">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="space-y-0.5">
+                          <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                            {{ t('settings.interface.maps.colors.title') }}
+                          </p>
+                          <p class="text-surface-400 text-xs">
+                            {{ t('settings.interface.maps.colors.description') }}
+                          </p>
+                        </div>
+                        <UButton
+                          color="neutral"
+                          size="xs"
+                          variant="ghost"
+                          @click="preferencesStore.resetMapMarkerColors()"
+                        >
+                          {{ t('common.reset') }}
+                        </UButton>
                       </div>
-                      <UButton
-                        color="neutral"
-                        size="xs"
-                        variant="ghost"
-                        @click="preferencesStore.resetMapMarkerColors()"
-                      >
-                        {{ t('common.reset') }}
-                      </UButton>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                      <label
-                        v-for="option in mapColorOptions"
-                        :key="option.key"
-                        class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
-                      >
-                        <span class="flex min-w-0 items-center gap-2">
-                          <span
-                            class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
-                            :style="{ backgroundColor: mapColors[option.key] }"
-                          />
-                          <span class="text-surface-200 text-[11px] font-medium">
-                            {{ option.label }}
+                      <MapObjectiveColorControls class="border-surface-700 border-b pb-3" />
+                      <div class="grid grid-cols-2 gap-2">
+                        <label
+                          v-for="option in mapColorOptions"
+                          :key="option.key"
+                          class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
+                        >
+                          <span class="flex min-w-0 items-center gap-2">
+                            <span
+                              class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
+                              :style="{ backgroundColor: mapColors[option.key] }"
+                            />
+                            <span class="text-surface-200 text-[11px] font-medium">
+                              {{ option.label }}
+                            </span>
                           </span>
-                        </span>
-                        <input
-                          :aria-label="option.label"
-                          :value="mapColors[option.key]"
-                          type="color"
-                          class="bg-surface-900 border-surface-700 h-7 w-9 shrink-0 cursor-pointer rounded border p-1"
-                          @input="onMapColorInput(option.key, $event)"
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </template>
-              </UPopover>
-            </AppTooltip>
-            <AppTooltip
-              :text="t('maps.map_settings')"
-              :disabled="mapSettingsOpen"
-              :content="{ side: 'bottom' }"
-            >
-              <UPopover
-                v-model:open="mapSettingsOpen"
-                arrow
-                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-                @update:open="onPopoverOpenChange('settings', $event)"
-              >
-                <button
-                  :ref="(el) => (popoverTriggers.settings = el as HTMLElement | null)"
-                  type="button"
-                  :aria-label="t('maps.map_settings')"
-                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  :class="
-                    mapSettingsOpen
-                      ? MAP_BUTTON_ACTIVE_CLASS
-                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
-                  "
-                >
-                  <UIcon name="i-mdi-cog" class="h-4 w-4" />
-                </button>
-                <template #content>
-                  <div class="w-56 space-y-2 p-3">
-                    <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                      {{ t('maps.map_settings') }}
-                    </p>
-                    <div class="space-y-2">
-                      <div class="space-y-1">
-                        <div
-                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                        >
-                          <span>{{ t('common.zoom_speed') }}</span>
-                          <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
-                        </div>
-                        <input
-                          v-model.number="mapZoomSpeed"
-                          type="range"
-                          :min="ZOOM_SPEED_MIN"
-                          :max="ZOOM_SPEED_MAX"
-                          step="0.1"
-                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                          :aria-label="t('common.zoom_speed')"
-                        />
-                      </div>
-                      <div class="space-y-1">
-                        <div
-                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                        >
-                          <span>{{ t('common.pan_speed') }}</span>
-                          <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
-                        </div>
-                        <input
-                          v-model.number="mapPanSpeed"
-                          type="range"
-                          :min="PAN_SPEED_MIN"
-                          :max="PAN_SPEED_MAX"
-                          step="0.1"
-                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                          :aria-label="t('common.pan_speed')"
-                        />
-                      </div>
-                      <div class="space-y-1">
-                        <div
-                          class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
-                        >
-                          <span>{{ t('common.zone_opacity') }}</span>
-                          <span class="text-surface-200 tabular-nums">{{ zoneOpacityLabel }}</span>
-                        </div>
-                        <input
-                          v-model.number="mapZoneOpacity"
-                          type="range"
-                          :min="ZONE_OPACITY_MIN"
-                          :max="ZONE_OPACITY_MAX"
-                          step="0.01"
-                          class="accent-primary-500 h-1.5 w-full cursor-pointer"
-                          :aria-label="t('common.zone_opacity')"
-                        />
-                      </div>
-                      <div class="flex items-center justify-between">
-                        <span class="text-surface-400 text-[10px] font-semibold uppercase">
-                          {{ t('maps.tooltip_density') }}
-                        </span>
-                        <button
-                          type="button"
-                          class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors"
-                          :class="
-                            mapTooltipDensity === 'compact'
-                              ? 'bg-surface-600 text-surface-100'
-                              : 'bg-surface-800 text-surface-400 hover:text-surface-200'
-                          "
-                          :aria-label="t('maps.aria.tooltip_density')"
-                          @click="
-                            mapTooltipDensity =
-                              mapTooltipDensity === 'compact' ? 'default' : 'compact'
-                          "
-                        >
-                          {{
-                            mapTooltipDensity === 'compact'
-                              ? t('common.compact')
-                              : t('common.default')
-                          }}
-                        </button>
+                          <input
+                            :aria-label="option.label"
+                            :value="mapColors[option.key]"
+                            type="color"
+                            class="bg-surface-900 border-surface-700 h-7 w-9 shrink-0 cursor-pointer rounded border p-1"
+                            @input="onMapColorInput(option.key, $event)"
+                          />
+                        </label>
                       </div>
                     </div>
-                  </div>
-                </template>
-              </UPopover>
-            </AppTooltip>
-            <AppTooltip
-              :text="t('maps.help.title')"
-              :disabled="mapHelpOpen"
-              :content="{ side: 'bottom' }"
-            >
-              <UPopover
-                v-model:open="mapHelpOpen"
-                arrow
-                :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
-                @update:open="onPopoverOpenChange('help', $event)"
+                  </template>
+                </UPopover>
+              </AppTooltip>
+              <AppTooltip
+                :text="t('maps.map_settings')"
+                :disabled="mapSettingsOpen"
+                :content="{ side: 'bottom' }"
               >
-                <button
-                  :ref="(el) => (popoverTriggers.help = el as HTMLElement | null)"
-                  type="button"
-                  data-testid="map-help-toggle"
-                  :aria-label="t('maps.help.title')"
-                  class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  :class="
-                    mapHelpOpen
-                      ? MAP_BUTTON_ACTIVE_CLASS
-                      : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
-                  "
+                <UPopover
+                  v-model:open="mapSettingsOpen"
+                  arrow
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                  @update:open="onPopoverOpenChange('settings', $event)"
                 >
-                  <span
-                    v-if="!mapHelpSeen"
-                    data-testid="map-help-unseen-dot"
-                    class="bg-primary-400 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
-                  />
-                  <UIcon name="i-mdi-help-circle-outline" class="h-4 w-4" />
-                </button>
-                <template #content>
-                  <div class="w-80 space-y-2.5 p-3">
-                    <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
-                      {{ t('maps.help.title') }}
-                    </p>
-                    <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
-                      <div class="space-y-1">
-                        <p
-                          class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
-                        >
-                          {{ t('maps.help.groups.navigate') }}
-                        </p>
-                        <i18n-t
-                          keypath="maps.help.pan"
-                          tag="p"
-                          scope="global"
-                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                        >
-                          <template #keys>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'WASD' }}
-                            </kbd>
-                            <span>/</span>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ '←↑↓→' }}
-                            </kbd>
-                          </template>
-                        </i18n-t>
-                        <i18n-t
-                          keypath="maps.help.zoom"
-                          tag="p"
-                          scope="global"
-                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                        >
-                          <template #keys>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'Shift' }}
-                            </kbd>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'Scroll' }}
-                            </kbd>
-                            <span>/</span>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'Q/E' }}
-                            </kbd>
-                          </template>
-                        </i18n-t>
-                        <i18n-t
-                          keypath="maps.help.reset"
-                          tag="p"
-                          scope="global"
-                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                        >
-                          <template #key>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'R' }}
-                            </kbd>
-                          </template>
-                        </i18n-t>
+                  <button
+                    :ref="(el) => (popoverTriggers.settings = el as HTMLElement | null)"
+                    type="button"
+                    :aria-label="t('maps.map_settings')"
+                    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    :class="
+                      mapSettingsOpen
+                        ? MAP_BUTTON_ACTIVE_CLASS
+                        : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                    "
+                  >
+                    <UIcon name="i-mdi-cog" class="h-4 w-4" />
+                  </button>
+                  <template #content>
+                    <div class="w-56 space-y-2 p-3">
+                      <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                        {{ t('maps.map_settings') }}
+                      </p>
+                      <div class="space-y-2">
+                        <div class="space-y-1">
+                          <div
+                            class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                          >
+                            <span>{{ t('common.zoom_speed') }}</span>
+                            <span class="text-surface-200 tabular-nums">{{ zoomSpeedLabel }}</span>
+                          </div>
+                          <input
+                            v-model.number="mapZoomSpeed"
+                            type="range"
+                            :min="ZOOM_SPEED_MIN"
+                            :max="ZOOM_SPEED_MAX"
+                            step="0.1"
+                            class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                            :aria-label="t('common.zoom_speed')"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <div
+                            class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                          >
+                            <span>{{ t('common.pan_speed') }}</span>
+                            <span class="text-surface-200 tabular-nums">{{ panSpeedLabel }}</span>
+                          </div>
+                          <input
+                            v-model.number="mapPanSpeed"
+                            type="range"
+                            :min="PAN_SPEED_MIN"
+                            :max="PAN_SPEED_MAX"
+                            step="0.1"
+                            class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                            :aria-label="t('common.pan_speed')"
+                          />
+                        </div>
+                        <div class="space-y-1">
+                          <div
+                            class="text-surface-400 flex items-center justify-between text-[10px] font-semibold uppercase"
+                          >
+                            <span>{{ t('common.zone_opacity') }}</span>
+                            <span class="text-surface-200 tabular-nums">
+                              {{ zoneOpacityLabel }}
+                            </span>
+                          </div>
+                          <input
+                            v-model.number="mapZoneOpacity"
+                            type="range"
+                            :min="ZONE_OPACITY_MIN"
+                            :max="ZONE_OPACITY_MAX"
+                            step="0.01"
+                            class="accent-primary-500 h-1.5 w-full cursor-pointer"
+                            :aria-label="t('common.zone_opacity')"
+                          />
+                        </div>
+                        <div class="flex items-center justify-between">
+                          <span class="text-surface-400 text-[10px] font-semibold uppercase">
+                            {{ t('maps.tooltip_density') }}
+                          </span>
+                          <button
+                            type="button"
+                            class="rounded px-2 py-0.5 text-[10px] font-medium transition-colors"
+                            :class="
+                              mapTooltipDensity === 'compact'
+                                ? 'bg-surface-600 text-surface-100'
+                                : 'bg-surface-800 text-surface-400 hover:text-surface-200'
+                            "
+                            :aria-label="t('maps.aria.tooltip_density')"
+                            @click="
+                              mapTooltipDensity =
+                                mapTooltipDensity === 'compact' ? 'default' : 'compact'
+                            "
+                          >
+                            {{
+                              mapTooltipDensity === 'compact'
+                                ? t('common.compact')
+                                : t('common.default')
+                            }}
+                          </button>
+                        </div>
                       </div>
-                      <div class="space-y-1">
-                        <div v-if="hasMultipleFloors" class="space-y-1">
+                    </div>
+                  </template>
+                </UPopover>
+              </AppTooltip>
+              <AppTooltip
+                :text="t('maps.help.title')"
+                :disabled="mapHelpOpen"
+                :content="{ side: 'bottom' }"
+              >
+                <UPopover
+                  v-model:open="mapHelpOpen"
+                  arrow
+                  :content="{ align: 'end', side: 'bottom', sideOffset: 8 }"
+                  @update:open="onPopoverOpenChange('help', $event)"
+                >
+                  <button
+                    :ref="(el) => (popoverTriggers.help = el as HTMLElement | null)"
+                    type="button"
+                    data-testid="map-help-toggle"
+                    :aria-label="t('maps.help.title')"
+                    class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-8 items-center justify-center rounded-md border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                    :class="
+                      mapHelpOpen
+                        ? MAP_BUTTON_ACTIVE_CLASS
+                        : 'text-surface-300 hover:text-surface-100 border-transparent hover:bg-white/5'
+                    "
+                  >
+                    <span
+                      v-if="!mapHelpSeen"
+                      data-testid="map-help-unseen-dot"
+                      class="bg-primary-400 absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
+                    />
+                    <UIcon name="i-mdi-help-circle-outline" class="h-4 w-4" />
+                  </button>
+                  <template #content>
+                    <div class="w-80 space-y-2.5 p-3">
+                      <p class="text-surface-200 text-xs font-semibold tracking-wide uppercase">
+                        {{ t('maps.help.title') }}
+                      </p>
+                      <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
+                        <div class="space-y-1">
                           <p
                             class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
                           >
-                            {{ t('maps.help.groups.floors') }}
+                            {{ t('maps.help.groups.navigate') }}
                           </p>
                           <i18n-t
-                            keypath="maps.help.cycle_floors"
+                            keypath="maps.help.pan"
                             tag="p"
                             scope="global"
                             class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
@@ -405,61 +335,155 @@
                               <kbd
                                 class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                               >
-                                {{ 'Ctrl' }}
+                                {{ 'WASD' }}
+                              </kbd>
+                              <span>/</span>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ '←↑↓→' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
+                          <i18n-t
+                            keypath="maps.help.zoom"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #keys>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'Shift' }}
                               </kbd>
                               <kbd
                                 class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
                               >
                                 {{ 'Scroll' }}
                               </kbd>
+                              <span>/</span>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'Q/E' }}
+                              </kbd>
                             </template>
                           </i18n-t>
-                          <p class="text-surface-400 text-[11px]">
-                            {{ t('maps.help.floor_panel') }}
+                          <i18n-t
+                            keypath="maps.help.reset"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #key>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'R' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
+                        </div>
+                        <div class="space-y-1">
+                          <div v-if="hasMultipleFloors" class="space-y-1">
+                            <p
+                              class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
+                            >
+                              {{ t('maps.help.groups.floors') }}
+                            </p>
+                            <i18n-t
+                              keypath="maps.help.cycle_floors"
+                              tag="p"
+                              scope="global"
+                              class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                            >
+                              <template #keys>
+                                <kbd
+                                  class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                                >
+                                  {{ 'Ctrl' }}
+                                </kbd>
+                                <kbd
+                                  class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                                >
+                                  {{ 'Scroll' }}
+                                </kbd>
+                              </template>
+                            </i18n-t>
+                            <p class="text-surface-400 text-[11px]">
+                              {{ t('maps.help.floor_panel') }}
+                            </p>
+                          </div>
+                          <p
+                            class="text-surface-400 pt-1 text-[10px] font-semibold tracking-wide uppercase"
+                          >
+                            {{ t('maps.help.groups.interact') }}
+                          </p>
+                          <i18n-t
+                            keypath="maps.help.click_at_cursor"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #key>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'F' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
+                          <i18n-t
+                            keypath="maps.help.copy_coordinates"
+                            tag="p"
+                            scope="global"
+                            class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                          >
+                            <template #key>
+                              <kbd
+                                class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
+                              >
+                                {{ 'C' }}
+                              </kbd>
+                            </template>
+                          </i18n-t>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.click_marker') }}
                           </p>
                         </div>
-                        <p
-                          class="text-surface-400 pt-1 text-[10px] font-semibold tracking-wide uppercase"
-                        >
-                          {{ t('maps.help.groups.interact') }}
-                        </p>
-                        <i18n-t
-                          keypath="maps.help.click_at_cursor"
-                          tag="p"
-                          scope="global"
-                          class="text-surface-300 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
-                        >
-                          <template #key>
-                            <kbd
-                              class="bg-surface-700 text-surface-200 rounded px-1 py-0.5 font-mono text-[10px]"
-                            >
-                              {{ 'F' }}
-                            </kbd>
-                          </template>
-                        </i18n-t>
-                        <p class="text-surface-300 text-[11px]">
-                          {{ t('maps.help.click_marker') }}
-                        </p>
-                      </div>
-                      <div class="col-span-2 space-y-1">
-                        <p
-                          class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
-                        >
-                          {{ t('maps.help.groups.view') }}
-                        </p>
-                        <p class="text-surface-300 text-[11px]">
-                          {{ t('maps.help.fullscreen') }}
-                        </p>
-                        <p class="text-surface-300 text-[11px]">
-                          {{ t('maps.help.resize') }}
-                        </p>
+                        <div class="col-span-2 space-y-1">
+                          <p
+                            class="text-surface-400 text-[10px] font-semibold tracking-wide uppercase"
+                          >
+                            {{ t('maps.help.groups.view') }}
+                          </p>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.fullscreen') }}
+                          </p>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.resize') }}
+                          </p>
+                          <p class="text-surface-300 text-[11px]">
+                            {{ t('maps.help.coordinates') }}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </template>
-              </UPopover>
-            </AppTooltip>
+                  </template>
+                </UPopover>
+              </AppTooltip>
+            </div>
           </div>
+          <MapLayersPanel
+            v-if="isLayersPanelOpen && layerGroups.length > 0"
+            :id="layersPanelId"
+            v-model:always-show-names="alwaysShowNames"
+            :groups="layerGroups"
+            :objective-kind-colors="objectiveKindColors"
+            @toggle="toggleLayer"
+            @show-all="showAllLayers"
+          />
         </div>
       </div>
       <div
@@ -468,13 +492,37 @@
       >
         <UIcon name="i-mdi-loading" class="text-surface-200 h-8 w-8 animate-spin" />
       </div>
-      <div class="relative" :class="{ 'min-h-0 flex-1': props.fill }">
+      <div
+        class="relative"
+        :class="{ 'min-h-0 flex-1': props.fill, 'map-names-visible': showAllNames }"
+        data-testid="map-viewport"
+      >
         <div
           ref="mapContainer"
           class="bg-surface-900 w-full rounded ring-1 ring-white/10 ring-inset"
           :class="props.fill ? 'h-full' : 'h-100 sm:h-125 lg:h-150'"
           :style="mapHeightStyle"
         />
+        <div
+          class="pointer-events-none absolute bottom-2 left-2 z-650 flex max-w-[calc(100%-4rem)] flex-col items-start gap-1"
+        >
+          <MapCursorCoordinates
+            :map="mapInstance"
+            :crosshair-shown="showKeyboardCursor"
+            :keyboard-activity="keyboardCursorActivity"
+            :has-keyboard-focus="isMapKeyboardActive"
+            :map-name="props.map.name"
+            :floor="coordinatesFloor"
+          />
+          <p
+            v-if="extractSource"
+            data-testid="map-extract-source"
+            class="text-surface-300 pointer-events-auto rounded bg-black/70 px-1.5 py-0.5 text-[10px] leading-snug"
+            :title="extractSource.detail"
+          >
+            {{ extractSource.label }} · {{ t('maps.extract_requirements.raid_notice') }}
+          </p>
+        </div>
         <div
           v-if="showKeyboardCursor"
           aria-hidden="true"
@@ -574,100 +622,19 @@
           </div>
         </div>
       </div>
-      <div class="mt-2 flex shrink-0 flex-wrap items-start justify-between gap-x-4 gap-y-4">
-        <div
-          v-if="props.showLegend"
-          class="bg-surface-850/95 text-surface-300 flex flex-wrap items-center gap-4 rounded-lg border border-white/8 px-3 py-2 text-xs shadow-lg"
-        >
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-surface-400 text-[10px] font-medium tracking-wide uppercase">
-              {{ t('common.tasks') }}
-            </span>
-            <button
-              v-for="chip in objectiveChips"
-              :key="chip.key"
-              type="button"
-              class="flex items-center gap-2 rounded-full border px-3 py-1.5 transition-opacity"
-              :class="chip.isOn ? '' : 'opacity-55 hover:opacity-80'"
-              :style="{
-                borderColor: chip.isOn
-                  ? `color-mix(in srgb, ${chip.color} 45%, transparent)`
-                  : 'var(--color-surface-700)',
-                backgroundColor: chip.isOn
-                  ? `color-mix(in srgb, ${chip.color} 15%, transparent)`
-                  : 'transparent',
-              }"
-              :aria-pressed="chip.isOn"
-              @click="chip.toggle()"
-            >
-              <span
-                class="h-2 w-2 shrink-0 rounded-full"
-                :class="chip.isOn ? '' : 'box-border border-2'"
-                :style="chip.isOn ? { backgroundColor: chip.color } : { borderColor: chip.color }"
-              />
-              <span
-                class="text-surface-100"
-                :class="chip.isOn ? '' : 'text-surface-400 line-through'"
-              >
-                {{ chip.label }}
-              </span>
-            </button>
-          </div>
-          <div v-if="showPmcSpawns && hasPmcSpawns" class="flex items-center gap-1">
-            <div class="h-3 w-3 rounded-full" :style="{ backgroundColor: mapColors.PMC_SPAWN }" />
-            <span>{{ t('common.pmc_spawn') }}</span>
-          </div>
-          <div v-if="showPmcExtracts" class="flex items-center gap-1">
-            <UIcon
-              name="i-mdi-exit-run"
-              class="h-3 w-3"
-              :style="{ color: mapColors.PMC_EXTRACT }"
-            />
-            <span>{{ t('common.pmc_extract') }}</span>
-          </div>
-          <div v-if="showScavExtracts" class="flex items-center gap-1">
-            <UIcon
-              name="i-mdi-exit-run"
-              class="h-3 w-3"
-              :style="{ color: mapColors.SCAV_EXTRACT }"
-            />
-            <span>{{ t('common.scav_extract') }}</span>
-          </div>
-          <div
-            v-if="(showPmcExtracts || showScavExtracts) && hasSharedExtracts"
-            class="flex items-center gap-1"
-          >
-            <UIcon
-              name="i-mdi-exit-run"
-              class="h-3 w-3"
-              :style="{ color: mapColors.SHARED_EXTRACT }"
-            />
-            <span>{{ t('maps.legend.shared_extract') }}</span>
-          </div>
-          <div
-            v-if="(showPmcExtracts || showScavExtracts) && hasCoopExtracts"
-            class="flex items-center gap-1"
-          >
-            <UIcon
-              name="i-mdi-exit-run"
-              class="h-3 w-3"
-              :style="{ color: mapColors.COOP_EXTRACT }"
-            />
-            <span>{{ t('maps.legend.coop_extract') }}</span>
-          </div>
-        </div>
-      </div>
     </template>
   </div>
 </template>
 <script setup lang="ts">
   import 'leaflet/dist/leaflet.css';
+  import { useElementSize, useStorage } from '@vueuse/core';
   import { createApp } from 'vue';
   import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
     mapObjectiveCategory,
     type MapObjectiveCategory,
   } from '@/composables/useMapObjectiveMarks';
+  import { useExtractRuleData } from '@/features/maps/composables/useExtractRuleData';
   import {
     MAP_BUTTON_ACTIVE_CLASS,
     MAP_BUTTON_INACTIVE_CLASS,
@@ -677,12 +644,51 @@
     ZONE_OPACITY_MIN,
     ZOOM_SPEED_MAX,
     ZOOM_SPEED_MIN,
-    isCoopExtract,
     useLeafletMapControls,
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
+  import MapCursorCoordinates from '@/features/maps/MapCursorCoordinates.vue';
+  import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
+  import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
+  import {
+    appendExtractRequirementTags,
+    createExtractDetails,
+    describeExtractSource,
+    getExtractDataSource,
+    getExtractRequirements,
+    type ExtractRequirements,
+  } from '@/features/maps/utils/extractRequirements';
+  import {
+    createElevationIndicator,
+    getMapFloorDelta,
+    type MapElevation,
+  } from '@/features/maps/utils/mapElevation';
+  import {
+    buildMapLayerGroups,
+    countHiddenLayers,
+    type MapLayerItem,
+  } from '@/features/maps/utils/mapLayerGroups';
+  import { isSavedMapLayerKey } from '@/features/maps/utils/mapLayerVisibility';
+  import {
+    createMapPinElement,
+    dimOffFloorPin,
+    getExtractGlyphKind,
+    MAP_MARKER_GLYPH_COLOR_KEYS,
+    MAP_PIN_ICON_CLASS,
+    type MapMarkerGlyphKind,
+  } from '@/features/maps/utils/markerGlyphs';
   import { getMarksHash, type MapMark } from '@/features/maps/utils/marksHash';
+  import {
+    getObjectiveTypeColors,
+    MAP_OBJECTIVE_PALETTES,
+  } from '@/features/maps/utils/objectiveColors';
+  import {
+    createObjectiveGlyphElement,
+    getObjectiveGlyphKind,
+    OBJECTIVE_CHIP_SIZE,
+    type MapObjectiveGlyphKind,
+  } from '@/features/maps/utils/objectiveGlyphs';
   import {
     findObjectiveHitStackAtPoint,
     projectObjectiveHitShape,
@@ -695,7 +701,11 @@
     type ObjectivePopupControl,
     type ObjectiveStackEntry,
   } from '@/features/maps/utils/objectiveStack';
+  import { zoneOutlineStyle, zoneScreenSize } from '@/features/maps/utils/objectiveZoneOutline';
+  import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
+  import { isEditableTarget } from '@/utils/editableTarget';
+  import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
   import {
@@ -759,10 +769,17 @@
     initialView?: MapViewState | null;
     initialFloor?: string;
     taskVisibilityActions?: MapTaskVisibilityActions | null;
+    /** Quest whose markers stand out while the rest fade (#920); null highlights none. */
+    highlightedTaskId?: string | null;
   }
   const props = withDefaults(defineProps<Props>(), {
     marks: () => [],
     showExtracts: true,
+    // Explicit undefined keeps Vue from casting absent booleans to false, so these fall back to
+    // showExtracts / the spawn default instead of hiding extracts on first load.
+    showPmcExtracts: undefined,
+    showScavExtracts: undefined,
+    showPmcSpawns: undefined,
     showExtractToggle: true,
     showSpawnToggle: true,
     showLegend: true,
@@ -773,13 +790,27 @@
     initialView: null,
     initialFloor: undefined,
     taskVisibilityActions: null,
+    highlightedTaskId: null,
   });
-  const emit = defineEmits<{ 'toggle-fullscreen': [] }>();
+  const emit = defineEmits<{
+    'toggle-fullscreen': [];
+    /** The quest of the objective under the pointer, or null when the pointer leaves it. */
+    'objective-hover': [taskId: string | null];
+  }>();
   const { t } = useI18n({ useScope: 'global' });
+  const formatNumber = useLocaleNumberFormatter();
   const router = useRouter();
+  const metadataStore = useMetadataStore();
   const preferencesStore = usePreferencesStore();
+  const currentGameMode = computed(() => metadataStore.currentGameMode ?? 'pvp');
   const mapSurfaceRef = ref<HTMLElement | null>(null);
   const showKeyboardCursor = ref(false);
+  /** Counts keyboard map actions; the coordinate readout follows the crosshair after each one. */
+  const keyboardCursorActivity = ref(0);
+  const showKeyboardCrosshair = () => {
+    showKeyboardCursor.value = true;
+    keyboardCursorActivity.value += 1;
+  };
   const fullscreenToggleLabel = computed(() =>
     props.isFullscreen ? t('maps.tooltips.exit_fullscreen') : t('maps.tooltips.open_fullscreen')
   );
@@ -803,44 +834,6 @@
     get: () => preferencesStore.getMapShowTeamObjectives,
     set: (value: boolean) => preferencesStore.setMapShowTeamObjectives(value),
   });
-  interface ObjectiveChip {
-    key: MapObjectiveCategory;
-    label: string;
-    color: string;
-    isOn: boolean;
-    toggle: () => void;
-  }
-  const objectiveChips = computed<ObjectiveChip[]>(() => {
-    return [
-      {
-        key: 'self',
-        label: t('maps.legend.regular'),
-        color: mapColors.value.SELF_OBJECTIVE,
-        isOn: mapShowSelfObjectives.value,
-        toggle: () => {
-          mapShowSelfObjectives.value = !mapShowSelfObjectives.value;
-        },
-      },
-      {
-        key: 'pinned',
-        label: t('maps.legend.pinned'),
-        color: mapColors.value.PINNED_OBJECTIVE,
-        isOn: mapShowPinnedObjectives.value,
-        toggle: () => {
-          mapShowPinnedObjectives.value = !mapShowPinnedObjectives.value;
-        },
-      },
-      {
-        key: 'team',
-        label: t('common.team'),
-        color: mapColors.value.TEAM_OBJECTIVE,
-        isOn: mapShowTeamObjectives.value,
-        toggle: () => {
-          mapShowTeamObjectives.value = !mapShowTeamObjectives.value;
-        },
-      },
-    ];
-  });
   const mapContainer = ref<HTMLElement | null>(null);
   const {
     mapInstance,
@@ -852,8 +845,10 @@
     objectiveLayer,
     extractLayer,
     spawnLayer,
+    transitLayer,
     setFloor,
     refreshView,
+    getFitZoom,
     clearMarkers,
   } = useLeafletMap({
     containerRef: mapContainer,
@@ -861,17 +856,31 @@
     initialView: props.initialView ?? null,
     initialFloor: props.initialFloor,
   });
-  const ZONE_HOVER_DELTA = 0.16;
-  const ZONE_HOVER_MAX = 0.6;
+  /** The floor named in copied coordinates, written as the floor panel shows it. */
+  const coordinatesFloor = computed(() => selectedFloor.value.replace(/_/g, ' ') || null);
+  /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */
+  const OBJECTIVE_DOT_RADIUS = OBJECTIVE_CHIP_SIZE / 2;
+  /** Hit-test dots are invisible: the chip above them is the visible marker. */
+  const OBJECTIVE_HIT_DOT_STYLE = { opacity: 0, fillOpacity: 0 } as const;
+  /** Content width of objective popups (`w-80`); Leaflet's limit must not cut it off. */
+  const OBJECTIVE_POPUP_WIDTH = 320;
+  /** Glyphs sit above objective dots and below extract pins; pointer input reaches the dots. */
+  const OBJECTIVE_GLYPH_PANE = 'objectiveGlyphs';
   const SPAWN_CLUSTER_ZOOM_THRESHOLD = 3.5;
   const SPAWN_CLUSTER_GRID_SIZE = 50;
   const SPAWN_CLUSTER_MIN_RADIUS = 6;
   const SPAWN_CLUSTER_MAX_RADIUS = 14;
   const MARKER_SVG_LOAD_DELAY_MS = 500;
   const {
+    hasTransits,
+    mapTransits,
+    showTransits,
     hasCoopExtracts,
+    hasPmcExtracts,
     hasPmcSpawns,
+    hasScavExtracts,
     hasSharedExtracts,
+    hasUnknownFactionExtracts,
     mapColors,
     mapColorOptions,
     mapExtracts,
@@ -885,6 +894,8 @@
     showPmcExtracts,
     showPmcSpawns,
     showScavExtracts,
+    showSharedExtracts,
+    showCoopExtracts,
     zoomSpeedLabel,
     zoneOpacityLabel,
   } = useLeafletMapControls({
@@ -894,6 +905,7 @@
     showPmcExtracts: props.showPmcExtracts,
     showPmcSpawns: props.showPmcSpawns,
     showScavExtracts: props.showScavExtracts,
+    gameMode: currentGameMode,
     t,
   });
   const mapColorsOpen = ref(false);
@@ -929,6 +941,111 @@
       mapSettingsOpen.value = false;
     }
   });
+  const layersPanelId = `map-layers-${useId()}`;
+  const layerGroups = computed(() =>
+    buildMapLayerGroups({
+      t,
+      colors: mapColors.value,
+      objectiveColorMode: preferencesStore.getMapObjectiveColorMode,
+      objectives: {
+        self: mapShowSelfObjectives,
+        pinned: mapShowPinnedObjectives,
+        team: mapShowTeamObjectives,
+      },
+      extracts: {
+        pmc: showPmcExtracts,
+        scav: showScavExtracts,
+        shared: showSharedExtracts,
+        coop: showCoopExtracts,
+      },
+      transit: showTransits,
+      spawns: showPmcSpawns,
+      available: {
+        pmc: props.showExtractToggle && hasPmcExtracts.value,
+        scav: props.showExtractToggle && hasScavExtracts.value,
+        shared:
+          props.showExtractToggle && (hasSharedExtracts.value || hasUnknownFactionExtracts.value),
+        unknownFaction: hasUnknownFactionExtracts.value,
+        coop: props.showExtractToggle && hasCoopExtracts.value,
+        transit: hasTransits.value,
+        spawns: props.showSpawnToggle && hasPmcSpawns.value,
+      },
+    })
+  );
+  const hiddenLayerCount = computed(() => countHiddenLayers(layerGroups.value));
+  /** The Objective icons key shows type colors only while chips are colored by type. */
+  const objectiveKindColors = computed(() =>
+    preferencesStore.getMapObjectiveColorMode === 'type'
+      ? getObjectiveTypeColors(MAP_OBJECTIVE_PALETTES[preferencesStore.getMapObjectivePalette])
+      : null
+  );
+  const extractRuleData = useExtractRuleData();
+  /** Which extract glyph categories are drawn; markers and the source line share this rule. */
+  const extractVisibility = computed<Record<MapMarkerGlyphKind, boolean>>(() => ({
+    pmc: showPmcExtracts.value,
+    scav: showScavExtracts.value,
+    shared: showSharedExtracts.value,
+    coop: showCoopExtracts.value,
+    // Extracts without a known faction follow the Shared row, the closest legend entry.
+    extract: showSharedExtracts.value,
+    transit: false,
+  }));
+  const anyExtractsVisible = computed(() =>
+    mapExtracts.value.some(
+      (extract) =>
+        Boolean(extract.position) &&
+        extractVisibility.value[getExtractGlyphKind(extract, currentGameMode.value)]
+    )
+  );
+  /** One map-level line names the requirement data source and that it is not live status. */
+  const extractSource = computed(() => {
+    const source = getExtractDataSource(
+      props.map.id,
+      metadataStore.currentGameMode ?? 'pvp',
+      extractRuleData.value
+    );
+    if (!source || !anyExtractsVisible.value) return null;
+    return describeExtractSource(source, t);
+  });
+  /** Extract, transit and spawn rows remember the user's choice across visits. */
+  const rememberLayer = (item: MapLayerItem) => {
+    if (isSavedMapLayerKey(item.key))
+      preferencesStore.setMapLayerVisible(item.key, item.visible.value);
+  };
+  const toggleLayer = (item: MapLayerItem) => {
+    item.visible.value = !item.visible.value;
+    rememberLayer(item);
+  };
+  const showAllLayers = () => {
+    layerGroups.value.forEach((group) => group.items.forEach(showLayer));
+  };
+  const showLayer = (item: MapLayerItem) => {
+    // Every row is saved, including ones already visible by default, so a later default change
+    // cannot hide what the user chose to show.
+    if (!item.visible.value) item.visible.value = true;
+    rememberLayer(item);
+  };
+  // The panel opens by default where there is room beside the map, and stays closed on narrow
+  // screens where it would push the map down. An explicit open/close choice is remembered.
+  const { width: mapSurfaceWidth } = useElementSize(mapSurfaceRef);
+  const layersPanelPreference = useStorage<boolean | null>(
+    'map_layers_panel_open',
+    null,
+    undefined,
+    {
+      serializer: {
+        read: (raw: string) => (raw === 'true' ? true : raw === 'false' ? false : null),
+        write: (value: boolean | null) => (value === null ? '' : String(value)),
+      },
+    }
+  );
+  const LAYERS_PANEL_MIN_WIDTH = 480;
+  const isLayersPanelOpen = computed({
+    get: () => layersPanelPreference.value ?? mapSurfaceWidth.value >= LAYERS_PANEL_MIN_WIDTH,
+    set: (open: boolean) => {
+      layersPanelPreference.value = open;
+    },
+  });
   const currentMapZoom = ref(0);
   const canZoomIn = computed(() => {
     const instance = mapInstance.value;
@@ -942,7 +1059,22 @@
   });
   const updateCurrentMapZoom = () => {
     currentMapZoom.value = mapInstance.value?.getZoom() ?? 0;
+    fitZoom.value = getFitZoom();
+    extractLayer.value?.eachLayer?.((layer) => {
+      const popup = (layer as L.Marker).getPopup?.();
+      if (popup) fitExtractPopup(popup);
+    });
   };
+  // Names appear for every pin once the user zooms in past the whole-map view, where there is room
+  // for them; hover and tap show a single name at any zoom.
+  const NAMES_ZOOM_DELTA = 1;
+  const fitZoom = ref<number | null>(null);
+  const alwaysShowNames = useStorage<boolean>('map_always_show_names', false);
+  const showAllNames = computed(
+    () =>
+      alwaysShowNames.value ||
+      (fitZoom.value !== null && currentMapZoom.value >= fitZoom.value + NAMES_ZOOM_DELTA)
+  );
   const zoomMapBy = (direction: 1 | -1) => {
     const instance = mapInstance.value;
     if (!instance) return;
@@ -1041,15 +1173,6 @@
       default:
         return null;
     }
-  };
-  const isEditableTarget = (target: EventTarget | null): boolean => {
-    if (!(target instanceof HTMLElement)) return false;
-    if (target.isContentEditable) return true;
-    return Boolean(
-      target.closest(
-        'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]'
-      )
-    );
   };
   const isMapKeyboardActive = (): boolean => {
     if (!mapInstance.value) return false;
@@ -1236,7 +1359,7 @@
       if (isEditableTarget(event.target)) return;
       if (!isMapKeyboardActive()) return;
       event.preventDefault();
-      showKeyboardCursor.value = true;
+      showKeyboardCrosshair();
       syncKeyboardCursorHover();
       if (event.repeat) return;
       triggerCenterMapClick();
@@ -1247,7 +1370,7 @@
       if (isEditableTarget(event.target)) return;
       if (!isMapKeyboardActive()) return;
       event.preventDefault();
-      showKeyboardCursor.value = true;
+      showKeyboardCrosshair();
       if (event.repeat) return;
       refreshView();
       window.requestAnimationFrame(syncKeyboardCursorHover);
@@ -1259,7 +1382,7 @@
     if (isEditableTarget(event.target)) return;
     if (!isMapKeyboardActive()) return;
     event.preventDefault();
-    showKeyboardCursor.value = true;
+    showKeyboardCrosshair();
     syncKeyboardCursorHover();
     pressedMapKeys.add(controlKey);
     startMapKeyboardLoop();
@@ -1472,12 +1595,17 @@
   const attachHoverPinPopup = (
     layer: L.Layer,
     objectiveId: string,
-    getLatLng: () => L.LatLngExpression
+    getLatLng: () => L.LatLngExpression,
+    chip: HTMLElement | null = null
   ): ObjectivePopupControl | null => {
     if (!leaflet.value || !mapInstance.value) return null;
     const popup = leaflet.value.popup({
       ...popupOptions,
       className: 'map-objective-popup',
+      // The tip touches the top of the chip instead of covering its glyph.
+      offset: [0, 7 - OBJECTIVE_DOT_RADIUS],
+      maxWidth: OBJECTIVE_POPUP_WIDTH,
+      minWidth: 256,
     });
     let isPinned = false;
     let isHovering = false;
@@ -1489,6 +1617,7 @@
     const originalStrokeColor = styledLayer.options?.color || mapColors.value.SELF_OBJECTIVE;
     const isCircleMarker = 'getRadius' in styledLayer;
     const setLayerSelected = (selected: boolean) => {
+      chip?.classList.toggle('is-selected', selected);
       if (!('setStyle' in styledLayer)) return;
       if (selected) {
         if (isCircleMarker) {
@@ -1571,6 +1700,7 @@
       currentMountedComponent = mountLayerPopup(pinned, entries);
       const mountedComponent = currentMountedComponent;
       popup.setContent(currentMountedComponent.element);
+      fitObjectivePopup(popup);
       popup.setLatLng(getLatLng());
       const popupIsOpen = map.hasLayer(popup);
       focusStackWhenPopupAttached(pinned, entries, popupIsOpen, mountedComponent);
@@ -1689,17 +1819,36 @@
     objectiveLayer.value.clearLayers();
     objectiveMarkers.clear();
     objectiveHitSources = [];
+    zoneOutlines = [];
+    taskChips.clear();
+    releaseMarkerHover();
     const zoneEntries: Array<{
       polygon: L.Polygon;
       centerMarker: L.CircleMarker;
+      chip: HTMLElement | null;
       latLngs: L.LatLngExpression[];
       area: number;
       objectiveId: string;
+      taskId: string | undefined;
     }> = [];
     const pointEntries: Array<{
       marker: L.CircleMarker;
+      chip: HTMLElement | null;
       objectiveId: string;
+      taskId: string | undefined;
     }> = [];
+    const glyphMarkers: L.Marker[] = [];
+    const addGlyph = (
+      latLng: L.LatLngExpression,
+      kind: MapObjectiveGlyphKind,
+      color: string,
+      offFloor: boolean
+    ): HTMLElement | null => {
+      const glyph = createObjectiveGlyph(L, latLng, kind, { color, offFloor });
+      if (!glyph) return null;
+      glyphMarkers.push(glyph.marker);
+      return glyph.chip;
+    };
     const calculateZoneArea = (outline: Array<{ x: number; z: number }>): number => {
       if (outline.length < 3) return 0;
       let sum = 0;
@@ -1726,7 +1875,9 @@
       if (!objectiveId) return;
       const category = mapObjectiveCategory(mark.pinned === true, mark.users ?? []);
       if (!categoryEnabled[category]) return;
-      const markerColor = categoryColors[category];
+      const markerColor = mark.color ?? categoryColors[category];
+      const taskId = mark.taskId;
+      const glyphKind = getObjectiveGlyphKind(mark.type);
       mark.possibleLocations?.forEach((location) => {
         if (location.map.id !== props.map.id) return;
         const positions = location.positions;
@@ -1735,13 +1886,16 @@
         if (!pos) return;
         const latLng = gameToLatLng(pos.x, pos.z);
         const marker = L.circleMarker([latLng.lat, latLng.lng], {
-          radius: 8,
+          radius: OBJECTIVE_DOT_RADIUS,
           fillColor: markerColor,
-          fillOpacity: 0.8,
           color: mapColors.value.MARKER_BORDER,
           weight: 2,
+          ...OBJECTIVE_HIT_DOT_STYLE,
         });
-        pointEntries.push({ marker, objectiveId });
+        const offFloor = addObjectiveElevation(marker, { position: pos });
+        const chip = addGlyph([latLng.lat, latLng.lng], glyphKind, markerColor, offFloor);
+        registerTaskChip(taskId, chip);
+        pointEntries.push({ marker, chip, objectiveId, taskId });
       });
       mark.zones.forEach((zone) => {
         if (zone.map.id !== props.map.id) return;
@@ -1753,31 +1907,42 @@
         const polygon = L.polygon(polygonLatLngs, {
           color: zoneColor,
           fillColor: zoneColor,
-          fillOpacity: mapZoneOpacity.value,
-          weight: 2.25,
-          opacity: 0.95,
+          ...zoneOutlineStyle(Number.POSITIVE_INFINITY, false, mapZoneOpacity.value),
         });
         const center = polygon.getBounds().getCenter();
         const centerMarker = L.circleMarker([center.lat, center.lng], {
-          radius: 5,
+          radius: OBJECTIVE_DOT_RADIUS,
           fillColor: zoneColor,
-          fillOpacity: 0.95,
           color: mapColors.value.MARKER_BORDER,
           weight: 1.5,
-          opacity: 1,
+          ...OBJECTIVE_HIT_DOT_STYLE,
         });
+        const offFloor = addObjectiveElevation(centerMarker, zone);
+        const chip = addGlyph(center, glyphKind, zoneColor, offFloor);
+        registerTaskChip(taskId, chip);
         const area = calculateZoneArea(zone.outline);
-        zoneEntries.push({ polygon, centerMarker, latLngs: polygonLatLngs, area, objectiveId });
+        zoneEntries.push({
+          polygon,
+          centerMarker,
+          chip,
+          latLngs: polygonLatLngs,
+          area,
+          objectiveId,
+          taskId,
+        });
       });
     });
     zoneEntries
       .sort((a, b) => b.area - a.area)
-      .forEach(({ polygon, centerMarker, latLngs, area, objectiveId }) => {
+      .forEach(({ polygon, centerMarker, chip, latLngs, area, objectiveId, taskId }) => {
         if (objectiveId) {
-          const zoneControl = attachHoverPinPopup(polygon, objectiveId, () =>
-            polygon.getBounds().getCenter()
+          const zoneControl = attachHoverPinPopup(
+            polygon,
+            objectiveId,
+            () => polygon.getBounds().getCenter(),
+            chip
           );
-          attachHoverPinPopup(centerMarker, objectiveId, () => centerMarker.getLatLng());
+          attachHoverPinPopup(centerMarker, objectiveId, () => centerMarker.getLatLng(), chip);
           if (zoneControl) {
             objectiveHitSources.push({
               kind: 'zone',
@@ -1790,91 +1955,317 @@
             });
           }
         }
-        polygon.on('mouseover', () =>
-          polygon.setStyle({
-            fillOpacity: Math.min(mapZoneOpacity.value + ZONE_HOVER_DELTA, ZONE_HOVER_MAX),
-            weight: 3,
-          })
-        );
-        polygon.on('mouseout', () =>
-          polygon.setStyle({ fillOpacity: mapZoneOpacity.value, weight: 2.25 })
-        );
+        trackZoneOutline(polygon, latLngs, [polygon, centerMarker], taskId);
+        liftChipOnHover(polygon, chip, taskId);
+        liftChipOnHover(centerMarker, chip, taskId);
         objectiveLayer.value!.addLayer(polygon);
         objectiveLayer.value!.addLayer(centerMarker);
       });
-    pointEntries.forEach(({ marker, objectiveId }) => {
+    pointEntries.forEach(({ marker, chip, objectiveId, taskId }) => {
       if (objectiveId) {
-        const control = attachHoverPinPopup(marker, objectiveId, () => marker.getLatLng());
+        const control = attachHoverPinPopup(marker, objectiveId, () => marker.getLatLng(), chip);
         if (control) objectiveHitSources.push({ kind: 'point', objectiveId, marker, control });
       }
+      liftChipOnHover(marker, chip, taskId);
       objectiveLayer.value!.addLayer(marker);
     });
+    glyphMarkers.forEach((glyph) => objectiveLayer.value!.addLayer(glyph));
+    applyTaskHighlight();
+  }
+  type ZoneOutline = {
+    polygon: L.Polygon;
+    ring: L.LatLngExpression[];
+    hovered: boolean;
+    taskId: string | undefined;
+  };
+  let zoneOutlines: ZoneOutline[] = [];
+  /** Draws or hides one zone's outline from its current on-screen size and hover state. */
+  function applyZoneOutline(zone: ZoneOutline): void {
+    const map = mapInstance.value;
+    const size = map
+      ? zoneScreenSize(zone.ring.map((latLng) => map.latLngToContainerPoint(latLng)))
+      : Number.POSITIVE_INFINITY;
+    const highlighted = zone.hovered || isHighlightedTask(zone.taskId);
+    zone.polygon.setStyle(zoneOutlineStyle(size, highlighted, mapZoneOpacity.value));
+  }
+  function refreshZoneOutlines(): void {
+    zoneOutlines.forEach(applyZoneOutline);
+  }
+  /** Hovering the zone or the chip at its centre shows the outline, even on a small zone. */
+  function trackZoneOutline(
+    polygon: L.Polygon,
+    ring: L.LatLngExpression[],
+    hoverTargets: L.Layer[],
+    taskId: string | undefined
+  ): void {
+    const zone: ZoneOutline = { polygon, ring, hovered: false, taskId };
+    zoneOutlines.push(zone);
+    const setHovered = (hovered: boolean) => {
+      zone.hovered = hovered;
+      applyZoneOutline(zone);
+    };
+    hoverTargets.forEach((layer) => {
+      layer.on('mouseover', () => setHovered(true));
+      layer.on('mouseout', () => setHovered(false));
+    });
+  }
+  /**
+   * The chip cannot take pointer input, so the dot or zone under it raises it on hover. Hovering
+   * also reports the objective's quest, so the legend can highlight it.
+   */
+  function liftChipOnHover(layer: L.Layer, chip: HTMLElement | null, taskId?: string): void {
+    layer.on('mouseover', () => {
+      chip?.classList.add('is-hovered');
+      if (taskId) reportMarkerHover(taskId);
+    });
+    layer.on('mouseout', () => {
+      chip?.classList.remove('is-hovered');
+      if (taskId) reportMarkerHover(null);
+    });
+  }
+  /** The quest this map last reported from a marker hover; the legend owns its own hover. */
+  let markerHoverTaskId: string | null = null;
+  function reportMarkerHover(taskId: string | null): void {
+    markerHoverTaskId = taskId;
+    emit('objective-hover', taskId);
+  }
+  /**
+   * A removed or redrawn layer, or an unmounted map, never fires mouseout, so release a hover the
+   * markers reported. A legend hover or a locked highlight is not this map's to clear.
+   */
+  function releaseMarkerHover(): void {
+    if (markerHoverTaskId !== null) reportMarkerHover(null);
+  }
+  /** Objective chips by quest, rebuilt with the markers, so a highlight never redraws them. */
+  const taskChips = new Map<string, HTMLElement[]>();
+  function registerTaskChip(taskId: string | undefined, chip: HTMLElement | null): void {
+    if (!taskId || !chip) return;
+    const chips = taskChips.get(taskId);
+    if (chips) chips.push(chip);
+    else taskChips.set(taskId, [chip]);
+  }
+  const isHighlightedTask = (taskId: string | undefined): boolean =>
+    Boolean(taskId) && taskId === props.highlightedTaskId;
+  /** Grows the highlighted quest's chips and outlines its zones; every other chip fades. */
+  function applyTaskHighlight(): void {
+    const highlighted = props.highlightedTaskId ?? null;
+    const active = highlighted !== null && taskChips.has(highlighted);
+    taskChips.forEach((chips, taskId) => {
+      chips.forEach((chip) => {
+        chip.classList.toggle('is-task-highlighted', active && taskId === highlighted);
+        chip.classList.toggle('is-task-dimmed', active && taskId !== highlighted);
+      });
+    });
+    refreshZoneOutlines();
   }
   function createExtractMarkers(): void {
     if (!leaflet.value || !extractLayer.value || !props.map) return;
     const L = leaflet.value;
     if (!isValidMapSvgConfig(props.map.svg) && !isValidMapTileConfig(props.map.tile)) return;
     extractLayer.value.clearLayers();
-    const showAnyExtracts = showPmcExtracts.value || showScavExtracts.value;
-    if (!showAnyExtracts) return;
     mapExtracts.value.forEach((extract) => {
       if (!extract.position) return;
-      const isCoop = extract.faction === 'shared' && isCoopExtract(extract);
-      const shouldShow =
-        extract.faction === 'pmc'
-          ? showPmcExtracts.value
-          : extract.faction === 'scav'
-            ? showScavExtracts.value
-            : showAnyExtracts;
-      if (!shouldShow) return;
-      const latLng = gameToLatLng(extract.position.x, extract.position.z);
-      let markerColor: string;
-      switch (extract.faction) {
-        case 'pmc':
-          markerColor = mapColors.value.PMC_EXTRACT;
-          break;
-        case 'scav':
-          markerColor = mapColors.value.SCAV_EXTRACT;
-          break;
-        case 'shared':
-          markerColor = isCoop ? mapColors.value.COOP_EXTRACT : mapColors.value.SHARED_EXTRACT;
-          break;
-        default:
-          markerColor = mapColors.value.DEFAULT_EXTRACT;
-          break;
-      }
-      const extractDot = L.circleMarker([latLng.lat, latLng.lng], {
-        radius: 3,
-        fillColor: markerColor,
-        fillOpacity: 1,
-        color: mapColors.value.EXTRACT_DOT_BORDER,
-        weight: 1,
-        opacity: 1,
-        interactive: false,
-      });
+      const kind = getExtractGlyphKind(extract, currentGameMode.value);
+      if (!extractVisibility.value[kind]) return;
       const extractName = extract.nameKey ? t(extract.nameKey, extract.name) : extract.name;
-      const extractBadge = document.createElement('div');
-      extractBadge.setAttribute('title', extractName);
-      extractBadge.setAttribute('aria-label', extractName);
-      extractBadge.className = 'extract-badge';
-      extractBadge.style.borderColor = markerColor;
-      const extractLabel = document.createElement('span');
-      extractLabel.className = 'extract-badge-label';
-      extractLabel.textContent = extractName;
-      extractBadge.appendChild(extractLabel);
-      const extractIcon = L.divIcon({
-        className: 'extract-marker',
-        html: extractBadge,
-        iconAnchor: [0, 0],
-        iconSize: undefined,
+      const requirements = getExtractRequirements({
+        mapId: props.map.id,
+        extract,
+        mode: metadataStore.currentGameMode ?? 'pvp',
+        t,
+        data: extractRuleData.value,
+        itemName: (id) => metadataStore.itemsById?.get(id)?.name,
+        formatNumber,
       });
-      const labelMarker = L.marker([latLng.lat, latLng.lng], {
-        icon: extractIcon,
-        interactive: false,
-        zIndexOffset: 1000,
+      extractLayer.value!.addLayer(
+        createPinMarker(
+          L,
+          kind,
+          extractName,
+          extract.position,
+          'extract-marker',
+          extract,
+          requirements
+        )
+      );
+    });
+  }
+  function elevationIndicator(elevation: MapElevation, onPin = true): HTMLElement | null {
+    const delta = getMapFloorDelta(props.map, selectedFloor.value, elevation);
+    return createElevationIndicator(
+      delta,
+      t(delta > 0 ? 'maps.elevation.above' : 'maps.elevation.below', { count: Math.abs(delta) }),
+      onPin
+    );
+  }
+  function appendElevation(element: HTMLElement, elevation: MapElevation): boolean {
+    const indicator = elevationIndicator(elevation);
+    if (!indicator) return false;
+    element.setAttribute(
+      'aria-label',
+      `${element.getAttribute('aria-label')}, ${indicator.getAttribute('aria-label')}`
+    );
+    element.appendChild(indicator);
+    return true;
+  }
+  /**
+   * An objective on another floor gets a floor badge beside it; its chip fades like an
+   * off-floor pin. Returns whether the objective is off the selected floor.
+   */
+  function addObjectiveElevation(layer: L.CircleMarker, elevation: MapElevation): boolean {
+    const indicator = elevationIndicator(elevation, false);
+    if (!indicator) return false;
+    layer.bindTooltip(indicator, {
+      permanent: true,
+      direction: 'left',
+      // Leaflet anchors the badge at the dot's centre, 6 px left of it for a left tooltip; this
+      // puts its right edge 2 px clear of the chip's edge.
+      offset: [4 - OBJECTIVE_DOT_RADIUS, 0],
+      className: 'map-elevation-tooltip border-0! bg-transparent! p-0! shadow-none! before:hidden',
+      opacity: 1,
+    });
+    return true;
+  }
+  function objectiveGlyphPane(map: L.Map): string {
+    if (map.getPane(OBJECTIVE_GLYPH_PANE)) return OBJECTIVE_GLYPH_PANE;
+    const pane = map.createPane(OBJECTIVE_GLYPH_PANE);
+    // Above the overlay pane's dots (400), below shadows (500) and extract pins (600).
+    pane.style.zIndex = '450';
+    pane.style.pointerEvents = 'none';
+    return OBJECTIVE_GLYPH_PANE;
+  }
+  /** A non-interactive chip centred on an objective dot, naming the action it asks for. */
+  function createObjectiveGlyph(
+    leafletApi: NonNullable<typeof leaflet.value>,
+    latLng: L.LatLngExpression,
+    kind: MapObjectiveGlyphKind,
+    { color, offFloor }: { color: string; offFloor: boolean }
+  ): { marker: L.Marker; chip: HTMLElement } | null {
+    const map = mapInstance.value;
+    if (!map) return null;
+    const size = OBJECTIVE_CHIP_SIZE;
+    const chip = createObjectiveGlyphElement(kind, {
+      color,
+      selectedColor: mapColors.value.SELECTED,
+      offFloor,
+    });
+    const icon = leafletApi.divIcon({
+      className: 'map-objective-glyph-icon',
+      html: chip,
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+    });
+    const marker = leafletApi.marker(latLng, {
+      icon,
+      interactive: false,
+      keyboard: false,
+      pane: objectiveGlyphPane(map),
+    });
+    return { marker, chip };
+  }
+  let openPin: HTMLElement | null = null;
+  /** Tap or click shows one pin's name until another pin or the map is clicked. */
+  function togglePinName(pin: HTMLElement): void {
+    if (openPin && openPin !== pin) openPin.classList.remove('is-open');
+    openPin = pin.classList.toggle('is-open') ? pin : null;
+  }
+  /** A map click outside every pin closes the open name. Pin clicks do not reach the map
+   * (Leaflet markers default to `bubblingMouseEvents: false`); the guard covers any that do. */
+  function closeOpenPin(event?: L.LeafletMouseEvent): void {
+    const target = event?.originalEvent?.target;
+    if (target instanceof Element && target.closest('.map-pin')) return;
+    openPin?.classList.remove('is-open');
+    openPin = null;
+  }
+  /** Objective popups are 320 px wide, narrowing (and scrolling) inside small maps. */
+  function fitObjectivePopup(popup: L.Popup): void {
+    const size = mapInstance.value?.getSize();
+    if (!size) return;
+    const maxWidth = Math.max(120, Math.min(OBJECTIVE_POPUP_WIDTH, size.x - 24));
+    Object.assign(popup.options, {
+      maxWidth,
+      minWidth: Math.min(256, maxWidth),
+      maxHeight: Math.max(160, size.y - 60),
+    });
+    if (mapInstance.value?.hasLayer(popup)) popup.update();
+  }
+  /** Keep requirement details inside the current map, including after viewport changes. */
+  function fitExtractPopup(popup: L.Popup): void {
+    const size = mapInstance.value?.getSize();
+    if (!size) return;
+    const maxWidth = Math.max(80, Math.min(280, size.x - 60));
+    Object.assign(popup.options, {
+      maxWidth,
+      minWidth: Math.min(200, maxWidth),
+      maxHeight: Math.max(60, size.y - 100),
+    });
+    if (popup.isOpen()) popup.update();
+  }
+  /** Place a glyph pin whose tail tip is the game position; its name shows on demand. */
+  function createPinMarker(
+    leafletApi: NonNullable<typeof leaflet.value>,
+    kind: MapMarkerGlyphKind,
+    label: string,
+    position: { x: number; y?: number; z: number },
+    className: string,
+    elevation: MapElevation = { position },
+    requirements?: ExtractRequirements
+  ): L.Marker {
+    const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
+    const pin = createMapPinElement(kind, color, label);
+    const offFloor = appendElevation(pin, elevation);
+    // The co-op pin glyph is already the handshake, so its requirement strip skips it.
+    if (requirements) appendExtractRequirementTags(pin, requirements, [kind]);
+    if (offFloor) dimOffFloorPin(pin);
+    const icon = leafletApi.divIcon({
+      className: `${className} ${MAP_PIN_ICON_CLASS}`,
+      html: pin,
+      iconAnchor: [0, 0],
+      iconSize: undefined,
+    });
+    const latLng = gameToLatLng(position.x, position.z);
+    const marker = leafletApi.marker([latLng.lat, latLng.lng], {
+      icon,
+      // Extracts expose their requirement details to keyboard users as well as pointer users.
+      // Transit pins keep the map surface keyboard controls.
+      interactive: true,
+      keyboard: Boolean(requirements),
+      zIndexOffset: 1000,
+    });
+    if (requirements) {
+      marker.bindPopup(createExtractDetails(label, requirements), {
+        className:
+          'map-extract-popup [&_.leaflet-popup-content-wrapper]:border [&_.leaflet-popup-content-wrapper]:border-white/10',
+        // Open above the pin head (36 px, scaled up while open) so the pin and its name stay visible.
+        offset: [0, -28],
       });
-      extractLayer.value!.addLayer(extractDot);
-      extractLayer.value!.addLayer(labelMarker);
+      marker.on('popupopen', (event: L.PopupEvent) => fitExtractPopup(event.popup));
+    }
+    marker.on('click', () => togglePinName(pin));
+    return marker;
+  }
+  const visibleTransits = computed(() => {
+    const hasRenderConfig =
+      isValidMapSvgConfig(props.map.svg) || isValidMapTileConfig(props.map.tile);
+    return showTransits.value && hasRenderConfig ? mapTransits.value : [];
+  });
+  /** Rebuild source-map transit labels, clearing stale markers when none are visible. */
+  function createTransitMarkers(): void {
+    const layer = transitLayer.value;
+    const L = leaflet.value;
+    if (!layer || !L) return;
+    layer.clearLayers();
+    visibleTransits.value.forEach((transit) => {
+      layer.addLayer(
+        createPinMarker(
+          L,
+          'transit',
+          transit.description,
+          transit.position,
+          'extract-marker transit-marker',
+          transit
+        )
+      );
     });
   }
   let lastSpawnZoomAboveThreshold: boolean | null = null;
@@ -1953,6 +2344,7 @@
     try {
       createObjectiveMarkers();
       createExtractMarkers();
+      createTransitMarkers();
       createPmcSpawnMarkers();
     } catch (error) {
       logger.error('Error updating map markers:', error);
@@ -1989,6 +2381,7 @@
     },
     { deep: true }
   );
+  watch(() => props.highlightedTaskId, applyTaskHighlight);
   watch(mapZoneOpacity, () => {
     lastMarksHash.value = '';
     updateMarkers();
@@ -1997,8 +2390,34 @@
     lastMarksHash.value = '';
     updateMarkers();
   });
-  watch([showPmcExtracts, showScavExtracts], () => createExtractMarkers());
+  // A changed default (e.g. the saved preference arriving from account sync after the map
+  // mounted) applies to every extract row the user has not set and whose visibility the page did
+  // not set explicitly.
+  const defaultableExtractLayers = (): Ref<boolean>[] => {
+    const saved = preferencesStore.getMapLayerVisibility;
+    return (
+      [
+        ['pmc', showPmcExtracts, props.showPmcExtracts],
+        ['scav', showScavExtracts, props.showScavExtracts],
+        ['shared', showSharedExtracts, undefined],
+        ['coop', showCoopExtracts, undefined],
+      ] as const
+    )
+      .filter(([key, , explicit]) => explicit === undefined && saved[key] === undefined)
+      .map(([, layer]) => layer);
+  };
+  watch(
+    () => props.showExtracts,
+    (visible) => defaultableExtractLayers().forEach((layer) => (layer.value = visible))
+  );
+  watch([showPmcExtracts, showScavExtracts, showSharedExtracts, showCoopExtracts], () =>
+    createExtractMarkers()
+  );
+  watch([() => metadataStore.currentGameMode, () => metadataStore.itemsById, extractRuleData], () =>
+    createExtractMarkers()
+  );
   watch(showPmcSpawns, () => createPmcSpawnMarkers());
+  watch([leaflet, transitLayer, visibleTransits], () => createTransitMarkers());
   watch(
     () => props.showPmcSpawns,
     (value) => {
@@ -2046,6 +2465,9 @@
       if (oldInstance && oldInstance !== instance) {
         oldInstance.off('zoomend', handleSpawnZoomChange);
         oldInstance.off('zoomend', updateCurrentMapZoom);
+        oldInstance.off('zoomend', refreshZoneOutlines);
+        oldInstance.off('resize', updateCurrentMapZoom);
+        oldInstance.off('click', closeOpenPin);
       }
       if (
         loading ||
@@ -2060,6 +2482,13 @@
       instance.on('zoomend', handleSpawnZoomChange);
       instance.off('zoomend', updateCurrentMapZoom);
       instance.on('zoomend', updateCurrentMapZoom);
+      instance.off('zoomend', refreshZoneOutlines);
+      instance.on('zoomend', refreshZoneOutlines);
+      // A resize changes the whole-map fit zoom that the names threshold is measured from.
+      instance.off('resize', updateCurrentMapZoom);
+      instance.on('resize', updateCurrentMapZoom);
+      instance.off('click', closeOpenPin);
+      instance.on('click', closeOpenPin);
       updateCurrentMapZoom();
       waitForSvgAndUpdateMarkers(instance);
     },
@@ -2105,6 +2534,8 @@
     getFloor,
     setFloor,
   });
+  // Emit before teardown, while the parent still listens.
+  onBeforeUnmount(releaseMarkerHover);
   onUnmounted(() => {
     window.removeEventListener('keydown', onGlobalMapKeydown);
     window.removeEventListener('keyup', onGlobalMapKeyup);
@@ -2121,12 +2552,16 @@
     if (mapInstance.value) {
       mapInstance.value.off('zoomend', handleSpawnZoomChange);
       mapInstance.value.off('zoomend', updateCurrentMapZoom);
+      mapInstance.value.off('zoomend', refreshZoneOutlines);
+      mapInstance.value.off('resize', updateCurrentMapZoom);
+      mapInstance.value.off('click', closeOpenPin);
     }
     if (activePinnedPopupCleanup) {
       activePinnedPopupCleanup();
     }
     objectiveMarkers.clear();
     objectiveHitSources = [];
+    zoneOutlines = [];
     clearMarkers();
   });
 </script>

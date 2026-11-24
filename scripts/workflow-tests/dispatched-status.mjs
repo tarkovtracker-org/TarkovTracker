@@ -4,6 +4,11 @@ import { test } from 'node:test';
 import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
 function assertStatusBoundary(workflow) {
   const job = jobBlock(workflow, 'ci-result');
+  assert.match(job, /^ {4}timeout-minutes: 15$/m);
+  assert.match(
+    job,
+    /^ {4}concurrency:\n {6}group: ci-result-\$\{\{ github\.event_name == 'workflow_dispatch' && 'publication' \|\| github\.run_id \}\}\n {6}queue: max\n {6}cancel-in-progress: false$/m
+  );
   const permissions = permissionsBlock(job, '    ')
     .trim()
     .split('\n')
@@ -34,7 +39,7 @@ function assertStatusBoundary(workflow) {
   );
   assert.match(
     report,
-    /^ {12}await reportDispatchedCi\(\{ github, context, outcome: process\.env\.VALIDATION_OUTCOME \}\);$/m
+    /^ {12}await reportDispatchedCi\(\{ github, context, outcome: process\.env\.VALIDATION_OUTCOME, serialized: true \}\);$/m
   );
   assert.ok(
     job.indexOf('name: Require all selected jobs') < job.indexOf('name: Report dispatched CI')
@@ -51,6 +56,13 @@ function withStatusCheckoutRef(workflow, ref) {
 }
 test('only the trusted aggregate CI job reports dispatched validation to branch rules', () => {
   assertStatusBoundary(readFileSync('.github/workflows/ci.yml', 'utf8'));
+});
+test('the publication job leaves time for the bounded rate-limit waits', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+  const job = jobBlock(workflow, 'ci-result');
+  const shortened = workflow.replace(job, job.replace('timeout-minutes: 15', 'timeout-minutes: 5'));
+  assert.notEqual(shortened, workflow);
+  assert.throws(() => assertStatusBoundary(shortened));
 });
 test('another job cannot receive status-write permissions', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
@@ -77,6 +89,8 @@ test('status publication contracts reject misleading configuration changes', () 
     ],
     ['id: validation', 'id: validation-other'],
     ['await reportDispatchedCi({', 'await unusedReporter({'],
+    ['serialized: true', 'serialized: false'],
+    [', serialized: true', ''],
     ['scripts/ci/report-dispatched-ci.mjs', 'scripts/unrelated.mjs'],
   ];
   for (const [before, after] of mutations) {

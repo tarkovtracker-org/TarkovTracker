@@ -5,6 +5,7 @@ const queuedFiles = new Map([
   ['.github/workflows/preview-retention.yml', 'pages-preview-lifecycle'],
 ]);
 const specializedNormalizers = new Map([
+  ['.github/workflows/ci.yml', normalizeCiWorkflow],
   ['.github/workflows/preview.yml', normalizePreviewWorkflow],
   ['.github/workflows/review-admission.yml', normalizeAdmissionWorkflow],
   ['.github/workflows/release-promotion-queue.yml', normalizePromotionWorkflow],
@@ -37,7 +38,20 @@ function normalizeAdmissionWorkflow(source, filename) {
 function normalizePromotionWorkflow(source, filename) {
   return normalizeSerializedJob(source, filename, 'enqueue', 'release-promotion-queue');
 }
-function normalizeSerializedJob(source, filename, name, group) {
+function normalizeCiWorkflow(source, filename) {
+  const expected =
+    'concurrency:\n  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}\n  cancel-in-progress: true\n';
+  const block = matchingBlock(source, /^concurrency:\n(?:[ \t]+[^\n]*\n)*/m);
+  if (block !== expected) throw new Error(`Invalid CI workflow concurrency: ${filename}`);
+  return normalizeSerializedJob(
+    source,
+    filename,
+    'ci-result',
+    "ci-result-${{ github.event_name == 'workflow_dispatch' && 'publication' || github.run_id }}",
+    2
+  );
+}
+function normalizeSerializedJob(source, filename, name, group, concurrencyCount = 1) {
   const expected = `    concurrency:\n      group: ${group}\n      queue: max\n      cancel-in-progress: false\n`;
   const jobs = matchingBlock(source, /^jobs:\n(?:[ \t]+[^\n]*\n|[ \t]*\n)*/m);
   const job = matchingBlock(
@@ -46,15 +60,15 @@ function normalizeSerializedJob(source, filename, name, group) {
   );
   const block = matchingBlock(job, /^ {4}concurrency:\n(?:[ \t]{6,}[^\n]*\n)*/m);
   if (block !== expected) throw new Error(`Invalid serialized job concurrency: ${filename}`);
-  requireSingleConcurrency(source, filename);
+  requireConcurrencyCount(source, filename, concurrencyCount);
   return source.replace(expected, expected.replace('      queue: max', ''));
 }
 function matchingBlock(source, pattern) {
   return source.match(pattern)?.[0] ?? '';
 }
-function requireSingleConcurrency(source, filename) {
+function requireConcurrencyCount(source, filename, expected) {
   const occurrences = source.match(/^[ \t]*concurrency:/gm) ?? [];
-  if (occurrences.length !== 1)
+  if (occurrences.length !== expected)
     throw new Error(`Ambiguous serialized job concurrency: ${filename}`);
 }
 const publisherJobs = new Map([

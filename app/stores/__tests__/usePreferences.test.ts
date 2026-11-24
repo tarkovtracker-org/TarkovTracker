@@ -134,7 +134,7 @@ describe('usePreferencesStore', () => {
       expect(store.neededTypeView).toBeNull();
       expect(store.neededItemsViewMode).toBeNull();
       expect(store.neededItemsFirFilter).toBeNull();
-      expect(store.neededItemsGroupByItem).toBe(false);
+      expect(store.neededItemsGroupByItem).toBe(true);
       expect(store.neededItemsHideNonFirSpecialEquipment).toBe(false);
       expect(store.neededItemsKappaOnly).toBe(false);
       expect(store.neededItemsSortBy).toBe('priority');
@@ -294,16 +294,27 @@ describe('usePreferencesStore', () => {
       expect(migratedValue?.data?.neededItemsHideOwned).toBe(true);
       expect(migratedValue?.data?.neededItemsHideCollected).toBeUndefined();
     });
-    it('should not override neededItemsHideOwned if both keys exist', () => {
+    it.each([
+      [false, false, false],
+      [false, true, true],
+      [true, false, true],
+      [true, true, true],
+    ])('preserves the combined legacy ownership filter (%s, %s)', (owned, collected, expected) => {
       const persistedState = {
-        neededItemsHideCollected: true,
-        neededItemsHideOwned: false,
+        neededItemsHideCollected: collected,
+        neededItemsHideOwned: owned,
       };
       localStorageMock.getItem.mockReturnValue(JSON.stringify(persistedState));
       const newPinia = createPinia();
       setActivePinia(newPinia);
       const store = usePreferencesStore();
-      expect(store.neededItemsHideOwned).toBe(false);
+      const migratedValue = localStorageMock.setItem.mock.calls
+        .filter(([key]) => key === STORAGE_KEYS.preferences)
+        .map(([, value]) => JSON.parse(value))
+        .at(-1);
+      expect(store.neededItemsHideOwned).toBe(expected);
+      expect(migratedValue?.data?.neededItemsHideOwned).toBe(expected);
+      expect(migratedValue?.data?.neededItemsHideCollected).toBeUndefined();
     });
     it('persists removal of retired hideout preferences on hydration', () => {
       localStorageMock.setItem(
@@ -846,9 +857,9 @@ describe('usePreferencesStore', () => {
       store.neededItemsFirFilter = 'fir';
       expect(store.getNeededItemsFirFilter).toBe('fir');
     });
-    it('should return default false for neededItemsGroupByItem', () => {
+    it('should return default true for neededItemsGroupByItem', () => {
       const store = usePreferencesStore();
-      expect(store.getNeededItemsGroupByItem).toBe(false);
+      expect(store.getNeededItemsGroupByItem).toBe(true);
     });
     it('should return set neededItemsGroupByItem value', () => {
       const store = usePreferencesStore();
@@ -1426,6 +1437,63 @@ describe('usePreferencesStore', () => {
       const store = usePreferencesStore();
       store.setShowMapExtracts(false);
       expect(store.showMapExtracts).toBe(false);
+    });
+    it('remembers Layers rows and lets the extracts default replace only extract rows', () => {
+      const store = usePreferencesStore();
+      expect(store.getMapLayerVisibility).toEqual({});
+      store.setMapLayerVisible('scav', false);
+      store.setMapLayerVisible('transit', false);
+      store.setMapLayerVisible('spawns', true);
+      expect(store.getMapLayerVisibility).toEqual({ scav: false, transit: false, spawns: true });
+      // Changing Show Extracts by Default is an explicit choice, so extract rows follow it again.
+      store.setShowMapExtracts(false);
+      expect(store.getMapLayerVisibility).toEqual({ transit: false, spawns: true });
+    });
+    it('keeps only known boolean Layers rows from saved storage', () => {
+      const sanitized = sanitizePersistedPreferencesState({
+        mapLayerVisibility: { pmc: false, transit: 'no', self: false, constructor: true },
+      } as never);
+      expect(sanitized.mapLayerVisibility).toEqual({ pmc: false });
+      expect(
+        sanitizePersistedPreferencesState({ mapLayerVisibility: [] } as never).mapLayerVisibility
+      ).toEqual({});
+    });
+    it('sets objective color mode and palette, rejecting unknown values', () => {
+      const store = usePreferencesStore();
+      expect(store.getMapObjectiveColorMode).toBe('category');
+      expect(store.getMapObjectivePalette).toBe('okabe_ito');
+      store.setMapObjectiveColorMode('task');
+      store.setMapObjectivePalette('tol_muted');
+      expect(store.getMapObjectiveColorMode).toBe('task');
+      expect(store.getMapObjectivePalette).toBe('tol_muted');
+      store.setMapObjectiveColorMode('rainbow' as never);
+      store.setMapObjectivePalette('neon' as never);
+      expect(store.getMapObjectiveColorMode).toBe('category');
+      expect(store.getMapObjectivePalette).toBe('okabe_ito');
+    });
+    it('pins quest colors and resets one quest or all of them', () => {
+      const store = usePreferencesStore();
+      store.setMapTaskColor('task-a', '#AABBCC');
+      store.setMapTaskColor('task-b', '#010203');
+      store.setMapTaskColor('task-c', 'red');
+      store.setMapTaskColor('', '#010203');
+      expect(store.getMapTaskColors).toEqual({ 'task-a': '#aabbcc', 'task-b': '#010203' });
+      store.clearMapTaskColors(['task-a']);
+      expect(store.getMapTaskColors).toEqual({ 'task-b': '#010203' });
+      store.clearMapTaskColors();
+      expect(store.getMapTaskColors).toEqual({});
+    });
+    it('keeps only valid objective color preferences from saved storage', () => {
+      const sanitized = sanitizePersistedPreferencesState({
+        mapObjectiveColorMode: 'rainbow',
+        mapObjectivePalette: 'tol_bright',
+        mapTaskColors: { 'task-a': '#00FF00', 'task-b': 'blue' },
+      } as never);
+      expect(sanitized).toMatchObject({
+        mapObjectiveColorMode: 'category',
+        mapObjectivePalette: 'tol_bright',
+        mapTaskColors: { 'task-a': '#00ff00' },
+      });
     });
     it('should set map zoom speed with valid value', () => {
       const store = usePreferencesStore();

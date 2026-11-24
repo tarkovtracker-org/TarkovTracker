@@ -122,6 +122,7 @@ jobs:
       url: ${{ steps.verify-deployment.outputs.url }}
       deployment_id: ${{ steps.verify-deployment.outputs.deployment_id }}
       head_sha: ${{ steps.verify.outputs.head_sha }}
+      checked_out_sha: ${{ steps.verify.outputs.checked_out_sha }}
       digest: ${{ steps.verify.outputs.digest }}
       preview_branch: ${{ steps.verify.outputs.preview_branch }}
     steps:
@@ -162,6 +163,7 @@ jobs:
               destination: `${process.env.RUNNER_TEMP}/preview-dist`,
             });
             core.setOutput('head_sha', manifest.headSha);
+            core.setOutput('checked_out_sha', manifest.checkedOutSha);
             core.setOutput('source_ci_run_id', decision.runId);
             core.setOutput('source_ci_attempt', manifest.runAttempt);
             core.setOutput('tree_sha', manifest.treeSha);
@@ -264,12 +266,23 @@ jobs:
           done
           echo "::error::Chromium still cannot launch after installing host dependencies."
           exit 1
+      # Read only data from the already verified deployment revision.
+      - name: Fetch deployed revision SEO copy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_SHA: ${{ needs.deploy.outputs.checked_out_sha }}
+        run: |
+          [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api --method GET --header 'Accept: application/vnd.github.raw+json' \
+            "repos/$GITHUB_REPOSITORY/contents/app/locales/en.json" \
+            -f ref="$BUILD_SHA" > "$RUNNER_TEMP/preview-en.json"
       - name: Run smoke tests against the unique deployment URL
         env:
           PREVIEW_URL: ${{ needs.deploy.outputs.url }}
           EXPECTED_HEAD_SHA: ${{ needs.deploy.outputs.head_sha }}
           EXPECTED_DIGEST: ${{ needs.deploy.outputs.digest }}
           EXPECTED_PREVIEW_BRANCH: ${{ needs.deploy.outputs.preview_branch }}
+          PREVIEW_SEO_COPY_PATH: ${{ runner.temp }}/preview-en.json
           SMOKE_REPORT_DIR: ${{ runner.temp }}/smoke-report
           PREVIEW_ACCESS_CLIENT_ID: ${{ secrets.PREVIEW_ACCESS_CLIENT_ID }}
           PREVIEW_ACCESS_CLIENT_SECRET: ${{ secrets.PREVIEW_ACCESS_CLIENT_SECRET }}

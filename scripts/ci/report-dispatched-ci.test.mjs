@@ -3,7 +3,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { reportDispatchedCi } from './report-dispatched-ci.mjs';
 function fixture() {
   return {
-    github: { rest: { repos: { createCommitStatus: vi.fn().mockResolvedValue({}) } } },
+    github: {
+      rest: {
+        repos: {
+          createCommitStatus: vi.fn().mockResolvedValue({}),
+          listCommitStatusesForRef: vi.fn(),
+        },
+      },
+      paginate: vi.fn().mockResolvedValue([]),
+    },
     context: {
       eventName: 'workflow_dispatch',
       repo: { owner: 'example', repo: 'repo' },
@@ -12,6 +20,7 @@ function fixture() {
       runId: 123,
     },
     outcome: 'success',
+    serialized: true,
   };
 }
 function localesFixture() {
@@ -67,27 +76,353 @@ function queueFixture() {
     { ...own, type: 'pull_request', parameters: { required_review_thread_resolution: true } },
   ];
   f.github.rest.repos.getBranchRules = vi.fn();
-  f.github.paginate = vi.fn().mockImplementation(async () => f.rules);
+  f.github.paginate.mockImplementation(async (method) =>
+    method === f.github.rest.repos.getBranchRules ? f.rules : []
+  );
   f.github.rest.git.getRef.mockResolvedValue({ data: { object: { sha: 'e'.repeat(40) } } });
   f.github.rest.git.getCommit
     .mockResolvedValueOnce({ data: { tree: { sha: 'd'.repeat(40) } } })
     .mockResolvedValueOnce({ data: { tree: { sha: 'e'.repeat(40) } } });
   return f;
 }
+function rateLimited(status, headers = {}, message = 'API rate limit exceeded for installation') {
+  return Object.assign(new Error(message), { status, response: { headers, data: { message } } });
+}
+function retryClock(f) {
+  let time = 1_800_000_000_000;
+  f.retry = {
+    now: () => time,
+    sleep: vi.fn(async (delay) => {
+      time += delay;
+    }),
+    warn: vi.fn(),
+  };
+  return f;
+}
+describe('rate-limited CI status publication', () => {
+  it('fails closed when an older workflow does not declare the serialization protocol', async () => {
+    const f = fixture();
+    delete f.serialized;
+    await expect(reportDispatchedCi(f)).rejects.toThrow('serialized');
+    expect(f.github.paginate).not.toHaveBeenCalled();
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+  it.each([
+    [403, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000090' }, 'quota', 91_000],
+    [403, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000380' }, 'quota', 381_000],
+    [429, { 'retry-after': '7' }, 'rate limit', 7_000],
+    [403, {}, 'You have exceeded a secondary rate limit.', 60_000],
+    [
+      403,
+      { 'retry-after': '120', 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000090' },
+      'quota',
+      120_000,
+    ],
+  ])('honors rate-limit instructions for HTTP %i', async (status, headers, message, delay) => {
+    const f = retryClock(fixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(rateLimited(status, headers, message));
+    await reportDispatchedCi(f);
+    expect(f.retry.sleep).toHaveBeenCalledExactlyOnceWith(delay);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish.mock.calls[1]).toEqual(publish.mock.calls[0]);
+    expect(publish.mock.calls[1][0]).toMatchObject({ sha: f.context.sha, state: 'success' });
+  });
+  it('still reports failed validation as failure after a rate-limit retry', async () => {
+    const f = retryClock(fixture());
+    f.outcome = 'failure';
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish.mock.calls.every(([request]) => request.state === 'failure')).toBe(true);
+  });
+  it('fails after three retries with increasing secondary-rate-limit backoff', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(403, {}, 'You have exceeded a secondary rate limit.');
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep.mock.calls).toEqual([[60_000], [120_000], [240_000]]);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(4);
+  });
+  it('fails without retrying earlier than a reset outside the eight-minute budget', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(403, {
+      'x-ratelimit-remaining': '0',
+      'x-ratelimit-reset': '1800000600',
+    });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(1);
+  });
+  it('caps short Retry-After responses at three retries', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(429, { 'retry-after': '1' });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep.mock.calls).toEqual([[1000], [1000], [1000]]);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(4);
+  });
+  it('bounds the cumulative wait across repeated Retry-After responses', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(429, { 'retry-after': '300' });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep.mock.calls).toEqual([[300_000]]);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(2);
+  });
+  it('charges request execution time to the elapsed retry budget', async () => {
+    const f = retryClock(fixture());
+    f.retry.now = vi.fn().mockReturnValueOnce(1_800_000_000_000).mockReturnValue(1_800_000_060_000);
+    const error = rateLimited(429, { 'retry-after': '450' });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+  });
+  it.each([401, 403, 500])('does not retry a non-rate-limit HTTP %i error', async (status) => {
+    const f = retryClock(fixture());
+    const error = Object.assign(new Error('Forbidden'), { status });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+  });
+  it('does not trust malformed primary reset headers', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(403, {
+      'x-ratelimit-remaining': '0',
+      'x-ratelimit-reset': 'invalid',
+    });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+  });
+  it.each([403, 429])(
+    'does not fall back to secondary retries for exhausted malformed primary quota (%i)',
+    async (status) => {
+      const f = retryClock(fixture());
+      const error = rateLimited(
+        status,
+        {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': 'invalid',
+        },
+        'You have exceeded a secondary rate limit.'
+      );
+      const publish = f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+      await expect(reportDispatchedCi(f)).rejects.toBe(error);
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(f.retry.sleep).not.toHaveBeenCalled();
+    }
+  );
+  it('honors valid Retry-After when an exhausted primary reset is malformed', async () => {
+    const f = retryClock(fixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(
+      rateLimited(
+        403,
+        {
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': 'invalid',
+          'retry-after': '2',
+        },
+        'You have exceeded a secondary rate limit.'
+      )
+    );
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(f.retry.sleep).toHaveBeenCalledExactlyOnceWith(2000);
+  });
+  it('does not retry authentication errors even when a Retry-After header is present', async () => {
+    const f = retryClock(fixture());
+    const error = rateLimited(401, { 'retry-after': '1' });
+    f.github.rest.repos.createCommitStatus.mockRejectedValue(error);
+    await expect(reportDispatchedCi(f)).rejects.toBe(error);
+    expect(f.retry.sleep).not.toHaveBeenCalled();
+  });
+  it('rechecks the locales head before publishing after a wait', async () => {
+    const f = retryClock(localesFixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    f.retry.sleep.mockImplementation(async () => {
+      f.github.rest.pulls.list.mockResolvedValue({
+        data: [{ ...f.pull, head: { ...f.pull.head, sha: 'e'.repeat(40) } }],
+      });
+    });
+    await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+    expect(f.github.rest.pulls.list).toHaveBeenCalledTimes(2);
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+  it('rechecks main after a delayed locales merge-status publication', async () => {
+    const f = retryClock(localesFixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    f.retry.sleep.mockImplementation(async () => {
+      f.github.rest.git.getRef.mockResolvedValue({ data: { object: { sha: 'e'.repeat(40) } } });
+    });
+    await expect(reportDispatchedCi(f)).rejects.toThrow('Cannot attest');
+    expect(publish).toHaveBeenCalledTimes(2);
+  });
+});
+function reportedStatus(f, run = 124, creator = {}) {
+  return {
+    context: 'CI Result',
+    state: 'failure',
+    creator: { id: 41898282, type: 'Bot', login: 'github-actions[bot]', ...creator },
+    target_url: `${f.context.serverUrl}/${f.context.repo.owner}/${f.context.repo.repo}/actions/runs/${run}`,
+  };
+}
+describe('superseded dispatch publication', () => {
+  it('does not overwrite a newer merge-SHA report when publishing from a locales head', async () => {
+    const f = localesFixture();
+    f.github.paginate.mockImplementation(async (_method, options) =>
+      options.ref === f.pull.merge_commit_sha ? [reportedStatus(f)] : []
+    );
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ sha: f.context.sha, state: 'success' })
+    );
+  });
+  it('does not overwrite a newer locales-derived report when publishing directly to its merge SHA', async () => {
+    const f = fixture();
+    f.context.sha = 'c'.repeat(40);
+    f.github.paginate.mockResolvedValue([reportedStatus(f)]);
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+  it('rechecks the merge target after a partial publication waits for quota', async () => {
+    const f = retryClock(localesFixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    f.retry.sleep.mockImplementation(async () => {
+      f.github.paginate.mockImplementation(async (_method, options) =>
+        options.ref === f.pull.merge_commit_sha ? [reportedStatus(f)] : []
+      );
+    });
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(3);
+    expect(publish).toHaveBeenLastCalledWith(expect.objectContaining({ sha: f.context.sha }));
+  });
+  it.each(['success', 'failure'])(
+    'does not overwrite a newer %s when an older validation finishes last',
+    async (state) => {
+      const f = fixture();
+      f.outcome = state === 'success' ? 'failure' : 'success';
+      f.github.paginate.mockResolvedValue([{ ...reportedStatus(f), state }]);
+      await reportDispatchedCi(f);
+      expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+    }
+  );
+  it('does not revive an older run when it is rerun after a newer failure', async () => {
+    const f = fixture();
+    f.context.runAttempt = 99;
+    f.github.paginate.mockResolvedValue([reportedStatus(f)]);
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+  it('rechecks for newer reports after waiting, even across different refs', async () => {
+    const f = retryClock(fixture());
+    f.context.ref = 'refs/heads/older-reference';
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish.mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    f.retry.sleep.mockImplementation(async () => {
+      f.github.paginate.mockResolvedValue([reportedStatus(f)]);
+    });
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+  it('suppresses both locales head and merge reports when a newer run has published', async () => {
+    const f = localesFixture();
+    f.github.paginate.mockResolvedValue([reportedStatus(f)]);
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+    expect(f.github.rest.pulls.get).not.toHaveBeenCalled();
+  });
+  it('does not finish a partial locales publication after a newer run has reported', async () => {
+    const f = retryClock(localesFixture());
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    f.retry.sleep.mockImplementation(async () => {
+      f.github.paginate.mockResolvedValue([reportedStatus(f)]);
+    });
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(2);
+    expect(f.github.rest.pulls.list).toHaveBeenCalledTimes(1);
+  });
+  it('can complete its own partial publication after rechecking the same run', async () => {
+    const f = retryClock(localesFixture());
+    f.github.paginate.mockResolvedValue([reportedStatus(f, f.context.runId)]);
+    const publish = f.github.rest.repos.createCommitStatus;
+    publish
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(rateLimited(429, { 'retry-after': '1' }));
+    await reportDispatchedCi(f);
+    expect(publish).toHaveBeenCalledTimes(4);
+    expect(publish).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sha: f.pull.merge_commit_sha, state: 'success' })
+    );
+  });
+  it.each([122, 123])('does not treat run %i as newer than the current run', async (run) => {
+    const f = fixture();
+    f.github.paginate.mockResolvedValue([reportedStatus(f, run)]);
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    (f) => reportedStatus(f, 124, { id: 1 }),
+    (f) => reportedStatus(f, 124, { type: 'User' }),
+    (f) => reportedStatus(f, 124, { login: 'forged' }),
+    (f) => ({ ...reportedStatus(f), context: 'Another context' }),
+    (f) => ({
+      ...reportedStatus(f),
+      target_url: 'https://github.com/foreign/repo/actions/runs/999',
+    }),
+    (f) => ({ ...reportedStatus(f), target_url: `${reportedStatus(f).target_url}?query=1` }),
+    (f) => ({ ...reportedStatus(f), target_url: `${reportedStatus(f).target_url}/job/1` }),
+    (f) => ({ ...reportedStatus(f), target_url: 'invalid' }),
+  ])('ignores untrusted or malformed status provenance', async (makeStatus) => {
+    const f = fixture();
+    f.github.paginate.mockResolvedValue([makeStatus(f)]);
+    await reportDispatchedCi(f);
+    expect(f.github.rest.repos.createCommitStatus).toHaveBeenCalledTimes(1);
+  });
+  it('uses paginated exact-SHA statuses rather than only the first page', async () => {
+    const f = fixture();
+    f.github.paginate.mockResolvedValue([
+      ...Array(100).fill(reportedStatus(f, 122)),
+      reportedStatus(f),
+    ]);
+    await reportDispatchedCi(f);
+    expect(f.github.paginate).toHaveBeenCalledWith(f.github.rest.repos.listCommitStatusesForRef, {
+      ...f.context.repo,
+      ref: f.context.sha,
+      per_page: 100,
+    });
+    expect(f.github.rest.repos.createCommitStatus).not.toHaveBeenCalled();
+  });
+});
 describe('verified Crowdin integration queue admission', () => {
   it.each(['success', 'failure'])(
     'reports only exact behind head %s without attesting a merge tree',
     async (outcome) => {
       const f = queueFixture();
       await reportDispatchedCi({ ...f, outcome });
-      expect(f.github.paginate).toHaveBeenCalledExactlyOnceWith(
-        f.github.rest.repos.getBranchRules,
-        {
-          ...f.context.repo,
-          branch: 'main',
-          per_page: 100,
-        }
-      );
+      expect(f.github.paginate).toHaveBeenCalledWith(f.github.rest.repos.getBranchRules, {
+        ...f.context.repo,
+        branch: 'main',
+        per_page: 100,
+      });
+      expect(
+        f.github.paginate.mock.calls.filter(
+          ([method]) => method === f.github.rest.repos.getBranchRules
+        )
+      ).toHaveLength(1);
       expect(f.github.rest.pulls.get).toHaveBeenCalledExactlyOnceWith({
         ...f.context.repo,
         pull_number: f.pull.number,

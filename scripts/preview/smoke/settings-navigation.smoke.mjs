@@ -180,6 +180,7 @@ test('desktop retains panel scrolling and sticky navigation', async ({ page }) =
   await page.getByTestId('desktop-tab-preferences').click();
   await expect(page.locator('#preferences')).toBeVisible();
   await expect(page.getByTestId('desktop-tab-preferences')).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('html')).toHaveCSS('scroll-behavior', 'auto');
   await expect
     .poll(() =>
       page
@@ -190,6 +191,8 @@ test('desktop retains panel scrolling and sticky navigation', async ({ page }) =
   await navigate(page, '/settings#keybinds');
   await expectNestedTarget(page, '#keybinds', '#preferences');
   await expect(page.getByTestId('desktop-tab-preferences')).toBeVisible();
+  await navigate(page, '/about');
+  await expect(page.locator('html')).toHaveCSS('scroll-behavior', 'smooth');
 });
 test('nested Skills target stays visible when level metadata replaces its loading hint', async ({
   page,

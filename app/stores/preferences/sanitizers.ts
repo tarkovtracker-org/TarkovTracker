@@ -1,4 +1,10 @@
+import { normalizeSavedMapLayerVisibility } from '@/features/maps/utils/mapLayerVisibility';
 import { normalizeTaskIdList } from '@/features/maps/utils/mapTaskVisibility';
+import {
+  normalizeMapObjectiveColorMode,
+  normalizeMapObjectivePalette,
+  normalizeMapTaskColors,
+} from '@/features/maps/utils/objectiveColors';
 import {
   normalizeNeededItemsCardStyle,
   normalizeNeededItemsFilterType,
@@ -176,6 +182,15 @@ const sanitizeMapTaskVisibilityIds = (state: PersistedPreferencesStateWithLegacy
   if ('mapHiddenTaskIds' in state)
     state.mapHiddenTaskIds = normalizeTaskIdList(state.mapHiddenTaskIds);
   if ('hiddenTaskIds' in state) state.hiddenTaskIds = normalizeTaskIdList(state.hiddenTaskIds);
+  if ('mapLayerVisibility' in state)
+    state.mapLayerVisibility = normalizeSavedMapLayerVisibility(state.mapLayerVisibility);
+};
+const sanitizeMapObjectiveColors = (state: PersistedPreferencesStateWithLegacy): void => {
+  if ('mapObjectiveColorMode' in state)
+    state.mapObjectiveColorMode = normalizeMapObjectiveColorMode(state.mapObjectiveColorMode);
+  if ('mapObjectivePalette' in state)
+    state.mapObjectivePalette = normalizeMapObjectivePalette(state.mapObjectivePalette);
+  if ('mapTaskColors' in state) state.mapTaskColors = normalizeMapTaskColors(state.mapTaskColors);
 };
 export const sanitizePersistedPreferencesState = (
   persistedState: PersistedPreferencesStateWithLegacy = {}
@@ -188,11 +203,9 @@ export const sanitizePersistedPreferencesState = (
   delete sanitizedState.hideoutSortReadyFirst;
   delete sanitizedState.hideoutCollapseCompleted;
   const legacyHideCollected = sanitizedState.neededItemsHideCollected;
-  if (
-    typeof sanitizedState.neededItemsHideOwned !== 'boolean' &&
-    typeof legacyHideCollected === 'boolean'
-  ) {
-    sanitizedState.neededItemsHideOwned = legacyHideCollected;
+  if (typeof legacyHideCollected === 'boolean') {
+    sanitizedState.neededItemsHideOwned =
+      sanitizedState.neededItemsHideOwned === true || legacyHideCollected;
   }
   if ('neededItemsHideCollected' in sanitizedState) {
     delete sanitizedState.neededItemsHideCollected;
@@ -266,6 +279,7 @@ export const sanitizePersistedPreferencesState = (
     );
   }
   sanitizeMapTaskVisibilityIds(sanitizedState);
+  sanitizeMapObjectiveColors(sanitizedState);
   if ('keybindOmnibar' in sanitizedState) {
     sanitizedState.keybindOmnibar = sanitizeKeybind(
       sanitizedState.keybindOmnibar,

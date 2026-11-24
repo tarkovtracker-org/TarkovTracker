@@ -33,6 +33,53 @@ async function expectHitTarget(control) {
     )
     .toBe(true);
 }
+test('Transit locations toggle independently in inline and fullscreen maps', async ({ page }) => {
+  await page.goto(`${origin}/tasks/maps`);
+  const inline = page
+    .locator('[tabindex="0"]')
+    .filter({ has: page.locator('.leaflet-container') })
+    .first();
+  await expect(inline.locator('.leaflet-image-layer')).toBeVisible();
+  await page.getByTestId('map-hint-dismiss').click();
+  const assertTransits = async (surface) => {
+    // Layer toggles live in the Layers panel.
+    const layersToggle = surface.getByTestId('map-layers-toggle');
+    if ((await layersToggle.getAttribute('aria-expanded')) !== 'true') await layersToggle.click();
+    await expect(layersToggle).toHaveAttribute('aria-expanded', 'true');
+    const panel = surface.getByTestId('map-layers-panel');
+    const toggle = panel.getByRole('button', { name: 'Transit', exact: true });
+    const markers = surface.locator('.transit-marker');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(markers).not.toHaveCount(0);
+    const count = await markers.count();
+    const extracts = panel.getByRole('button', { name: 'PMC', exact: true });
+    if ((await extracts.getAttribute('aria-pressed')) !== 'true') await extracts.click();
+    await expectHitTarget(toggle);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(markers).toHaveCount(0);
+    await expect(extracts).toHaveAttribute('aria-pressed', 'true');
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(markers).toHaveCount(count);
+  };
+  await assertTransits(inline);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await assertTransits(inline);
+  await inline.getByTestId('map-fullscreen-toggle').click();
+  const fullscreen = page.getByTestId('map-fullscreen-overlay');
+  await expect(fullscreen.locator('.leaflet-image-layer')).toBeVisible();
+  await assertTransits(fullscreen);
+  await fullscreen.getByTestId('map-fullscreen-exit').click();
+  await page.getByRole('button', { name: /^Customs(?:\s*\d+)?$/ }).click();
+  await expect(
+    inline.locator('.transit-marker').filter({ hasText: 'Transit to Reserve' })
+  ).toHaveCount(1);
+  await expect(
+    inline.locator('.transit-marker').filter({ hasText: 'Transit to Streets of Tarkov' })
+  ).toHaveCount(0);
+});
 function areSeparate(first, second) {
   return (
     first.x + first.width <= second.x ||
@@ -41,18 +88,55 @@ function areSeparate(first, second) {
     second.y + second.height <= first.y
   );
 }
+const flip = (value) => (value === 'true' ? 'false' : 'true');
+async function checkPopover(page, control) {
+  await expect(control).toHaveAttribute('data-state', 'open');
+  await page.keyboard.press('Escape');
+  await expect(control).toHaveAttribute('data-state', 'closed');
+}
+// The Layers disclosure toggles in place; restore it so later controls keep their layout.
+async function checkDisclosure(control, expanded) {
+  await expect(control).toHaveAttribute('aria-expanded', flip(expanded));
+  await control.click();
+  await expect(control).toHaveAttribute('aria-expanded', expanded);
+}
+async function checkToolbarControl(page, control) {
+  await expectHitTarget(control);
+  const pressed = await control.getAttribute('aria-pressed');
+  const expanded = await control.getAttribute('aria-expanded');
+  const isLayersToggle = (await control.getAttribute('data-testid')) === 'map-layers-toggle';
+  await control.click();
+  if (pressed !== null) return expect(control).toHaveAttribute('aria-pressed', flip(pressed));
+  if (isLayersToggle) return checkDisclosure(control, expanded);
+  return checkPopover(page, control);
+}
+async function checkLayerRow(row) {
+  await expectHitTarget(row);
+  const pressed = await row.getAttribute('aria-pressed');
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', flip(pressed));
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', pressed);
+}
+// Leave the disclosure as found so later viewports keep their original layout.
+async function setLayersPanel(layersToggle, expanded) {
+  if ((await layersToggle.getAttribute('aria-expanded')) !== expanded) await layersToggle.click();
+  await expect(layersToggle).toHaveAttribute('aria-expanded', expanded);
+}
+// Layer rows inside the Layers panel must be reachable and flip, then restore their state.
+async function checkLayerRows(surface) {
+  const layersToggle = surface.getByTestId('map-layers-toggle');
+  await expect(layersToggle).toBeVisible();
+  const expanded = await layersToggle.getAttribute('aria-expanded');
+  await setLayersPanel(layersToggle, 'true');
+  const rows = surface.getByTestId('map-layers-panel').locator('button[aria-pressed]');
+  await expect(rows.first()).toBeVisible();
+  for (const row of await rows.all()) await checkLayerRow(row);
+  await setLayersPanel(layersToggle, expanded);
+}
 async function checkToolbar(page, toolbar) {
   for (const control of await toolbar.getByRole('button').all()) {
-    await expectHitTarget(control);
-    const pressed = await control.getAttribute('aria-pressed');
-    await control.click();
-    if (pressed !== null) {
-      await expect(control).toHaveAttribute('aria-pressed', pressed === 'true' ? 'false' : 'true');
-    } else {
-      await expect(control).toHaveAttribute('data-state', 'open');
-      await page.keyboard.press('Escape');
-      await expect(control).toHaveAttribute('data-state', 'closed');
-    }
+    await checkToolbarControl(page, control);
   }
 }
 async function checkFloors(page, surface) {
@@ -135,5 +219,6 @@ test('Ground Zero floors and toolbar remain operable in normal and fullscreen ma
   ]) {
     await page.setViewportSize({ width, height });
     await checkToolbar(page, inline.getByTestId('map-toolbar'));
+    await checkLayerRows(inline);
   }
 });

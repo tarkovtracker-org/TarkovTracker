@@ -187,6 +187,51 @@ describe('useSupporter', () => {
     expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
     supporter.unsubscribe();
   });
+  it('loads supporter status while a join is deferred and refreshes once it subscribes', async () => {
+    vi.useFakeTimers();
+    const { installRealtimeVisibility } = await import('@/utils/realtimeVisibility');
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const channel = { on: vi.fn(), subscribe: vi.fn() };
+    channel.on.mockReturnValue(channel);
+    mockChannel.mockReturnValue(channel);
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+    const transport = {
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      getChannels: () => [channel],
+      setAuth: vi.fn(),
+    } as unknown as Parameters<typeof installRealtimeVisibility>[0];
+    Object.assign(mockSupabase.client, { realtime: transport });
+    const page = Object.assign(new EventTarget(), {
+      visibilityState: 'hidden' as DocumentVisibilityState,
+    });
+    const dispose = installRealtimeVisibility(
+      transport,
+      async () => ({ accessToken: 'user-token', isCurrent: () => true }),
+      page
+    );
+    try {
+      await vi.advanceTimersByTimeAsync(60_000);
+      const completed = vi.fn();
+      void supporter.subscribe('user-1').then(completed);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(completed).toHaveBeenCalledWith(true);
+      expect(mockMaybeSingle).toHaveBeenCalledOnce();
+      expect(channel.subscribe).not.toHaveBeenCalled();
+      page.visibilityState = 'visible';
+      page.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(channel.subscribe).toHaveBeenCalledOnce();
+      channel.subscribe.mock.calls[0]![0]('SUBSCRIBED');
+      expect(mockMaybeSingle).toHaveBeenCalledTimes(2);
+    } finally {
+      dispose();
+      supporter.unsubscribe();
+      Reflect.deleteProperty(mockSupabase.client, 'realtime');
+      vi.useRealTimers();
+    }
+  });
   it.each([true, false])(
     'settles initialization from a superseding refresh (success: %s)',
     async (success) => {
@@ -422,6 +467,99 @@ describe('useSupporter', () => {
       new Set(createdChannels)
     );
   });
+  it('blocks overlapping requests across checkout controls', async () => {
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+    const response = createDeferred<{ url: string }>();
+    mockFetch.mockReturnValue(response.promise);
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const first = useSupporter().createCheckout({ mode: 'subscription', tier: 'scav' });
+    const otherControl = useSupporter();
+    const pending = otherControl.checkoutPending?.value;
+    const overlapping = otherControl.createCheckout({ mode: 'payment', amount: 5 });
+    response.resolve({ url: 'https://checkout.test' });
+    await expect(overlapping).resolves.toBeNull();
+    await expect(first).resolves.toBe('https://checkout.test');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(pending).toBe(true);
+    expect(otherControl.checkoutPending.value).toBe(false);
+  });
+  it.each([0, 23 * 60 * 60 * 1000])('reuses the attempt ID on retry after %d ms', async (delay) => {
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+    mockFetch
+      .mockRejectedValueOnce(new Error('Connection lost'))
+      .mockResolvedValue({ url: 'https://checkout.test' });
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const params = { mode: 'payment', amount: 5 } as const;
+    await expect(supporter.createCheckout(params)).resolves.toBeNull();
+    const retryAt = Date.now() + delay;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(retryAt);
+    try {
+      await expect(supporter.createCheckout(params)).resolves.toBe('https://checkout.test');
+    } finally {
+      clock.mockRestore();
+    }
+    await expect(supporter.createCheckout(params)).resolves.toBe('https://checkout.test');
+    const ids = mockFetch.mock.calls.map(([, options]) => options.body.checkoutAttemptId);
+    expect(ids[0]).toEqual(expect.any(String));
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[0]);
+  });
+  it('keeps a retry keyed while auth state hydrates and gives a changed selection a new key', async () => {
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+    mockFetch.mockRejectedValue(new Error('Connection lost'));
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    userState.id = '';
+    await supporter.createCheckout({ mode: 'payment', amount: 5 });
+    userState.id = 'user-1';
+    await supporter.createCheckout({ mode: 'payment', amount: 5 });
+    await supporter.createCheckout({ mode: 'payment', amount: 10 });
+    const [first, retry, changed] = mockFetch.mock.calls.map(
+      ([, options]) => options.body.checkoutAttemptId
+    );
+    expect(first).toEqual(expect.any(String));
+    expect(retry).toBe(first);
+    expect(changed).not.toBe(first);
+  });
+  it('releases checkout on auth reset and ignores the previous request finishing', async () => {
+    mockSupabase.client.auth.getSession.mockResolvedValue({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+    const stale = createDeferred<{ url: string }>();
+    const current = createDeferred<{ url: string }>();
+    mockFetch.mockReturnValueOnce(stale.promise).mockReturnValueOnce(current.promise);
+    const { useSupporter } = await import('@/composables/useSupporter');
+    const supporter = useSupporter();
+    const params = { mode: 'payment', amount: 5 } as const;
+    const first = supporter.createCheckout(params);
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const firstSignal = mockFetch.mock.calls[0]?.[1].signal;
+    supporter.reset();
+    const unlocked = !supporter.checkoutPending.value;
+    userState.id = 'user-2';
+    const second = supporter.createCheckout(params);
+    stale.resolve({ url: 'https://checkout.test/old' });
+    const oldUrl = await first;
+    const currentPending = supporter.checkoutPending.value;
+    current.resolve({ url: 'https://checkout.test/new' });
+    expect(unlocked).toBe(true);
+    expect(firstSignal.aborted).toBe(true);
+    expect(oldUrl).toBeNull();
+    expect(currentPending).toBe(true);
+    await expect(second).resolves.toBe('https://checkout.test/new');
+    expect(supporter.checkoutPending.value).toBe(false);
+  });
   it('refreshes auth before creating a checkout session when no cached token exists', async () => {
     mockFetch.mockResolvedValue({ url: 'https://checkout.test' });
     mockSupabase.client.auth.getSession.mockResolvedValue({
@@ -438,9 +576,10 @@ describe('useSupporter', () => {
       'https://checkout.test'
     );
     expect(mockFetch).toHaveBeenCalledWith('/api/stripe/checkout', {
-      body: { mode: 'payment' },
+      body: { mode: 'payment', checkoutAttemptId: expect.any(String) },
       headers: { Authorization: 'Bearer refreshed-token' },
       method: 'POST',
+      signal: expect.any(AbortSignal),
     });
   });
   afterEach(() => {

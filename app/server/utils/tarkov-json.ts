@@ -3,6 +3,7 @@ import { useRuntimeConfig } from '#imports';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
+import { isGameDataString, upstreamStringKey } from '@/utils/gameDataStrings';
 import { buildSkillImageUrl } from '@/utils/tarkovUrls';
 import { assertTaskImportSource } from '@/utils/taskImportCatalog';
 import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
@@ -16,6 +17,7 @@ import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
 import type {
   FinishRewards,
   HideoutStation,
+  ObjectiveEquipment,
   PlayerLevel,
   PrestigeLevel,
   TarkovBootstrapQueryResult,
@@ -60,7 +62,7 @@ const HIDEOUT_SKILL_REQUIREMENT_SKILLS: Record<string, { id: string; name: strin
   },
 };
 type JsonRecord = Record<string, unknown>;
-type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'season' | 'tasks' | 'traders';
+export type TarkovJsonEndpoint = 'hideout' | 'items' | 'maps' | 'season' | 'tasks' | 'traders';
 type TarkovJsonEnvelope<T = unknown> = {
   data: T;
   translations?: string[];
@@ -79,9 +81,10 @@ type TarkovJsonDependencies = {
   logger?: Pick<typeof logger, 'error' | 'warn'>;
   sleep?: (ms: number) => Promise<void>;
 };
-type TarkovJsonOptions = {
+export type TarkovJsonOptions = {
   gameMode?: ValidGameMode;
   lang?: string;
+  neutral?: boolean;
   baseUrl?: string;
   maxRetries?: number;
   timeoutMs?: number;
@@ -315,8 +318,8 @@ function tokenizeTranslationPath(rest: string): TranslationPathSegment[] | null 
 }
 const hasUnsafeName = (segment: TranslationPathSegment) =>
   segment.kind !== 'wildcard' && segment.names.some((name) => UNSAFE_TRANSLATION_KEYS.has(name));
-function parseTranslationPath(path: string): TranslationPathSegment[] | null {
-  if (!path.startsWith('$')) return null;
+function parseTranslationPath(path: unknown): TranslationPathSegment[] | null {
+  if (typeof path !== 'string' || !path.startsWith('$')) return null;
   const segments = tokenizeTranslationPath(path.slice(1));
   if (!segments || segments.some(hasUnsafeName)) return null;
   return segments;
@@ -383,7 +386,7 @@ function applyTranslationPath(
 ): unknown {
   const segments = parseTranslationPath(path);
   if (segments) return translateAtPath(current, segments, 0, translate);
-  if (requireTranslations) throw new Error('Unsupported json.tarkov.dev season translation path');
+  if (requireTranslations) throw new Error('Unsupported json.tarkov.dev translation path');
   log.warn('[TarkovJson] Skipped unsupported translation path', { path });
   return current;
 }
@@ -411,12 +414,33 @@ function applyTranslations<T>(
   return (translated as TarkovJsonEnvelope<T>).data;
 }
 const resolveLogger = (options: TarkovJsonOptions) => options.deps?.logger ?? logger;
-export async function fetchTarkovJsonEndpoint<T>(
+function neutralizeEnvelope<T>(
+  baseResponse: TarkovJsonEnvelope<T>,
   endpoint: TarkovJsonEndpoint,
-  options: TarkovJsonOptions = {}
+  options: TarkovJsonOptions
+): T {
+  const translated = (baseResponse.translations ?? []).reduce<unknown>(
+    (current, path) =>
+      applyTranslationPath(
+        current,
+        path,
+        (key) =>
+          isGameDataString(key)
+            ? key
+            : upstreamStringKey(options.gameMode ?? 'regular', endpoint, key),
+        resolveLogger(options),
+        true
+      ),
+    baseResponse
+  );
+  return (translated as TarkovJsonEnvelope<T>).data;
+}
+async function localizeEnvelope<T>(
+  baseResponse: TarkovJsonEnvelope<T>,
+  endpoint: TarkovJsonEndpoint,
+  options: TarkovJsonOptions
 ): Promise<T> {
   const lang = options.lang?.trim() || ENGLISH_LANGUAGE;
-  const baseResponse = await fetchEnvelope<T>(buildPath(endpoint, options), options);
   if (!baseResponse.translations?.length) {
     return baseResponse.data;
   }
@@ -434,6 +458,35 @@ export async function fetchTarkovJsonEndpoint<T>(
     endpoint === 'season'
   );
 }
+const translateEnvelope = <T>(
+  response: TarkovJsonEnvelope<T>,
+  endpoint: TarkovJsonEndpoint,
+  options: TarkovJsonOptions
+): T | Promise<T> =>
+  options.neutral
+    ? neutralizeEnvelope(response, endpoint, options)
+    : localizeEnvelope(response, endpoint, options);
+export async function fetchTarkovJsonEndpoint<T>(
+  endpoint: TarkovJsonEndpoint,
+  options: TarkovJsonOptions = {}
+): Promise<T> {
+  const response = await fetchEnvelope<T>(buildPath(endpoint, options), options);
+  return translateEnvelope(response, endpoint, options);
+}
+/** Fetch only one flat translation envelope. Dataset requests never call this in neutral mode. */
+export async function fetchTarkovJsonStrings(
+  endpoint: TarkovJsonEndpoint,
+  options: TarkovJsonOptions
+): Promise<Record<string, unknown>> {
+  const response = await fetchEnvelope<JsonRecord>(
+    buildPath(endpoint, options, options.lang ?? ENGLISH_LANGUAGE),
+    options
+  );
+  if (!isRecord(response.data)) throw new Error('Invalid upstream translation table');
+  return response.data;
+}
+const catalogLink = (value: unknown): string | undefined =>
+  isGameDataString(value) ? `@tt:link:${value.slice(4)}` : toTrustedGameLinkUrl(value);
 function adaptCategoryRef(value: unknown, context: AdapterContext) {
   const raw = readRecordRef(value, context.itemCategoriesById);
   if (!raw) return undefined;
@@ -457,8 +510,8 @@ const ITEM_STRING_FIELDS = [
 function adaptItemFields(raw: JsonRecord, id: string): JsonRecord {
   const fields: JsonRecord = {
     id: typeof raw.id === 'string' ? raw.id : id,
-    link: toTrustedGameLinkUrl(raw.link),
-    wikiLink: toTrustedGameLinkUrl(raw.wikiLink),
+    link: catalogLink(raw.link),
+    wikiLink: catalogLink(raw.wikiLink),
   };
   for (const key of ITEM_STRING_FIELDS) {
     if (typeof raw[key] === 'string') fields[key] = raw[key];
@@ -499,6 +552,19 @@ function adaptObjectiveItemRef(value: unknown, context: AdapterContext): TarkovI
     properties: defaultPreset ? { defaultPreset } : undefined,
   }) as TarkovItem;
 }
+function adaptObjectiveEquipment(
+  value: unknown,
+  context: AdapterContext
+): ObjectiveEquipment | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return adaptObjectiveItemRef(value, context);
+  // An empty list is known empty; malformed leaves remain explicit unknown references.
+  return value.map((entry) =>
+    Array.isArray(entry)
+      ? entry.map((item) => adaptObjectiveItemRef(item, context))
+      : adaptObjectiveItemRef(entry, context)
+  );
+}
 function adaptObjectiveItemRefs(
   values: unknown,
   context: AdapterContext
@@ -513,6 +579,8 @@ function adaptObjectiveItemRefs(
     .filter((item): item is TarkovItem => Boolean(item?.id));
 }
 function adaptItem(raw: JsonRecord, context: AdapterContext, lite = false): TarkovItem {
+  const base = adaptItemRef(raw, context);
+  if (lite) return base;
   const categories = Array.isArray(raw.categories)
     ? raw.categories.map((category) => adaptCategoryRef(category, context)).filter(Boolean)
     : undefined;
@@ -522,8 +590,6 @@ function adaptItem(raw: JsonRecord, context: AdapterContext, lite = false): Tark
         count: typeof entry.count === 'number' ? entry.count : 1,
       }))
     : undefined;
-  const base = adaptItemRef(raw, context);
-  if (lite) return base;
   return compactObject({
     ...raw,
     ...base,
@@ -608,16 +674,10 @@ function adaptObjective(raw: JsonRecord, context: AdapterContext): TaskObjective
     useAny: Array.isArray(raw.useAny)
       ? raw.useAny.map((item) => adaptObjectiveItemRef(item, context))
       : undefined,
-    usingWeapon: raw.usingWeapon ? adaptObjectiveItemRef(raw.usingWeapon, context) : undefined,
-    usingWeaponMods: Array.isArray(raw.usingWeaponMods)
-      ? raw.usingWeaponMods.map((item) => adaptObjectiveItemRef(item, context))
-      : undefined,
-    wearing: Array.isArray(raw.wearing)
-      ? raw.wearing.map((item) => adaptObjectiveItemRef(item, context))
-      : undefined,
-    notWearing: Array.isArray(raw.notWearing)
-      ? raw.notWearing.map((item) => adaptObjectiveItemRef(item, context))
-      : undefined,
+    usingWeapon: adaptObjectiveEquipment(raw.usingWeapon, context),
+    usingWeaponMods: adaptObjectiveEquipment(raw.usingWeaponMods, context),
+    wearing: adaptObjectiveEquipment(raw.wearing, context),
+    notWearing: adaptObjectiveEquipment(raw.notWearing, context),
     hideoutStation: stationValue ? adaptHideoutRef(stationValue, context) : undefined,
     skillLevel:
       skillName && typeof skillLevelValue === 'number'
@@ -638,7 +698,7 @@ function adaptTaskRef(value: unknown, context: AdapterContext) {
   return compactObject({
     id,
     name: typeof raw?.name === 'string' ? raw.name : undefined,
-    wikiLink: toTrustedGameLinkUrl(raw?.wikiLink),
+    wikiLink: catalogLink(raw?.wikiLink),
   });
 }
 function adaptTaskRequirement(raw: unknown, context: AdapterContext) {
@@ -703,6 +763,9 @@ function adaptTraderRequirements(
     traderRequirements: onlyIfPopulated(traderRequirements),
   };
 }
+/** Upstream reports "no delay" as 0 or omits the field; only a real delay is carried. */
+const positiveSeconds = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
   return compactObject({
     id: stringId(raw) ?? '',
@@ -713,8 +776,10 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     lightkeeperRequired:
       typeof raw.lightkeeperRequired === 'boolean' ? raw.lightkeeperRequired : undefined,
     experience: typeof raw.experience === 'number' ? raw.experience : undefined,
-    wikiLink: toTrustedGameLinkUrl(raw.wikiLink),
+    wikiLink: catalogLink(raw.wikiLink),
     minPlayerLevel: typeof raw.minPlayerLevel === 'number' ? raw.minPlayerLevel : undefined,
+    availableDelaySecondsMin: positiveSeconds(raw.availableDelaySecondsMin),
+    availableDelaySecondsMax: positiveSeconds(raw.availableDelaySecondsMax),
     requiredPrestige: resolveRequiredPrestige(raw.requiredPrestige),
     taskRequirements: Array.isArray(raw.taskRequirements)
       ? raw.taskRequirements.map((requirement) => adaptTaskRequirement(requirement, context))
@@ -1077,13 +1142,39 @@ export function createTarkovJsonBootstrapFetcher(options: TarkovJsonOptions) {
       (await fetchEnvelope<JsonItemsPayload>(buildPath('items', options), options)).data
     );
 }
+// Only exact declarations whose fields the lite adapter discards are omitted.
+// Unfamiliar/overlapping paths still use the full translator, including its guards.
+const OMITTED_LITE_ITEM_TRANSLATIONS = new Set([
+  '$.data.items.*.description',
+  '$.data.fleaMarket.*.name',
+  '$.data.armorMaterial.*.name',
+  '$.data.skills.*.name',
+  '$.data.itemCategories.*.name',
+  '$.data.handbookCategories.*.name',
+]);
+async function fetchItemsLitePayload(options: TarkovJsonOptions): Promise<JsonItemsPayload> {
+  const response = await fetchEnvelope<JsonItemsPayload>(buildPath('items', options), options);
+  // The upstream envelope may be shared by concurrent full/lite and locale requests.
+  return translateEnvelope(
+    {
+      ...response,
+      translations: response.translations?.filter(
+        (path) => !OMITTED_LITE_ITEM_TRANSLATIONS.has(path)
+      ),
+    },
+    'items',
+    options
+  );
+}
 export function createTarkovJsonItemsFetcher(
   options: TarkovJsonOptions,
   adapterOptions: { lite?: boolean } = {}
 ) {
   return async () =>
     adaptItemsResponse(
-      await fetchTarkovJsonEndpoint<JsonItemsPayload>('items', options),
+      await (adapterOptions.lite
+        ? fetchItemsLitePayload(options)
+        : fetchTarkovJsonEndpoint<JsonItemsPayload>('items', options)),
       adapterOptions
     );
 }

@@ -36,6 +36,37 @@ describe('default fetch budget', () => {
     expect(worstCaseMs).toBeLessThan(100_000);
   });
 });
+describe('map transit data', () => {
+  it.each(['regular', 'pve', 'pvp-season'] as const)(
+    'preserves localized transit coordinates through the %s map adapter',
+    async (gameMode) => {
+      const transit = {
+        id: '9',
+        description: 'CUST_TRANSIT_9_DESC',
+        map: 'reserve',
+        position: { x: 650.64, y: 1.59, z: 124.94 },
+      };
+      const fetcher = createFetcher({
+        [`https://json.tarkov.dev/${gameMode}/maps`]: {
+          data: { maps: { customs: { id: 'customs', name: 'Customs', transits: [transit] } } },
+          translations: ['$.data.maps.*.transits[*].description'],
+        },
+        [`https://json.tarkov.dev/${gameMode}/maps_de`]: { data: {} },
+        [`https://json.tarkov.dev/${gameMode}/maps_en`]: {
+          data: { CUST_TRANSIT_9_DESC: 'Transit to Reserve' },
+        },
+      });
+      const payload = await fetchTarkovJsonEndpoint<{ maps: Record<string, unknown> }>('maps', {
+        gameMode,
+        lang: 'de',
+        deps: { fetcher },
+      });
+      const result = adaptTasksCoreResponse({}, payload, {}).data;
+      expect(result.maps[0]?.transits).toEqual([{ ...transit, description: 'Transit to Reserve' }]);
+      expect(transit.description).toBe('CUST_TRANSIT_9_DESC');
+    }
+  );
+});
 describe('createTarkovJsonBootstrapFetcher', () => {
   it('reads player levels from the base envelope without fetching language envelopes', async () => {
     const fetcher = createFetcher({
@@ -83,7 +114,7 @@ describe('fetchTarkovJsonEndpoint', () => {
         gameMode: 'pvp-season',
         deps: { fetcher },
       })
-    ).rejects.toThrow('Unsupported json.tarkov.dev season translation path');
+    ).rejects.toThrow('Unsupported json.tarkov.dev translation path');
   });
   it('localizes grouped season perks with English fallback using the published paths', async () => {
     const fetcher = createFetcher({
@@ -378,6 +409,38 @@ describe('fetchTarkovJsonEndpoint', () => {
       path: '$.data.items[?(@.name)].name',
     });
   });
+  it.each([null, 7, {}, [], false])('skips a non-string translation path %j', async (path) => {
+    const warn = vi.fn();
+    const items = { item1: { name: 'item.name' } };
+    const fetcher = createFetcher({
+      'https://json.tarkov.dev/regular/items': {
+        data: { items },
+        translations: [path, '$.data.items.*.name'],
+      },
+      'https://json.tarkov.dev/regular/items_en': { data: { 'item.name': 'Bandage' } },
+    });
+    const result = await fetchTarkovJsonEndpoint<{ items: typeof items }>('items', {
+      deps: { fetcher, logger: { warn, error: vi.fn() } },
+    });
+    expect(result.items.item1.name).toBe('Bandage');
+    expect(items.item1.name).toBe('item.name');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('unsupported'), { path });
+  });
+  it.each([null, 7, {}, [], false])(
+    'rejects a non-string required season path %j',
+    async (path) => {
+      const fetcher = createFetcher({
+        'https://json.tarkov.dev/regular/season': {
+          data: { name: 'season.name' },
+          translations: [path],
+        },
+        'https://json.tarkov.dev/regular/season_en': { data: { 'season.name': 'Season' } },
+      });
+      await expect(fetchTarkovJsonEndpoint('season', { deps: { fetcher } })).rejects.toThrow(
+        'Unsupported json.tarkov.dev translation path'
+      );
+    }
+  );
   it('skips own __proto__ keys when walking wildcards', async () => {
     const items = JSON.parse('{"__proto__":{"name":"item.name"},"item1":{"name":"item.name"}}');
     const fetcher = createFetcher({
@@ -637,6 +700,40 @@ describe('tarkov JSON adapters', () => {
     });
     expect(result.maps[0]?.spawns).toHaveLength(1);
     expect(result.traders[0]?.levels).toHaveLength(1);
+  });
+  it('carries positive time-gate delays and drops absent, zero, or invalid ones', () => {
+    const base = tasksPayload.tasks.task1;
+    const delays: Record<string, Record<string, unknown>> = {
+      ranged: { availableDelaySecondsMin: 1800, availableDelaySecondsMax: 2100 },
+      fixed: { availableDelaySecondsMin: 36000, availableDelaySecondsMax: 36000 },
+      zero: { availableDelaySecondsMin: 0, availableDelaySecondsMax: 0 },
+      absent: {},
+      invalid: {
+        availableDelaySecondsMin: '3600',
+        availableDelaySecondsMax: Number.POSITIVE_INFINITY,
+      },
+      negative: { availableDelaySecondsMin: -5, availableDelaySecondsMax: Number.NaN },
+    };
+    const payload = {
+      tasks: Object.fromEntries(
+        Object.entries(delays).map(([id, fields]) => [id, { ...base, id, ...fields }])
+      ),
+    };
+    const tasks = adaptTasksCoreResponse(payload, mapsPayload, tradersPayload).data.tasks;
+    const byId = new Map(tasks.map((task) => [task.id, task]));
+    expect(byId.get('ranged')).toMatchObject({
+      availableDelaySecondsMin: 1800,
+      availableDelaySecondsMax: 2100,
+    });
+    expect(byId.get('fixed')).toMatchObject({
+      availableDelaySecondsMin: 36000,
+      availableDelaySecondsMax: 36000,
+    });
+    for (const id of ['zero', 'absent', 'invalid', 'negative']) {
+      expect(byId.get(id)).toBeDefined();
+      expect(byId.get(id)).not.toHaveProperty('availableDelaySecondsMin');
+      expect(byId.get(id)).not.toHaveProperty('availableDelaySecondsMax');
+    }
   });
   it('adapts map spawns', () => {
     expect(adaptMapSpawnsResponse(mapsPayload).data.maps[0]).toMatchObject({

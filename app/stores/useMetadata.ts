@@ -2,7 +2,12 @@ import { defineStore } from 'pinia';
 import { extractLanguageCode, useSafeLocale } from '@/composables/i18nHelpers';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import mapsData from '@/data/maps.json';
-import { type FetchResponse, isFetchError, isFetchSuccess } from '@/stores/tarkov/fetchResponse';
+import {
+  type FetchResponse,
+  type FetchSuccess,
+  isFetchError,
+  isFetchSuccess,
+} from '@/stores/tarkov/fetchResponse';
 import { type ObjectiveWithItems, createItemPicker } from '@/stores/tarkov/itemPicker';
 import {
   getMetadataGameMode,
@@ -17,6 +22,8 @@ import {
   getPromiseRequestKeyStore,
   getPromiseStore,
 } from '@/stores/tarkov/promiseStore';
+import { delay } from '@/utils/async';
+import { catalogSnapshotAfterPurge, fetchTarkovCatalog } from '@/utils/catalogResponse';
 import {
   API_GAME_MODES,
   API_SUPPORTED_LANGUAGES,
@@ -32,9 +39,18 @@ import {
   isGameEdition,
   getExcludedTaskIdsForEdition as getExcludedTaskIds,
 } from '@/utils/editionHelpers';
+import { MissingGameDataStringError } from '@/utils/gameDataStrings';
 import { createGraph, type TaskGraph } from '@/utils/graphHelpers';
 import { queueIdleTask } from '@/utils/idleScheduler';
 import { logger } from '@/utils/logger';
+import {
+  claimMetadataCacheWrite,
+  fetchLocalizedMetadata,
+  hasCachedGameDataStrings,
+  invalidateGameDataStrings,
+  localizeCachedMetadata,
+  localizeMetadata,
+} from '@/utils/metadataLocalization';
 import { perfEnd, perfStart } from '@/utils/perf';
 import { buildPrestigeTaskMap } from '@/utils/prestige';
 import { resolveSeasonalPerks } from '@/utils/seasonalPerks';
@@ -49,7 +65,10 @@ import {
   getCachedData,
   setCachedData,
 } from '@/utils/tarkovCache';
-import { TASK_OBJECTIVES_CACHE_VERSION } from '@/utils/taskCatalogCache';
+import {
+  TASK_OBJECTIVES_CACHE_VERSION,
+  TASK_OBJECTIVES_PURGE_CHECK_TTL_MS,
+} from '@/utils/taskCatalogCache';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   FinishRewards,
@@ -86,6 +105,20 @@ const requestSignals = new WeakMap<Promise<unknown>, AbortSignal>();
 // A replacement startup must not join a request fenced to its previous owner.
 const editionRequestOwners = new WeakMap<Promise<unknown>, () => boolean>();
 const liveEditionRequests = new WeakSet<Promise<void>>();
+const neutralEditionCatalogs = new WeakMap<
+  object,
+  Map<string, { data: ProgressionCatalog; expires: number }>
+>();
+const freshNeutralEditionCatalogs = (owner: object) => {
+  let catalogs = neutralEditionCatalogs.get(toRaw(owner));
+  if (!catalogs) {
+    catalogs = new Map();
+    neutralEditionCatalogs.set(toRaw(owner), catalogs);
+  }
+  return catalogs;
+};
+const hasFreshNeutralEditions = (owner: object, mode: string): boolean =>
+  (freshNeutralEditionCatalogs(owner).get(mode)?.expires ?? 0) > Date.now();
 type EditionRequestOptions = {
   revalidate?: boolean;
   signal?: AbortSignal;
@@ -136,14 +169,14 @@ const ownsMetadataRequest = (
 const BOOTSTRAP_CACHE_VERSION = 'json-v2';
 /** Requests for language-independent data always use English to share one cache entry. */
 const ENGLISH_LANGUAGE_CODE = 'en';
-const TASKS_CORE_CACHE_VERSION = 'json-v3';
-const MAP_SPAWNS_CACHE_VERSION = 'json-v1';
-const ITEMS_CACHE_VERSION = 'json-v2';
-const TASK_REWARDS_CACHE_VERSION = 'json-v2';
-const HIDEOUT_CACHE_VERSION = 'json-v5';
+const TASKS_CORE_CACHE_VERSION = 'neutral-v1';
+const MAP_SPAWNS_CACHE_VERSION = 'neutral-v1';
+const ITEMS_CACHE_VERSION = 'neutral-v1';
+const TASK_REWARDS_CACHE_VERSION = 'neutral-v1';
+const HIDEOUT_CACHE_VERSION = 'neutral-v1';
 const HIDEOUT_CACHE_TTL_MS = 60 * 60 * 1000;
-const PRESTIGE_CACHE_VERSION = 'json-v3';
-const EDITIONS_CACHE_VERSION = 'overlay-v3';
+const PRESTIGE_CACHE_VERSION = 'neutral-v1';
+const EDITIONS_CACHE_VERSION = 'neutral-v1';
 const settledEditionScope = (requested: string, current: string) =>
   requested === current ? requested : '';
 /**
@@ -160,6 +193,146 @@ const CACHE_PURGE_STORAGE_KEY = STORAGE_KEYS.cachePurgeAt;
 const CACHE_PURGE_CHECK_TTL_MS = 5 * 60 * 1000;
 const CACHE_PURGE_CHECK_TIMEOUT_MS = 2500;
 const CACHE_PURGE_CHECK_STORAGE_KEY = STORAGE_KEYS.cachePurgeCheckAt;
+const readPurgeStorage = (key: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const writePurgeStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    logger.warn('[MetadataStore] Failed to persist cache purge metadata:', error);
+  }
+};
+const storedObjectivePurgeTime = () =>
+  Date.parse(readPurgeStorage(CACHE_PURGE_STORAGE_KEY) ?? '') || 0;
+const observedObjectivePurgeTime = (store: object) =>
+  Math.max(getPromiseStore(store).observedCachePurgeTime, storedObjectivePurgeTime());
+const buildObjectiveCatalogCacheKey = (scope: string, purgeTime: number) => {
+  const key = `${TASK_OBJECTIVES_CACHE_VERSION}-${scope}`;
+  return purgeTime ? `${key}-${purgeTime}` : key;
+};
+const objectiveCatalogCacheKey = (store: object, scope: string) =>
+  buildObjectiveCatalogCacheKey(scope, observedObjectivePurgeTime(store));
+// An operator purge changes browser generations while immutable seeds retain their build timestamps.
+const hasObjectiveCatalogSince = (response: FetchSuccess<unknown>, purgeTime: number) => {
+  if (!purgeTime) return true;
+  return (
+    catalogSnapshotAfterPurge(response, purgeTime) ??
+    Date.parse(response.dataOverlay?.fetchedAt ?? '') >= purgeTime
+  );
+};
+const hasCurrentObjectiveOverlay = (store: object, response: FetchSuccess<unknown>) =>
+  hasObjectiveCatalogSince(response, observedObjectivePurgeTime(store));
+const assertCurrentObjectiveCounts = (store: object, response: FetchSuccess<unknown>) => {
+  if (!hasCurrentObjectiveOverlay(store, response)) {
+    throw new Error('Objective catalog predates the latest cache purge');
+  }
+};
+type MetadataCacheScope = {
+  cacheType: CacheType;
+  cacheKey: string;
+  language: string;
+  mode: string;
+};
+async function readMetadataCache<T>(store: object, scope: MetadataCacheScope) {
+  const cached = await getCachedData<T>(scope.cacheType, scope.cacheKey, ENGLISH_LANGUAGE_CODE);
+  if (
+    scope.cacheType === 'tasks-objectives' &&
+    scope.cacheKey !== objectiveCatalogCacheKey(store, scope.mode)
+  ) {
+    return null;
+  }
+  return cached;
+}
+const metadataWriteKey = (
+  store: object,
+  scope: MetadataCacheScope,
+  response: FetchSuccess<unknown>
+): string | null => {
+  if (typeof window === 'undefined') return null;
+  if (scope.cacheType !== 'tasks-objectives') return scope.cacheKey;
+  const purgeTime = observedObjectivePurgeTime(store);
+  return hasObjectiveCatalogSince(response, purgeTime)
+    ? buildObjectiveCatalogCacheKey(scope.mode, purgeTime)
+    : null;
+};
+const isStaleObjectiveCatalog = (store: object, cacheType: CacheType, response: unknown) =>
+  cacheType === 'tasks-objectives' &&
+  isFetchSuccess(response) &&
+  !hasCurrentObjectiveOverlay(store, response);
+async function fetchMetadataForCache<T>(
+  store: object,
+  cacheType: CacheType,
+  endpoint: string,
+  options: { signal?: AbortSignal; query: Record<string, string> },
+  isCurrent: () => boolean
+): Promise<FetchResponse<T>> {
+  const fetchCatalog = () =>
+    fetchTarkovCatalog<FetchResponse<T>>(endpoint, options, observedObjectivePurgeTime(store));
+  const response = await fetchCatalog();
+  if (!isStaleObjectiveCatalog(store, cacheType, response)) return response;
+  // Give a warm Worker one marker-check interval before sharing a single retry.
+  await delay(TASK_OBJECTIVES_PURGE_CHECK_TTL_MS + 5000, options.signal);
+  if (!isCurrent()) return response;
+  const retry = await fetchCatalog();
+  return isStaleObjectiveCatalog(store, cacheType, retry)
+    ? { error: 'Objective catalog still predates the latest cache purge after retry' }
+    : retry;
+}
+const unserializableMetadataError = (error: Record<string, unknown>): string => {
+  const parts = Object.entries(error)
+    .filter(([key, value]) => ['name', 'message', 'code', 'stack'].includes(key) && value)
+    .map(([key, value]) => `${key}=${String(value).slice(0, key === 'stack' ? 100 : undefined)}`);
+  return parts.length > 0 ? parts.join('; ') : `[Unserializable: ${typeof error}]`;
+};
+const serializedMetadataError = (error: Record<string, unknown>): string => {
+  try {
+    return JSON.stringify(error).slice(0, 200);
+  } catch {
+    return unserializableMetadataError(error);
+  }
+};
+const metadataErrorMessage = (error: string | Record<string, unknown>): string => {
+  if (typeof error === 'string') return error;
+  if (typeof error.message === 'string') return error.message;
+  return serializedMetadataError(error);
+};
+const lastPurgeCheckTime = (sessionCheckAt: number) => {
+  const storedCheckAt = Number(readPurgeStorage(CACHE_PURGE_CHECK_STORAGE_KEY));
+  return Number.isFinite(storedCheckAt) ? Math.max(sessionCheckAt, storedCheckAt) : sessionCheckAt;
+};
+async function updateObservedPurge(
+  lastPurgeAt: string,
+  state: Pick<MetadataState, 'tasksObjectivesHydrated' | 'objectiveModeCountDifferencesHydrated'>
+) {
+  const purgeTime = Date.parse(lastPurgeAt);
+  if (!Number.isFinite(purgeTime) || purgeTime <= storedObjectivePurgeTime()) return;
+  const promises = getPromiseStore(state);
+  if (purgeTime < promises.observedCachePurgeTime) return;
+  if (purgeTime > promises.observedCachePurgeTime) {
+    promises.observedCachePurgeTime = purgeTime;
+    state.tasksObjectivesHydrated = false;
+    state.objectiveModeCountDifferencesHydrated = false;
+    promises.modeObjectiveCounts.clear();
+  }
+  try {
+    await clearAllCache();
+    invalidateGameDataStrings(state);
+    neutralEditionCatalogs.delete(toRaw(state));
+  } catch (error) {
+    logger.error('[MetadataStore] Failed to clear local cache after server purge:', error);
+    return;
+  }
+  logger.info('[MetadataStore] Cleared local cache after server purge.');
+  if (purgeTime >= observedObjectivePurgeTime(state)) {
+    writePurgeStorage(CACHE_PURGE_STORAGE_KEY, lastPurgeAt);
+  }
+}
 // Exported type for craft sources used by components
 export type CraftSource = { stationId: string; stationName: string; stationLevel: number };
 export interface MetadataStoreTaskLookup {
@@ -178,10 +351,12 @@ interface MetadataState {
   loading: boolean;
   // Only core replacement advances this token; detail and item merges leave it unchanged.
   tasksCoreRevision: number;
+  tasksCoreGameMode: GameMode | null;
   tasksCoreRefreshing: boolean;
   // Indicates objectives still need to be fetched (set when tasks exist but objectives not yet loaded)
   tasksObjectivesPending: boolean;
   tasksObjectivesHydrated: boolean;
+  tasksRewardsHydrated: boolean;
   hideoutLoading: boolean;
   itemsLoading: boolean;
   mapSpawnsLoading: boolean;
@@ -192,6 +367,7 @@ interface MetadataState {
   prestigeLoading: boolean;
   editionsLoading: boolean;
   error: Error | null;
+  tasksObjectivesError: Error | null;
   hideoutError: Error | null;
   itemsError: Error | null;
   mapSpawnsError: Error | null;
@@ -278,24 +454,40 @@ const finishTaskCoreRefresh = (
 };
 type CriticalCacheData = {
   scope: string;
+  purgeGeneration?: number;
   tasksCore: TarkovTasksCoreQueryResult;
   hideout: TarkovHideoutQueryResult;
   prestige: TarkovPrestigeQueryResult;
   editions: CachedEditions;
 };
+type CriticalCacheCandidate = {
+  scope: string;
+  purgeGeneration: number;
+  tasksCore: TarkovTasksCoreQueryResult | null;
+  hideout: TarkovHideoutQueryResult | null;
+  prestige: TarkovPrestigeQueryResult | null;
+  editions: CachedEditions | null;
+};
+const isCompleteCriticalCache = (
+  candidate: CriticalCacheCandidate
+): candidate is CriticalCacheData & { purgeGeneration: number } =>
+  [candidate.tasksCore, candidate.hideout, candidate.prestige].every(Boolean) &&
+  isProgressionCatalog(candidate.editions);
 type CachedEditions = {
   editions?: GameEdition[];
   storyChapters?: StoryChapter[];
   seasonalPerks?: SeasonalPerk[];
 };
-const readCachedEditions = async (mode: string, language: string): Promise<CachedEditions> => {
+const readCachedEditions = async (owner: object, mode: string): Promise<CachedEditions> => {
+  if (hasFreshNeutralEditions(owner, mode))
+    return freshNeutralEditionCatalogs(owner).get(mode)!.data;
   if (typeof window === 'undefined') return {};
   try {
     return (
       (await getCachedData<CachedEditions>(
         'editions' as CacheType,
         `${EDITIONS_CACHE_VERSION}-${mode}`,
-        language
+        ENGLISH_LANGUAGE_CODE
       )) ?? {}
     );
   } catch (error) {
@@ -321,6 +513,9 @@ const prepareEditionScope = (
   scope: string
 ) => {
   if (store.editionsScope && store.editionsScope !== scope) {
+    const previousMode = store.editionsScope.slice(0, store.editionsScope.lastIndexOf('-'));
+    const nextMode = scope.slice(0, scope.lastIndexOf('-'));
+    if (previousMode !== nextMode) freshNeutralEditionCatalogs(state).delete(previousMode);
     // Freshness belongs to the live catalog, which this scope change discards.
     store.editionsRevalidatedScopes.delete(store.editionsScope);
     store.editionsSettledScope = '';
@@ -345,8 +540,9 @@ const applyCachedEditions = async (
     editions = [],
     storyChapters = [],
     seasonalPerks = [],
-  } = await readCachedEditions(mode, language);
-  if (!isCurrent() || !hasValidCachedEditions(editions)) return false;
+  } = await localizeMetadata(state, await readCachedEditions(state, mode), language);
+  if (!isCurrent()) return false;
+  if (!hasFreshNeutralEditions(state, mode) && !hasValidCachedEditions(editions)) return false;
   state.editions = markRaw(editions);
   state.seasonalPerks = perksForMode(seasonalPerks, mode);
   if (!storyChapters.length) return false;
@@ -373,7 +569,7 @@ type ProgressionCatalog = CachedEditions & {
   storyChapters: StoryChapter[];
 };
 const isProgressionCatalog = (
-  overlay: CachedEditions | undefined
+  overlay: CachedEditions | null | undefined
 ): overlay is ProgressionCatalog => {
   if (!overlay) return false;
   if (!Array.isArray(overlay.storyChapters)) return false;
@@ -381,14 +577,12 @@ const isProgressionCatalog = (
 };
 const fetchProgressionCatalog = async (
   mode: string,
-  language: string,
   forceRefresh: boolean,
   signal?: AbortSignal
 ): Promise<ProgressionCatalog> => {
   const response = await tarkovApiFetch<{ data: CachedEditions }>('/api/tarkov/editions', {
     signal,
     query: {
-      lang: language,
       gameMode: mode,
       ...(forceRefresh ? { cacheBust: '1' } : {}),
     },
@@ -417,22 +611,31 @@ const cachedProgressionCatalog = (cached: CriticalCacheData['editions']): Progre
   storyChapters: cached.storyChapters ?? [],
   seasonalPerks: cached.seasonalPerks ?? [],
 });
-const cacheProgressionCatalog = (
-  state: ProgressionCatalogState,
+const cachedProgressionView = (
+  state: Pick<MetadataState, 'languageCode'>,
   mode: string,
-  language: string
+  cached: CachedEditions
+): ProgressionCatalog => {
+  const fallback = cachedProgressionCatalog(cached);
+  const neutral = hasFreshNeutralEditions(state, mode)
+    ? freshNeutralEditionCatalogs(state).get(mode)!.data
+    : fallback;
+  return localizeCachedMetadata(state, neutral, state.languageCode) ?? fallback;
+};
+const cacheProgressionCatalog = (
+  overlay: ProgressionCatalog,
+  mode: string,
+  isCurrent: () => boolean
 ) => {
+  if (!isCurrent()) return;
   if (typeof window === 'undefined') return;
   setCachedData(
     'editions' as CacheType,
     `${EDITIONS_CACHE_VERSION}-${mode}`,
-    language,
-    {
-      editions: state.editions,
-      storyChapters: state.storyChapters,
-      seasonalPerks: state.seasonalPerks,
-    },
-    CACHE_CONFIG.MAX_TTL
+    ENGLISH_LANGUAGE_CODE,
+    overlay,
+    HIDEOUT_CACHE_TTL_MS,
+    isCurrent
   ).catch((err) => logger.error('[MetadataStore] Error caching editions:', err));
 };
 /**
@@ -453,20 +656,26 @@ const loadProgressionCatalog = async (
     mode: string;
     scope: string;
   }
-): Promise<boolean> => {
+): Promise<ProgressionCatalog | false> => {
   try {
-    const overlay = await fetchProgressionCatalog(
-      context.mode,
-      context.language,
-      context.forceRefresh,
-      context.signal
+    const generation = observedObjectivePurgeTime(state);
+    const claim = claimMetadataCacheWrite(
+      state,
+      `editions/${EDITIONS_CACHE_VERSION}-${context.mode}/en`
     );
+    const canWrite = () => claim() && generation === observedObjectivePurgeTime(state);
+    const { neutral: overlay, localized } = await fetchLocalizedMetadata(state, {
+      load: (fresh) =>
+        fetchProgressionCatalog(context.mode, context.forceRefresh || fresh, context.signal),
+      language: context.language,
+      signal: context.signal,
+    });
     throwIfAborted(context.signal);
     if (!context.isCurrent()) return false;
-    applyProgressionCatalog(state, overlay, context.mode);
+    applyProgressionCatalog(state, localized, context.mode);
     promiseStore.editionsSettledScope = context.scope;
-    cacheProgressionCatalog(state, context.mode, context.language);
-    return true;
+    cacheProgressionCatalog(overlay, context.mode, canWrite);
+    return overlay;
   } catch (err) {
     throwIfAborted(context.signal);
     if (!context.isCurrent()) return false;
@@ -475,15 +684,39 @@ const loadProgressionCatalog = async (
     return false;
   }
 };
+/** Purges invalidate in-flight catalogs without replacing the request's scope owner. */
+const loadCurrentProgressionCatalog = async (
+  state: Parameters<typeof loadProgressionCatalog>[0],
+  promiseStore: ReturnType<typeof getPromiseStore>,
+  context: Parameters<typeof loadProgressionCatalog>[2]
+): Promise<{ overlay: ProgressionCatalog; isCurrent: () => boolean } | false> => {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await promiseStore.cachePurgePromise;
+    if (!context.isCurrent()) return false;
+    const generation = observedObjectivePurgeTime(state);
+    const isCurrent = () => context.isCurrent() && generation === observedObjectivePurgeTime(state);
+    const overlay = await loadProgressionCatalog(state, promiseStore, {
+      ...context,
+      isCurrent,
+    });
+    if (!context.isCurrent()) return false;
+    if (generation !== observedObjectivePurgeTime(state)) continue;
+    return overlay ? { overlay, isCurrent } : false;
+  }
+  state.editionsError = new Error('Progression catalog changed during cache purge');
+  return false;
+};
 export const useMetadataStore = defineStore('metadata', {
   state: (): MetadataState => ({
     initialized: false,
     initializationFailed: false,
     loading: false,
     tasksCoreRevision: 0,
+    tasksCoreGameMode: null,
     tasksCoreRefreshing: false,
     tasksObjectivesPending: false,
     tasksObjectivesHydrated: false,
+    tasksRewardsHydrated: false,
     hideoutLoading: false,
     itemsLoading: false,
     mapSpawnsLoading: false,
@@ -494,6 +727,7 @@ export const useMetadataStore = defineStore('metadata', {
     prestigeLoading: false,
     editionsLoading: false,
     error: null,
+    tasksObjectivesError: null,
     hideoutError: null,
     itemsError: null,
     mapSpawnsError: null,
@@ -644,6 +878,27 @@ export const useMetadataStore = defineStore('metadata', {
       buildPrestigeTaskMap(state.tasks, state.prestigeLevels),
   },
   actions: {
+    getCachePurgeGeneration(): number {
+      return observedObjectivePurgeTime(this);
+    },
+    getObjectiveCatalogCacheKey(mode: string): string {
+      return objectiveCatalogCacheKey(this, mode);
+    },
+    fetchCatalogResponse<T>(config: {
+      cacheType: CacheType;
+      endpoint: string;
+      query: Record<string, string>;
+      signal?: AbortSignal;
+      isCurrent: () => boolean;
+    }): Promise<FetchResponse<T>> {
+      return fetchMetadataForCache<T>(
+        this,
+        config.cacheType,
+        config.endpoint,
+        { signal: config.signal, query: config.query },
+        config.isCurrent
+      );
+    },
     async initialize(options?: { forceRefresh?: boolean; gameMode?: GameMode }) {
       const forceRefresh = options?.forceRefresh ?? false;
       const perfTimer = perfStart('[Metadata] initialize');
@@ -741,12 +996,13 @@ export const useMetadataStore = defineStore('metadata', {
      * Returns the cached data to avoid redundant fetches, or null if cache is incomplete.
      */
     async hasCriticalLocaleCache(locale: string): Promise<boolean> {
+      await getPromiseStore(this).cachePurgePromise;
       const language =
         LOCALE_TO_API_MAPPING[locale as keyof typeof LOCALE_TO_API_MAPPING] ??
         extractLanguageCode(locale, [...API_SUPPORTED_LANGUAGES]);
       const mode = this.getApiGameMode();
       const cached = await Promise.all([
-        this.loadCriticalCacheData(language),
+        this.loadCriticalCacheData(language, false),
         getCachedData<TarkovBootstrapQueryResult>(
           'bootstrap',
           `${BOOTSTRAP_CACHE_VERSION}-${mode}`,
@@ -755,62 +1011,56 @@ export const useMetadataStore = defineStore('metadata', {
         getCachedData<TarkovItemsQueryResult>(
           'items-lite',
           `${ITEMS_CACHE_VERSION}-${mode}`,
-          language
+          ENGLISH_LANGUAGE_CODE
         ),
         getCachedData<TarkovTaskObjectivesQueryResult>(
           'tasks-objectives',
-          `${TASK_OBJECTIVES_CACHE_VERSION}-${mode}`,
-          language
+          objectiveCatalogCacheKey(this, mode),
+          ENGLISH_LANGUAGE_CODE
         ),
         getCachedData<TarkovTaskRewardsQueryResult>(
           'tasks-rewards',
           `${TASK_REWARDS_CACHE_VERSION}-${mode}`,
-          language
+          ENGLISH_LANGUAGE_CODE
         ),
       ]).catch(() => null);
-      return cached?.every(Boolean) ?? false;
+      if (!cached?.every(Boolean)) return false;
+      return hasCachedGameDataStrings(this, language, cached).catch(() => false);
     },
-    async loadCriticalCacheData(language?: string): Promise<CriticalCacheData | null> {
+    async loadCriticalCacheData(
+      language?: string,
+      translate = true
+    ): Promise<CriticalCacheData | null> {
       language ??= this.languageCode;
       try {
-        const apiGameMode =
-          API_GAME_MODES[this.currentGameMode as keyof typeof API_GAME_MODES] ||
-          API_GAME_MODES[GAME_MODES.PVP];
+        const apiGameMode = this.getApiGameMode();
         const scope = `${apiGameMode}-${language}`;
+        await this.checkCachePurge();
+        const purgeGeneration = this.getCachePurgeGeneration();
         // Load all critical cache entries in parallel
         const [tasksCore, hideout, prestige, editions] = await Promise.all([
           getCachedData<TarkovTasksCoreQueryResult>(
             'tasks-core' as CacheType,
             `${TASKS_CORE_CACHE_VERSION}-${apiGameMode}`,
-            language
+            ENGLISH_LANGUAGE_CODE
           ),
           getCachedData<TarkovHideoutQueryResult>(
             'hideout' as CacheType,
             `${HIDEOUT_CACHE_VERSION}-${apiGameMode}`,
-            language
+            ENGLISH_LANGUAGE_CODE
           ),
           getCachedData<TarkovPrestigeQueryResult>(
             'prestige' as CacheType,
             `${PRESTIGE_CACHE_VERSION}-${apiGameMode}`,
-            language
+            ENGLISH_LANGUAGE_CODE
           ),
-          getCachedData<CachedEditions>(
-            'editions' as CacheType,
-            `${EDITIONS_CACHE_VERSION}-${apiGameMode}`,
-            language
-          ),
+          readCachedEditions(this, apiGameMode),
         ]);
-        if (
-          tasksCore &&
-          hideout &&
-          prestige &&
-          editions &&
-          Array.isArray(editions.editions) &&
-          editions.editions.every(isGameEdition) &&
-          Array.isArray(editions.storyChapters)
-        ) {
+        const bundle = { scope, purgeGeneration, tasksCore, hideout, prestige, editions };
+        if (isCompleteCriticalCache(bundle)) {
           logger.debug('[MetadataStore] Critical cache: ALL PRESENT');
-          return { scope, tasksCore, hideout, prestige, editions };
+          const localized = translate ? await localizeMetadata(this, bundle, language) : bundle;
+          return purgeGeneration === this.getCachePurgeGeneration() ? localized : null;
         }
         logger.debug('[MetadataStore] Critical cache: MISSING some entries');
         return null;
@@ -840,12 +1090,13 @@ export const useMetadataStore = defineStore('metadata', {
         | 'editionsLoading';
       errorKey?:
         | 'error'
+        | 'tasksObjectivesError'
         | 'hideoutError'
         | 'itemsError'
         | 'mapSpawnsError'
         | 'prestigeError'
         | 'editionsError';
-      processData: (data: T) => void;
+      processData: (data: T, response?: FetchSuccess<T>) => void;
       onEmpty?: () => void;
       logName: string;
       forceRefresh?: boolean;
@@ -903,12 +1154,13 @@ export const useMetadataStore = defineStore('metadata', {
         | 'editionsLoading';
       errorKey?:
         | 'error'
+        | 'tasksObjectivesError'
         | 'hideoutError'
         | 'itemsError'
         | 'mapSpawnsError'
         | 'prestigeError'
         | 'editionsError';
-      processData: (data: T) => void;
+      processData: (data: T, response?: FetchSuccess<T>) => void;
       onEmpty?: () => void;
       logName: string;
       forceRefresh?: boolean;
@@ -950,7 +1202,10 @@ export const useMetadataStore = defineStore('metadata', {
         promiseRequestId,
         throwOnError = false,
       } = config;
-      const requestScope = `${this.getApiGameMode()}-${this.languageCode}`;
+      const mode = this.getApiGameMode();
+      const cacheScope = { cacheType, cacheKey, language: cacheLanguage, mode };
+      const requestLanguage = this.languageCode;
+      const requestScope = `${mode}-${requestLanguage}`;
       const isCurrentRequestContext = (ignoreAbort = false): boolean =>
         canApplyRequestSignal(config.signal, ignoreAbort) &&
         `${this.getApiGameMode()}-${this.languageCode}` === requestScope &&
@@ -962,7 +1217,7 @@ export const useMetadataStore = defineStore('metadata', {
       // Step 1: Check IndexedDB cache (unless forcing refresh)
       if (!forceRefresh && typeof window !== 'undefined') {
         try {
-          const cached = await getCachedData<T>(cacheType, cacheKey, cacheLanguage);
+          const cached = await readMetadataCache<T>(this, cacheScope);
           throwIfAborted(config.signal);
           if (cached) {
             logger.debug(
@@ -973,7 +1228,9 @@ export const useMetadataStore = defineStore('metadata', {
               endPerf({ cached: true, stale: true });
               return;
             }
-            processData(cached);
+            const localized = await localizeMetadata(this, cached, requestLanguage, config.signal);
+            if (!isCurrentRequestContext()) return;
+            processData(localized);
             if (loadingKey) this.$patch({ [loadingKey]: false });
             perfSource = 'cache';
             endPerf({ cached: true });
@@ -1000,41 +1257,32 @@ export const useMetadataStore = defineStore('metadata', {
         const effectiveQueryParams = forceRefresh
           ? { ...queryParams, cacheBust: '1' }
           : queryParams;
-        const response = await tarkovApiFetch<FetchResponse<T>>(endpoint, {
-          signal: config.signal,
-          query: effectiveQueryParams,
-        });
+        const canWrite = claimMetadataCacheWrite(this, `${cacheType}/${cacheKey}/${cacheLanguage}`);
+        const { neutral: response, localized: localizedResponse } = await fetchLocalizedMetadata(
+          this,
+          {
+            load: (fresh) =>
+              fetchMetadataForCache<T>(
+                this,
+                cacheType,
+                endpoint,
+                {
+                  signal: config.signal,
+                  query: fresh ? { ...effectiveQueryParams, cacheBust: '1' } : effectiveQueryParams,
+                },
+                isCurrentRequestContext
+              ),
+            language: requestLanguage,
+            signal: config.signal,
+          }
+        );
         throwIfAborted(config.signal);
         if (isFetchError(response)) {
           // Log full response for debugging
           logger.debug(`[MetadataStore] ${logName} error response:`, response);
-          // Construct user-friendly error message
-          let errorMessage: string;
-          if (typeof response.error === 'string') {
-            errorMessage = response.error;
-          } else {
-            const errorObj = response.error as { message?: unknown };
-            if (typeof errorObj.message === 'string') {
-              errorMessage = errorObj.message;
-            } else {
-              try {
-                errorMessage = JSON.stringify(response.error).slice(0, 200);
-              } catch {
-                // Safely extract error details when JSON.stringify fails (e.g., circular refs)
-                const err = response.error as Record<string, unknown>;
-                const parts: string[] = [];
-                if (err.name) parts.push(`name=${String(err.name)}`);
-                if (err.message) parts.push(`message=${String(err.message)}`);
-                if (err.code) parts.push(`code=${String(err.code)}`);
-                if (err.stack) parts.push(`stack=${String(err.stack).slice(0, 100)}`);
-                errorMessage =
-                  parts.length > 0 ? parts.join('; ') : `[Unserializable: ${typeof err}]`;
-              }
-            }
-          }
-          throw new Error(`API error: ${errorMessage}`);
+          throw new Error(`API error: ${metadataErrorMessage(response.error)}`);
         }
-        if (!isFetchSuccess<T>(response)) {
+        if (!isFetchSuccess<T>(response) || !isFetchSuccess<T>(localizedResponse)) {
           // Log full response for debugging
           logger.debug(`[MetadataStore] ${logName} unexpected response shape:`, response);
           const keys = response && typeof response === 'object' ? Object.keys(response) : [];
@@ -1045,12 +1293,18 @@ export const useMetadataStore = defineStore('metadata', {
           endPerf({ stale: true });
           return;
         }
-        processData(response.data);
+        processData(localizedResponse.data, response);
         // Step 4: Store in IndexedDB for future visits
-        if (typeof window !== 'undefined') {
-          setCachedData(cacheType, cacheKey, cacheLanguage, response.data, cacheTTL).catch((err) =>
-            logger.error(`[MetadataStore] Error caching ${logName} data:`, err)
-          );
+        const writeKey = metadataWriteKey(this, cacheScope, response);
+        if (writeKey !== null && canWrite()) {
+          setCachedData(
+            cacheType,
+            writeKey,
+            cacheLanguage,
+            response.data,
+            cacheTTL,
+            canWrite
+          ).catch((err) => logger.error(`[MetadataStore] Error caching ${logName} data:`, err));
         }
       } catch (err) {
         throwIfAborted(config.signal);
@@ -1059,7 +1313,7 @@ export const useMetadataStore = defineStore('metadata', {
           this.$patch({ [errorKey]: err as Error });
         }
         const isCurrent = isCurrentRequestContext();
-        if (onEmpty && isCurrent) {
+        if (onEmpty && isCurrent && !(err instanceof MissingGameDataStringError)) {
           onEmpty();
         }
         hadError = true;
@@ -1085,15 +1339,17 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * Check if the server has purged cache and clear local cache if needed.
      */
-    async checkCachePurge(): Promise<void> {
+    checkCachePurge(): Promise<void> {
+      const promises = getPromiseStore(this);
+      promises.cachePurgePromise ??= this._checkCachePurge().finally(() => {
+        promises.cachePurgePromise = null;
+      });
+      return promises.cachePurgePromise;
+    },
+    async _checkCachePurge(): Promise<void> {
       if (typeof window === 'undefined') return;
       const now = Date.now();
-      const storedCheckRaw = localStorage.getItem(CACHE_PURGE_CHECK_STORAGE_KEY);
-      const storedCheckAt = storedCheckRaw ? Number(storedCheckRaw) : 0;
-      const lastCheckAt = Number.isFinite(storedCheckAt)
-        ? Math.max(this.lastCachePurgeCheckAt, storedCheckAt)
-        : this.lastCachePurgeCheckAt;
-      if (now - lastCheckAt < CACHE_PURGE_CHECK_TTL_MS) return;
+      if (now - lastPurgeCheckTime(this.lastCachePurgeCheckAt) < CACHE_PURGE_CHECK_TTL_MS) return;
       this.lastCachePurgeCheckAt = now;
       const timeoutMs = CACHE_PURGE_CHECK_TIMEOUT_MS;
       const controller = new AbortController();
@@ -1107,25 +1363,9 @@ export const useMetadataStore = defineStore('metadata', {
           { signal: controller.signal }
         );
         if (!isFetchSuccess(response)) return;
-        localStorage.setItem(CACHE_PURGE_CHECK_STORAGE_KEY, String(now));
+        writePurgeStorage(CACHE_PURGE_CHECK_STORAGE_KEY, String(now));
         const lastPurgeAt = response.data?.lastPurgeAt;
-        if (!lastPurgeAt) return;
-        const serverTime = Date.parse(lastPurgeAt);
-        if (!Number.isFinite(serverTime)) return;
-        const localValue = localStorage.getItem(CACHE_PURGE_STORAGE_KEY);
-        const localTime = localValue ? Date.parse(localValue) : 0;
-        if (!Number.isFinite(localTime) || serverTime > localTime) {
-          try {
-            await clearAllCache();
-            localStorage.setItem(CACHE_PURGE_STORAGE_KEY, lastPurgeAt);
-            logger.info('[MetadataStore] Cleared local cache after server purge.');
-          } catch (clearError) {
-            logger.error(
-              '[MetadataStore] Failed to clear local cache after server purge:',
-              clearError
-            );
-          }
-        }
+        if (lastPurgeAt) await updateObservedPurge(lastPurgeAt, this);
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           logger.warn(`[MetadataStore] Cache purge check timed out after ${timeoutMs}ms.`, error);
@@ -1139,15 +1379,14 @@ export const useMetadataStore = defineStore('metadata', {
     /** Keep cached first paint while checking the catalog once per owned session scope. */
     scheduleCachedEditionsRevalidation(isOwner: () => boolean, signal?: AbortSignal) {
       const promises = getPromiseStore(this);
-      const scope = `${this.getApiGameMode()}-${this.languageCode}`;
-      if (promises.editionsRevalidatedScopes.has(scope)) return;
+      if (hasFreshNeutralEditions(this, this.getApiGameMode())) return;
       const requestVersion = promises.editionsRequestVersion;
       void queueIdleTask(
         () => {
           if (
             !isOwner() ||
             promises.editionsRequestVersion !== requestVersion ||
-            promises.editionsRevalidatedScopes.has(scope)
+            hasFreshNeutralEditions(this, this.getApiGameMode())
           )
             return;
           return this.fetchEditionsData(false, { revalidate: true, signal, isOwner });
@@ -1174,6 +1413,7 @@ export const useMetadataStore = defineStore('metadata', {
       } = {}
     ) {
       throwIfAborted(options.signal);
+      invalidateGameDataStrings(this, forceRefresh);
       const requestScope = `${this.getApiGameMode()}-${this.languageCode}`;
       const isCurrent = () =>
         !options.signal?.aborted &&
@@ -1181,9 +1421,6 @@ export const useMetadataStore = defineStore('metadata', {
         (options.isOwner?.() ?? true);
       const { deferHeavy = false, cachedData = null } = options;
       const perfTimer = perfStart('[Metadata] fetchAllData', { forceRefresh, deferHeavy });
-      this.checkCachePurge().catch((err) =>
-        logger.warn('[MetadataStore] Background cache purge check failed:', err)
-      );
       // Run cleanup once per session
       if (typeof window !== 'undefined') {
         cleanupExpiredCache().catch((err) =>
@@ -1197,6 +1434,11 @@ export const useMetadataStore = defineStore('metadata', {
       let editionsPromise: Promise<void> = Promise.resolve();
       let tasksCorePromise: Promise<void>;
       try {
+        await this.checkCachePurge().catch((err) =>
+          logger.warn('[MetadataStore] Cache purge check failed:', err)
+        );
+        throwIfAborted(options.signal);
+        if (!isCurrent()) return;
         const cacheApplied =
           !forceRefresh && cachedData !== null && this.applyCriticalCachedData(cachedData);
         await this.fetchBootstrapData(forceRefresh, options.signal);
@@ -1259,7 +1501,8 @@ export const useMetadataStore = defineStore('metadata', {
       const itemsLitePromise = this.fetchItemsLiteData(forceRefresh, options.signal);
       void itemsLitePromise.catch(() => {});
       let taskObjectivesPromise: Promise<void> = Promise.resolve();
-      if (this.tasks.length && deferHeavy) {
+      const deferTaskHydration = this.tasks.length > 0 && deferHeavy;
+      if (deferTaskHydration) {
         queueIdleTask(
           () =>
             isCurrent()
@@ -1279,7 +1522,7 @@ export const useMetadataStore = defineStore('metadata', {
         void taskObjectivesPromise.catch(() => {});
       }
       // Only defer non-critical task rewards
-      if (this.tasks.length && deferHeavy) {
+      if (deferTaskHydration) {
         const rewardsRequestVersion = promiseStore.taskRewardsRequestVersion;
         queueIdleTask(
           () => {
@@ -1353,9 +1596,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovTasksCoreQueryResult>({
         cacheType: 'tasks-core' as CacheType,
         cacheKey: `${TASKS_CORE_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/tasks-core',
-        queryParams: { lang: requestLanguage, gameMode: requestGameMode },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'loading',
         errorKey: 'error',
@@ -1378,9 +1621,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovMapSpawnsQueryResult>({
         cacheType: 'map-spawns' as CacheType,
         cacheKey: `${MAP_SPAWNS_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/map-spawns',
-        queryParams: { lang: requestLanguage, gameMode: requestGameMode },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'mapSpawnsLoading',
         errorKey: 'mapSpawnsError',
@@ -1395,9 +1638,20 @@ export const useMetadataStore = defineStore('metadata', {
     /**
      * Fetch task objectives and fail conditions data
      */
-    async fetchTaskObjectivesData(forceRefresh = false, signal?: AbortSignal) {
+    async fetchTaskObjectivesData(forceRefresh = false, signal?: AbortSignal): Promise<void> {
       throwIfAborted(signal);
-      if (this.tasksObjectivesHydrated && !forceRefresh) {
+      const promises = getPromiseStore(this);
+      if (promises.cachePurgePromise) {
+        await promises.cachePurgePromise;
+        throwIfAborted(signal);
+      }
+      const requestLanguage = this.languageCode;
+      const requestGameMode = this.getApiGameMode();
+      const cacheKey = objectiveCatalogCacheKey(this, requestGameMode);
+      const requestKey = `${requestLanguage}-${cacheKey}`;
+      const isHydrated =
+        this.tasksObjectivesHydrated && promises.taskObjectiveHydrationScope === requestKey;
+      if (isHydrated && !forceRefresh) {
         this.fetchObjectiveModeCountDifferences(false, signal).catch((err) =>
           signal?.aborted
             ? undefined
@@ -1408,22 +1662,23 @@ export const useMetadataStore = defineStore('metadata', {
         );
         return;
       }
-      const requestLanguage = this.languageCode;
-      const requestGameMode = this.getApiGameMode();
-      const requestKey = `${requestLanguage}-${requestGameMode}`;
       await this.fetchWithCache<TarkovTaskObjectivesQueryResult>({
         cacheType: 'tasks-objectives' as CacheType,
-        cacheKey: `${TASK_OBJECTIVES_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheKey,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/tasks-objectives',
         queryParams: {
           gameMode: requestGameMode,
-          lang: requestLanguage,
           version: TASK_OBJECTIVES_CACHE_VERSION,
         },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         loadingKey: 'tasksObjectivesPending',
-        processData: (data) => {
+        errorKey: 'tasksObjectivesError',
+        processData: (data, response) => {
+          const currentKey = objectiveCatalogCacheKey(this, requestGameMode);
+          if (!response && cacheKey !== currentKey) return;
+          if (response && !hasCurrentObjectiveOverlay(this, response)) return;
+          promises.taskObjectiveHydrationScope = `${requestLanguage}-${currentKey}`;
           this.mergeTaskObjectives(data.tasks, {
             rebuildDerivedData: false,
             repairFailedTaskStates: false,
@@ -1480,15 +1735,17 @@ export const useMetadataStore = defineStore('metadata', {
         }
         const requestApiMode = this.getApiGameMode();
         const requestEpoch = promiseStore.taskCatalogEpoch;
+        const requestPurgeTime = observedObjectivePurgeTime(this);
         const otherApiMode =
           requestApiMode === API_GAME_MODES[GAME_MODES.PVE]
             ? API_GAME_MODES[GAME_MODES.PVP]
             : API_GAME_MODES[GAME_MODES.PVE];
-        // Only the task catalog itself (mode switch or tasks-core reload) invalidates the
-        // comparison. Reward/item hydration replaces the array reference but not the counts.
+        // A catalog or purge generation change invalidates counts. Rewards and item
+        // hydration can replace the task array without changing its counts.
         const isStale = () =>
           this.getApiGameMode() !== requestApiMode ||
-          promiseStore.taskCatalogEpoch !== requestEpoch;
+          promiseStore.taskCatalogEpoch !== requestEpoch ||
+          observedObjectivePurgeTime(this) !== requestPurgeTime;
         try {
           const otherCounts = await this.loadModeObjectiveCounts(
             otherApiMode,
@@ -1541,10 +1798,10 @@ export const useMetadataStore = defineStore('metadata', {
       signal?: AbortSignal
     ): Promise<Record<string, number>> {
       const memo = getPromiseStore(this).modeObjectiveCounts;
-      const existing = memo.get(apiGameMode);
+      const cacheKey = objectiveCatalogCacheKey(this, `counts-${apiGameMode}`);
+      const existing = memo.get(cacheKey);
       if (existing && !forceRefresh && requestSignals.get(existing) === signal && !signal?.aborted)
         return existing;
-      const cacheKey = `${TASK_OBJECTIVES_CACHE_VERSION}-counts-${apiGameMode}`;
       const promise = (async () => {
         if (!forceRefresh && typeof window !== 'undefined') {
           const cached = await getCachedData<Record<string, number>>(
@@ -1555,16 +1812,17 @@ export const useMetadataStore = defineStore('metadata', {
           throwIfAborted(signal);
           if (cached) return cached;
         }
-        const response = await tarkovApiFetch<FetchResponse<TarkovTaskObjectivesQueryResult>>(
+        const response = await fetchTarkovCatalog<FetchResponse<TarkovTaskObjectivesQueryResult>>(
           '/api/tarkov/tasks-objectives',
           {
             signal,
             query: {
               gameMode: apiGameMode,
-              lang: ENGLISH_LANGUAGE_CODE,
               version: TASK_OBJECTIVES_CACHE_VERSION,
+              view: 'counts',
             },
-          }
+          },
+          observedObjectivePurgeTime(this)
         );
         if (isFetchError(response)) {
           const errorMessage =
@@ -1575,11 +1833,10 @@ export const useMetadataStore = defineStore('metadata', {
           throw new Error('Invalid response: expected { data }');
         }
         throwIfAborted(signal);
+        assertCurrentObjectiveCounts(this, response);
         const modeTasks = (response.data.tasks || []).map((task) => ({
           id: task.id,
-          objectives: this.normalizeObjectiveItems(
-            normalizeTaskObjectives<TaskObjective>(task.objectives)
-          ),
+          objectives: normalizeTaskObjectives<TaskObjective>(task.objectives),
         }));
         const deduped = this.dedupeObjectiveIds(modeTasks as Task[]).tasks;
         const counts = Object.fromEntries(this.buildObjectiveCountMap(deduped));
@@ -1595,10 +1852,10 @@ export const useMetadataStore = defineStore('metadata', {
         return counts;
       })();
       if (signal) requestSignals.set(promise, signal);
-      memo.set(apiGameMode, promise);
+      memo.set(cacheKey, promise);
       // A failed load must not pin the rejection for the rest of the session.
       promise.catch(() => {
-        if (memo.get(apiGameMode) === promise) memo.delete(apiGameMode);
+        if (memo.get(cacheKey) === promise) memo.delete(cacheKey);
       });
       return promise;
     },
@@ -1613,13 +1870,14 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovTaskRewardsQueryResult>({
         cacheType: 'tasks-rewards' as CacheType,
         cacheKey: `${TASK_REWARDS_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/tasks-rewards',
-        queryParams: { lang: requestLanguage, gameMode: requestGameMode },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.DEFAULT_TTL,
         processData: (data) => {
           this.mergeTaskRewards(data.tasks, { rebuildDerivedData: false });
           this.hydrateTaskItems();
+          this.tasksRewardsHydrated = true;
         },
         logName: 'Task rewards',
         forceRefresh,
@@ -1638,9 +1896,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovHideoutQueryResult>({
         cacheType: 'hideout' as CacheType,
         cacheKey: `${HIDEOUT_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/hideout',
-        queryParams: { lang: requestLanguage, gameMode: requestGameMode },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: HIDEOUT_CACHE_TTL_MS,
         loadingKey: 'hideoutLoading',
         errorKey: 'hideoutError',
@@ -1682,9 +1940,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovItemsQueryResult>({
         cacheType: 'items-lite' as CacheType,
         cacheKey: `${ITEMS_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/items-lite',
-        queryParams: { gameMode: requestGameMode, lang: requestLanguage },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.MAX_TTL,
         loadingKey: 'itemsLoading',
         errorKey: 'itemsError',
@@ -1736,9 +1994,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovItemsQueryResult>({
         cacheType: 'items' as CacheType,
         cacheKey: `${ITEMS_CACHE_VERSION}-${requestGameMode}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/items',
-        queryParams: { gameMode: requestGameMode, lang: requestLanguage },
+        queryParams: { gameMode: requestGameMode },
         cacheTTL: CACHE_CONFIG.MAX_TTL,
         loadingKey: 'itemsLoading',
         errorKey: 'itemsError',
@@ -1803,9 +2061,9 @@ export const useMetadataStore = defineStore('metadata', {
       await this.fetchWithCache<TarkovPrestigeQueryResult>({
         cacheType: 'prestige' as CacheType,
         cacheKey: `${PRESTIGE_CACHE_VERSION}-${this.getApiGameMode()}`,
-        cacheLanguage: requestLanguage,
+        cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/prestige',
-        queryParams: { lang: requestLanguage, gameMode: requestMode },
+        queryParams: { gameMode: requestMode },
         cacheTTL: CACHE_CONFIG.MAX_TTL,
         loadingKey: 'prestigeLoading',
         errorKey: 'prestigeError',
@@ -1867,14 +2125,18 @@ export const useMetadataStore = defineStore('metadata', {
           promiseStore.editionsPromise === promise &&
           this.getApiGameMode() === requestMode &&
           this.languageCode === requestLanguage;
+        const cacheGeneration = observedObjectivePurgeTime(this);
+        const isCacheCurrent = () =>
+          isCurrent() && cacheGeneration === observedObjectivePurgeTime(this);
         if (
           !skipBrowserCache &&
-          (await this.reuseOrApplyCachedEditions(isCurrent, requestMode, requestLanguage))
+          (await this.reuseOrApplyCachedEditions(isCacheCurrent, requestMode, requestLanguage)) &&
+          isCacheCurrent()
         ) {
           if (!isCurrent()) return;
           this.editionsError = null;
           // Revalidate once while the successfully checked catalog remains live in this scope.
-          if (!promiseStore.editionsRevalidatedScopes.has(scope)) {
+          if (!hasFreshNeutralEditions(this, requestMode)) {
             void this.fetchEditionsData(false, { revalidate: true, signal: options.signal }).catch(
               (error) =>
                 options.signal?.aborted
@@ -1889,7 +2151,7 @@ export const useMetadataStore = defineStore('metadata', {
         this.editionsError = null;
         this.editionsLoading = true;
         liveEditionRequests.add(promise);
-        const loaded = await loadProgressionCatalog(this, promiseStore, {
+        const loaded = await loadCurrentProgressionCatalog(this, promiseStore, {
           forceRefresh,
           signal: options.signal,
           isCurrent,
@@ -1898,13 +2160,20 @@ export const useMetadataStore = defineStore('metadata', {
           scope,
         });
         // A successful live load is as fresh as a revalidation.
-        if (loaded && isCurrent()) {
+        if (loaded && loaded.isCurrent()) {
+          freshNeutralEditionCatalogs(this).set(requestMode, {
+            data: loaded.overlay,
+            expires: Date.now() + HIDEOUT_CACHE_TTL_MS,
+          });
           promiseStore.editionsRevalidatedScopes.add(scope);
         }
       });
       if (options.signal) requestSignals.set(promise, options.signal);
       if (options.isOwner) editionRequestOwners.set(promise, options.isOwner);
-      if (skipBrowserCache) liveEditionRequests.add(promise);
+      if (skipBrowserCache) {
+        freshNeutralEditionCatalogs(this).delete(requestMode);
+        liveEditionRequests.add(promise);
+      }
       promiseStore.editionsPromise = promise;
       try {
         await promise;
@@ -1931,6 +2200,7 @@ export const useMetadataStore = defineStore('metadata', {
       return applyCachedEditionsOrIgnore(this, isCurrent, mode, language);
     },
     hasRevalidatedCatalog(scope: string): boolean {
+      if (!hasFreshNeutralEditions(this, this.getApiGameMode())) return false;
       const promises = getPromiseStore(this);
       return (
         promises.editionsScope === scope &&
@@ -1940,6 +2210,7 @@ export const useMetadataStore = defineStore('metadata', {
       );
     },
     applyCriticalCachedData(cachedData: CriticalCacheData): boolean {
+      if ((cachedData.purgeGeneration ?? 0) !== this.getCachePurgeGeneration()) return false;
       const scope = `${this.getApiGameMode()}-${this.languageCode}`;
       if (cachedData.scope !== scope || !cachedData.editions.editions?.every(isGameEdition))
         return false;
@@ -1973,7 +2244,7 @@ export const useMetadataStore = defineStore('metadata', {
       if (!preserveLiveCatalog) {
         applyProgressionCatalog(
           this,
-          cachedProgressionCatalog(cachedData.editions),
+          cachedProgressionView(this, this.getApiGameMode(), cachedData.editions),
           this.getApiGameMode()
         );
       } else {
@@ -2018,7 +2289,9 @@ export const useMetadataStore = defineStore('metadata', {
         traders: data.traders?.length ?? 0,
       });
       this.tasksObjectivesPending = (data.tasks?.length ?? 0) > 0;
+      this.tasksObjectivesError = null;
       this.tasksObjectivesHydrated = false;
+      this.tasksRewardsHydrated = false;
       this.objectiveModeCountDifferences = markRaw({});
       this.objectiveModeCountDifferencesHydrated = false;
       getPromiseStore(this).taskCatalogEpoch += 1;
@@ -2027,6 +2300,7 @@ export const useMetadataStore = defineStore('metadata', {
         maps: data.maps || [],
         traders: data.traders || [],
       });
+      this.tasksCoreGameMode = gameModeForApiMode(this.getApiGameMode());
       this.tasksCoreRevision += 1;
       perfEnd(perfTimer, { tasks: this.tasks.length });
     },
@@ -2297,7 +2571,8 @@ export const useMetadataStore = defineStore('metadata', {
       const itemsById = this.itemsById.size
         ? this.itemsById
         : new Map(this.items.map((item) => [item.id, item]));
-      const { pickItemLite, pickItemArray, pickItemMatrix } = createItemPicker(itemsById);
+      const { pickItemLite, pickItemArray, pickItemMatrix, pickEquipment } =
+        createItemPicker(itemsById);
       const hydrateObjective = (objective: TaskObjective): TaskObjective => {
         const obj = objective as ObjectiveWithItems;
         return {
@@ -2309,10 +2584,10 @@ export const useMetadataStore = defineStore('metadata', {
           requiredKeys: pickItemMatrix(obj.requiredKeys),
           containsAll: pickItemArray(obj.containsAll),
           useAny: pickItemArray(obj.useAny),
-          usingWeapon: pickItemLite(obj.usingWeapon),
-          usingWeaponMods: pickItemArray(obj.usingWeaponMods),
-          wearing: pickItemArray(obj.wearing),
-          notWearing: pickItemArray(obj.notWearing),
+          usingWeapon: pickEquipment(obj.usingWeapon),
+          usingWeaponMods: pickEquipment(obj.usingWeaponMods),
+          wearing: pickEquipment(obj.wearing),
+          notWearing: pickEquipment(obj.notWearing),
         } as TaskObjective;
       };
       const hydrateRewards = (rewards?: FinishRewards): FinishRewards | undefined => {
@@ -2544,6 +2819,7 @@ export const useMetadataStore = defineStore('metadata', {
      * Reset tasks data to empty state
      */
     resetTasksData() {
+      this.tasksCoreGameMode = null;
       this.tasks = markRaw([]);
       this.maps = markRaw([]);
       this.traders = markRaw([]);
@@ -2559,7 +2835,9 @@ export const useMetadataStore = defineStore('metadata', {
       this.objectiveModeCountDifferencesHydrated = false;
       getPromiseStore(this).taskCatalogEpoch += 1;
       this.tasksObjectivesPending = false;
+      this.tasksObjectivesError = null;
       this.tasksObjectivesHydrated = false;
+      this.tasksRewardsHydrated = false;
       this.mapSpawnsLoaded = false;
       this.mapSpawnsLoading = false;
       this.mapSpawnsError = null;

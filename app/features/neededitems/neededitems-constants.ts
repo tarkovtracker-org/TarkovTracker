@@ -1,44 +1,15 @@
 /**
  * Constants for the needed items page
  */
-/** Number of items to load per infinite-scroll batch */
-export const INFINITE_SCROLL_BATCH_SIZE = 12;
+/** Items added per infinite-scroll batch; 24 fills whole rows at 2, 3, 4 and 6 columns. */
+export const INFINITE_SCROLL_BATCH_SIZE = 24;
 /** Root margin for infinite scroll intersection observer */
 export const INFINITE_SCROLL_MARGIN = '600px';
-/** Default initial render count before responsive adjustments */
-export const DEFAULT_INITIAL_RENDER_COUNT = 12;
 /**
- * Screen size multipliers for initial render count.
- * These are multiplicative factors applied to a base render count.
- *
- * Usage formula at runtime:
- *   viewAdjusted = viewMode === 'grid' ? DEFAULT_INITIAL_RENDER_COUNT * SCREEN_SIZE_MULTIPLIERS.gridView : DEFAULT_INITIAL_RENDER_COUNT
- *   finalCount = Math.ceil(viewAdjusted * SCREEN_SIZE_MULTIPLIERS.xs) // when xs screen
- *   finalCount = Math.ceil(viewAdjusted * SCREEN_SIZE_MULTIPLIERS.belowMd) // when belowMd screen
- *
- * Note: DEFAULT_INITIAL_RENDER_COUNT (currently 12) is the base value used in these calculations.
- * Only one screen size multiplier (xs or belowMd) is applied per calculation.
+ * Entries rendered before scrolling: about two desktop screens of list rows, and whole rows of
+ * tiles at 2, 3, 4 and 6 columns. Narrow screens render half, which still fills the viewport.
  */
-export const SCREEN_SIZE_MULTIPLIERS = {
-  /** Multiplier for grid view vs list view */
-  gridView: 1.4,
-  /** Multiplier for extra small screens */
-  xs: 0.6,
-  /** Multiplier for below medium screens */
-  belowMd: 0.8,
-} as const;
-/**
- * Minimum render counts for small screens.
- * These are lower bounds applied AFTER multiplication to ensure a minimum number of items render.
- *
- * Usage formula at runtime:
- *   finalCount = Math.max(MIN_RENDER_COUNTS.xs, computedCount) // when xs screen
- *   finalCount = Math.max(MIN_RENDER_COUNTS.belowMd, computedCount) // when belowMd screen
- */
-export const MIN_RENDER_COUNTS = {
-  xs: 6,
-  belowMd: 8,
-} as const;
+export const INITIAL_RENDER_COUNT = { list: 30, grid: 24 } as const;
 /** Filter type options */
 export type NeededItemsFilterType = 'all' | 'tasks' | 'hideout' | 'completed';
 /**

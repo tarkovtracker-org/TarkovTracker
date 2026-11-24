@@ -69,7 +69,6 @@
               :aria-label="$t('settings.tabs.progression')"
             >
               <DisplayNameCard />
-              <PlayerLevelCard />
               <SkillsCard />
               <ResetProgressCard />
             </section>
@@ -91,8 +90,7 @@
               role="tabpanel"
               :aria-label="$t('common.preferences')"
             >
-              <AppearanceCard />
-              <GeneralPreferencesCard />
+              <AppPreferencesCard />
               <TaskDisplayCard />
               <MapSettingsCard />
               <div id="keybinds" class="scroll-mt-24">
@@ -140,7 +138,6 @@
               :aria-label="$t('common.backup_restore')"
             >
               <DataManagementCard view="backup" :session="dataManagementSession" />
-              <DebugStateCard />
             </section>
             <section
               v-if="visitedTabs.api"
@@ -172,15 +169,13 @@
   import PageHeader from '@/components/ui/PageHeader.vue';
   import AccountDeletionCard from '@/features/settings/AccountDeletionCard.vue';
   import ApiTokensCard from '@/features/settings/ApiTokensCard.vue';
+  import AppPreferencesCard from '@/features/settings/AppPreferencesCard.vue';
   import DataManagementCard from '@/features/settings/DataManagementCard.vue';
-  import DebugStateCard from '@/features/settings/DebugStateCard.vue';
   import DeviceDataCard from '@/features/settings/DeviceDataCard.vue';
   import DiscordLinkCard from '@/features/settings/DiscordLinkCard.vue';
   import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
-  import GeneralPreferencesCard from '@/features/settings/GeneralPreferencesCard.vue';
   import KeybindsCard from '@/features/settings/KeybindsCard.vue';
   import MapSettingsCard from '@/features/settings/MapSettingsCard.vue';
-  import PlayerLevelCard from '@/features/settings/PlayerLevelCard.vue';
   import PrestigeCard from '@/features/settings/PrestigeCard.vue';
   import ProfileSharingCard from '@/features/settings/ProfileSharingCard.vue';
   import ResetProgressCard from '@/features/settings/ResetProgressCard.vue';
@@ -195,6 +190,8 @@
   definePageMeta({
     alias: ['/progression', '/prestige', '/preferences'],
   });
+  // Nuxt's hash scroll uses `auto`, which otherwise inherits the document's smooth scrolling.
+  useHead({ htmlAttrs: { class: 'no-smooth-scroll' } });
   const { t } = useI18n({ useScope: 'global' });
   const route = useRoute();
   const router = useRouter();
@@ -368,8 +365,7 @@
   const scrollTarget = (element: Element, hash: string) => {
     const isTab = element.getAttribute('role') === 'tab';
     const options: ScrollIntoViewOptions = {
-      // Settle horizontal tab movement before Nuxt's subsequent panel scroll.
-      behavior: isTab ? 'instant' : 'smooth',
+      behavior: 'instant',
       block: 'start',
       inline: 'nearest',
     };
@@ -377,9 +373,7 @@
     if (!isTab) {
       return;
     }
-    // An instant scroll issued while an earlier smooth panel scroll is still animating does not
-    // fully cancel it in Chromium: the stale animation applies one more frame and leaves the tab
-    // strip under the app bar. Re-assert the position once that frame has run.
+    // Keep the mobile tab visible after Nuxt scrolls to the panel.
     requestAnimationFrame(() => {
       if (hash === route.hash && element.isConnected) {
         element.scrollIntoView(options);

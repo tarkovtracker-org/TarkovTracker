@@ -2,6 +2,7 @@ import { createError } from 'h3';
 export const VALID_TIERS = ['supporter', 'scav', 'timmy', 'chad'] as const;
 const VALID_INTERVALS = ['monthly', '6month', 'yearly'] as const;
 const VALID_MODES = ['payment', 'subscription'] as const;
+const CHECKOUT_ATTEMPT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export const MIN_ONE_TIME_CENTS = 400;
 export const MAX_ONE_TIME_CENTS = 52_000;
 export type CheckoutTier = (typeof VALID_TIERS)[number];
@@ -12,7 +13,15 @@ export type CheckoutBody = {
   tier?: CheckoutTier;
   interval?: CheckoutInterval;
   amount?: number;
+  checkoutAttemptId?: string;
 };
+function validateCheckoutAttemptId(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !CHECKOUT_ATTEMPT_ID.test(value)) {
+    throw createError({ statusCode: 400, message: 'Invalid checkout attempt ID' });
+  }
+  return value;
+}
 /**
  * Validate and normalize a Stripe checkout request body. Throws an h3 400 on
  * any invalid field. Mode-specific shape (e.g. amount required for payment,
@@ -28,7 +37,10 @@ export function validateCheckoutBody(raw: unknown): CheckoutBody {
   if (typeof mode !== 'string' || !VALID_MODES.includes(mode as CheckoutMode)) {
     throw createError({ statusCode: 400, message: 'Invalid mode' });
   }
-  const result: CheckoutBody = { mode: mode as CheckoutMode };
+  const result: CheckoutBody = {
+    mode: mode as CheckoutMode,
+    checkoutAttemptId: validateCheckoutAttemptId(body.checkoutAttemptId),
+  };
   if (body.tier !== undefined) {
     if (typeof body.tier !== 'string' || !VALID_TIERS.includes(body.tier as CheckoutTier)) {
       throw createError({ statusCode: 400, message: 'Invalid tier' });

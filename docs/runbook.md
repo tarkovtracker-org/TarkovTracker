@@ -16,6 +16,11 @@ is explicitly set to a `cloudflare*` preset.
 See the canonical map for `STRIPE_SECRET_KEY` and the nine `STRIPE_PRICE_*` IDs used by the Nuxt
 `/api/stripe/checkout` route to create Checkout Sessions.
 
+The supporter page allows one Checkout request at a time across all tiers and the one-time form.
+For up to 24 hours, retrying a failed request with the same selection in the same page uses the
+same attempt ID. The route scopes that ID to the signed-in user before passing it to Stripe as
+an idempotency key. Clients served before this change can still omit the ID.
+
 ### Stripe webhook (Supabase Edge Function `stripe-webhook`)
 
 Receipt completion, fenced retries, migration-before-handler rollout and historical receipt
@@ -80,6 +85,13 @@ metrics; when targeting `/api/logs/client`, it has the same edge-protection prer
 browser log forwarding disabled when enabling these metrics alone. Verify delivery to the approved
 retention/query destination after rebuilding the application.
 
+The production `/api/logs/progress` collector, production-only service binding,
+protection prerequisites, retention and staged verification are documented in
+[Aggregate progress diagnostics](progress-diagnostics.md). Production enables only
+the aggregate progress sink; general, root/local and preview logging stay disabled.
+The [approved rollout evidence](https://github.com/tarkovtracker-org/TarkovTracker/issues/960#issuecomment-6908809905)
+records the synthetic delivery/privacy checks and pre-activation PostgreSQL baseline.
+
 ## Pre-Deploy Validation
 
 1. `pnpm run format:check`
@@ -114,6 +126,16 @@ Prepare and deploy each rollover in two releases during the no-write gap between
    the app countdown and `/progress` Seasonal row selection before announcing the new season open.
 4. Do not combine the database flip and application constants in one merge because their production
    deployment order is uncontrolled. Do not delete the previous season's rows.
+
+### Correcting an end time within the active season
+
+When correcting the end of the current season, update the application timestamp and replace only
+`private.active_season_ends_at()` in a forward migration. The app reads its bundled timestamp for the
+countdown and log import. The database selects writable Seasonal rows by season number, so either
+artifact can deploy first. After both deploy, verify the displayed cutoff, the database end timestamp,
+and the active season number. If the same season is still active and the correction must be reverted,
+restore the prior app timestamp and use a separately reviewed forward migration to restore the prior
+database timestamp. Repeat those checks after both reversions deploy.
 
 ## Deployment
 
@@ -194,11 +216,13 @@ integration fails or is unavailable, not the normal path.
    Verify the object itself landed, not just the version row; for a constraint, check
    `pg_constraint` (`convalidated = false` is expected for `NOT VALID`).
 
-   **Ordering caveat:** migrations, Workers and Edge Functions all deploy from the same merge and
-   you cannot control the order between them. Code that depends on a new DB object (e.g. a worker
-   calling the `merge_progress_data` RPC) can briefly run against a database that does not have it
-   yet. When the dependency matters, land the migration in an **earlier release** than the code
-   that uses it; adding a DB object ahead of its caller is safe, the reverse is not.
+   **Deployment ordering:** the [Supabase GitHub integration](https://supabase.com/docs/guides/deployment/branching/github-integration#what-runs-on-each-push)
+   applies config, migrations, seed, then Edge Functions. The old deployed function remains
+   active while migrations run, so migrations must be compatible with that old handler until
+   the new function version is active. Workers deploy independently and can reach a new DB
+   object before its migration; land required objects in an earlier release when that dependency
+   matters. Adding backward-compatible DB objects ahead of callers can be safe; constraints
+   and behavior changes may require staged compatible callers first.
 
    **Constraint/validation ordering:** the same applies when a migration adds a CHECK constraint
    that an Edge Function also enforces in application code (e.g.
@@ -252,6 +276,67 @@ integration fails or is unavailable, not the normal path.
    - `https://api.tarkovtracker.org/health`
 9. If the tarkov.dev profile cleanup migration shipped, note that old manual backups may still
    contain historic imported profile snapshots until users regenerate them.
+
+### Billing deletion cutover
+
+Before merging the billing-safe deletion migration/handler, deploy the prerequisite
+`account-delete` maintenance gate as a separate release. It returns HTTP 503 with
+`Retry-After: 60` before authentication, limiter writes, job claims, team changes, or Auth
+deletion, and requires no new database objects. Account deletion is temporarily unavailable.
+
+Record the prerequisite merge SHA and the production `account-delete` active version/source
+revision from Supabase (not a preview or merely a green CI check). Using a disposable test
+account's valid session, POST to the production function and verify HTTP 503, the retry header,
+and the maintenance error. Confirm that its teams, Auth user, deletion jobs, and limiter state
+remain unchanged. Do not log the session token. Wait for requests already running the old
+function version to drain before proceeding. Record the active version and matching deployed
+source, absence of old-version invocations in logs, and bounded-runtime evidence; a deploy
+success alone does not prove old invocations finished.
+
+Only then merge the billing-safe release. Supabase applies migrations before deploying Edge
+Functions: the already-active gate prevents the old team-first handler from running against
+the new Auth deletion guard during that interval. Verify the expected migration and new active
+function version, then smoke-test the billing-safe refusal and eligible deletion paths with disposable fixtures.
+If rollout fails, keep/redeploy the maintenance gate; never roll back to the old team-first
+handler after the billing guard migration. Remove the gate only in the billing-safe handler
+release.
+
+The HTTP gate does not pause the database cron jobs. Unlike the old HTTP handler's separate
+committed calls, `private.retry_account_deletion` and `private.delete_inactive_account` run
+team preparation and Auth deletion within one transaction. Their callers' per-account
+`BEGIN ... EXCEPTION` blocks roll back those changes when the Auth billing guard raises
+`23514`; failure accounting then runs after that rollback. See migrations
+`20261006120000_retry_failed_account_deletions.sql` and
+`20260930003202_automate_inactive_account_cleanup.sql`. These cron paths do not have the HTTP
+handler's partial team-change gap.
+
+Before the billing migration, inspect pending/in-progress deletion jobs and the latest/running
+`account-deletion-retry` and `inactive-account-cleanup` cron runs. Record the read-only evidence
+and investigate failures or unexpected activity. This prerequisite does not require manually
+disabling cron: any additional operational intervention needs evidence and separate authority.
+
+The Settings Discord card reads the unique username from the matching Discord auth identity, not
+the display name or cached `discord_username` (which may contain a numeric ID or display name).
+If the username is unavailable, the card shows "Discord account linked" and keeps role sync and
+unlink available.
+The same provider-and-ID lookup selects the identity to unlink; if it is missing, the link stays
+active and no roles are revoked.
+
+Discord identity linking returns to `/settings?discord_linked=1#account`. Supabase readiness
+exchanges its PKCE `code` before the card loads the link or synchronizes roles, then removes
+`code` and `sb_flow_id` while preserving the link marker and account tab. Other Settings or team
+invite `code` parameters are not OAuth callbacks.
+If session readiness fails, the card keeps the complete callback URL for a reload/retry and
+does not load the link or synchronize roles with a stale session.
+Callback readiness rejects after its time budget while the code exchange is still pending.
+An exchange failure remains visible to subsequent readiness callers until a page reload; a
+slow exchange that later succeeds can satisfy a later readiness call without exchanging twice.
+The normal `/auth/callback` page retains its five-second session-settle allowance after a
+pending readiness timeout, awaiting confirmed callback readiness before reporting success.
+A restored session alone does not complete the callback or count as a successful login.
+Navigating to an authenticated or admin route while the callback is pending cancels that
+navigation without clearing the existing session or discarding the callback URL. Access to
+the protected route remains blocked until readiness succeeds.
 
 When a user unlinks their Discord identity, the `discord-unlink` Edge Function first revokes all
 managed roles from that Discord account, then the client removes the identity and the database
@@ -1356,57 +1441,74 @@ first edit ([decision record](./decision-browser-progress.md#historical-rollback
 
 ### Combined task cache contract rollout (v2 to v3)
 
-The progression and overlay changes ship together through PR #826, which supersedes PR #825.
-Do not merge or dispatch the standalone #825 branch: its envelope-format-1 writer uses the same
-v3 keys as the combined envelope-format-2 contract and would replace incompatible payloads.
-Only the reviewed combined producer contract may publish v3 entries. Split producer and consumer
-changes when preseeding is required: first land the compatible producer on `main`, while the
-application continues reading v2 keys.
+Historical release #826 combined progression and overlay provenance in envelope
+format 2, superseding the incompatible standalone #825 writer. That rollout used
+48 `tasks-core-json-v3-*` language/mode entries and
+`overlay-precompute-manifest-json-v3`. These are historical keys. Current neutral
+readers use the complete release below. Reusing an old writer for a current
+snapshot namespace can replace a newer contract, so rollback always requires the
+matching reviewed producer and snapshots still inside their retention window.
 
-For the `tasks-core-json-v2-*` to `tasks-core-json-v3-*` transition, an authorized operator must dispatch
-`.github/workflows/precompute-tarkov-data.yml` on `main` after the reviewed producer changes land
-and before merging or promoting the v3 consumer. Leave both workflow inputs, `lang` and
-`gameMode`, empty to include all 48 combinations across `regular`, `pve`, and `pvp-season`. Require `succeeded: 48` and `failed: 0`,
-verify every `tasks-core-json-v3-*` entry uses envelope format 2, and attach the run and approved
-revision to the release. Fetch the published overlay metadata again for each rollout; never reuse
-a SHA from an older rehearsal. If the SHA changed, repeat the rehearsal and approve the new
-identity before dispatch. Set `expectedOverlaySha` to that approved published SHA and verify
-`overlay-precompute-manifest-json-v3` contains all 48 matching identities.
+### Language-neutral catalog rollout (#1065)
 
-Before rollout, confirm no incompatible original PR revision has a production deployment or an
-in-flight precompute run. After the fresh v3 population and matching overlay identities are
-verified, merge the consumer PR and close #825 as superseded. The scheduled workflow then
-refreshes the combined v3 contract.
-Before relying on the previous app for rollback, confirm its existing `tasks-core-json-v2-*`
-entries remain within their seven-day TTL. Roll back to the previous v2 application, never the
-standalone #825 application. The cold fetch/adapt/overlay fallback is not a safe bridge during
-this cache-key rollout. After deployment, run `pnpm run verify:overlay` and retain the served
-fleet verification before closing issue #729.
+The production release contains 46 neutral objects across 30 mode catalogs, 3 counts views, and 13 language bundles,
+plus three independently validated whole English import snapshots. Follow the
+[producer-before-consumer order](./systems/overlay-and-precompute.md#release-order).
+
+1. Release the overlay's `overlay-neutral.json` sidecar alongside `overlay.json`.
+   Verify both digests and that the sidecar's `$source` names the legacy artifact.
+2. Merge the reviewed Tracker producer while the deployed consumer keeps its old
+   contract. The initial migration runner writes both legacy and neutral catalogs.
+3. Read the intended published overlay's `$meta.sha256`, then dispatch
+   `precompute-tarkov-data.yml` on `main` with that `expectedOverlaySha` and both
+   `lang` and `gameMode` empty. The production-precompute environment owns the KV
+   edit and private overlay read credentials. A changed published SHA requires a
+   new approved full run before promotion.
+4. Require successful storage/readback for every immutable object, the exact 43
+   scopes in `catalogRelease`, its matching `overlaySha`, and successful results
+   for all three English imports. Retain the workflow run and diagnostic artifact.
+   A filtered run, preview namespace, or older localized manifest cannot satisfy
+   this gate.
+5. Promote the consumer after the complete production manifest is available.
+   Supply the private overlay read token through the `OVERLAY_TOKEN` process
+   environment or a secret store. `pnpm run verify:overlay` must report all 46 scopes current and three current
+   imports. It checks raw response digest/length, release timestamp, precompute
+   source, cache policy, and overlay identity, retrying one concurrent release
+   change. A `STALE` fallback does not certify the active release.
+6. Wait at least 90 seconds after the successful producer readback, then confirm
+   the same release is still active. If it changed, verify the new release and
+   restart the wait. Purge browser metadata with **Purge Game Data**, then
+   measure the uncached language switch and return to a fresh cached language.
+   Require one `strings` request and zero game-data requests respectively. Check
+   mode-specific objective translations with stable task/objective IDs. Retain
+   production evidence before closing the issue.
+7. Retire the legacy localized writer after promotion and verification. Preserve
+   the whole English import producer. Rollback must use a compatible reviewed
+   application and complete snapshots whose seven-day retention has not expired.
 
 ### EFT import snapshot rollout (#1161)
 
-`/api/tarkov/tasks-import` reads only `tasks-import-json-v1-en-{regular,pve,pvp-season}` and returns
-503 while a key is missing, so seed before Pages deploys the consumer
-([release order](./systems/overlay-and-precompute.md#release-verification)):
+The retained import contract serves only
+`tasks-import-json-v1-en-{regular,pve,pvp-season}`. Each envelope uses format 2,
+contains a complete English task catalog with its own mode, and includes overlay
+identity and `storedAt`. The endpoint validates progress-critical task/objective
+shape, scope, and bounded age before serving it. Missing, corrupt, wrong-mode, or
+expired snapshots return 503.
 
-1. Split producer and consumer changes if preseeding is required. Land the reviewed producer
-   changes on `main` while keeping the existing consumer compatible. Read the published overlay
-   `$meta.sha256`, then dispatch `precompute-tarkov-data.yml` on `main` with `lang=en`, no mode,
-   and that `expectedOverlaySha`. Require the run's
-   `importSnapshots.failures` to be empty.
-2. Confirm each of the three envelopes in `TARKOV_DATA` has envelope version 2, the expected
-   overlay SHA, a fresh `storedAt` and its own `catalog.gameMode`.
-3. Only after the fresh matching snapshots are verified, merge the consumer PR. After Pages
-   deploys, `GET /api/tarkov/tasks-import?gameMode=<mode>` returns 200 for all three modes, and `pnpm run verify:overlay` (with `OVERLAY_TOKEN` supplied through the process
-   environment or a secret store) reports no import mismatches.
-4. If the overlay changes before consumer promotion, repeat the dispatch and snapshot verification
-   with the new approved `expectedOverlaySha` before merging. Use an unfiltered run on `main` so
-   all 48 core entries and the import keys share the release.
+For an incompatible import contract, land its reviewed producer before promoting
+the consumer. Verify all three target envelopes in the selected namespace, their
+expected overlay SHA, fresh storage time, and whole catalog shape. A current
+neutral manifest alone cannot establish import readiness. An English-only
+maintenance refresh can update imports, but leaves the neutral manifest unchanged.
+Use the unfiltered run for the combined language-neutral release so the 46 neutral
+scopes and all imports carry the intended source-overlay identity.
 
-Rollback: the previous app ignores these keys and returns to its `json-v3` objective entries,
-which can lack overlay provenance (the defect this change fixes), so EFT imports may again fail
-for affected modes. Purge the `json-v3` objective targets with `admin-cache-purge` after rolling
-back so they regenerate with the overlay. The 7-day import keys can be left to expire.
+After deployment, all three `tasks-import?gameMode=` requests must return 200 and
+`pnpm run verify:overlay` must certify their whole-catalog scope, provenance, and
+response headers. Supply `OVERLAY_TOKEN` through the environment or secret store.
+The previous #1161 rollout's `json-v3` objective fallback described an older
+application. Current rollback decisions require the actual compatible reader and
+retained snapshot contract rather than those retired request-path assumptions.
 
 ### Retired automatic-level cleanup
 

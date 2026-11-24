@@ -10,6 +10,9 @@ export const MAX_RECOVERY_ARCHIVE_SIZE = 128 * 1024 * 1024;
 // Retained edits (20), failed captures (20), and one pending copy fit with slack.
 export const MAX_RECOVERY_OLDER_ENTRIES = 64;
 export const DEBUG_EXPORT_FORMAT = 'tarkovtracker-debug-export' as const;
+export const SUPERSEDED_ARCHIVE_FORMAT = 'tarkovtracker-superseded-progress' as const;
+// Copies come from this browser's localStorage, so a genuine export stays well below this.
+export const MAX_SUPERSEDED_ARCHIVE_SIZE = 16 * 1024 * 1024;
 const SUPPORTED_VERSIONS = [1, 2] as const;
 type Faction = 'USEC' | 'BEAR';
 export interface TarkovTrackerExport {
@@ -352,3 +355,57 @@ export function buildPreview(
   };
 }
 export type ValidatedBackup = Extract<ReturnType<typeof validateBackup>, { ok: true }>['data'];
+/** One copy from a superseded-progress file, sanitized like any restored backup mode. */
+export type SupersededArchiveCopy = {
+  /** The exported copy's id, kept so restoring the same file twice does not duplicate it. */
+  id: string | null;
+  mode: GameMode;
+  seasonNumber: number | null;
+  supersededAt: number;
+  progress: UserProgressData;
+};
+export function isSupersededArchive(json: unknown): json is Record<string, unknown> {
+  return isBackupObject(json) && json._format === SUPERSEDED_ARCHIVE_FORMAT;
+}
+const hasValidCopySeason = (mode: GameMode, seasonNumber: unknown): boolean =>
+  mode === GAME_MODES.SEASONAL ? isValidBackupSeasonNumber(seasonNumber) : seasonNumber === null;
+// The largest time value a Date can represent; later values cannot be shown as a capture date.
+const MAX_DATE_MS = 8_640_000_000_000_000;
+const isValidCopyTime = (value: unknown): value is number =>
+  Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= MAX_DATE_MS;
+const COPY_ID_PATTERN = /^[A-Za-z0-9_-]{1,96}$/;
+const copyIdOf = (value: unknown): string | null =>
+  typeof value === 'string' && COPY_ID_PATTERN.test(value) ? value : null;
+const hasValidCopyIdentity = (
+  raw: Record<string, unknown>
+): raw is Record<string, unknown> & {
+  mode: GameMode;
+  supersededAt: number;
+} =>
+  isGameMode(raw.mode) &&
+  hasValidCopySeason(raw.mode, raw.seasonNumber) &&
+  isValidCopyTime(raw.supersededAt);
+function parseSupersededArchiveCopy(raw: unknown): SupersededArchiveCopy | null {
+  if (!isBackupObject(raw) || !hasValidCopyIdentity(raw)) return null;
+  const progress = sanitizeProgressData(raw.progress);
+  if (!progress.ok) return null;
+  return {
+    id: copyIdOf(raw.id),
+    mode: raw.mode,
+    seasonNumber: raw.mode === GAME_MODES.SEASONAL ? (raw.seasonNumber as number) : null,
+    supersededAt: raw.supersededAt,
+    progress: progress.data,
+  };
+}
+const supersededArchiveCopies = (json: Record<string, unknown>): unknown[] | null =>
+  json._version === 1 && Array.isArray(json.copies) ? json.copies : null;
+/** Returns every copy in a version 1 superseded-progress file, or null when any copy is invalid. */
+export function parseSupersededArchive(
+  json: Record<string, unknown>
+): SupersededArchiveCopy[] | null {
+  const raw = supersededArchiveCopies(json);
+  // Like the exporter, no count limit applies; the file size limit bounds the work.
+  if (!raw || raw.length === 0) return null;
+  const copies = raw.map(parseSupersededArchiveCopy);
+  return copies.every((copy) => copy !== null) ? (copies as SupersededArchiveCopy[]) : null;
+}

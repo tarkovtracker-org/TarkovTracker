@@ -17,7 +17,7 @@
         :id="getRowObjectiveIds(row)[0] ? `objective-${getRowObjectiveIds(row)[0]}` : undefined"
         :key="row.itemKey"
         :data-objective-ids="getRowObjectiveIds(row).join(',')"
-        class="flex w-full max-w-full items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors"
+        class="flex w-full max-w-full flex-wrap items-center gap-1.5 rounded-md border px-1.5 py-1 transition-colors"
         :class="[
           row.allComplete
             ? 'border-success-500/50 bg-success-500/10'
@@ -25,12 +25,14 @@
           isParentTaskLocked ? 'opacity-70' : '',
         ]"
       >
-        <ObjectiveItemDisplay
-          :primary-item="getRowPrimaryItem(row)"
-          :accepted-items="getRowAcceptedItems(row)"
-          :fallback-name="row.meta.itemName"
-          :paused="isParentTaskLocked"
-        />
+        <div class="flex min-w-0 grow basis-36 items-center gap-1.5">
+          <ObjectiveItemDisplay
+            :primary-item="getRowPrimaryItem(row)"
+            :accepted-items="getRowAcceptedItems(row)"
+            :fallback-name="row.meta.itemName"
+            :paused="isParentTaskLocked"
+          />
+        </div>
         <span
           v-if="row.meta.foundInRaid"
           class="bg-kappa-500/20 text-kappa-300 rounded px-1 py-0.5 text-[10px] font-semibold"
@@ -68,6 +70,7 @@
             :current-count="row.currentCount"
             :needed-count="row.meta.neededCount"
             :is-complete="row.allComplete"
+            :count-disabled="row.countObjectives.length === 0"
             :disabled="isParentTaskLocked"
             @decrease="decreaseCountForRow(row)"
             @increase="increaseCountForRow(row)"
@@ -81,6 +84,7 @@
       v-if="groupRequiredKeys.length > 0"
       variant="keys"
       :required-keys="groupRequiredKeys"
+      :paused="isParentTaskLocked"
       class="ml-6"
     />
     <ObjectiveRequiredItems
@@ -104,7 +108,9 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { distinctObjectiveItems } from '@/utils/objectiveEquipment';
   import { getKeyDevUrl, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
+  import { isHandoverObjective } from '@/utils/taskObjectiveProgress';
   import type { TaskObjective, TarkovItem } from '@/types/tarkov';
   const jumpToMapObjective = inject(jumpToMapObjectiveKey, null);
   const isMapView = inject(isMapViewKey, ref(false));
@@ -134,13 +140,13 @@
     meta: ObjectiveMeta;
   };
   const findObjectiveTypes = new Set(['findItem', 'findQuestItem']);
-  const giveObjectiveTypes = new Set(['giveItem', 'giveQuestItem']);
   // Consolidated row groups objectives by item ID
   type ConsolidatedRow = {
     itemKey: string;
     meta: ObjectiveMeta;
     objectives: ObjectiveRow[];
     countObjectives: ObjectiveRow[];
+    handedOverCount: number;
     allComplete: boolean;
     currentCount: number;
   };
@@ -254,6 +260,7 @@
           meta: { ...row.meta }, // Initial meta, will be aggregated below
           objectives: [],
           countObjectives: [],
+          handedOverCount: 0,
           allComplete: true,
           currentCount: 0,
         });
@@ -272,7 +279,7 @@
         findObjectiveTypes.has(row.objective.type ?? '')
       );
       const giveObjectives = consolidated.objectives.filter((row) =>
-        giveObjectiveTypes.has(row.objective.type ?? '')
+        isHandoverObjective(row.objective.type)
       );
       // Determine which objectives to count for the total
       // If we have give objectives, use those (find is just a passive check)
@@ -283,12 +290,19 @@
           : findObjectives.length > 0
             ? findObjectives
             : consolidated.objectives;
+      let handedOverCount = 0;
       let totalCurrent = 0;
       let totalNeeded = 0;
-      objectivesToCount.forEach((row) => {
-        totalCurrent += row.meta.currentCount;
+      const countObjectives = objectivesToCount.filter((row) => {
         totalNeeded += row.meta.neededCount;
+        if (isHandoverObjective(row.objective.type) && isObjectiveComplete(row.objective.id)) {
+          handedOverCount += row.meta.neededCount;
+          return false;
+        }
+        totalCurrent += row.meta.currentCount;
+        return true;
       });
+      totalCurrent += handedOverCount;
       // Check completion status across ALL objectives (both find and give must be complete)
       consolidated.objectives.forEach((row) => {
         if (!isObjectiveComplete(row.objective.id)) {
@@ -297,7 +311,8 @@
       });
       return {
         ...consolidated,
-        countObjectives: objectivesToCount,
+        countObjectives,
+        handedOverCount,
         allComplete,
         currentCount: totalCurrent,
         meta: {
@@ -320,26 +335,22 @@
     const source = full ?? objective;
     return source.item ?? source.items?.[0] ?? source.markerItem ?? source.questItem ?? undefined;
   };
-  // "Any of these" objectives accept multiple items; expose the full list so the
-  // display can rotate through them. Only returns >1 items for a single
-  // objective whose items array has alternatives (display-only).
+  const acceptedItemsFor = (objective: TaskObjective) => {
+    const full = fullObjectives.value.find((entry) => entry.id === objective.id);
+    return distinctObjectiveItems(full?.items ?? objective.items ?? []);
+  };
+  // Consolidated rows can share a choice only when each objective accepts the same items.
   const getRowAcceptedItems = (row: ConsolidatedRow): TarkovItem[] | undefined => {
-    if (row.objectives.length !== 1) return undefined;
-    const objective = row.objectives[0]?.objective;
-    if (!objective) return undefined;
-    const full = fullObjectives.value.find((o) => o.id === objective.id);
-    const items = (full ?? objective).items;
-    if (!Array.isArray(items)) return undefined;
-    const valid = items.filter((entry): entry is TarkovItem => Boolean(entry?.id));
-    return valid.length > 1 ? valid : undefined;
+    const [first, ...others] = row.objectives.map(({ objective }) => acceptedItemsFor(objective));
+    if (!first || first.length < 2) return undefined;
+    const ids = new Set(first.map((item) => item.id));
+    const samePool = (items: TarkovItem[]) =>
+      items.length === first.length && items.every((item) => ids.has(item.id));
+    return others.every(samePool) ? first : undefined;
   };
-  const rowHasGiveObjectives = (row: ConsolidatedRow): boolean => {
-    return row.objectives.some((objRow) => giveObjectiveTypes.has(objRow.objective.type ?? ''));
-  };
-  const isRowReadyToHandOver = (row: ConsolidatedRow): boolean => {
-    if (!rowHasGiveObjectives(row)) return false;
-    return row.currentCount >= row.meta.neededCount && !row.allComplete;
-  };
+  const isRowReadyToHandOver = (row: ConsolidatedRow): boolean =>
+    row.currentCount >= row.meta.neededCount &&
+    row.countObjectives.some((objRow) => isHandoverObjective(objRow.objective.type));
   const rowHasMapLocation = (row: ConsolidatedRow): boolean => {
     if (!isMapView.value) return false;
     return row.objectives.some((objRow) => {
@@ -462,7 +473,7 @@
     if (isParentTaskLocked.value) return;
     const totalNeeded = row.meta.neededCount;
     const clampedCount = Math.max(0, Math.min(totalNeeded, newCount));
-    let remaining = clampedCount;
+    let remaining = Math.max(0, clampedCount - row.handedOverCount);
     row.countObjectives.forEach((obj) => {
       const objNeeded = obj.meta.neededCount;
       const objCount = Math.min(remaining, objNeeded);

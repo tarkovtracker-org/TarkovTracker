@@ -3,7 +3,11 @@ import { mockNuxtImport, mountSuspended } from '@nuxt/test-utils/runtime';
 import { flushPromises } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick, ref } from 'vue';
+import DisplayNameCard from '@/features/settings/DisplayNameCard.vue';
 import SettingsPage from '@/pages/settings.vue';
+import type { PMCFaction } from '@/utils/constants';
+const currentFaction = ref<PMCFaction>('USEC');
+const metadataLoading = ref(false);
 const { mockFns, mockState } = vi.hoisted(() => ({
   mockState: {
     isLoggedIn: false,
@@ -47,6 +51,7 @@ mockNuxtImport('useRoute', () => () => ({
 mockNuxtImport('useSeoMeta', () => mockFns.seoMeta);
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
+    loading: metadataLoading,
     editions: [
       { value: 1, title: 'Standard' },
       { value: 2, title: 'Left Behind' },
@@ -70,6 +75,11 @@ vi.mock('@/stores/useTarkov', () => ({
       return mockState.gameMode;
     },
     getCurrentGameMode: () => mockState.gameMode,
+    getPMCFaction: () => currentFaction.value,
+    setPMCFaction: (faction: PMCFaction) => {
+      currentFaction.value = faction;
+    },
+    getModeDisplayName: () => '',
     getGameEdition: () => mockState.gameEdition,
     setGameEdition: mockFns.setGameEdition,
     getPvPProgressData: () => ({ prestigeLevel: mockState.prestigeLevel }),
@@ -93,7 +103,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
   }),
 }));
 const defaultGlobalStubs = {
-  AppearanceCard: { template: '<div data-testid="appearance-card" />' },
+  AppPreferencesCard: { template: '<div data-testid="app-preferences-card" />' },
   AccountDeletionCard: { template: '<div data-testid="account-deletion-card" />' },
   ApiTokensCard: { template: '<div data-testid="api-tokens-card" />' },
   DataManagementCard: {
@@ -120,10 +130,9 @@ const defaultGlobalStubs = {
   },
   'i18n-t': { template: '<span><slot /><slot name="word" /></span>' },
   ExperienceCard: { template: '<div data-testid="experience-card" />' },
-  GeneralPreferencesCard: { template: '<div data-testid="general-preferences-card" />' },
   KeybindsCard: { template: '<div data-testid="keybinds-card" />' },
   MapSettingsCard: { template: '<div data-testid="map-settings-card" />' },
-  PlayerLevelCard: { template: '<div data-testid="player-level-card" />' },
+  PlayerLevelField: { template: '<div data-testid="player-level-field" />' },
   PrestigeCard: { template: '<div data-testid="prestige-card" />' },
   ProfileSharingCard: { template: '<div data-testid="profile-sharing-card" />' },
   ResetProgressCard: { template: '<div data-testid="reset-progress-card" />' },
@@ -190,11 +199,13 @@ describe('settings page', () => {
   });
   beforeEach(() => {
     configureMockState();
+    currentFaction.value = 'USEC';
+    metadataLoading.value = false;
     vi.clearAllMocks();
   });
   const globalConfig = {
     stubs: defaultGlobalStubs,
-    mocks: { $t: (key: string) => key },
+    mocks: { $t: (key: string, fallback?: string) => fallback ?? key },
   };
   it.each([
     { hash: '#preferences', mobile: true, expected: 'tab' },
@@ -230,13 +241,13 @@ describe('settings page', () => {
     const selectedScroll = expected === 'tab' ? scrollTab : scrollPanel;
     const otherScroll = expected === 'tab' ? scrollPanel : scrollTab;
     const options = {
-      behavior: expected === 'tab' ? 'instant' : 'smooth',
+      behavior: 'instant',
       block: 'start',
       inline: 'nearest',
     };
     expect(selectedScroll).toHaveBeenCalledWith(options);
     expect(selectedScroll).toHaveBeenCalledTimes(1);
-    // Only the instant tab scroll is re-asserted after an interrupted smooth scroll's last frame.
+    // Re-assert the mobile tab's position after Nuxt scrolls to the panel.
     vi.spyOn(tab, 'isConnected', 'get').mockReturnValue(true);
     frames.splice(0).forEach((callback) => callback(0));
     expect(selectedScroll).toHaveBeenCalledTimes(expected === 'tab' ? 2 : 1);
@@ -249,9 +260,33 @@ describe('settings page', () => {
       global: globalConfig,
     });
     expect(wrapper.find('[data-testid="display-name-card"]').exists()).toBe(true);
-    expect(wrapper.find('#progression [data-testid="player-level-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="experience-card"]').exists()).toBe(false);
     expect(wrapper.find('#progression').exists()).toBe(true);
+  });
+  it('groups the faction and level in Game Settings and sets the active faction', async () => {
+    const wrapper = await mountSuspended(SettingsPage, {
+      global: {
+        ...globalConfig,
+        stubs: { ...defaultGlobalStubs, DisplayNameCard: false },
+      },
+    });
+    const progression = wrapper.get('#progression');
+    const gameSettings = progression.getComponent(DisplayNameCard);
+    const activeMode = gameSettings.get('section[aria-labelledby="settings-active-mode"]');
+    expect(activeMode.find('[data-testid="player-level-field"]').exists()).toBe(true);
+    expect(progression.findAll('[data-testid="player-level-field"]')).toHaveLength(1);
+    const group = activeMode.get('[role="group"][aria-label="Select faction"]');
+    expect(progression.findAll('[role="group"][aria-label="Select faction"]')).toHaveLength(1);
+    const buttons = group.findAll('button');
+    expect(buttons.map((button) => button.text())).toEqual(['BEAR', 'USEC']);
+    expect(group.get('[aria-pressed="true"]').text()).toBe('USEC');
+    await buttons[0]!.trigger('click');
+    expect(currentFaction.value).toBe('BEAR');
+    expect(group.get('[aria-pressed="true"]').text()).toBe('BEAR');
+    metadataLoading.value = true;
+    await nextTick();
+    expect(buttons.every((button) => button.element.disabled)).toBe(true);
+    wrapper.unmount();
   });
   describe('user states', () => {
     it('renders logged out state', async () => {
@@ -307,7 +342,7 @@ describe('settings page', () => {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('[data-testid="general-preferences-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="app-preferences-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="task-display-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-testid="keybinds-card"]').exists()).toBe(true);
       expect(wrapper.find('#progression').exists()).toBe(false);
@@ -351,13 +386,13 @@ describe('settings page', () => {
       expect(wrapper.find('[data-testid="api-tokens-card"]').exists()).toBe(true);
       expect(wrapper.find('#progression').exists()).toBe(false);
     });
-    it('renders streamer mode on the preferences tab', async () => {
+    it('renders App Preferences on the preferences tab', async () => {
       configureMockState({ routeHash: '#preferences' });
       const wrapper = await mountSuspended(SettingsPage, {
         global: globalConfig,
       });
       await vi.dynamicImportSettled();
-      expect(wrapper.find('[data-testid="general-preferences-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="app-preferences-card"]').exists()).toBe(true);
     });
     it('opens the account tab from the route hash without remounting', async () => {
       configureMockState({ routeHash: '#account' });

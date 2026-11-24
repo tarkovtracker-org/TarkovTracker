@@ -216,7 +216,7 @@ export function useTurnstileWidget(
   };
   const reset = (): void => {
     latestToken = null;
-    solved.value = false;
+    solved.value = !enabled;
     if (rerenderUnrenderedWidget()) return;
     if (api && widgetId !== undefined) {
       // Clear a latched error first so a repeat failure transitions `unavailable` again.

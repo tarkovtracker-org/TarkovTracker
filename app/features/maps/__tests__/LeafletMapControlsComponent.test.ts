@@ -1,6 +1,14 @@
 import { mountSuspended } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick, shallowRef } from 'vue';
+import maps from '@/data/maps.json';
+import { resetExtractRuleData } from '@/features/maps/composables/useExtractRuleData';
+import { MAP_MARKER_GLYPH_PATHS } from '@/features/maps/utils/markerGlyphs';
+import extractRuleFixture from '@/utils/__tests__/fixtures/extractRuleData.json';
 import type { TarkovMap } from '@/types/tarkov';
+// Saved Layers rows, shared by every map the test mounts and reactive like the real store. The
+// preferences mock reads it lazily, after module evaluation.
+const savedLayers = shallowRef<Record<string, boolean>>({});
 const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => {
   const instance = {
     size: { x: 800, y: 600 },
@@ -46,12 +54,16 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
       hasMultipleFloors: false,
       isLoading: false,
       leaflet: null as unknown,
+      fitZoom: null as number | null,
       objectiveLayer: null as unknown,
       extractLayer: null as unknown,
       spawnLayer: null as unknown,
+      transitLayer: null as unknown,
     },
   };
 });
+const { mockTarkovApiFetch } = vi.hoisted(() => ({ mockTarkovApiFetch: vi.fn() }));
+vi.mock('@/utils/tarkovApiFetch', () => ({ tarkovApiFetch: mockTarkovApiFetch }));
 const refreshViewSpy = vi.fn();
 const setFloorSpy = vi.fn();
 const useLeafletMapOptionsSpy = vi.fn();
@@ -67,10 +79,11 @@ vi.mock('@/composables/useLeafletMap', () => ({
   },
   useLeafletMap: (options: unknown) => {
     useLeafletMapOptionsSpy(options);
+    const selectedFloor = ref('');
     return {
       mapInstance: shallowRef(mockMapInstance),
       leaflet: shallowRef(mapState.leaflet),
-      selectedFloor: ref(''),
+      selectedFloor,
       floors: ref([]),
       hasMultipleFloors: ref(mapState.hasMultipleFloors),
       isLoading: ref(mapState.isLoading),
@@ -79,8 +92,13 @@ vi.mock('@/composables/useLeafletMap', () => ({
       objectiveLayer: shallowRef(mapState.objectiveLayer),
       extractLayer: shallowRef(mapState.extractLayer),
       spawnLayer: shallowRef(mapState.spawnLayer),
-      setFloor: setFloorSpy,
+      transitLayer: shallowRef(mapState.transitLayer),
+      setFloor: (floor: string) => {
+        setFloorSpy(floor);
+        selectedFloor.value = floor;
+      },
       refreshView: refreshViewSpy,
+      getFitZoom: () => mapState.fitZoom,
       clearMarkers: vi.fn(),
       destroy: vi.fn(),
     };
@@ -97,8 +115,14 @@ vi.mock('@/stores/usePreferences', () => ({
       SCAV_EXTRACT: '#555555',
       SHARED_EXTRACT: '#666666',
       COOP_EXTRACT: '#777777',
+      DEFAULT_EXTRACT: '#888888',
+      TRANSIT: '#cf5959',
     },
     getMapTooltipDensity: 'comfortable',
+    getMapObjectiveColorMode: 'category',
+    getMapObjectivePalette: 'okabe_ito',
+    setMapObjectiveColorMode: vi.fn(),
+    setMapObjectivePalette: vi.fn(),
     getMapShowSelfObjectives: true,
     getMapShowPinnedObjectives: false,
     getMapShowTeamObjectives: false,
@@ -106,10 +130,19 @@ vi.mock('@/stores/usePreferences', () => ({
     getMapZoomSpeed: 1,
     mapPanSpeed: 1,
     setMapMarkerColor: vi.fn(),
+    setMapShowPinnedObjectives: vi.fn(),
+    setMapShowSelfObjectives: vi.fn(),
+    setMapShowTeamObjectives: vi.fn(),
     setMapPanSpeed: vi.fn(),
     setMapTooltipDensity: vi.fn(),
     setMapZoneOpacity: vi.fn(),
     setMapZoomSpeed: vi.fn(),
+    get getMapLayerVisibility() {
+      return savedLayers.value;
+    },
+    setMapLayerVisible: (key: string, visible: boolean) => {
+      savedLayers.value = { ...savedLayers.value, [key]: visible };
+    },
   }),
 }));
 vi.mock('@/stores/useMetadata', () => ({
@@ -167,7 +200,13 @@ describe('LeafletMap controls', () => {
     mapState.objectiveLayer = null;
     mapState.extractLayer = null;
     mapState.spawnLayer = null;
+    mapState.transitLayer = null;
+    mapState.fitZoom = null;
     localStorage.clear();
+    savedLayers.value = {};
+    resetExtractRuleData();
+    mockTarkovApiFetch.mockReset();
+    mockTarkovApiFetch.mockResolvedValue({ data: null });
     refreshViewSpy.mockClear();
     setFloorSpy.mockClear();
     useLeafletMapOptionsSpy.mockClear();
@@ -188,15 +227,489 @@ describe('LeafletMap controls', () => {
     mockMapInstance.latLngToContainerPoint.mockClear();
     mockMapInstance.latLngToContainerPoint.mockReturnValue({ x: 50, y: 50 });
   });
-  it('keeps enabled extract labels readable on the light toolbar and updates when toggled', async () => {
-    const wrapper = await mountMap({ showPmcExtracts: true });
-    const toggle = wrapper.findAll('button').find((button) => button.text() === 'PMC')!;
-    expect(toggle.attributes('aria-pressed')).toBe('true');
-    expect(toggle.classes()).toContain('text-primary-100');
+  const openLayersPanel = async (wrapper: Awaited<ReturnType<typeof mountMap>>) => {
+    await wrapper.get('[data-testid="map-layers-toggle"]').trigger('click');
+    return (key: string) => wrapper.find(`[data-testid="map-layers-panel"] [data-layer="${key}"]`);
+  };
+  it('starts extracts from the saved default and follows it when it changes', async () => {
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [
+          { id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } },
+          { id: 'b', name: 'Old Gas Station', faction: 'scav', position: { x: 2, y: 0, z: 2 } },
+          { id: 'c', name: 'Railroad', faction: 'shared', position: { x: 3, y: 0, z: 3 } },
+        ],
+      },
+      showExtracts: false,
+    });
+    const row = await openLayersPanel(wrapper);
+    const pressed = () =>
+      ['pmc', 'scav', 'shared'].map((key) => row(key).attributes('aria-pressed'));
+    expect(pressed()).toEqual(['false', 'false', 'false']);
+    // The preference can arrive from account sync after the map mounted.
+    await wrapper.setProps({ showExtracts: true });
+    expect(pressed()).toEqual(['true', 'true', 'true']);
+    // A row the user changed keeps their choice through later default changes.
+    await row('scav').trigger('click');
+    await wrapper.setProps({ showExtracts: false });
+    await wrapper.setProps({ showExtracts: true });
+    expect(pressed()).toEqual(['true', 'false', 'true']);
+    wrapper.unmount();
+  });
+  it('remembers extract and transit rows across a refresh or page change', async () => {
+    const map = {
+      id: '653e6760052c01c1c805532f',
+      name: 'Ground Zero',
+      svg: maps.groundzero.svg,
+      extracts: [
+        {
+          id: 'a',
+          name: 'Crossroads',
+          faction: 'pmc',
+          position: { x: 151.63, y: 24.66, z: -97.46 },
+        },
+        { id: 'b', name: 'Scav exit', faction: 'scav', position: { x: 150, y: 24.66, z: -90 } },
+      ],
+      transits: [
+        {
+          id: 't',
+          description: 'Streets transit',
+          map: 'streets',
+          position: { x: 229.6, y: 16.99, z: 65.36 },
+        },
+      ],
+    } as TarkovMap;
+    const first = await mountMap({ map });
+    const firstRow = await openLayersPanel(first);
+    await firstRow('scav').trigger('click');
+    await firstRow('transit').trigger('click');
+    expect(savedLayers.value).toEqual({ scav: false, transit: false });
+    first.unmount();
+    // The panel remembers being opened; reset that so the helper opens it again.
+    localStorage.removeItem('map_layers_panel_open');
+    // A new map instance stands in for the reload: it starts from the saved rows.
+    const second = await mountMap({ map });
+    const row = await openLayersPanel(second);
+    expect(['pmc', 'scav', 'transit'].map((key) => row(key).attributes('aria-pressed'))).toEqual([
+      'true',
+      'false',
+      'false',
+    ]);
+    // A saved row is the user's choice, so a later default change leaves it alone.
+    await second.setProps({ showExtracts: false });
+    await second.setProps({ showExtracts: true });
+    expect(row('scav').attributes('aria-pressed')).toBe('false');
+    // Show all layers is an explicit choice for every listed row, and is remembered.
+    await second.get('[data-testid="map-layers-show-all"]').trigger('click');
+    expect(savedLayers.value).toEqual({ pmc: true, scav: true, transit: true });
+    second.unmount();
+  });
+  it('restores a saved row over an explicit page value', async () => {
+    savedLayers.value = { pmc: false };
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [{ id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } }],
+      },
+      showPmcExtracts: true,
+    });
+    const row = await openLayersPanel(wrapper);
+    expect(row('pmc').attributes('aria-pressed')).toBe('false');
+    wrapper.unmount();
+  });
+  it('follows a row saved by another map on the page, such as the full-screen map', async () => {
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [{ id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } }],
+      },
+    });
+    const row = await openLayersPanel(wrapper);
+    expect(row('pmc').attributes('aria-pressed')).toBe('true');
+    savedLayers.value = { pmc: false };
+    await nextTick();
+    expect(row('pmc').attributes('aria-pressed')).toBe('false');
+    wrapper.unmount();
+  });
+  it('combines the legend and layer toggles in one panel that remembers being opened', async () => {
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [
+          { id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } },
+          { id: 'b', name: 'Old Gas Station', faction: 'scav', position: { x: 2, y: 0, z: 2 } },
+          { id: 'c', name: 'Railroad', faction: 'shared', position: { x: 3, y: 0, z: 3 } },
+          { id: 'd', name: 'Scav Co-op Exfil', faction: 'shared', position: { x: 4, y: 0, z: 4 } },
+        ],
+      },
+      showPmcExtracts: true,
+      showScavExtracts: true,
+    });
+    const toggle = wrapper.get('[data-testid="map-layers-toggle"]');
+    // The test surface has no width, so the narrow-screen default keeps the panel closed.
+    expect(toggle.attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('[data-testid="map-layers-panel"]').exists()).toBe(false);
+    const row = await openLayersPanel(wrapper);
+    expect(toggle.attributes('aria-expanded')).toBe('true');
     expect(toggle.classes()).toContain('light:text-primary-900');
+    expect(localStorage.getItem('map_layers_panel_open')).toBe('true');
+    const panel = wrapper.get('[data-testid="map-layers-panel"]');
+    expect(panel.attributes('id')).toBe(toggle.attributes('aria-controls'));
+    expect(panel.findAll('[role="group"]').map((group) => group.find('p').text())).toEqual([
+      'Tasks',
+      'Extracts',
+    ]);
+    for (const key of ['self', 'pinned', 'team', 'pmc', 'scav', 'shared', 'coop']) {
+      expect(row(key).exists()).toBe(true);
+    }
+    expect(row('transit').exists()).toBe(false);
+    expect(row('pmc').attributes('aria-pressed')).toBe('true');
+    expect(row('pmc').text()).toContain('PMC');
+    expect(row('shared').text()).toContain('Shared');
+    expect(row('shared').text()).toContain('Either faction');
+    expect(row('shared').text()).not.toContain('unknown');
+    expect(
+      row('shared')
+        .findAll('svg path')
+        .map((path) => path.attributes('d'))
+    ).toEqual([MAP_MARKER_GLYPH_PATHS.shared]);
+    expect(row('coop').text()).toContain('PMC and Scav together');
+    await row('pmc').trigger('click');
+    await row('shared').trigger('click');
+    expect(row('pmc').attributes('aria-pressed')).toBe('false');
+    expect(row('shared').attributes('aria-pressed')).toBe('false');
+    expect(row('scav').attributes('aria-pressed')).toBe('true');
+    // Pinned and Team start hidden in the mocked preferences.
+    expect(wrapper.get('[data-testid="map-layers-hidden-count"]').text()).toBe('4 hidden');
+    await wrapper.get('[data-testid="map-layers-show-all"]').trigger('click');
+    expect(row('pmc').attributes('aria-pressed')).toBe('true');
+    expect(row('shared').attributes('aria-pressed')).toBe('true');
+    await toggle.trigger('click');
+    expect(wrapper.find('[data-testid="map-layers-panel"]').exists()).toBe(false);
+    expect(localStorage.getItem('map_layers_panel_open')).toBe('false');
+    wrapper.unmount();
+  });
+  it('labels the shared row honestly when an extract has no known faction', async () => {
+    const wrapper = await mountMap({
+      map: {
+        ...mapData,
+        extracts: [
+          { id: 'unknown', name: 'Unknown exit', faction: null, position: { x: 1, z: 1 } },
+        ],
+      },
+    });
+    const row = await openLayersPanel(wrapper);
+    expect(row('shared').text()).toContain('Shared / unknown');
+    expect(row('shared').text()).toContain('Either faction, or faction not supplied');
+    expect(row('shared').findAll('svg path')).toHaveLength(1);
+    await row('shared').trigger('click');
+    expect(row('shared').attributes('aria-pressed')).toBe('false');
+    wrapper.unmount();
+  });
+  it('attaches visible vehicle requirements and keyboard details that fit after resizing', async () => {
+    const popup = { options: {}, isOpen: vi.fn(() => true), update: vi.fn() };
+    const markerInstance = {
+      on: vi.fn<(event: string, handler: (event: { popup: typeof popup }) => void) => void>(),
+      getPopup: vi.fn(() => popup),
+      bindPopup: vi.fn<(content: HTMLElement, options: unknown) => unknown>().mockReturnThis(),
+    };
+    const marker = vi.fn((_position: unknown, _options: unknown) => markerInstance);
+    const divIcon = vi.fn((options) => options);
+    const layer = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
+    mapState.leaflet = { marker, divIcon };
+    mapState.objectiveLayer = layer();
+    mapState.spawnLayer = layer();
+    mapState.extractLayer = {
+      ...layer(),
+      eachLayer: (visit: (entry: unknown) => void) => visit(markerInstance),
+    };
+    const extractMap = {
+      ...mapData,
+      id: '653e6760052c01c1c805532f',
+      svg: maps.groundzero.svg,
+      extracts: [
+        {
+          id: 'e858220a780a95ffbb923225d7649aa134df8836',
+          name: 'Police Cordon V-Ex',
+          faction: 'pmc',
+          position: { x: 0, y: 0, z: 0 },
+        },
+      ],
+    } as TarkovMap;
+    let answerRules!: (response: unknown) => void;
+    mockTarkovApiFetch.mockImplementation(() => new Promise((resolve) => (answerRules = resolve)));
+    const wrapper = await mountMap({ map: extractMap });
+    await wrapper.setProps({ map: { ...extractMap } });
+    // Until the overlay rules answer, the pin claims nothing: unknown requirements, no source line.
+    const pendingPin = divIcon.mock.calls.at(-1)![0].html as HTMLElement;
+    expect(pendingPin.querySelector<HTMLElement>('.map-extract-requirements')?.dataset.tags).toBe(
+      'unknown'
+    );
+    const pendingDetails = markerInstance.bindPopup.mock.calls.at(-1)![0] as HTMLElement;
+    expect(pendingDetails.textContent).toContain('Requirements unknown. Check in raid.');
+    expect(pendingDetails.textContent).not.toContain('No requirements listed');
+    expect(wrapper.find('[data-testid="map-extract-source"]').exists()).toBe(false);
+    answerRules({ data: extractRuleFixture });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await nextTick();
+    const pin = divIcon.mock.calls.at(-1)![0].html as HTMLElement;
+    const strip = pin.querySelector<HTMLElement>('.map-pin-side > .map-extract-requirements');
+    expect(strip?.dataset.tags).toBe('money conditional');
+    expect(strip?.nextElementSibling?.classList).toContain('map-pin-label');
+    expect(pin.getAttribute('aria-label')).toContain('Money, Conditional');
+    expect(marker.mock.calls.at(-1)?.[1]).toMatchObject({ keyboard: true });
+    const details = markerInstance.bindPopup.mock.calls.at(-1)![0] as HTMLElement;
+    expect(details.textContent).toContain(`Pay ${new Intl.NumberFormat().format(20000)} roubles`);
+    expect(details.textContent).not.toContain('Not live raid status');
+    // The popup opens above the pin head so the pin and its name stay visible.
+    expect(markerInstance.bindPopup.mock.calls.at(-1)![1]).toMatchObject({ offset: [0, -28] });
+    // The source and not-live notice appear once for the map, not in every popup.
+    const source = wrapper.get('[data-testid="map-extract-source"]');
+    expect(source.text()).toBe(
+      'Requirements: EFT 1.3.0.0 data, public references and scene cues · Not live raid status'
+    );
+    expect(source.attributes('title')).toContain('EFT 1.3.0.0.48484');
+    expect(wrapper.findAll('[data-testid="map-extract-source"]')).toHaveLength(1);
+    // Hiding the only drawn extract's category also removes its source line.
+    const row = await openLayersPanel(wrapper);
+    await row('pmc').trigger('click');
+    expect(wrapper.find('[data-testid="map-extract-source"]').exists()).toBe(false);
+    const openPopup = markerInstance.on.mock.calls.find(([event]) => event === 'popupopen')![1];
+    mockMapInstance.size = { x: 286, y: 320 };
+    openPopup({ popup });
+    expect(popup.options).toMatchObject({ maxWidth: 226, maxHeight: 220 });
+    mockMapInstance.size = { x: 220, y: 240 };
+    const resize = mockMapInstance.on.mock.calls.filter(([event]) => event === 'resize').at(-1)![1];
+    resize();
+    expect(popup.options).toMatchObject({ maxWidth: 160, minWidth: 160, maxHeight: 140 });
+    expect(popup.update).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it('shows pin names on tap, past the whole-map zoom, or with the always-names switch', async () => {
+    const layer = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
+    const pinClicks: Array<() => void> = [];
+    const marker = vi.fn(() => ({
+      bindPopup: vi.fn().mockReturnThis(),
+      on: vi.fn((event: string, handler: () => void) => {
+        if (event === 'click') pinClicks.push(handler);
+      }),
+    }));
+    const divIcon = vi.fn((options) => options);
+    mapState.leaflet = { marker, divIcon };
+    mapState.objectiveLayer = layer();
+    mapState.extractLayer = layer();
+    mapState.spawnLayer = layer();
+    mapState.transitLayer = layer();
+    // The mocked view sits at zoom 4.25; names show for every pin once the fit zoom is <= 3.25.
+    mapState.fitZoom = 4;
+    const extractMap: TarkovMap = {
+      ...mapData,
+      extracts: [
+        { id: 'a', name: 'Crossroads', faction: 'pmc', position: { x: 1, y: 0, z: 1 } },
+        { id: 'b', name: 'Old Gas Station', faction: 'scav', position: { x: 2, y: 0, z: 2 } },
+      ],
+      svg: {
+        file: 'customs.svg',
+        floors: ['ground'],
+        defaultFloor: 'ground',
+        coordinateRotation: 0,
+        bounds: [
+          [0, 0],
+          [100, 100],
+        ],
+      },
+    };
+    const wrapper = await mountMap({ map: extractMap });
+    await wrapper.setProps({ map: { ...extractMap } });
+    // Extracts start visible when the parent asks for them, without per-faction props.
+    const pins = divIcon.mock.calls.map(([options]) => options.html as HTMLElement).slice(-2);
+    expect(pins.map((pin) => pin.querySelector('.map-pin-label')?.textContent)).toEqual([
+      'Crossroads',
+      'Old Gas Station',
+    ]);
+    const clicks = pinClicks.slice(-2);
+    clicks[0]!();
+    expect(pins[0]!.classList.contains('is-open')).toBe(true);
+    clicks[1]!();
+    expect(pins[0]!.classList.contains('is-open')).toBe(false);
+    expect(pins[1]!.classList.contains('is-open')).toBe(true);
+    // Only a click outside every pin closes the open name.
+    const mapClick = mockMapInstance.on.mock.calls
+      .filter(([event]) => event === 'click')
+      .at(-1)?.[1] as (event: { originalEvent: { target: EventTarget } }) => void;
+    mapClick({ originalEvent: { target: pins[1]!.firstElementChild! } });
+    expect(pins[1]!.classList.contains('is-open')).toBe(true);
+    mapClick({ originalEvent: { target: document.body } });
+    expect(pins[1]!.classList.contains('is-open')).toBe(false);
+    clicks[1]!();
+    clicks[1]!();
+    expect(pins[1]!.classList.contains('is-open')).toBe(false);
+    const viewport = wrapper.get('[data-testid="map-viewport"]');
+    expect(viewport.classes()).not.toContain('map-names-visible');
+    // A resize that lowers the whole-map fit zoom makes the current view count as zoomed in.
+    const onResize = mockMapInstance.on.mock.calls
+      .filter(([event]) => event === 'resize')
+      .at(-1)?.[1] as () => void;
+    mapState.fitZoom = 3;
+    onResize();
+    await nextTick();
+    expect(viewport.classes()).toContain('map-names-visible');
+    mapState.fitZoom = 4;
+    onResize();
+    await nextTick();
+    expect(viewport.classes()).not.toContain('map-names-visible');
+    const row = await openLayersPanel(wrapper);
+    expect(row('pmc').attributes('aria-pressed')).toBe('true');
+    const names = wrapper.get('[data-testid="map-layers-always-names"]');
+    expect(names.attributes('aria-checked')).toBe('false');
+    await names.trigger('click');
+    expect(names.attributes('aria-checked')).toBe('true');
+    expect(viewport.classes()).toContain('map-names-visible');
+    expect(localStorage.getItem('map_always_show_names')).toBe('true');
+    wrapper.unmount();
+  });
+  it('redraws extract and transit arrows with accessible directions when the selected floor changes', async () => {
+    const divIcon = vi.fn((options) => options);
+    const marker = vi.fn(() => ({ on: vi.fn(), bindPopup: vi.fn().mockReturnThis() }));
+    mapState.leaflet = { divIcon, marker };
+    mapState.extractLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
+    mapState.transitLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
+    const map = {
+      id: '653e6760052c01c1c805532f',
+      name: 'Ground Zero',
+      svg: maps.groundzero.svg,
+      extracts: [
+        {
+          id: 'native',
+          name: 'Emercom',
+          faction: 'shared',
+          position: { x: 151.63, y: 24.66, z: -97.46 },
+        },
+      ],
+      transits: [
+        {
+          id: '1',
+          description: 'Streets transit',
+          map: 'streets',
+          position: { x: 229.6, y: 16.99, z: 65.36 },
+        },
+      ],
+    } as TarkovMap;
+    const wrapper = await mountMap({ map });
+    const vm = wrapper.vm as unknown as { setFloor: (floor: string) => void };
+    const pins = () => divIcon.mock.calls.map(([options]) => options.html as HTMLElement);
+    divIcon.mockClear();
+    vm.setFloor('3rd Floor');
+    await nextTick();
+    expect(pins()).toHaveLength(2);
+    for (const pin of pins()) {
+      const badge = pin.querySelector<HTMLElement>('.map-elevation');
+      expect(badge?.dataset.direction).toBe('down');
+      expect(badge?.textContent).toBe('2');
+      expect(pin.getAttribute('aria-label')).toMatch(/Go down 2 levels/);
+      // Off-floor pins fade their head; the floor badge itself is not faded.
+      expect(pin.classList).toContain('map-pin--off-floor');
+      expect(pin.querySelector('.map-pin-head')?.classList).toContain('opacity-55');
+      expect(badge?.className).not.toContain('opacity-55');
+    }
+    divIcon.mockClear();
+    vm.setFloor('Garage');
+    await nextTick();
+    expect(pins()).toHaveLength(2);
+    for (const pin of pins()) {
+      const badge = pin.querySelector<HTMLElement>('.map-elevation');
+      expect(badge?.dataset.direction).toBe('up');
+      expect(badge?.textContent).toBe('');
+    }
+    divIcon.mockClear();
+    vm.setFloor('Ground_Level');
+    await nextTick();
+    expect(pins()).toHaveLength(2);
+    for (const pin of pins()) {
+      expect(pin.querySelector('.map-elevation')).toBeNull();
+      expect(pin.classList).not.toContain('map-pin--off-floor');
+    }
+    wrapper.unmount();
+  });
+  it('renders transit locations safely, toggles independently, and clears on map changes', async () => {
+    const transitLayer = { clearLayers: vi.fn(), addLayer: vi.fn() };
+    const marker = vi.fn(() => ({ on: vi.fn(), bindPopup: vi.fn().mockReturnThis() }));
+    const divIcon = vi.fn((options) => options);
+    mapState.transitLayer = transitLayer;
+    mapState.leaflet = { marker, divIcon };
+    const transit = {
+      id: '9',
+      description: 'Transit to <Reserve>',
+      map: 'reserve',
+      position: { x: 650.64, y: 1.59, z: 124.94 },
+    };
+    const transitMap: TarkovMap = {
+      ...mapData,
+      transits: [transit],
+      spawns: [{ position: { x: 1, y: 0, z: 1 }, sides: ['pmc'], categories: ['player'] }],
+      svg: {
+        file: 'customs.svg',
+        floors: ['ground'],
+        defaultFloor: 'ground',
+        coordinateRotation: 0,
+        bounds: [
+          [0, 0],
+          [100, 100],
+        ],
+      },
+    };
+    const wrapper = await mountMap({
+      map: transitMap,
+      showPmcExtracts: true,
+      showScavExtracts: true,
+      showPmcSpawns: true,
+    });
+    // Exercise the real redraw watcher without depending on SVG load timing.
+    await wrapper.setProps({ map: { ...transitMap } });
+    const row = await openLayersPanel(wrapper);
+    const toggle = row('transit');
+    expect(toggle.attributes('aria-pressed')).toBe('true');
+    expect(marker).toHaveBeenLastCalledWith([124.94, 650.64], expect.any(Object));
+    const badge = divIcon.mock.calls.at(-1)?.[0].html as HTMLElement;
+    expect(badge.textContent).toContain('Transit to <Reserve>');
+    expect(badge.querySelector('reserve')).toBeNull();
+    expect(transitLayer.addLayer).toHaveBeenCalled();
+    const added = transitLayer.addLayer.mock.calls.length;
+    transitLayer.clearLayers.mockClear();
     await toggle.trigger('click');
     expect(toggle.attributes('aria-pressed')).toBe('false');
-    expect(toggle.classes()).not.toContain('light:text-primary-900');
+    expect(transitLayer.clearLayers).toHaveBeenCalledOnce();
+    expect(transitLayer.addLayer).toHaveBeenCalledTimes(added);
+    // This map has no extracts, so only the spawn row sits beside Transit outside the task rows.
+    expect(row('pmc').exists()).toBe(false);
+    expect(row('spawns').attributes('aria-pressed')).toBe('true');
+    await toggle.trigger('click');
+    expect(transitLayer.addLayer.mock.calls.length).toBeGreaterThan(added);
+    transitLayer.addLayer.mockClear();
+    transitLayer.clearLayers.mockClear();
+    await wrapper.setProps({ map: { ...transitMap, svg: undefined } });
+    expect(transitLayer.clearLayers).toHaveBeenCalled();
+    expect(transitLayer.addLayer).not.toHaveBeenCalled();
+    await wrapper.setProps({
+      map: {
+        ...transitMap,
+        svg: undefined,
+        tile: {
+          tilePath: '/tiles/{z}/{x}/{y}.png',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      },
+    });
+    expect(transitLayer.addLayer).toHaveBeenCalled();
+    transitLayer.clearLayers.mockClear();
+    await wrapper.setProps({ map: { ...mapData, id: 'other', transits: [] } });
+    expect(row('transit').exists()).toBe(false);
+    expect(transitLayer.clearLayers).toHaveBeenCalled();
     wrapper.unmount();
   });
   it('uses the same theme-aware active foreground for the opened help control', async () => {
@@ -271,12 +784,13 @@ describe('LeafletMap controls', () => {
   it('renders localized help rows with their keyboard shortcuts in message slots', async () => {
     mapState.hasMultipleFloors = true;
     const wrapper = await mountMap();
-    expect(wrapper.findAll('kbd')).toHaveLength(9);
+    expect(wrapper.findAll('kbd')).toHaveLength(10);
     expect(wrapper.text()).toMatch(/WASD\s*\/\s*←↑↓→\s+or drag to pan/);
     expect(wrapper.text()).toMatch(/Shift\s*Scroll\s*\/\s*Q\/E\s+to zoom/);
     expect(wrapper.text()).toMatch(/R\s+to reset view/);
     expect(wrapper.text()).toMatch(/Ctrl\s*Scroll\s+to cycle floors/);
     expect(wrapper.text()).toMatch(/F\s+to click at cursor/);
+    expect(wrapper.text()).toMatch(/C\s+to copy the coordinates under the cursor/);
     const hint = wrapper.find('[data-testid="map-first-use-hint"]');
     expect(hint.exists()).toBe(true);
     expect(hint.text()).toMatch(/Ctrl \+ Scroll to change floors/);
@@ -284,7 +798,7 @@ describe('LeafletMap controls', () => {
   });
   it('hides floor help and the floor shortcut from the hint on single-floor maps', async () => {
     const wrapper = await mountMap();
-    expect(wrapper.findAll('kbd')).toHaveLength(7);
+    expect(wrapper.findAll('kbd')).toHaveLength(8);
     expect(wrapper.text()).not.toContain('to cycle floors');
     expect(wrapper.text()).not.toContain('Or use the floor panel.');
     const hint = wrapper.find('[data-testid="map-first-use-hint"]');
@@ -386,6 +900,8 @@ describe('LeafletMap controls', () => {
     const popups: Array<{
       element: HTMLElement;
       isOpen: boolean;
+      options: Record<string, unknown>;
+      update: ReturnType<typeof vi.fn>;
       setContent: (content: HTMLElement) => void;
       setLatLng: ReturnType<typeof vi.fn>;
       getElement: () => HTMLElement;
@@ -406,6 +922,8 @@ describe('LeafletMap controls', () => {
       const popup = {
         element,
         isOpen: false,
+        options: {} as Record<string, unknown>,
+        update: vi.fn(),
         setContent(content: HTMLElement) {
           element.replaceChildren(content);
         },
@@ -435,8 +953,12 @@ describe('LeafletMap controls', () => {
       createLayer(options)
     );
     const objectiveLayer = createLayerGroup();
+    const divIcon = vi.fn((options: { html: HTMLElement }) => options);
+    const marker = vi.fn((_position: unknown, options: Record<string, unknown>) => ({ options }));
     mapState.leaflet = {
       circleMarker,
+      divIcon,
+      marker,
       polygon: (_positions: unknown, options: Record<string, unknown>) => createLayer(options),
       popup: createPopup,
       DomEvent: { stop: vi.fn() },
@@ -448,6 +970,7 @@ describe('LeafletMap controls', () => {
     const marks = [
       {
         id: 'objective-a',
+        type: 'plantItem',
         users: ['self'],
         zones: [
           {
@@ -463,6 +986,7 @@ describe('LeafletMap controls', () => {
       },
       {
         id: 'objective-b',
+        type: 'findQuestItem',
         users: ['self'],
         zones: [],
         possibleLocations: [{ map: { id: 'customs' }, positions: [{ x: 10, z: 10 }] }],
@@ -490,6 +1014,37 @@ describe('LeafletMap controls', () => {
     await nextTick();
     expect(objectiveLayer.clearLayers).toHaveBeenCalled();
     expect(circleMarker).toHaveBeenCalled();
+    // Each dot carries a pass-through glyph for its objective's action.
+    const glyphs = divIcon.mock.calls.map(([options]) => options.html);
+    expect(glyphs.map((glyph) => glyph.dataset.kind)).toEqual(['plant', 'find']);
+    expect(glyphs.every((glyph) => glyph.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(marker.mock.calls.map(([, options]) => options.interactive)).toEqual([false, false]);
+    expect(objectiveLayer.addLayer).toHaveBeenCalledWith(marker.mock.results[0]?.value);
+    // The chip is the visible marker in the category color; the dot under it only takes input.
+    expect(glyphs.map((glyph) => glyph.style.getPropertyValue('--chip-color'))).toEqual([
+      '#111111',
+      '#111111',
+    ]);
+    expect(circleMarker.mock.calls.map(([, options]) => options.fillOpacity)).toEqual([0, 0]);
+    const zoneLayer = createdLayers[0]!;
+    zoneLayer.handlers.get('mouseover')?.forEach((handler) => handler({}));
+    expect(glyphs[0]!.classList).toContain('is-hovered');
+    zoneLayer.handlers.get('mouseout')?.forEach((handler) => handler({}));
+    expect(glyphs[0]!.classList).not.toContain('is-hovered');
+    // The mocked map projects every point to one pixel, so this zone is far smaller than its
+    // chip: its outline is hidden, and hovering its chip (the centre dot) shows it.
+    expect(zoneLayer.setStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ opacity: 0, fillOpacity: 0 })
+    );
+    const zoneCentre = createdLayers[1]!;
+    zoneCentre.handlers.get('mouseover')?.forEach((handler) => handler({}));
+    expect(zoneLayer.setStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ opacity: 0.95, weight: 3 })
+    );
+    zoneCentre.handlers.get('mouseout')?.forEach((handler) => handler({}));
+    expect(zoneLayer.setStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ opacity: 0, fillOpacity: 0 })
+    );
     try {
       const firstMarker = createdLayers[0];
       expect(firstMarker).toBeDefined();
@@ -517,5 +1072,169 @@ describe('LeafletMap controls', () => {
       wrapper.unmount();
       popups.forEach((popup) => popup.element.remove());
     }
+  });
+  it('fills chips with quest colors, reports hovered quests and highlights one quest', async () => {
+    type FakeHandler = () => void;
+    const dots: Array<{ handlers: Map<string, FakeHandler[]> }> = [];
+    const createLayer = () => {
+      const handlers = new Map<string, FakeHandler[]>();
+      const layer = {
+        handlers,
+        options: {},
+        setStyle: vi.fn(),
+        getLatLng: () => ({ lat: 0, lng: 0 }),
+        getRadius: () => 13,
+        on(name: string, handler: FakeHandler) {
+          handlers.set(name, [...(handlers.get(name) ?? []), handler]);
+          return layer;
+        },
+      };
+      dots.push(layer);
+      return layer;
+    };
+    const createPopup = () => {
+      const element = document.createElement('div');
+      const popup = {
+        options: {},
+        isOpen: false,
+        update: vi.fn(),
+        setContent: (content: HTMLElement) => element.replaceChildren(content),
+        setLatLng: vi.fn(),
+        getElement: () => element,
+        addTo: () => {
+          popup.isOpen = true;
+        },
+        remove: () => {
+          popup.isOpen = false;
+        },
+        on: vi.fn(),
+        once: vi.fn(),
+      };
+      return popup;
+    };
+    const divIcon = vi.fn((options: { html: HTMLElement }) => options);
+    const createLayerGroup = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
+    const mapPane = document.createElement('div');
+    mapPane.innerHTML = '<svg width="100" height="100"></svg>';
+    mockMapInstance.getPane.mockReturnValue(mapPane);
+    mockMapInstance.getContainer.mockReturnValue(mapPane);
+    mapState.leaflet = {
+      circleMarker: createLayer,
+      divIcon,
+      marker: (_position: unknown, options: Record<string, unknown>) => ({ options }),
+      popup: createPopup,
+      DomEvent: { stop: vi.fn() },
+    };
+    mapState.objectiveLayer = createLayerGroup();
+    mapState.extractLayer = createLayerGroup();
+    mapState.spawnLayer = createLayerGroup();
+    const point = (id: string, taskId: string, color: string) => ({
+      id,
+      taskId,
+      color,
+      type: 'visit',
+      users: ['self'],
+      zones: [],
+      possibleLocations: [{ map: { id: 'customs' }, positions: [{ x: 10, z: 10 }] }],
+    });
+    const marks = [
+      point('objective-a', 'task-a', '#f0e442'),
+      point('objective-b', 'task-b', '#0072b2'),
+      point('objective-c', 'task-a', '#f0e442'),
+    ];
+    let unmounted = false;
+    // emitted() is not kept past unmount, so the unmount check listens through the prop.
+    const onObjectiveHover = vi.fn();
+    const wrapper = await mountMap({
+      onObjectiveHover,
+      map: {
+        ...mapData,
+        svg: {
+          file: 'customs.svg',
+          floors: ['ground'],
+          defaultFloor: 'ground',
+          coordinateRotation: 0,
+          bounds: [
+            [0, 0],
+            [100, 100],
+          ],
+        },
+      },
+      marks,
+      showExtracts: false,
+      showPmcSpawns: false,
+    });
+    try {
+      await wrapper.setProps({ marks: [...marks] });
+      await nextTick();
+      const chips = divIcon.mock.calls.map(([options]) => options.html).slice(-3);
+      // The mark's quest color replaces the category color; the light yellow gets a dark glyph.
+      expect(chips.map((chip) => chip.style.getPropertyValue('--chip-color'))).toEqual([
+        '#f0e442',
+        '#0072b2',
+        '#f0e442',
+      ]);
+      expect(chips.map((chip) => chip.style.getPropertyValue('--chip-ink'))).toEqual([
+        '#0a0a0b',
+        '#ffffff',
+        '#0a0a0b',
+      ]);
+      const dotB = dots[dots.length - 2]!;
+      dotB.handlers.get('mouseover')?.forEach((handler) => handler());
+      dotB.handlers.get('mouseout')?.forEach((handler) => handler());
+      expect(wrapper.emitted('objective-hover')).toEqual([['task-b'], [null]]);
+      await wrapper.setProps({ highlightedTaskId: 'task-a' });
+      expect(chips.map((chip) => chip.classList.contains('is-task-highlighted'))).toEqual([
+        true,
+        false,
+        true,
+      ]);
+      expect(chips.map((chip) => chip.classList.contains('is-task-dimmed'))).toEqual([
+        false,
+        true,
+        false,
+      ]);
+      // Highlighting only toggles classes; it never redraws the markers.
+      const drawn = divIcon.mock.calls.length;
+      await wrapper.setProps({ highlightedTaskId: 'task-gone' });
+      expect(chips.some((chip) => chip.classList.contains('is-task-dimmed'))).toBe(false);
+      await wrapper.setProps({ highlightedTaskId: null });
+      expect(chips.some((chip) => chip.classList.contains('is-task-highlighted'))).toBe(false);
+      expect(divIcon.mock.calls.length).toBe(drawn);
+      // A redraw removes the hovered dot without a mouseout, so the map releases its hover.
+      dotB.handlers.get('mouseover')?.forEach((handler) => handler());
+      await wrapper.setProps({ marks: [marks[0]!, marks[2]!] });
+      await nextTick();
+      expect(wrapper.emitted('objective-hover')?.slice(-2)).toEqual([['task-b'], [null]]);
+      // Unmounting releases a hover too, but only one the markers reported.
+      const lastDot = dots[dots.length - 1]!;
+      lastDot.handlers.get('mouseover')?.forEach((handler) => handler());
+      expect(onObjectiveHover.mock.calls.at(-1)).toEqual(['task-a']);
+      wrapper.unmount();
+      unmounted = true;
+      expect(onObjectiveHover.mock.calls.at(-1)).toEqual([null]);
+    } finally {
+      if (!unmounted) wrapper.unmount();
+    }
+  });
+  it('tells the coordinate readout about every keyboard action, even with the crosshair shown', async () => {
+    const wrapper = await mountMap();
+    const MapCursorCoordinates = (await import('@/features/maps/MapCursorCoordinates.vue')).default;
+    const readout = () => wrapper.findComponent(MapCursorCoordinates);
+    (wrapper.element as HTMLElement).focus();
+    const press = async (key: string, code: string) => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key, code, bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { key, code, bubbles: true }));
+      await nextTick();
+    };
+    expect(readout().props('keyboardActivity')).toBe(0);
+    await press('w', 'KeyW');
+    expect(readout().props('crosshairShown')).toBe(true);
+    expect(readout().props('keyboardActivity')).toBe(1);
+    // The crosshair is already shown, so only the activity count can hand it the reading back.
+    await press('w', 'KeyW');
+    await press('r', 'KeyR');
+    expect(readout().props('keyboardActivity')).toBe(3);
+    wrapper.unmount();
   });
 });

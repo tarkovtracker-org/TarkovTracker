@@ -9,7 +9,7 @@
         <span class="inline-flex">
           <button
             type="button"
-            :disabled="disabled || currentCount <= 0"
+            :disabled="disabled || countDisabled || currentCount <= 0"
             :aria-label="t('page.tasks.questcard.decrease')"
             class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-l-md transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
             @click="$emit('decrease')"
@@ -46,7 +46,7 @@
         <span class="inline-flex">
           <button
             type="button"
-            :disabled="disabled || currentCount >= neededCount"
+            :disabled="disabled || countDisabled || currentCount >= neededCount"
             :aria-label="t('page.tasks.questcard.increase')"
             class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 text-surface-300 flex h-7 w-7 items-center justify-center rounded-r-md transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
             @click="$emit('increase')"
@@ -93,10 +93,12 @@
       currentCount: number;
       neededCount: number;
       disabled?: boolean;
+      countDisabled?: boolean;
       isComplete?: boolean | null;
     }>(),
     {
       disabled: false,
+      countDisabled: false,
       isComplete: null,
     }
   );
@@ -120,7 +122,7 @@
       current: () => props.currentCount,
       max: () => props.neededCount,
       onUpdate: (value) => {
-        if (value !== props.currentCount) {
+        if (!props.disabled && !props.countDisabled && value !== props.currentCount) {
           emit('set-count', value);
         }
       },
@@ -133,7 +135,7 @@
       },
     });
   const startEditing = () => {
-    if (props.disabled) return;
+    if (props.disabled || props.countDisabled) return;
     startEdit();
   };
 </script>

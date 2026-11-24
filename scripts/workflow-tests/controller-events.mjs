@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { relevantComment } from '../ci/review-admission.mjs';
-import { jobBlock } from './helpers/workflow-blocks.mjs';
+import {
+  jobBlock,
+  permissionsBlock,
+  workflowEvent,
+  workflowStep,
+} from './helpers/workflow-blocks.mjs';
 const repository = 'example/repo';
 const head = 'a'.repeat(40);
 const bot = { id: 136622811, type: 'Bot', login: 'coderabbitai[bot]' };
@@ -21,7 +26,7 @@ function event(name, payload = {}) {
     },
   };
 }
-function allows(filename, job, github) {
+function allows(filename, job, github, needs = {}) {
   const source = readFileSync(`.github/workflows/${filename}.yml`, 'utf8');
   const block = jobBlock(source, job);
   const condition = block.match(/^ {4}if: (?:>-\n((?: {6}.*\n)+)|([^\n]+))/m);
@@ -31,6 +36,7 @@ function allows(filename, job, github) {
   // case-insensitive, as GitHub's expression functions are.
   const evaluate = new Function(
     'github',
+    'needs',
     'contains',
     'startsWith',
     'endsWith',
@@ -40,6 +46,7 @@ function allows(filename, job, github) {
   const text = (value) => String(value ?? '').toLowerCase();
   return evaluate(
     github,
+    needs,
     (value, needle) =>
       Array.isArray(value)
         ? value.some((item) => text(item) === text(needle))
@@ -100,13 +107,93 @@ test('only relevant release-promotion jobs enter the serialized queue', () => {
     /^ {4}concurrency:\n {6}group: release-promotion-queue\n {6}queue: max\n {6}cancel-in-progress: false$/m
   );
   for (const conclusion of ['success', 'failure', 'cancelled', 'skipped']) {
-    const github = event('workflow_run');
+    const github = sourceRun('release');
     github.event.workflow_run.conclusion = conclusion;
     assert.equal(allows('release-promotion-queue', 'enqueue', github), conclusion === 'success');
   }
-  const foreign = event('workflow_run');
+  const foreign = sourceRun('release');
   foreign.event.workflow_run.repository.full_name = 'other/repo';
   assert.equal(allows('release-promotion-queue', 'enqueue', foreign), false);
+});
+test('explicit promotion dispatch only runs the main controller', () => {
+  const dispatch = event('workflow_dispatch');
+  assert.equal(allows('release-promotion-queue', 'enqueue', dispatch), true);
+  dispatch.ref = 'refs/heads/untrusted';
+  assert.equal(allows('release-promotion-queue', 'enqueue', dispatch), false);
+});
+test('only published release admission requests promotion with isolated dispatch permissions', async () => {
+  const workflow = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  const job = jobBlock(workflow, 'request-promotion');
+  assert.match(job, /needs: admission/);
+  assert.equal(permissionsBlock(job, '    ').trim(), 'actions: write');
+  assert.doesNotMatch(job, /secrets\.|environment:|checkout@/);
+  const admission = jobBlock(workflow, 'admission');
+  assert.match(admission, /release_promotion: \$\{\{ steps.publish.outputs.release_promotion \}\}/);
+  assert.match(
+    admission,
+    /admission_run_attempt: \$\{\{ steps.publish.outputs.admission_run_attempt \}\}/
+  );
+  const publish = workflowStep(admission, 'Publish verified admission after evidence upload');
+  assert.match(publish, /id: publish/);
+  assert.match(publish, /const releasePromotion = await publishReviewScope/);
+  assert.match(publish, /core.setOutput\('release_promotion', String\(releasePromotion\)\)/);
+  assert.match(
+    publish,
+    /core.setOutput\('admission_run_attempt', process.env.GITHUB_RUN_ATTEMPT\)/
+  );
+  const calls = [];
+  const github = {
+    rest: { actions: { createWorkflowDispatch: async (args) => calls.push(args) } },
+  };
+  const dispatch = workflowStep(job, 'Dispatch promotion from trusted main');
+  assert.match(dispatch, /^ {10}retries: 3$/m);
+  assert.match(
+    dispatch,
+    /ADMISSION_RUN_ATTEMPT: \$\{\{ needs.admission.outputs.admission_run_attempt \}\}/
+  );
+  const script = dispatch.split('script: |\n')[1];
+  const execute = new Function(
+    'github',
+    'context',
+    'process',
+    `return (async () => { ${script} })()`
+  );
+  for (const output of [undefined, '', 'false', 'true']) {
+    const needs = { admission: { outputs: { release_promotion: output } } };
+    const allowed = allows(
+      'review-admission',
+      'request-promotion',
+      event('workflow_dispatch'),
+      needs
+    );
+    assert.equal(allowed, output === 'true');
+    if (allowed)
+      await execute(
+        github,
+        { repo: { owner: 'example', repo: 'repo' }, runId: 123 },
+        { env: { GITHUB_RUN_ATTEMPT: '2', ADMISSION_RUN_ATTEMPT: '2' } }
+      );
+  }
+  assert.deepEqual(calls, [
+    {
+      owner: 'example',
+      repo: 'repo',
+      workflow_id: 'release-promotion-queue.yml',
+      ref: 'main',
+      inputs: { admission_run_id: '123', admission_run_attempt: '2' },
+    },
+  ]);
+  for (const attempt of ['1', undefined]) {
+    await assert.rejects(
+      execute(
+        github,
+        { repo: { owner: 'example', repo: 'repo' }, runId: 123 },
+        { env: { GITHUB_RUN_ATTEMPT: '2', ADMISSION_RUN_ATTEMPT: attempt } }
+      ),
+      /freshly published admission/
+    );
+    assert.equal(calls.length, 1);
+  }
 });
 function sourceRun(path, fields = {}) {
   const github = event('workflow_run');
@@ -114,6 +201,9 @@ function sourceRun(path, fields = {}) {
   return github;
 }
 test('ordinary PR admissions never wake the release promotion queue', () => {
+  const workflow = readFileSync('.github/workflows/release-promotion-queue.yml', 'utf8');
+  assert.match(workflow, /workflows: \[Release\]/);
+  assert.doesNotMatch(workflow, /workflows: \[[^\n]*Review Admission/);
   const admission = (title) =>
     allows(
       'release-promotion-queue',
@@ -130,11 +220,11 @@ test('ordinary PR admissions never wake the release promotion queue', () => {
     'Review Admission wip/release-1.2.3-123-1',
     'Review Admission gh-readonly-queue/main/pr-7-abcdef',
     'Review Admission unscoped',
-    // Runs created before the run-name locator keep the old always-wake behavior.
+    // Older display titles cannot restore the removed completion trigger either.
     'Review Admission',
     'chore(release): 1.2.3',
   ])
-    assert.equal(admission(title), true, title);
+    assert.equal(admission(title), false, title);
   for (const event of ['schedule', 'workflow_dispatch', 'workflow_run'])
     assert.equal(
       allows('release-promotion-queue', 'enqueue', sourceRun('release', { event })),
@@ -149,7 +239,7 @@ function admissionTitle(payload = {}) {
   const github = event('workflow_run', { pull_request: { head: { ref: '' } }, ...payload });
   return `Review Admission ${new Function('github', `return (${expression[1]});`)(github)}`;
 }
-test('provider-suite admissions retain promotion wakeups from the default branch', () => {
+test('provider-suite admissions do not automatically wake promotion from the default branch', () => {
   const title = admissionTitle({ workflow_run: { event: 'check_suite', head_branch: 'main' } });
   assert.equal(title, 'Review Admission unscoped');
   assert.equal(
@@ -158,7 +248,7 @@ test('provider-suite admissions retain promotion wakeups from the default branch
       'enqueue',
       sourceRun('review-admission', { display_title: title })
     ),
-    true
+    false
   );
 });
 test('the admission locator preserves candidate branches and unscoped events', () => {
@@ -181,17 +271,44 @@ test('the admission locator preserves candidate branches and unscoped events', (
   ])
     assert.equal(admissionTitle(payload), `Review Admission ${branch}`);
 });
-test('review bursts collapse to one admission signal per pull request', () => {
+test('review withdrawals cannot be canceled or delayed by subsequent review edits', () => {
   const signal = readFileSync('.github/workflows/review-admission-signal.yml', 'utf8');
-  assert.match(
-    signal,
-    /^concurrency:\n {2}group: review-admission-signal-\$\{\{ github\.event\.pull_request\.number && format\('pr-\{0\}', github\.event\.pull_request\.number\) \|\| format\('run-\{0\}', github\.run_id\) \}\}\n {2}cancel-in-progress: true$/m
-  );
+  for (const [name, types] of [
+    ['pull_request_review', ['submitted', 'edited', 'dismissed']],
+    ['pull_request_review_comment', ['created', 'edited', 'deleted']],
+  ]) {
+    const block = workflowEvent(signal, name);
+    const configured = block.match(/^ {4}types:\s*\[([^\]]+)\]/m);
+    assert.ok(configured, `${name} must configure its event types`);
+    assert.deepEqual(
+      configured[1]
+        .split(',')
+        .map((type) => type.trim())
+        .sort(),
+      types.sort()
+    );
+  }
+  assert.doesNotMatch(signal, /^concurrency:/m);
   const job = jobBlock(signal, 'signal');
-  const debounce = job.indexOf('Coalesce review burst');
-  assert.ok(debounce > 0 && debounce < job.indexOf('Notify trusted admission controller'));
-  assert.match(
-    job,
-    /if: github\.event_name == 'pull_request_review' \|\| github\.event_name == 'pull_request_review_comment'\n {8}run: sleep 45/
-  );
+  assert.doesNotMatch(job, /sleep\s+\d|concurrency:/);
+  assert.ok(job.includes('Notify trusted admission controller'));
+  for (const [name, action, state] of [
+    ['pull_request_review', 'dismissed', 'DISMISSED'],
+    ['pull_request_review', 'submitted', 'CHANGES_REQUESTED'],
+    ['pull_request_review', 'edited', 'COMMENTED'],
+    ['pull_request_review_comment', 'edited', 'COMMENTED'],
+  ]) {
+    assert.equal(
+      allows(
+        'review-admission-signal',
+        'signal',
+        event(name, {
+          action,
+          pull_request: { number: 7 },
+          review: { state },
+        })
+      ),
+      true
+    );
+  }
 });

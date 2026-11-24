@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { mountSuspended } from '@nuxt/test-utils/runtime';
+import { DOMWrapper, flushPromises } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import { nextTick, reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
+import TaskCardAlternatives from '@/features/tasks/TaskCardAlternatives.vue';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
@@ -19,6 +21,9 @@ const taskState = reactive({
 const preferencesState = reactive({
   collapseDefault: false,
   hideRewards: false,
+  showPrevious: true,
+  showNext: true,
+  hideCompletedObjectives: false,
   manualFail: false,
   primaryView: 'all',
   pinnedTaskIds: [] as string[],
@@ -46,18 +51,21 @@ const tarkovStoreMock = {
   playerLevel: vi.fn(() => 1),
   setObjectiveCount: vi.fn(),
 };
-const metadataStoreMock = {
+const metadataStoreMock = reactive({
+  alternativeTasks: {} as Record<string, string[]>,
   alternativeTaskSources: {} as Record<string, string[]>,
   editions: [],
+  fetchTaskObjectivesData: vi.fn<() => Promise<void>>(),
   getTaskById: vi.fn(),
   mapsWithSvg: [],
   storyChapters: [] as StoryChapter[],
   storyChaptersGameMode: null as string | null,
   tasks: [] as Task[],
+  tasksObjectivesError: null as Error | null,
   tasksObjectivesHydrated: true,
   tasksObjectivesPending: false,
   traders: [],
-};
+});
 const taskFilteringMock = {
   isGlobalTask: vi.fn(() => false),
 };
@@ -85,7 +93,9 @@ vi.mock('@/stores/usePreferences', () => ({
     get getEnableManualTaskFail() {
       return preferencesState.manualFail;
     },
-    getHideCompletedTaskObjectives: false,
+    get getHideCompletedTaskObjectives() {
+      return preferencesState.hideCompletedObjectives;
+    },
     get getHideTaskRewards() {
       return preferencesState.hideRewards;
     },
@@ -93,6 +103,12 @@ vi.mock('@/stores/usePreferences', () => ({
     getHiddenTaskIds: [] as string[],
     getRespectTaskFiltersForImpact: false,
     getShowRequiredLabels: true,
+    get getShowPreviousQuests() {
+      return preferencesState.showPrevious;
+    },
+    get getShowNextQuests() {
+      return preferencesState.showNext;
+    },
     getTaskCollapseDefault: preferencesState.collapseDefault,
     getTaskMapView: 'all',
     getTaskPrimaryView: preferencesState.primaryView,
@@ -132,7 +148,9 @@ vi.mock('vue-i18n', async (importOriginal) => ({
       const template = resolveEn(key);
       if (typeof template !== 'string') return key;
       const params = (args[0] ?? {}) as Record<string, unknown>;
-      return template.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? name));
+      const [singular, plural = singular] = template.split(' | ');
+      const message = (params.count === 1 ? singular : plural) ?? template;
+      return message.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? name));
     },
   }),
 }));
@@ -152,7 +170,8 @@ const TaskCardHeaderStub = {
   props: ['task'],
 };
 const TaskCardBadgesStub = {
-  template: '<div data-testid="task-card-badges"><slot name="actions" /></div>',
+  template:
+    '<div data-testid="task-card-badges"><slot name="alternatives" /><slot name="actions" /></div>',
   props: ['task', 'isActive'],
 };
 const TaskCardActionsStub = {
@@ -180,7 +199,9 @@ const AppTooltipStub = {
   template: '<span><slot /></span>',
 };
 const QuestObjectivesStub = {
-  template: '<div data-testid="task-objectives" />',
+  props: ['objectives'],
+  template:
+    '<div data-testid="task-objectives">{{ objectives.map((objective) => objective.id).join(",") }}</div>',
 };
 const mountTaskCard = async (
   taskOverrides: Partial<Task> = {},
@@ -205,7 +226,6 @@ const mountTaskCard = async (
         ContextMenuItem: ContextMenuItemStub,
         NuxtImg: true,
         QuestObjectives: QuestObjectivesStub,
-        QuestObjectivesSkeleton: QuestObjectivesStub,
         TaskCardActions: TaskCardActionsStub,
         TaskCardBackground: TaskCardBackgroundStub,
         TaskCardBadges: TaskCardBadgesStub,
@@ -224,6 +244,9 @@ describe('TaskCard appearance and expansion controls', () => {
     taskState.failed = false;
     preferencesState.collapseDefault = false;
     preferencesState.hideRewards = false;
+    preferencesState.showPrevious = true;
+    preferencesState.showNext = true;
+    preferencesState.hideCompletedObjectives = false;
     preferencesState.manualFail = false;
     preferencesState.primaryView = 'all';
     preferencesState.pinnedTaskIds = [];
@@ -235,11 +258,165 @@ describe('TaskCard appearance and expansion controls', () => {
     vi.clearAllMocks();
     mockTaskActionListener = undefined;
     mockTaskGetter = undefined;
+    metadataStoreMock.alternativeTasks = {};
+    metadataStoreMock.alternativeTaskSources = {};
     metadataStoreMock.getTaskById.mockReset();
+    metadataStoreMock.fetchTaskObjectivesData.mockReset().mockResolvedValue();
     metadataStoreMock.storyChapters = [];
     metadataStoreMock.storyChaptersGameMode = null;
+    metadataStoreMock.tasks = [];
+    metadataStoreMock.tasksObjectivesError = null;
+    metadataStoreMock.tasksObjectivesHydrated = true;
+    metadataStoreMock.tasksObjectivesPending = false;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStoreMock.getObjectiveCount.mockReturnValue(0);
+  });
+  it('shows counted groups of name-only quest links from a compact chip on a collapsed card', async () => {
+    preferencesState.collapseDefault = true;
+    metadataStoreMock.alternativeTasks = {
+      'task-1': ['mutual', 'same-name', 'outgoing', 'missing'],
+    };
+    metadataStoreMock.alternativeTaskSources = { 'task-1': ['mutual', 'same-name', 'incoming'] };
+    metadataStoreMock.tasks = [
+      { id: 'mutual', name: 'Mutual choice' },
+      { id: 'same-name', name: 'Mutual choice', trader: { name: 'Skier' } },
+      { id: 'outgoing', name: 'Quest this one fails' },
+      { id: 'incoming', name: 'Quest that fails this one' },
+    ] as Task[];
+    metadataStoreMock.getTaskById.mockImplementation((id) =>
+      metadataStoreMock.tasks.find((task) => task.id === id)
+    );
+    const wrapper = await mountTaskCard();
+    expect(wrapper.find('#task-content-task-1').exists()).toBe(false);
+    const chip = wrapper.get('[data-testid="task-card-badges"] button[aria-label="Quest links"]');
+    expect(chip.text()).toBe('Quest links');
+    const overlays = new DOMWrapper(document.body);
+    expect(overlays.find('[data-testid="task-alternatives"]').exists()).toBe(false);
+    expect(chip.attributes('aria-expanded')).toBe('false');
+    await chip.trigger('click');
+    await flushPromises();
+    expect(chip.attributes('aria-expanded')).toBe('true');
+    const alternatives = overlays.get('[data-testid="task-alternatives"]');
+    expect(alternatives.get('h3').text()).toBe('Quest links');
+    expect(alternatives.text()).toContain('4 linked quests');
+    expect(alternatives.text()).toContain('Completing either quest fails the other.');
+    expect(alternatives.findAll('h4').map((label) => label.text())).toEqual([
+      'Mutually exclusive',
+      'Completing this quest fails',
+      'Completing any of these fails this quest',
+    ]);
+    expect(
+      alternatives.findAll('section > div > span[aria-hidden="true"]').map((count) => count.text())
+    ).toEqual(['2', '1', '1']);
+    expect(alternatives.findAll('ul').map((group) => group.findAll('li').length)).toEqual([
+      2, 1, 1,
+    ]);
+    expect(alternatives.findAll('a').map((link) => [link.text(), link.attributes('href')])).toEqual(
+      [
+        ['Mutual choice', '/tasks?task=mutual'],
+        ['Mutual choice', '/tasks?task=same-name'],
+        ['Quest this one fails', '/tasks?task=outgoing'],
+        ['Quest that fails this one', '/tasks?task=incoming'],
+      ]
+    );
+    expect(alternatives.text()).not.toMatch(/Skier|same-name/);
+    const { alternativeTasks, alternativeTaskSources } = metadataStoreMock;
+    metadataStoreMock.alternativeTasks = {};
+    metadataStoreMock.alternativeTaskSources = {};
+    await flushPromises();
+    expect(overlays.find('[data-testid="task-alternatives"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="task-alternatives-trigger"]').exists()).toBe(false);
+    metadataStoreMock.alternativeTasks = alternativeTasks;
+    metadataStoreMock.alternativeTaskSources = alternativeTaskSources;
+    await flushPromises();
+    expect(
+      wrapper.get('[data-testid="task-alternatives-trigger"]').attributes('aria-expanded')
+    ).toBe('false');
+    expect(overlays.find('[data-testid="task-alternatives"]').exists()).toBe(false);
+    await wrapper.setProps({ task: { id: 'unrelated', name: 'Unrelated quest' } });
+    expect(wrapper.find('[data-testid="task-alternatives-trigger"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('offers a retry when objectives fail and shows the hydrated objectives afterward', async () => {
+    metadataStoreMock.tasksObjectivesHydrated = false;
+    metadataStoreMock.tasksObjectivesPending = true;
+    metadataStoreMock.getTaskById.mockImplementation((id) =>
+      metadataStoreMock.tasks.find((task) => task.id === id)
+    );
+    const wrapper = await mountTaskCard();
+    const skeleton = () => wrapper.find('#objectives-content-task-1 > [aria-hidden="true"]');
+    expect(skeleton().exists()).toBe(true);
+    metadataStoreMock.tasksObjectivesPending = false;
+    metadataStoreMock.tasksObjectivesError = new Error('offline');
+    await nextTick();
+    expect(skeleton().exists()).toBe(false);
+    expect(wrapper.get('[role="status"]').text()).toBe('Could not load objectives.');
+    const retry = Promise.withResolvers<undefined>();
+    metadataStoreMock.fetchTaskObjectivesData.mockImplementationOnce(() => {
+      metadataStoreMock.tasksObjectivesError = null;
+      metadataStoreMock.tasksObjectivesPending = true;
+      return retry.promise;
+    });
+    await wrapper.get('[data-testid="retry-task-objectives"]').trigger('click');
+    expect(metadataStoreMock.fetchTaskObjectivesData).toHaveBeenCalledExactlyOnceWith();
+    expect(skeleton().exists()).toBe(true);
+    expect(wrapper.find('[data-testid="retry-task-objectives"]').exists()).toBe(false);
+    metadataStoreMock.tasks = [
+      { id: 'task-1', objectives: [{ id: 'objective-1', type: 'visit', count: 1 }] } as Task,
+    ];
+    metadataStoreMock.tasksObjectivesHydrated = true;
+    metadataStoreMock.tasksObjectivesPending = false;
+    retry.resolve(undefined);
+    await nextTick();
+    expect(wrapper.get('[data-testid="task-objectives"]').text()).toBe('objective-1');
+    expect(skeleton().exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('keeps loaded objectives visible after a refresh failure', async () => {
+    metadataStoreMock.tasksObjectivesHydrated = false;
+    metadataStoreMock.tasksObjectivesError = new Error('offline');
+    const wrapper = await mountTaskCard({
+      objectives: [{ id: 'objective-1', type: 'visit', count: 1 }],
+    });
+    expect(wrapper.find('[data-testid="task-objectives"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="retry-task-objectives"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('discloses completed objectives manually and responds to preference and completion changes', async () => {
+    taskState.complete = true;
+    preferencesState.hideCompletedObjectives = true;
+    const wrapper = await mountTaskCard({
+      objectives: [{ id: 'objective-1', type: 'visit', count: 1 }],
+    });
+    const toggle = wrapper.get('[data-testid="task-objectives-header"] button');
+    expect(toggle.attributes('aria-controls')).toBe('objectives-content-task-1');
+    const expectDisclosure = (expanded: boolean) => {
+      expect(toggle.attributes('aria-expanded')).toBe(String(expanded));
+      expect(wrapper.find('#objectives-content-task-1').exists()).toBe(expanded);
+      expect(wrapper.find('[data-testid="task-objectives"]').exists()).toBe(expanded);
+    };
+    expectDisclosure(false);
+    await toggle.trigger('click');
+    expectDisclosure(true);
+    await toggle.trigger('click');
+    expectDisclosure(false);
+    preferencesState.hideCompletedObjectives = false;
+    await nextTick();
+    expectDisclosure(true);
+    await toggle.trigger('click');
+    expectDisclosure(false);
+    await toggle.trigger('click');
+    expectDisclosure(true);
+    preferencesState.hideCompletedObjectives = true;
+    await nextTick();
+    expectDisclosure(false);
+    taskState.complete = false;
+    await nextTick();
+    expectDisclosure(true);
+    taskState.complete = true;
+    await nextTick();
+    expectDisclosure(false);
+    wrapper.unmount();
   });
   it('offers a task-local confirmation reset without touching objectives', async () => {
     const gated: Partial<Task> = {
@@ -315,6 +492,36 @@ describe('TaskCard appearance and expansion controls', () => {
     }
     wrapper.unmount();
   });
+  it('shows the stated time-gate delay only for delayed, unfinished tasks', async () => {
+    const normal = await mountTaskCard();
+    expect(normal.find('[data-testid="task-time-gate"]').exists()).toBe(false);
+    normal.unmount();
+    const fixed = await mountTaskCard({
+      availableDelaySecondsMin: 36000,
+      availableDelaySecondsMax: 36000,
+    });
+    expect(fixed.get('[data-testid="task-time-gate"]').text()).toBe(
+      'Unlocks 10h after prerequisites are complete'
+    );
+    fixed.unmount();
+    const ranged = await mountTaskCard({
+      availableDelaySecondsMin: 1800,
+      availableDelaySecondsMax: 2100,
+    });
+    expect(ranged.get('[data-testid="task-time-gate"]').text()).toBe(
+      'Unlocks 30m–35m after prerequisites are complete'
+    );
+    ranged.unmount();
+    taskState.complete = true;
+    const completed = await mountTaskCard({ availableDelaySecondsMax: 36000 });
+    expect(completed.find('[data-testid="task-time-gate"]').exists()).toBe(false);
+    completed.unmount();
+    taskState.complete = false;
+    taskState.failed = true;
+    const failed = await mountTaskCard({ availableDelaySecondsMax: 36000 });
+    expect(failed.find('[data-testid="task-time-gate"]').exists()).toBe(false);
+    failed.unmount();
+  });
   it('renders no overflow menu button', async () => {
     const wrapper = await mountTaskCard();
     expect(wrapper.find('[aria-label="More"]').exists()).toBe(false);
@@ -334,6 +541,99 @@ describe('TaskCard appearance and expansion controls', () => {
     // card text lands near 1.5:1 against the dark red fill.
     expect(classes).toContain('light:bg-error-100');
     expect(classes).toContain('light:border-error-700');
+    wrapper.unmount();
+  });
+  it('puts follow-up and remaining previous links in Quest links and respects their preferences', async () => {
+    metadataStoreMock.getTaskById.mockImplementation((id) =>
+      id === 'follow-up' ? { id } : { id, name: id }
+    );
+    const wrapper = await mountTaskCard({
+      parents: ['visible-prerequisite', 'other-previous'],
+      children: ['follow-up'],
+      taskRequirements: [{ task: { id: 'visible-prerequisite' }, status: ['complete'] }],
+    });
+    const chip = wrapper.get('button[aria-label="Quest links"]');
+    await chip.trigger('click');
+    await flushPromises();
+    const panel = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(panel.findAll('h4').map((heading) => heading.text())).toEqual([
+      'Unlocks next',
+      'Previous tasks',
+    ]);
+    expect(panel.findAll('a').map((link) => link.text())).toEqual(['follow-up', 'other-previous']);
+    expect(wrapper.get('[data-testid="task-requirements-summary"] a').text()).toContain(
+      'visible-prerequisite'
+    );
+    preferencesState.showPrevious = false;
+    await nextTick();
+    expect(panel.findAll('a').map((link) => link.text())).toEqual(['follow-up']);
+    preferencesState.showNext = false;
+    await nextTick();
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('keeps met prerequisites in Quest links while the Requirements list is collapsed', async () => {
+    metadataStoreMock.getTaskById.mockImplementation((id) => ({ id, name: id }));
+    tarkovStoreMock.getCurrentProgressData.mockReturnValue({
+      taskCompletions: { prior: { complete: true, timestamp: 1 } },
+    });
+    const wrapper = await mountTaskCard({
+      parents: ['prior'],
+      taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
+    });
+    const header = wrapper.get('[data-testid="task-requirements-header"] button');
+    expect(header.attributes('aria-expanded')).toBe('false');
+    await wrapper.get('button[aria-label="Quest links"]').trigger('click');
+    await flushPromises();
+    const panel = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(panel.findAll('a').map((link) => link.text())).toEqual(['prior']);
+    await header.trigger('click');
+    expect(wrapper.get('[data-testid="task-requirements-summary"] a').text()).toContain('prior');
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('keeps downstream impact available by keyboard with or without visible quest links', async () => {
+    preferencesState.showNext = false;
+    const wrapper = await mountSuspended(TaskCardAlternatives, {
+      props: { taskId: 'task-1', impactCount: 3, nextTasks: [{ id: 'next' }], previousTasks: [] },
+      global: { stubs: { AppTooltip: AppTooltipStub, UIcon: true } },
+    });
+    expect(wrapper.get('[tabindex="0"]').text()).toContain('Impact: 3');
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
+    preferencesState.showNext = true;
+    await nextTick();
+    await wrapper.get('button[aria-label="Quest links"]').trigger('click');
+    await flushPromises();
+    const popup = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(popup.findAll('[tabindex="0"]').some((element) => element.text() === 'Impact: 3')).toBe(
+      true
+    );
+    wrapper.unmount();
+  });
+  it('keeps previous links available while hidden behind the compact blocker limit', async () => {
+    preferencesState.collapseDefault = true;
+    const ids = ['first', 'second', 'third', 'fourth'];
+    const taskRequirements = ids.map((id) => ({ task: { id }, status: ['complete'] }));
+    metadataStoreMock.getTaskById.mockImplementation((id) => ({ id, name: id }));
+    progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
+    progressStoreMock.taskEvaluations = {
+      'task-1': {
+        self: {
+          available: false,
+          blockers: [{ type: 'prerequisite', requirements: taskRequirements }],
+        },
+      },
+    };
+    const wrapper = await mountTaskCard({ parents: ids, taskRequirements });
+    const compact = wrapper.get('[data-testid="task-requirements-blocking"]');
+    expect(compact.findAll('a')).toHaveLength(3);
+    await wrapper.get('button[aria-label="Quest links"]').trigger('click');
+    await flushPromises();
+    const links = new DOMWrapper(document.body).get('[data-testid="task-alternatives"]');
+    expect(links.findAll('a').map((link) => link.text())).toEqual(['fourth']);
+    await compact.get('button').trigger('click');
+    expect(compact.findAll('a')).toHaveLength(4);
+    expect(wrapper.find('button[aria-label="Quest links"]').exists()).toBe(false);
     wrapper.unmount();
   });
   it('keeps a locked card usable before its evaluation snapshot is available', async () => {
@@ -406,6 +706,14 @@ describe('TaskCard appearance and expansion controls', () => {
         },
       ],
     });
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    expect(summary.findAll('li').map((row) => row.text())).toEqual([
+      expect.stringContaining('Level 20+'),
+      expect.stringContaining('Prapor reputation 0.50+'),
+    ]);
+    expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
+    await wrapper.get('button[aria-label="Collapse task"]').trigger('click');
+    expect(wrapper.find('[data-testid="task-requirements-summary"]').exists()).toBe(false);
     const chips = wrapper
       .findAll('[data-testid="task-requirement-chip"]')
       .map((chip) => chip.text());
@@ -441,7 +749,10 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
     expect(summary.text()).toContain('1 of 1 met');
-    await summary.get('button').trigger('click');
+    const header = summary.get('[data-testid="task-requirements-header"] button');
+    expect(header.attributes('aria-expanded')).toBe('false');
+    expect(summary.text()).not.toContain('Level 20+');
+    await header.trigger('click');
     expect(summary.text()).toContain('Level 20+');
     tarkovStoreMock.playerLevel.mockReturnValue(1);
     wrapper.unmount();
@@ -454,7 +765,6 @@ describe('TaskCard appearance and expansion controls', () => {
       taskRequirements: [{ task: { id: 'prior' }, status: ['complete'] }],
     });
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
-    await summary.get('button').trigger('click');
     return { wrapper, rows: summary.findAll('li').map((item) => item.text()) };
   };
   it.each([
@@ -501,13 +811,17 @@ describe('TaskCard appearance and expansion controls', () => {
       ],
     });
     const summary = wrapper.get('[data-testid="task-requirements-summary"]');
-    await summary.get('button').trigger('click');
     const rows = summary.findAll('li').map((item) => item.text());
     expect(rows).toEqual([
-      expect.stringMatching(/^Met:\s*Story objective: Goal \(Chapter\)/),
-      expect.stringMatching(/^Met:\s*Additional in-game progression required/),
-      expect.stringMatching(/^Not met:\s*Requires an in-game trader conversation/),
+      expect.stringMatching(/^Not met:\s*Trader conversation$/),
+      expect.stringMatching(/^Met:\s*Story: Goal$/),
+      expect.stringMatching(/^Met:\s*Additional in-game progression$/),
     ]);
+    const details = summary.findAll('[data-testid="task-requirement-detail"]');
+    expect(details.map((detail) => detail.attributes('aria-label'))).toEqual([
+      'Story chapter: Chapter',
+    ]);
+    expect(summary.get('p').text()).toContain('Use Mark available');
     wrapper.unmount();
   });
   it('retains the confirmation warning for an unmapped unknown scalar gate', async () => {
@@ -525,9 +839,9 @@ describe('TaskCard appearance and expansion controls', () => {
         { type: 'globalVariable', id: 'scalar', variableId: 'v', compareMethod: '>=', value: 3 },
       ],
     });
-    expect(wrapper.get('[data-testid="task-requirement-chip"]').text()).toContain(
-      'Use Mark available only if this task is available in-game.'
-    );
+    const summary = wrapper.get('[data-testid="task-requirements-summary"]');
+    expect(summary.text()).toContain('Additional in-game progression');
+    expect(summary.text()).toContain('Use Mark available once the task is available in-game.');
     wrapper.unmount();
   });
   it('shows unresolved-pool confirmation guidance before opening contributors', async () => {
@@ -559,7 +873,7 @@ describe('TaskCard appearance and expansion controls', () => {
       ],
     });
     expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
-    expect(wrapper.get('[data-testid="task-requirements-blocking"]').text()).toContain(
+    expect(wrapper.get('[data-testid="task-requirements-summary"]').text()).toContain(
       'If this task is already available in-game, use Mark available.'
     );
     wrapper.unmount();
@@ -598,11 +912,10 @@ describe('TaskCard appearance and expansion controls', () => {
     await wrapper.get('button[aria-label="Collapse task"]').trigger('click');
     await wrapper.get('button[aria-label="Expand task"]').trigger('click');
     expect(wrapper.find('[data-testid="task-pool-details"]').exists()).toBe(false);
-    await wrapper.get('[data-testid="task-requirement-chip"] button').trigger('click');
+    await wrapper
+      .get('button[aria-controls="task-requirements-task-1-pool-gate"]')
+      .trigger('click');
     expect(wrapper.get('[data-testid="task-pool-details"]').text()).toContain('Contributor task');
-    expect(
-      wrapper.get('[data-testid="task-requirements-summary"] button').attributes('aria-expanded')
-    ).toBe('true');
     wrapper.unmount();
   });
   it('renders a dedicated toggle button in compact mode without making the header interactive', async () => {

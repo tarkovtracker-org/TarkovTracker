@@ -10,6 +10,7 @@ export const SUPPORTED_LOCALES = [
   'pl',
   'pt',
   'ru',
+  'tr',
   'uk',
   'zh',
 ] as const;

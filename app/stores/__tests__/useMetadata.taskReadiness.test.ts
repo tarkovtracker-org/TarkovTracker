@@ -177,6 +177,31 @@ describe('metadata task readiness ownership', () => {
     await queued![0]();
     expect(store.fetchWithCache).toHaveBeenCalledTimes(1);
   });
+  it('marks rewards hydrated only after applying the current catalog response', async () => {
+    vi.mocked(store.fetchTaskRewardsData).mockRestore();
+    const fetchMock = vi.mocked($fetch);
+    fetchMock.mockResolvedValueOnce({ data: { tasks: [] } });
+    await store.fetchTaskRewardsData();
+    expect(store.tasksRewardsHydrated).toBe(true);
+    store.processTasksCoreData({ tasks: store.tasks, maps: [], traders: [] });
+    expect(store.tasksRewardsHydrated).toBe(false);
+    fetchMock.mockRejectedValueOnce(new Error('rewards offline'));
+    await store.fetchTaskRewardsData();
+    expect(store.tasksRewardsHydrated).toBe(false);
+    const staleResponse = createDeferred<object>();
+    fetchMock.mockReturnValueOnce(staleResponse.promise);
+    const staleRequest = store.fetchTaskRewardsData();
+    await flushPromises();
+    store.languageCode = 'fr';
+    staleResponse.resolve({ data: { tasks: [] } });
+    await staleRequest;
+    expect(store.tasksRewardsHydrated).toBe(false);
+    vi.mocked(cacheUtils.getCachedData).mockResolvedValueOnce({ tasks: [] });
+    await store.fetchTaskRewardsData();
+    expect(store.tasksRewardsHydrated).toBe(true);
+    store.resetTasksData();
+    expect(store.tasksRewardsHydrated).toBe(false);
+  });
   it('retains deferred editions when no eager request takes ownership', async () => {
     await store.fetchAllData(false, { deferHeavy: true });
     expect($fetch).not.toHaveBeenCalled();

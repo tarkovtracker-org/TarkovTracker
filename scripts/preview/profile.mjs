@@ -92,6 +92,7 @@ export function previewBuildEnv(previewBranch) {
     NUXT_TURNSTILE_SECRET_KEY: '',
     STRIPE_SECRET_KEY: '',
     CODECOV_TOKEN: '',
+    CODECOV_USE_OIDC: '',
     ...Object.fromEntries(STRIPE_PRICE_KEYS.map((key) => [key, ''])),
   };
 }

@@ -143,14 +143,31 @@ The controller serializes relevant events at job scope, after its event filter. 
 comments do not consume publication slots. Approval creation, edits and deletion remain relevant,
 including withdrawal of a command with leading whitespace.
 
+The read-only filter authenticates successful signal attempts, their jobs, locators and target
+identity before serialization. It skips only the publisher's existing proven-obsolete cases:
+merged review targets and provider suites on canonical queue commits without a linked PR.
+Missing or ambiguous identity, receipt and API failures fail the filter; active targets retain
+their events even for stale signal SHAs, drafts, findings or withdrawn approval. The filter has
+Actions, checks, contents and pull-request read scopes, without a protected environment or App key.
+The publisher repeats source/target authentication after waiting in the unchanged global
+`queue: max` lock, and initializes its App only when the target still needs evaluation.
+Each stage reuses its authenticated run record for target resolution; no run proof is cached
+between preflight, evaluation and publication.
+
+Permission lookups consider only current-head human approval reviews and exact-head approval
+commands. Every review, finding and comment still reaches policy evaluation; current roles are
+reread for each evaluation/publication, without a cross-event cache. This keeps discussion size
+from multiplying collaborator API calls across repeated head/queue evidence reads.
+
 An intake condition also skips ordinary comments before allocating the read-only filter runner.
 It is a coarse selector, never approval evidence: trusted main still verifies retained events.
 Both current and previous comment bodies are checked so approval edits/deletions and provider
 withdrawals still reach revocation.
-Release-promotion serialization is limited to successful same-repository source runs; the serialized
-job still authenticates receipts and skips runs without an eligible release PR. These no-op runs can
-delay promotions, but their separate lock cannot block admission publication. GitHub may still display
-skipped workflow records; these records perform no validation or publication work.
+Review Admission dispatches release promotion only after publishing approval for a canonical
+generated version PR without a queue-integration receipt. Ordinary, held and integration admissions
+create no promotion workflow run and take no promotion lock. Completed Release runs retain their
+fallback wakeup. The serialized controller authenticates the successful same-repository source
+attempt and receipts, then rechecks live head, main and approval before submission.
 Post-merge main CI remains required by release provenance checks even when queue CI used the same
 commit; it must not be removed without updating and validating those consumers.
 
@@ -160,7 +177,9 @@ missing exact-head review, unresolved findings or changes requested, missing sen
 notice, so a denial does not create a failed run for every review event. Integrity, identity,
 publisher and API errors still fail the run. A hold found after a receipt output was recorded also
 fails the run, so no receipt can be uploaded or published. Consumers still require a `success`
-status, a successful run and an approving receipt.
+status, a successful run and an approving receipt. The publisher retries an empty exact-receipt
+lookup after 1, 2, 4 and 8 seconds to allow for delayed artifact visibility. It rejects duplicate
+or expired receipts immediately and rechecks live admission evidence before publishing success.
 
 Ordinary changes, translations and verified safe dependency/version metadata changes may
 enter after bot review. Ordinary paths include `app/{components,pages,features,layouts,assets}/`,
@@ -207,15 +226,23 @@ admission; an explicit trusted-main dispatch can recover once review evidence is
 controller never assumes a signal SHA equals the live PR head. Prove provider wakeup delivery
 and ordering in the live canary; [GitHub restricts check-suite event delivery](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#check_suite).
 
-Review and review-comment signals are debounced per PR: each waits 45 seconds inside a per-PR
-`cancel-in-progress` group, so a review and its inline comments wake the serialized controller
-once. Cancelled signals are already ignored by the controller's success-only intake, and the
-surviving signal still rereads live evidence, so no review state is lost. Queue and
-provider-suite signals keep unique groups. A coarse prefilter keeps follow-on controllers off
-the shared queue: Release Promotion Queue skips Review Admission runs whose display-only
-`run-name` names an ordinary branch (`wip/release-*`, queue refs, `unscoped` and pre-locator
-titles still wake it; provider-suite admissions stay `unscoped` because their signal runs on
-`main`). The title is not evidence; every retained run is authenticated as before.
+Late review signals for a service-linked, merged PR record an obsolete notice without changing
+statuses or producing receipts or promotion requests. If GitHub omits the link (`pull_requests: []`),
+recovery requires one merged PR from the full source-branch PR history, matching the authenticated
+run's exact source repository, branch and SHA and this repository's `main` base. The controller
+rejects active PRs sharing that source branch or SHA, then rereads the merged target. Missing,
+ambiguous, mismatched or unmerged targets and API failures remain errors. Run, attempt, workflow,
+event and signal-job authentication still precede recovery; branch names alone never authorize it.
+
+Review and review-comment signals run independently without cancellation groups or a debounce
+delay. In particular, later contributor edits cannot suppress an approval withdrawal. Each
+successful signal wakes the trusted controller, which serializes publication and rereads live
+evidence for the exact PR head and queue commit. Queue and provider-suite signals retain their
+existing identity checks. Release Promotion Queue no longer subscribes to
+Review Admission completion: a release-only job explicitly dispatches the trusted main controller
+after publication. Display titles do not affect promotion. The controller waits at most 60 seconds
+for the requesting attempt to complete successfully and authenticates its receipts as before;
+[release automation](../scripts/release/README.md#queue-promotion) owns retry and race handling.
 
 Crowdin validates its immutable translation diff without updating a behind branch when queue
 policy is active, as it is now. In `strict-queue` mode (strict freshness and the queue both
@@ -469,7 +496,7 @@ Receipt helpers run in Ubuntu/WSL and require Node and `unzip`; workflow tests a
 In `queue`/`strict-queue` mode, verified Crowdin translation PRs are exempt from requesting
 independent review through Review Admission. This admission exemption
 requires the numeric repository identity and same-repository `locales` -> `main` branch, the actual
-GitHub Actions bot ID/type/login, a complete unique PR changed-file inventory restricted to supported non-English locales, and an immutable
+GitHub Actions bot ID/type/login, a complete unique PR changed-file inventory restricted to the pinned non-English locales in `review-admission-policy.mjs`, and an immutable
 GitHub compare plus non-truncated tree proving regular JSON blobs. Renames, deletions, executable
 modes, English source, nested paths, mixed changes and incomplete inventories fail back to normal
 review. The policy additionally requires a head-owned validation receipt uploaded by this
@@ -493,7 +520,9 @@ that accepted dispatch and its exact-head receipt, then performs normal guarded 
 Legacy `strict` mode is unchanged: its merge step uses the broader flat non-English JSON scope, does not
 wait for Review Admission, and retains guarded `gh pr merge --match-head-commit` plus post-merge main-CI
 dispatch. It does not enforce or attest the new queue-admission exemption described above; it must
-not be used as its commissioning path. Unsupported locales in queue modes retain normal review. The admission helper allows at most 120 pending polls with five-second sleeps,
+not be used as its commissioning path. Locales outside the pinned list in `review-admission-policy.mjs` retain normal review in queue modes.
+The list can include a Crowdin target the app does not load yet: `tr` is listed while its
+translations are in progress and joins `SUPPORTED_LOCALES` separately. The admission helper allows at most 120 pending polls with five-second sleeps,
 plus each poll's existing API deadlines; it fails closed on terminal errors. This is a retry-count
 bound rather than an exact ten-minute wall-clock deadline. CI and preview keep their existing
 limits. No additional privileged trigger, promotion workflow or scanner exception is needed.

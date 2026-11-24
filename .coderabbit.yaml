@@ -21,6 +21,7 @@ reviews:
     - '!app/locales/pl.json'
     - '!app/locales/pt.json'
     - '!app/locales/ru.json'
+    - '!app/locales/tr.json'
     - '!app/locales/uk.json'
     - '!app/locales/zh.json'
   path_instructions:

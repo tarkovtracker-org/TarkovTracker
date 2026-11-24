@@ -534,6 +534,33 @@ it('keeps unknown and misplaced empty sections unconsumed', () => {
     'modes.regular.progressionCounters',
   ]);
 });
+it('consumes valid extract rules and cues and leaves malformed ones unconsumed', () => {
+  const source = { clientBuild: '1.3.0.0.48484', definitionsSha256: 'a'.repeat(64) };
+  const extractRequirements = {
+    sources: { regular: source },
+    maps: { map: { exit: { name: 'exit', rules: [{ type: 'coop' }] } } },
+  };
+  const extractCues = {
+    map: {
+      exit: { name: 'exit', cues: [{ type: 'green_flare' }], reference: 'https://example.com' },
+    },
+  };
+  expect(unknownOverlaySections({ ...overlay, extractRequirements, extractCues })).toEqual([]);
+  const badRule = {
+    ...extractRequirements,
+    maps: { map: { exit: { name: 'exit', rules: [{ type: 'teleport' }] } } },
+  };
+  expect(unknownOverlaySections({ ...overlay, extractRequirements: badRule, extractCues })).toEqual(
+    ['extractRequirements']
+  );
+  expect(
+    unknownOverlaySections({
+      ...overlay,
+      extractRequirements: { maps: extractRequirements.maps },
+      extractCues: { map: { exit: { name: 'exit', cues: [], reference: 'x' } } },
+    })
+  ).toEqual(['extractRequirements', 'extractCues']);
+});
 it.each([
   [undefined, true],
   [[], true],

@@ -1,6 +1,6 @@
 <template>
   <div
-    class="bg-surface-900 border-surface-700/80 absolute top-full left-0 z-50 mt-1 max-h-[70vh] w-full min-w-72 overflow-y-auto rounded-xl border p-1.5 shadow-2xl"
+    class="bg-surface-900 border-surface-700/80 absolute top-full left-0 z-50 mt-1 max-h-[70vh] w-full overflow-y-auto rounded-xl border p-1.5 shadow-2xl"
     @mousedown.prevent
   >
     <div :id="props.listboxId" role="listbox" :aria-label="props.label">

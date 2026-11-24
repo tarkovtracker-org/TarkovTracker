@@ -1,6 +1,22 @@
 import { defineStore } from 'pinia';
 import 'pinia-plugin-persistedstate';
+import { normalizeHexColor } from '@/features/maps/utils/colorContrast';
+import {
+  EXTRACT_LAYER_KEYS,
+  normalizeSavedMapLayerVisibility,
+  type SavedMapLayerKey,
+  type SavedMapLayerVisibility,
+} from '@/features/maps/utils/mapLayerVisibility';
 import { normalizeTaskIdList } from '@/features/maps/utils/mapTaskVisibility';
+import {
+  DEFAULT_MAP_OBJECTIVE_COLOR_MODE,
+  DEFAULT_MAP_OBJECTIVE_PALETTE,
+  normalizeMapObjectiveColorMode,
+  normalizeMapObjectivePalette,
+  normalizeMapTaskColors,
+  type MapObjectiveColorMode,
+  type MapObjectivePaletteKey,
+} from '@/features/maps/utils/objectiveColors';
 import {
   normalizeNeededItemsCardStyle,
   normalizeNeededItemsFilterType,
@@ -156,6 +172,13 @@ export interface PreferencesState {
   pinnedTaskIds: string[];
   // Quests the user hid from the Tasks map (#918); persisted locally only, not synced to Supabase
   mapHiddenTaskIds: string[];
+  // Layers rows the user turned on or off (extracts, transits, spawns); local only, like the above
+  mapLayerVisibility: SavedMapLayerVisibility;
+  // Objective chip coloring (#920): category, quest or objective type; local only, like the above
+  mapObjectiveColorMode: MapObjectiveColorMode;
+  mapObjectivePalette: MapObjectivePaletteKey;
+  // Per-quest chip colors the user picked, keyed by task ID; local only
+  mapTaskColors: Record<string, string>;
   // Quests the user hid from every task list; view-only, never changes progress or unlocks
   hiddenTaskIds: string[];
   mapShowSelfObjectives: boolean;
@@ -197,7 +220,7 @@ export const preferencesDefaultState: PreferencesState = {
   neededTypeView: null,
   neededItemsViewMode: null,
   neededItemsFirFilter: null,
-  neededItemsGroupByItem: false,
+  neededItemsGroupByItem: true,
   neededItemsHideNonFirSpecialEquipment: false,
   neededItemsKappaOnly: false,
   neededItemsSortBy: 'priority',
@@ -245,6 +268,10 @@ export const preferencesDefaultState: PreferencesState = {
   mapTooltipDensity: 'default',
   pinnedTaskIds: [],
   mapHiddenTaskIds: [],
+  mapLayerVisibility: {},
+  mapObjectiveColorMode: DEFAULT_MAP_OBJECTIVE_COLOR_MODE,
+  mapObjectivePalette: DEFAULT_MAP_OBJECTIVE_PALETTE,
+  mapTaskColors: {},
   hiddenTaskIds: [],
   mapShowSelfObjectives: true,
   mapShowPinnedObjectives: true,
@@ -503,7 +530,7 @@ export const usePreferencesStore = defineStore('preferences', {
       return normalizeNeededItemsFirFilter(state.neededItemsFirFilter);
     },
     getNeededItemsGroupByItem: (state) => {
-      return state.neededItemsGroupByItem ?? false;
+      return state.neededItemsGroupByItem ?? true;
     },
     getNeededItemsHideNonFirSpecialEquipment: (state) => {
       return state.neededItemsHideNonFirSpecialEquipment ?? false;
@@ -632,6 +659,14 @@ export const usePreferencesStore = defineStore('preferences', {
     getMapHiddenTaskIds: (state) => {
       return state.mapHiddenTaskIds ?? [];
     },
+    getMapLayerVisibility: (state): SavedMapLayerVisibility =>
+      normalizeSavedMapLayerVisibility(state.mapLayerVisibility),
+    getMapObjectiveColorMode: (state): MapObjectiveColorMode =>
+      normalizeMapObjectiveColorMode(state.mapObjectiveColorMode),
+    getMapObjectivePalette: (state): MapObjectivePaletteKey =>
+      normalizeMapObjectivePalette(state.mapObjectivePalette),
+    getMapTaskColors: (state): Record<string, string> =>
+      normalizeMapTaskColors(state.mapTaskColors),
     getHiddenTaskIds: (state): string[] => {
       return normalizeTaskIdList(state.hiddenTaskIds);
     },
@@ -910,6 +945,16 @@ export const usePreferencesStore = defineStore('preferences', {
     // Map display actions
     setShowMapExtracts(show: boolean) {
       this.showMapExtracts = show;
+      // Changing the default is an explicit choice, so it replaces remembered extract rows.
+      this.mapLayerVisibility = Object.fromEntries(
+        Object.entries(this.getMapLayerVisibility).filter(
+          ([key]) => !EXTRACT_LAYER_KEYS.includes(key as SavedMapLayerKey)
+        )
+      );
+    },
+    /** Remembers a Layers row the user turned on or off. */
+    setMapLayerVisible(key: SavedMapLayerKey, visible: boolean) {
+      this.mapLayerVisibility = { ...this.getMapLayerVisibility, [key]: visible };
     },
     setMapMarkerColor(key: MapMarkerColorKey, color: string) {
       if (typeof color !== 'string' || color.trim().length === 0) return;
@@ -920,6 +965,29 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     resetMapMarkerColors() {
       this.mapMarkerColors = { ...MAP_MARKER_COLORS };
+    },
+    setMapObjectiveColorMode(mode: MapObjectiveColorMode) {
+      this.mapObjectiveColorMode = normalizeMapObjectiveColorMode(mode);
+    },
+    setMapObjectivePalette(palette: MapObjectivePaletteKey) {
+      this.mapObjectivePalette = normalizeMapObjectivePalette(palette);
+    },
+    /** Pins a quest's chip color; an invalid color is ignored. */
+    setMapTaskColor(taskId: string, color: string) {
+      const hex = normalizeHexColor(color);
+      if (!taskId || !hex) return;
+      this.mapTaskColors = { ...this.getMapTaskColors, [taskId]: hex };
+    },
+    /** Returns the given quests to their automatic color, or every quest when omitted. */
+    clearMapTaskColors(taskIds?: readonly string[]) {
+      if (!taskIds) {
+        this.mapTaskColors = {};
+        return;
+      }
+      const clearSet = new Set(taskIds);
+      this.mapTaskColors = Object.fromEntries(
+        Object.entries(this.getMapTaskColors).filter(([taskId]) => !clearSet.has(taskId))
+      );
     },
     togglePinnedTask(taskId: string) {
       const current = this.pinnedTaskIds ?? [];
@@ -1071,8 +1139,13 @@ export const usePreferencesStore = defineStore('preferences', {
       'mapZoomSpeed',
       'mapPanSpeed',
       'mapZoneOpacity',
+      'mapTooltipDensity',
       'pinnedTaskIds',
       'mapHiddenTaskIds',
+      'mapLayerVisibility',
+      'mapObjectiveColorMode',
+      'mapObjectivePalette',
+      'mapTaskColors',
       'hiddenTaskIds',
       'taskFilterPresets',
       'skillSortMode',

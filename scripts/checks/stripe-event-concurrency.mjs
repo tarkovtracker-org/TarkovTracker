@@ -132,7 +132,8 @@ async function withFixture(run, setup = createFixture) {
     await run();
   } finally {
     if (created) {
-      query(`DELETE FROM public.supporters WHERE user_id='${user}'; DELETE FROM auth.users WHERE id='${user}';
+      query(`DELETE FROM public.supporters WHERE user_id='${user}';
+        DELETE FROM public.account_billing_subscriptions WHERE user_id='${user}'; DELETE FROM auth.users WHERE id='${user}';
         DELETE FROM public.stripe_events WHERE event_id='${event}';`);
     }
   }

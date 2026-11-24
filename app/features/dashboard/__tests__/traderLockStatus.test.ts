@@ -78,7 +78,7 @@ describe('resolveTraderUnlock', () => {
         for (const [normalizedName, gate] of gates) {
           const trader = { id: normalizedName, normalizedName };
           const deps = { gameMode, tasks: [ragmanTask] };
-          expect(resolve(trader, deps)).toEqual({ kind: 'task', task: null });
+          expect(resolve(trader, deps)).toEqual({ kind: 'unknown' });
           expect(resolve(trader, { ...deps, isTaskComplete: (id) => id === gate })).toBeNull();
         }
       }
@@ -96,10 +96,10 @@ describe('resolveTraderUnlock', () => {
         resolve(trader, { isTaskComplete: (id) => id === TASK_ID_REGISTRY.GETTING_ACQUAINTED })
       ).toBeNull();
     });
-    it('assumes a configured trader is locked while metadata tasks load', () => {
+    it('marks a configured unlock as unknown while metadata tasks load', () => {
       const trader = { id: 'lk-id', normalizedName: 'lightkeeper' };
-      expect(resolve(trader, { tasks: [] })).toEqual({ kind: 'task', task: null });
-      expect(resolve(trader, { tasks: null })).toEqual({ kind: 'task', task: null });
+      expect(resolve(trader, { tasks: [] })).toEqual({ kind: 'unknown' });
+      expect(resolve(trader, { tasks: null })).toEqual({ kind: 'unknown' });
       expect(resolve(PRAPOR, { tasks: undefined })).toBeNull();
     });
     it('resolves the ref unlock task by game mode', () => {
@@ -115,6 +115,20 @@ describe('resolveTraderUnlock', () => {
       expect(
         resolve(ref, { gameMode: GAME_MODES.PVE, tasks: [...createDeps().tasks!, pveTask] })
       ).toEqual({ kind: 'task', task: pveTask });
+    });
+    it('uses a Seasonal task that explicitly rewards access to Ref', () => {
+      const ref = { id: 'ref-id', normalizedName: 'ref' };
+      const task = {
+        id: 'seasonal-unlock',
+        name: 'Seasonal unlock task',
+        finishRewards: { traderUnlock: { id: ref.id, name: 'Ref' } },
+      };
+      const deps = { gameMode: GAME_MODES.SEASONAL, tasks: [task] };
+      expect(resolve(ref, deps)).toEqual({
+        kind: 'task',
+        task: { id: task.id, name: task.name },
+      });
+      expect(resolve(ref, { ...deps, isTaskComplete: (id) => id === task.id })).toBeNull();
     });
     it('reads trader unlocks from task finish rewards (Jaeger via Introduction)', () => {
       expect(resolve(JAEGER)).toEqual({

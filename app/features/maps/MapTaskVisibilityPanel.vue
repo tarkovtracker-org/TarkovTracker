@@ -20,13 +20,40 @@
       </span>
       <span
         data-testid="map-raid-plan-summary"
-        class="truncate text-xs"
+        class="text-xs"
         :class="hiddenCount > 0 ? 'text-warning-200' : 'text-surface-400'"
+        role="status"
       >
         {{ summaryText }}
       </span>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="text-surface-300 flex flex-wrap items-center gap-2 text-xs">
+        <label :for="reputationFilterId">
+          {{ t('page.tasks.map.raid_plan.trader_reputation', 'Trader reputation') }}
+        </label>
+        <select
+          :id="reputationFilterId"
+          v-model="minimumReputation"
+          class="bg-surface-800 border-surface-700 text-surface-100 focus-visible:ring-primary-500 min-h-7 rounded-md border px-2 text-xs focus-visible:ring-2"
+        >
+          <option :value="null">
+            {{ t('page.tasks.map.raid_plan.any_reward', 'Any reward') }}
+          </option>
+          <option :value="0">
+            {{ t('page.tasks.map.raid_plan.any_reputation_gain', 'Any gain') }}
+          </option>
+          <option v-for="amount in reputationOptions" :key="amount" :value="amount">
+            {{
+              t(
+                'page.tasks.map.raid_plan.minimum_reputation',
+                { amount: n(amount, { minimumFractionDigits: 2, maximumFractionDigits: 20 }) },
+                '+{amount} or more'
+              )
+            }}
+          </option>
+        </select>
+      </div>
       <UButton
         v-if="hiddenCount > 0"
         data-testid="map-raid-plan-show-all"
@@ -54,6 +81,18 @@
             <p class="text-surface-400 px-1.5 pt-1 pb-2 text-xs">
               {{ t('page.tasks.map.raid_plan.popover_description') }}
             </p>
+            <div v-if="overriddenTaskIds.length > 0" class="flex justify-end px-1.5 pb-1">
+              <UButton
+                data-testid="map-raid-plan-reset-colors"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+                icon="i-mdi-palette-swatch-outline"
+                @click="preferencesStore.clearMapTaskColors(overriddenTaskIds)"
+              >
+                {{ t('page.tasks.map.raid_plan.reset_quest_colors') }}
+              </UButton>
+            </div>
             <ul class="max-h-80 overflow-y-auto">
               <li
                 v-for="row in rows"
@@ -82,6 +121,13 @@
                     {{ row.task.name }}
                   </span>
                 </button>
+                <MapQuestColorPicker
+                  :task-name="row.task.name"
+                  :color="row.color"
+                  :has-override="row.hasOverride"
+                  @change="preferencesStore.setMapTaskColor(row.task.id, $event)"
+                  @reset="preferencesStore.clearMapTaskColors([row.task.id])"
+                />
                 <UButton
                   data-testid="map-raid-plan-row-only"
                   size="xs"
@@ -101,6 +147,13 @@
         </template>
       </UPopover>
     </div>
+    <MapQuestLegend
+      :entries="legendRows"
+      :highlighted-task-id="highlightedTaskId"
+      :locked-task-id="lockedTaskId"
+      @highlight="emit('highlight', $event)"
+      @toggle-highlight-lock="emit('toggle-highlight-lock', $event)"
+    />
     <p
       v-if="allHidden"
       data-testid="map-raid-plan-all-hidden"
@@ -112,16 +165,47 @@
   </div>
 </template>
 <script setup lang="ts">
+  import MapQuestColorPicker from '@/features/maps/MapQuestColorPicker.vue';
+  import MapQuestLegend from '@/features/maps/MapQuestLegend.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import type { Task } from '@/types/tarkov';
-  const props = defineProps<{
-    tasks: Task[];
-    hiddenTaskIds: ReadonlySet<string>;
+  const props = withDefaults(
+    defineProps<{
+      tasks: Task[];
+      hiddenTaskIds: ReadonlySet<string>;
+      reputationOptions: readonly number[];
+      /** Quest colors while chips are colored by quest (#920); empty in the other modes. */
+      taskColors?: ReadonlyMap<string, string>;
+      /** Quest whose markers the map highlights, from the legend or a hovered marker. */
+      highlightedTaskId?: string | null;
+      /** Quest highlighted by a legend click until it is clicked again. */
+      lockedTaskId?: string | null;
+    }>(),
+    { taskColors: () => new Map(), highlightedTaskId: null, lockedTaskId: null }
+  );
+  const emit = defineEmits<{
+    highlight: [taskId: string | null];
+    'toggle-highlight-lock': [taskId: string];
   }>();
-  const { t } = useI18n({ useScope: 'global' });
+  const minimumReputation = defineModel<number | null>('minimumReputation', { default: null });
+  const reputationFilterId = useId();
+  const { n, t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
+  const taskColorOverrides = computed(() => preferencesStore.getMapTaskColors);
   const rows = computed(() =>
-    props.tasks.map((task) => ({ task, isShown: !props.hiddenTaskIds.has(task.id) }))
+    props.tasks.map((task) => ({
+      task,
+      isShown: !props.hiddenTaskIds.has(task.id),
+      color: props.taskColors.get(task.id),
+      hasOverride: props.taskColors.size > 0 && Object.hasOwn(taskColorOverrides.value, task.id),
+    }))
+  );
+  /** Shown quests with their color; hidden quests leave the legend. */
+  const legendRows = computed(() =>
+    rows.value.flatMap((row) => (row.isShown && row.color ? [{ ...row, color: row.color }] : []))
+  );
+  const overriddenTaskIds = computed(() =>
+    rows.value.filter((row) => row.hasOverride).map((row) => row.task.id)
   );
   const taskIds = computed(() => props.tasks.map((task) => task.id));
   const hiddenCount = computed(() => rows.value.filter((row) => !row.isShown).length);
@@ -130,8 +214,15 @@
   );
   const summaryText = computed(() => {
     const params = { hidden: hiddenCount.value, total: rows.value.length };
-    if (hiddenCount.value === 0) return t('page.tasks.map.raid_plan.summary_all', params);
-    return t('page.tasks.map.raid_plan.summary_hidden', params);
+    if (params.hidden > 0) return t('page.tasks.map.raid_plan.summary_hidden', params);
+    if (minimumReputation.value === null) return t('page.tasks.map.raid_plan.summary_all', params);
+    if (params.total === 0) {
+      return t(
+        'page.tasks.map.raid_plan.no_reputation_matches',
+        'No mapped quests match this filter.'
+      );
+    }
+    return t('page.tasks.map.raid_plan.reputation_quests_shown', params.total);
   });
   const showOnly = (taskId: string) => {
     preferencesStore.showOnlyMapTask(taskId, taskIds.value);

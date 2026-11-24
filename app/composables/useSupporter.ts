@@ -10,7 +10,9 @@ import {
   removeOwnedChannel,
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
+import { subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
 import { refreshSupabaseSession } from '@/utils/supabaseAuth';
+import type { SupabaseClient } from '@supabase/supabase-js';
 export interface SupporterStatus {
   tier: 'supporter' | 'scav' | 'timmy' | 'chad';
   status: 'active' | 'past_due' | 'expired' | 'cancelled';
@@ -29,6 +31,27 @@ export interface SupporterStatus {
 const supporterState = ref<SupporterStatus | null>(null);
 const loading = ref(false);
 const error = ref<string | null>(null);
+const checkoutRequest = shallowRef<AbortController | null>(null);
+const checkoutPending = computed(() => checkoutRequest.value !== null);
+const CHECKOUT_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+let checkoutAttempt: { scope: string; id: string; expiresAt: number } | null = null;
+function getCheckoutAttemptId(scope: string) {
+  const now = Date.now();
+  if (checkoutAttempt?.scope === scope && checkoutAttempt.expiresAt > now) {
+    return checkoutAttempt.id;
+  }
+  const id = crypto.randomUUID();
+  checkoutAttempt = { scope, id, expiresAt: now + CHECKOUT_RETRY_WINDOW_MS };
+  return id;
+}
+function finishCheckout(url: string | null, signal: AbortSignal) {
+  if (signal.aborted) return null;
+  if (url) checkoutAttempt = null;
+  return url;
+}
+function reportSupporterRequestError(message: string, signal?: AbortSignal) {
+  if (!signal?.aborted) error.value = message;
+}
 let channel: OwnedRealtimeChannel | null = null;
 const channelRelease = createChannelReleaseLatch();
 let channelUserId: string | null = null;
@@ -136,6 +159,46 @@ export function useSupporter() {
       finishStatusRequest(userId, requestVersion, success);
     }
   }
+  function subscribeToSupporterChanges(
+    client: SupabaseClient,
+    topic: string,
+    userId: string,
+    requestVersion: number
+  ) {
+    let initialReadStarted = false;
+    const nextChannel = client.channel(topic).on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'supporters',
+        filter: `user_id=eq.${userId}`,
+      },
+      () => {
+        if (requestVersion !== subscriptionRequestVersion) return;
+        fetchStatus(userId).catch((err) => {
+          logger.error('Realtime supporter status refresh failed', { userId, err });
+        });
+      }
+    );
+    const readStatus = () => {
+      initialReadStarted = true;
+      void fetchStatus(userId);
+    };
+    const joinedImmediately = subscribeRealtimeChannel(
+      client.realtime,
+      nextChannel,
+      (status, err) => {
+        if (requestVersion !== subscriptionRequestVersion) return;
+        logChannelSubscribeFailure('Supporter', status, err, { userId });
+        // Subscribe reports either a join or a failure. Read once even if the initial join fails.
+        if (status !== 'SUBSCRIBED' && initialReadStarted) return;
+        readStatus();
+      }
+    );
+    if (!joinedImmediately) readStatus();
+    return nextChannel;
+  }
   async function subscribe(userId: string): Promise<boolean> {
     if (!$supabase || !userId) return false;
     if (channel && channelUserId === userId) {
@@ -160,39 +223,16 @@ export function useSupporter() {
     if ($supabase.user?.loggedIn === false || $supabase.user?.id !== userId) return false;
     if (channel || channelUserId) return false;
     const client = $supabase.client;
-    let initialReadStarted = false;
     let resolveInitial!: (success: boolean) => void;
     const promise = new Promise<boolean>((resolve) => {
       resolveInitial = resolve;
     });
-    const pending = { userId, promise, resolve: resolveInitial };
-    initialRead = pending;
-    const nextChannel = client
-      .channel(topic)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'supporters',
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          if (requestVersion !== subscriptionRequestVersion) return;
-          fetchStatus(userId).catch((err) => {
-            logger.error('Realtime supporter status refresh failed', { userId, err });
-          });
-        }
-      )
-      .subscribe((status, err) => {
-        if (requestVersion !== subscriptionRequestVersion) return;
-        logChannelSubscribeFailure('Supporter', status, err, { userId });
-        // Subscribe reports either a join or a failure. Read once even if the initial join fails.
-        if (status !== 'SUBSCRIBED' && initialReadStarted) return;
-        initialReadStarted = true;
-        void fetchStatus(userId);
-      });
-    channel = { channel: nextChannel, client, topic };
+    initialRead = { userId, promise, resolve: resolveInitial };
+    channel = {
+      channel: subscribeToSupporterChanges(client, topic, userId, requestVersion),
+      client,
+      topic,
+    };
     channelUserId = userId;
     return promise;
   }
@@ -214,6 +254,9 @@ export function useSupporter() {
     supporterState.value = null;
     error.value = null;
     loading.value = false;
+    checkoutRequest.value?.abort();
+    checkoutRequest.value = null;
+    checkoutAttempt = null;
   }
   async function createCheckout(params: {
     mode: 'payment' | 'subscription';
@@ -221,18 +264,34 @@ export function useSupporter() {
     interval?: string;
     amount?: number;
   }): Promise<string | null> {
-    return postWithAuth<{ url: string }>('/api/stripe/checkout', params).then(
-      (r) => r?.url ?? null
-    );
+    if (checkoutRequest.value) return null;
+    const request = new AbortController();
+    checkoutRequest.value = request;
+    try {
+      const { mode, tier, interval, amount } = params;
+      const scope = JSON.stringify([mode, tier, interval, amount]);
+      const result = await postWithAuth<{ url: string }>(
+        '/api/stripe/checkout',
+        { ...params, checkoutAttemptId: getCheckoutAttemptId(scope) },
+        request.signal
+      );
+      return finishCheckout(result?.url ?? null, request.signal);
+    } finally {
+      if (checkoutRequest.value === request) checkoutRequest.value = null;
+    }
   }
   async function openBillingPortal(returnUrl?: string): Promise<string | null> {
     return postWithAuth<{ url: string }>('/api/stripe/portal', returnUrl ? { returnUrl } : {}).then(
       (r) => r?.url ?? null
     );
   }
-  async function postWithAuth<T>(path: string, body: Record<string, unknown>): Promise<T | null> {
+  async function postWithAuth<T>(
+    path: string,
+    body: Record<string, unknown>,
+    signal?: AbortSignal
+  ): Promise<T | null> {
     if (!$supabase) {
-      error.value = 'Supabase client not available';
+      reportSupporterRequestError('Supabase client not available', signal);
       return null;
     }
     try {
@@ -250,18 +309,19 @@ export function useSupporter() {
       }
       if (!token) {
         const message = 'You must be signed in to support TarkovTracker.';
-        error.value = message;
+        reportSupporterRequestError(message, signal);
         return null;
       }
       const result = await $fetch(path, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body,
+        signal,
       });
       return result as T;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Request failed';
-      error.value = message;
+      reportSupporterRequestError(message, signal);
       logger.error('Supporter request failed', { path, error: e });
       return null;
     }
@@ -281,6 +341,7 @@ export function useSupporter() {
     subscribe,
     unsubscribe,
     reset,
+    checkoutPending,
     createCheckout,
     openBillingPortal,
   };

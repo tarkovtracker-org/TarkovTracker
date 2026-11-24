@@ -19,10 +19,11 @@ opts into prerendering; link crawling is disabled and missing required documents
 Payload extraction is off: prerendered documents inline their Nuxt payload because
 `_payload.json` URLs match the client-rendered catch-all and would return HTML; a required public
 or client document that references one fails the build.
-Public route entrypoints in `app/features/seo-pages/` pass the shared `PageHeader` into each
-client-only tracker module's `header` slot and render the same header in a matching container as the
-prerendered fallback, so each page keeps one `h1` in one position. The `pages:extend` hook maps those
-routes to wrappers while preserving the existing modules in `app/pages/`.
+The `pages:extend` hook maps public routes to wrappers in `app/features/seo-pages/` and keeps the
+tracker modules in `app/pages/`. Most tracker wrappers pass their header through the module's
+`header` slot and render the same header in the prerendered fallback. The hideout wrapper renders
+its header and English PvP station requirements above the client-only tracker. Each station and
+level has a fragment target in the initial HTML, so links can open the reference before hydration.
 Resource guides render their full article. Navigation, personal state, supporter checkout,
 changelog requests, and application initialization run only in the browser. English HTML hydrates
 before saved/browser locale selection; initialization mounts once per application.
@@ -87,7 +88,6 @@ Ranking causes and improvements must be measured separately from these rendering
 │   │   ├── dashboard/       # Main dashboard
 │   │   ├── drawer/          # Side-drawer and help UI
 │   │   ├── hideout/         # Hideout tracking
-│   │   ├── kappa/           # Kappa completion tracker
 │   │   ├── maps/            # Interactive maps
 │   │   ├── neededitems/     # Required items tracker
 │   │   ├── omnibar/         # Inline app-bar search and jump results
@@ -181,7 +181,10 @@ graph TB
 
 ## Settings navigation
 
-The [player-level card](../app/features/settings/PlayerLevelCard.vue) reserves the translated
+Settings applies hash scrolls immediately while the page is mounted. Both the page and Nuxt can
+handle a hash change, so the page also disables inherited smooth scrolling for Nuxt's scroll.
+
+The [player-level field](../app/features/settings/PlayerLevelField.vue) reserves the translated
 loading hint's height while displaying the current range hint. Loading level metadata can shorten
 that hint; keeping its footprint stable prevents nested `#skills` links below it from moving under
 the fixed header after scrolling. The hidden reservation is excluded from assistive output. Existing
@@ -403,32 +406,35 @@ for the server's `Retry-After` delay. An ordinary probe
 failure rejects its callers without showing the gate, and the next request probes again.
 Gated GETs keep `$fetch`'s single transient retry. Shared-profile loads start their request budget after access is released.
 Cloudflare owns clearance; application
-verification does not authorize CDN hits. Cache and overlay ordering are unchanged.
+verification does not authorize CDN hits. When enabled, the browser client checks clearance before requesting a catalog. Server-side callers and direct public reads do not use this client gate.
 
-All game data is fetched through Nuxt server routes that proxy to `json.tarkov.dev` static data.
-Internal modes map to upstream endpoints as `pvp` → `regular`, `pve` → `pve`, and
-`seasonal` → `pvp-season`.
+Game data is prepared from `json.tarkov.dev` by the scheduled producer, then served
+through Nuxt snapshot readers. Internal modes map to upstream endpoints as
+`pvp` → `regular`, `pve` → `pve`, and `seasonal` → `pvp-season`.
 
-> Canonical endpoint details: [`systems/game-data.md`](./systems/game-data.md#tarkovdev-data-integration) and
-> [`api.md`](./api.md). The table below is a quick map.
+See the canonical [game-data architecture](./systems/game-data.md#tarkovdev-data-integration)
+and [endpoint contract](./api.md#neutral-catalog-responses).
 
-| Endpoint                       | Purpose                   | Cache TTL   |
-| ------------------------------ | ------------------------- | ----------- |
-| `/api/tarkov/bootstrap`        | Player levels             | 12h         |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders      | 12h         |
-| `/api/tarkov/tasks-objectives` | Task objectives           | 12h         |
-| `/api/tarkov/tasks-rewards`    | Task rewards              | 12h         |
-| `/api/tarkov/hideout`          | Hideout stations          | 12h         |
-| `/api/tarkov/items-lite`       | Items (minimal)           | 24h         |
-| `/api/tarkov/items`            | Items (full)              | 24h         |
-| `/api/tarkov/prestige`         | Prestige levels           | 24h         |
-| `/api/tarkov/editions`         | Editions, chapters, perks | — (overlay) |
-| `/api/tarkov/map-spawns`       | Map spawn points          | 12h         |
-| `/api/tarkov/overlay-status`   | Precompute fleet manifest | no-store    |
-| `/api/tarkov/cache-meta`       | Cache purge status        | 5m edge     |
+| Endpoint                       | Purpose                                             | HTTP cache policy |
+| ------------------------------ | --------------------------------------------------- | ----------------- |
+| `/api/tarkov/bootstrap`        | Player levels                                       | no-store          |
+| `/api/tarkov/tasks-core`       | Tasks, maps, traders                                | no-store          |
+| `/api/tarkov/tasks-objectives` | Task objectives                                     | no-store          |
+| `/api/tarkov/tasks-rewards`    | Task rewards                                        | no-store          |
+| `/api/tarkov/hideout`          | Hideout stations                                    | no-store          |
+| `/api/tarkov/items-lite`       | Minimal items                                       | no-store          |
+| `/api/tarkov/items`            | Full items                                          | no-store          |
+| `/api/tarkov/prestige`         | Prestige levels                                     | no-store          |
+| `/api/tarkov/editions`         | Editions, chapters, perks                           | no-store          |
+| `/api/tarkov/map-spawns`       | Map spawn points                                    | no-store          |
+| `/api/tarkov/strings`          | Referenced strings for every mode, per API language | no-store          |
+| `/api/tarkov/tasks-import`     | Whole English task snapshot per mode                | no-store          |
+| `/api/tarkov/overlay-status`   | Activated complete catalog manifest                 | no-store          |
+| `/api/tarkov/cache-meta`       | Browser purge marker                                | 5m edge           |
 
-`editions` projects the overlay directly and sets no explicit server cache TTL; `overlay-status`
-reads the precompute manifest and is always `no-store`.
+The ten neutral datasets are prepared once per mode. Display strings load as one
+language bundle shared across modes. Editions use the same snapshot reader as the
+other neutral datasets. English imports retain their independent snapshot contract.
 
 ### Team API
 
@@ -438,38 +444,22 @@ reads the precompute manifest and is always `no-store`.
 
 ### Caching Strategy
 
-Layer 1 of the server cache is the optional precomputed `TARKOV_DATA` KV (populated off the request path by
-the scheduled precompute workflow; currently only `/api/tarkov/tasks-core` reads it via
-`precomputed: true` — other game-data routes start at the per-colo Cache API); the full four-layer
-fall-through is specified in
-[`systems/game-data.md`](./systems/game-data.md#multi-layer-caching). The diagram below shows the
-client → edge → upstream path.
+The activated `TARKOV_DATA` manifest references 30 immutable mode catalogs and 13
+language bundles. Readers stream compressed objects and can reuse a per-colo Cache
+API copy after the active manifest confirms its key and timestamp. During KV
+failure, an eligible last-good copy is served as `STALE`; without one the reader
+returns 503. The browser stores neutral mode data and language strings separately
+in IndexedDB, then creates localized views for components. The existing purge
+marker invalidates both. See [browser caching](./systems/game-data.md#browser-cache-and-translation).
 
 ```mermaid
-graph TD
-    subgraph "Client"
-        IDB[(IndexedDB<br/>Primary Cache)]
-        LS[(localStorage<br/>Purge Timestamps)]
-    end
-
-    subgraph "Server"
-        Edge[Edge Cache<br/>Cloudflare]
-        API[API Handler]
-    end
-
-    subgraph "External"
-        JsonData[json.tarkov.dev]
-    end
-
-    Request --> IDB
-    IDB -- "Cache Miss" --> Edge
-    Edge -- "Cache Miss" --> API
-    API --> JsonData
-    JsonData --> API
-    API --> Edge
-    Edge --> IDB
-
-    LS -- "Check Purge" --> API
+flowchart LR
+    Producer["Scheduled reviewed producer"] --> KV["Immutable KV objects and complete manifest"]
+    KV --> Reader["Snapshot reader"]
+    Reader --> Cache["Compressed per-colo Cache API copy"]
+    Cache --> Reader
+    Reader --> Browser["Neutral IndexedDB data and language tables"]
+    Browser --> View["Localized component view"]
 ```
 
 ## Security

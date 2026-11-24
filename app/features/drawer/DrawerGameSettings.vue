@@ -1,83 +1,61 @@
 <template>
-  <div class="flex flex-col gap-1.5 px-3 py-1">
-    <SelectMenuFixed
-      :model-value="currentGameMode"
-      :items="modeOptions"
-      value-key="value"
-      label-key="label"
-      :disabled="dataLoading"
-      :aria-label="t('game_settings.select_game_mode_label', 'Select game mode')"
-      class="w-full"
-      :ui="{ base: 'min-h-9 w-full' }"
-      @update:model-value="switchMode($event as GameMode)"
-    >
-      <template #leading>
-        <UIcon :name="currentModeOption.icon" class="h-4 w-4" />
-      </template>
-    </SelectMenuFixed>
-    <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
-      {{ switchModeError }}
-    </div>
-    <time
-      v-if="currentGameMode === GAME_MODES.SEASONAL"
-      :datetime="ACTIVE_SEASON.endsAt"
-      class="text-warning-300 light:text-warning-700 text-xs"
-      :title="seasonEndDate"
-    >
-      {{ seasonCountdownLabel }}
-    </time>
+  <div class="flex flex-col gap-2 px-3 pb-1">
     <div
-      class="flex w-full overflow-hidden rounded-md border border-white/10"
+      class="grid grid-cols-3 gap-1"
       role="group"
-      :aria-label="t('game_settings.select_faction_label')"
+      :aria-label="t('game_settings.select_game_mode_label', 'Select game mode')"
+      :aria-busy="dataLoading"
     >
-      <button
-        v-for="faction in factions"
-        :key="faction"
-        class="light:focus:ring-surface-300/70 flex min-h-8 flex-1 items-center justify-center px-2 py-1.5 text-xs font-semibold uppercase transition-colors focus:z-10 focus:ring-2 focus:ring-white/40 focus:outline-none"
-        :class="[
-          faction === currentFaction
-            ? 'light:bg-surface-700/70 light:text-surface-50 bg-white/15 text-white'
-            : dataLoading
-              ? 'light:text-surface-400 bg-transparent text-white/50'
-              : 'light:text-surface-400 light:hover:bg-surface-700/40 light:hover:text-surface-100 bg-transparent text-white/50 hover:bg-white/5 hover:text-white/80',
-          dataLoading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
-        ]"
+      <CompactChoiceButton
+        v-for="option in modeOptions"
+        :key="option.value"
+        class="flex flex-col items-center gap-1 px-0.5 pt-1.5 pb-1.5 leading-none"
+        :tone="GAME_MODE_UI[option.value].color"
+        :aria-pressed="selectedMode === option.value"
         :disabled="dataLoading"
-        :aria-pressed="faction === currentFaction"
-        @click="setFaction(faction)"
+        @click="switchMode(option.value)"
       >
-        <span class="leading-none">{{ faction }}</span>
-      </button>
+        <GameModeBadge :mode="option.value" :size="36" class="size-9 max-w-full" />
+        <span class="w-full wrap-anywhere">{{ option.label }}</span>
+      </CompactChoiceButton>
     </div>
+    <div v-if="switchModeError" class="text-error-400 text-xs" role="alert">
+      {{ t(switchModeError) }}
+    </div>
+    <p
+      v-if="currentGameMode === GAME_MODES.SEASONAL"
+      class="text-surface-400 -mt-0.5 flex items-center justify-center gap-1.5 text-[11px] leading-none"
+    >
+      <UIcon
+        name="i-mdi-timer-sand"
+        class="text-warning-400 size-3.5 shrink-0"
+        aria-hidden="true"
+      />
+      <time :datetime="ACTIVE_SEASON.endsAt" :title="seasonEndDate">
+        {{ seasonCountdownLabel }}
+      </time>
+    </p>
+    <FactionPicker v-model="currentFaction" :disabled="dataLoading" />
   </div>
 </template>
 <script setup lang="ts">
-  import { storeToRefs } from 'pinia';
-  import SelectMenuFixed from '@/components/SelectMenuFixed.vue';
-  import { useMetadataStore } from '@/stores/useMetadata';
+  import FactionPicker from '@/components/FactionPicker.vue';
+  import GameModeBadge from '@/components/GameModeBadge.vue';
+  import CompactChoiceButton from '@/components/ui/CompactChoiceButton.vue';
+  import { useCurrentFaction } from '@/composables/useCurrentFaction';
+  import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useTarkovStore } from '@/stores/useTarkov';
   import {
     ACTIVE_SEASON,
+    GAME_MODE_UI,
     GAME_MODES,
     getActiveSeasonTimeRemaining,
-    PMC_FACTIONS,
-    type GameMode,
-    type PMCFaction,
   } from '@/utils/constants';
-  import { logger } from '@/utils/logger';
-  const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const { t } = useI18n({ useScope: 'global' });
-  const switchModeError = ref('');
+  const { dataLoading, switchMode, switchModeError } = useGameModeSwitch();
   const seasonCountdownNow = ref(Date.now());
-  const factions = PMC_FACTIONS;
-  const currentFaction = computed<PMCFaction>(() => tarkovStore.getPMCFaction());
-  function setFaction(faction: PMCFaction) {
-    if (faction !== currentFaction.value) {
-      tarkovStore.setPMCFaction(faction);
-    }
-  }
+  const currentFaction = useCurrentFaction();
   const currentGameMode = computed(() => tarkovStore.getCurrentGameMode());
   const seasonEndDate = computed(() => new Date(ACTIVE_SEASON.endsAt).toLocaleString());
   const seasonCountdownLabel = computed(() => {
@@ -113,58 +91,16 @@
     { immediate: true }
   );
   const modeOptions = computed(() => [
-    { icon: 'i-mdi-sword-cross', label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
-    { icon: 'i-mdi-account-group', label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },
+    { label: t('common.pvp', 'PvP'), value: GAME_MODES.PVP },
+    { label: t('common.pve', 'PvE'), value: GAME_MODES.PVE },
     {
-      icon: 'i-mdi-calendar-star',
-      label: t('common.seasonal_pvp', 'Seasonal PvP'),
+      label: t('game_settings.seasonal_label', 'Seasonal'),
       value: GAME_MODES.SEASONAL,
     },
   ]);
-  const currentModeOption = computed(
+  const selectedMode = computed(
     () =>
-      modeOptions.value.find((option) => option.value === currentGameMode.value) ?? {
-        icon: 'i-mdi-sword-cross',
-        label: t('common.pvp', 'PvP'),
-        value: GAME_MODES.PVP,
-      }
+      modeOptions.value.find((option) => option.value === currentGameMode.value)?.value ??
+      GAME_MODES.PVP
   );
-  const { loading: dataLoading } = storeToRefs(metadataStore);
-  async function switchMode(mode: GameMode) {
-    if (mode !== currentGameMode.value && !dataLoading.value) {
-      metadataStore.setLoading(true);
-      const previousMode = currentGameMode.value;
-      try {
-        switchModeError.value = '';
-        await tarkovStore.switchGameMode(mode);
-      } catch (err) {
-        switchModeError.value = t(
-          'settings.game_settings.switch_mode_failed',
-          'Failed to switch game mode, please retry'
-        );
-        logger.error('[DrawerGameSettings] Error switching mode:', err);
-        metadataStore.setLoading(false);
-        return;
-      }
-      try {
-        metadataStore.updateLanguageAndGameMode();
-        await metadataStore.fetchAllData();
-      } catch (err) {
-        try {
-          await tarkovStore.switchGameMode(previousMode);
-          metadataStore.updateLanguageAndGameMode();
-          await metadataStore.fetchAllData();
-        } catch (rollbackErr) {
-          logger.error('[DrawerGameSettings] rollback failed:', rollbackErr);
-        }
-        switchModeError.value = t(
-          'settings.game_settings.switch_mode_fetch_failed',
-          'Game mode switched but failed to refresh data, please retry'
-        );
-        logger.error('[DrawerGameSettings] Error fetching data after mode switch:', err);
-      } finally {
-        metadataStore.setLoading(false);
-      }
-    }
-  }
 </script>

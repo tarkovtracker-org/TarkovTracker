@@ -26,6 +26,8 @@ type CacheOptions = {
   staleTtl?: number;
   // Only for routes whose cached payload is final (no post-cache overlay/adaptation).
   response?: boolean;
+  // Require each HTTP request to reach the Worker while retaining its internal cache.
+  noStoreResponse?: boolean;
 };
 type CfExecutionContext = { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
 type CfRuntimeContext = { cloudflare?: { context?: CfExecutionContext } };
@@ -80,13 +82,25 @@ function isTruthyFlag(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   return ['1', 'true', 'yes', 'y', 'on'].includes(value.toLowerCase());
 }
+const NO_STORE_RESPONSE_HEADERS = {
+  'Cache-Control': 'no-store',
+  'Cloudflare-CDN-Cache-Control': 'no-store',
+};
+function setCacheErrorHeaders(
+  event: H3Event,
+  setHeaders: typeof setResponseHeaders,
+  options: CacheOptions
+) {
+  if (options.noStoreResponse) setHeaders(event, NO_STORE_RESPONSE_HEADERS);
+}
 function setCacheResponseHeaders(
   event: H3Event,
   setHeaders: typeof setResponseHeaders,
   fullCacheKey: string,
   status: 'BYPASS' | 'DEV' | 'HIT' | 'MISS' | 'PRECOMPUTE' | 'STALE',
   ttl: number,
-  overlayMeta: OverlayHeadersMeta | null
+  overlayMeta: OverlayHeadersMeta | null,
+  noStoreResponse?: boolean
 ) {
   const cacheControl =
     status === 'HIT' || status === 'MISS' || status === 'PRECOMPUTE'
@@ -96,6 +110,7 @@ function setCacheResponseHeaders(
     'X-Cache-Status': status,
     'X-Cache-Key': fullCacheKey,
     'Cache-Control': cacheControl,
+    ...(noStoreResponse ? NO_STORE_RESPONSE_HEADERS : {}),
     ...buildOverlayResponseHeaders(overlayMeta),
   };
   setHeaders(event, headers);
@@ -264,7 +279,8 @@ export async function edgeCache<T>(
               fullCacheKey,
               'PRECOMPUTE',
               ttl,
-              overlayMeta
+              overlayMeta,
+              options.noStoreResponse
             );
             return cacheResult(payload, headers, asResponse);
           }
@@ -287,7 +303,8 @@ export async function edgeCache<T>(
           fullCacheKey,
           'BYPASS',
           ttl,
-          overlayMeta
+          overlayMeta,
+          options.noStoreResponse
         );
         return cacheResult(response, headers, asResponse);
       }
@@ -318,7 +335,8 @@ export async function edgeCache<T>(
             fullCacheKey,
             'STALE',
             ttl,
-            overlayMeta
+            overlayMeta,
+            options.noStoreResponse
           );
           return cacheResult(data, headers, asResponse);
         }
@@ -328,7 +346,8 @@ export async function edgeCache<T>(
           fullCacheKey,
           'HIT',
           ttl,
-          overlayMeta
+          overlayMeta,
+          options.noStoreResponse
         );
         return cacheResult(data, headers, asResponse);
       }
@@ -350,7 +369,8 @@ export async function edgeCache<T>(
         fullCacheKey,
         'MISS',
         ttl,
-        overlayMeta
+        overlayMeta,
+        options.noStoreResponse
       );
       return cacheResult(asResponse ? cacheResponse : response, headers, asResponse);
     }
@@ -363,7 +383,8 @@ export async function edgeCache<T>(
       fullCacheKey,
       'DEV',
       ttl,
-      overlayMeta
+      overlayMeta,
+      options.noStoreResponse
     );
     return cacheResult(response, headers, asResponse);
   } catch (error) {
@@ -371,6 +392,7 @@ export async function edgeCache<T>(
     logger.error(`Error in edgeCache for ${fullCacheKey}:`, error);
     const statusCode = (error as { statusCode?: unknown } | null)?.statusCode === 503 ? 503 : 502;
     const sanitizedErrorMessage = sanitizeErrorMessage(errorMessage);
+    setCacheErrorHeaders(event, setHeaders, options);
     throw createErrorFn({
       statusCode,
       statusMessage: sanitizedErrorMessage

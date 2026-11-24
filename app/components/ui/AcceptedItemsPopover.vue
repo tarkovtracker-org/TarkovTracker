@@ -33,7 +33,7 @@
           class="border-surface-600 bg-surface-900 text-surface-100 focus-visible:ring-primary-500 mb-2 w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-2"
         />
         <ul ref="itemList" class="max-h-72 space-y-1 overflow-y-auto pr-1">
-          <li v-for="entry in pageItems" :key="entry.id">
+          <li v-for="{ entry, icon } in pageItems" :key="entry.id">
             <a
               :href="toWikiUrl(getKeyPrimaryUrl(entry))"
               target="_blank"
@@ -44,8 +44,8 @@
                 class="bg-surface-900 flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded ring-1 ring-white/10"
               >
                 <NuxtImg
-                  v-if="entry.iconLink"
-                  :src="entry.iconLink"
+                  v-if="icon"
+                  :src="icon"
                   :alt="entry.name ?? entry.shortName ?? ''"
                   width="36"
                   height="36"
@@ -104,7 +104,7 @@
 </template>
 <script setup lang="ts">
   import { useWikiLink } from '@/composables/useWikiLink';
-  import { getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
+  import { getItemDisplayIcon, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
   import type { TarkovItem } from '@/types/tarkov';
   const props = withDefaults(
     defineProps<{
@@ -139,7 +139,9 @@
   });
   const pageCount = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / PAGE_SIZE)));
   const pageItems = computed(() =>
-    filteredItems.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE)
+    filteredItems.value
+      .slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE)
+      .map((entry) => ({ entry, icon: getItemDisplayIcon(entry) }))
   );
   watch([open, () => props.items], () => {
     search.value = '';

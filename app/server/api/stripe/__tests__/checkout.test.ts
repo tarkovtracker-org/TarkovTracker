@@ -106,6 +106,58 @@ describe('POST /api/stripe/checkout', () => {
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
   it.each(['payment', 'subscription'])(
+    'makes %s retries idempotent per authenticated user',
+    async (mode) => {
+      const checkoutAttemptId = 'e9c6c198-0f24-4351-95ac-773f2abac282';
+      mockReadBody.mockResolvedValue({
+        mode,
+        amount: 5,
+        tier: 'scav',
+        interval: 'monthly',
+        checkoutAttemptId,
+      });
+      mockGetSupporterBillingState.mockResolvedValue(null);
+      mockCreateCheckoutSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay' });
+      const { default: handler } = await import('@/server/api/stripe/checkout.post');
+      await Promise.all([
+        handler(makeEvent({ id: 'user-1' })),
+        handler(makeEvent({ id: 'user-1' })),
+        handler(makeEvent({ id: 'user-2' })),
+      ]);
+      const options = mockCreateCheckoutSession.mock.calls.map(
+        ([, requestOptions]) => requestOptions
+      );
+      expect(options[0]?.idempotencyKey).toMatch(/^supporter-checkout:[0-9a-f]{64}$/);
+      expect(options[1]).toEqual(options[0]);
+      expect(options[2]?.idempotencyKey).toMatch(/^supporter-checkout:[0-9a-f]{64}$/);
+      expect(options[2]).not.toEqual(options[0]);
+    }
+  );
+  it('rejects malformed attempt IDs before checking eligibility or calling Stripe', async () => {
+    mockReadBody.mockResolvedValue({ mode: 'payment', amount: 5, checkoutAttemptId: 'invalid' });
+    const { default: handler } = await import('@/server/api/stripe/checkout.post');
+    await expect(handler(makeEvent({ id: 'user-1' }))).rejects.toMatchObject({ statusCode: 400 });
+    expect(mockAdminSupabaseFetch).not.toHaveBeenCalled();
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+  it('waits for billing lookup recovery before starting a keyed one-time session', async () => {
+    const checkoutAttemptId = 'e9c6c198-0f24-4351-95ac-773f2abac282';
+    mockReadBody.mockResolvedValue({ mode: 'payment', amount: 5, checkoutAttemptId });
+    mockGetSupporterBillingState
+      .mockImplementationOnce(async (_event, _user, options) => {
+        if (options.throwOnUnavailable) throw new MockSupporterCustomerLookupUnavailableError();
+        return null;
+      })
+      .mockResolvedValue({ stripeCustomerId: 'cus_existing' });
+    mockCreateCheckoutSession.mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay' });
+    const { default: handler } = await import('@/server/api/stripe/checkout.post');
+    const event = makeEvent({ id: 'user-1', email: 'user@example.com' });
+    await expect(handler(event)).rejects.toMatchObject({ statusCode: 503 });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    await expect(handler(event)).resolves.toEqual({ url: 'https://checkout.stripe.com/c/pay' });
+    expect(firstSessionArgs()).toMatchObject({ customer: 'cus_existing' });
+  });
+  it.each(['payment', 'subscription'])(
     'blocks disqualified %s checkout before Stripe calls',
     async (mode) => {
       mockAdminSupabaseFetch.mockResolvedValue(true);

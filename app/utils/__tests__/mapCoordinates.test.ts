@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyRotation,
+  formatGameCoordinate,
+  gameToLatLng,
   getLeafletBounds,
   getSvgOverlayBounds,
   getMapSvgCdnUrl,
   getMapSvgFallbackUrl,
   isValidMapSvgConfig,
+  latLngToGame,
   resolveFloorTilePath,
   rotateGameCoordinates,
 } from '@/utils/mapCoordinates';
@@ -246,6 +249,21 @@ describe('mapCoordinates', () => {
       expect(getMapSvgFallbackUrl(preEncoded)).toBe(
         'https://tarkovtracker.github.io/tarkovdata/maps/customs%2520east.svg'
       );
+    });
+  });
+  describe('latLngToGame', () => {
+    it('inverts gameToLatLng', () => {
+      expect(latLngToGame(gameToLatLng(-122.03, 460.69))).toEqual({ x: -122.03, z: 460.69 });
+    });
+  });
+  describe('formatGameCoordinate', () => {
+    it('keeps two decimals with a dot separator', () => {
+      expect(formatGameCoordinate(442.2349)).toBe('442.23');
+      expect(formatGameCoordinate(-7)).toBe('-7.00');
+    });
+    it('never shows negative zero', () => {
+      expect(formatGameCoordinate(-0.004)).toBe('0.00');
+      expect(formatGameCoordinate(-0)).toBe('0.00');
     });
   });
   describe('resolveFloorTilePath', () => {

@@ -123,6 +123,100 @@ describe('Shared Profile API', () => {
     await expect(handler(mockEvent as H3Event)).rejects.toThrow('Invalid profile id');
     expect(mockOverlay).not.toHaveBeenCalled();
   });
+  it.each(['supporter', 'active_subscriber'])('only exposes the %s badge label', async (badge) => {
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(modeProgressResponse({ displayName: 'Rat One', level: 18 }))
+      .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ badge, stripe_customer_id: 'private', amount_total: 123 }],
+      });
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({ supporterBadge: badge });
+    expect(JSON.stringify(result)).not.toContain('stripe_customer_id');
+    expect(JSON.stringify(result)).not.toContain('amount_total');
+    expect(String(mockFetch.mock.calls[3]?.[0])).toContain(
+      '/rest/v1/shared_profile_supporter_badges?select=badge&user_id=eq.11111111-1111-4111-8111-111111111111&game_mode=eq.pvp&season_number=eq.0&limit=1'
+    );
+  });
+  it('keeps shared profiles available before the badge migration is deployed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(modeProgressResponse({ displayName: 'Rat One', level: 18 }))
+      .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: false, status: 404 });
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({ visibility: 'public' });
+    expect(result).not.toHaveProperty('supporterBadge');
+    expect(warn).toHaveBeenCalledWith(
+      '[SharedProfileSupporterBadge]',
+      'Supporter badge lookup returned an unsuccessful response',
+      { status: 404 }
+    );
+  });
+  it('opens the public PvE mode from a short link without returning the account ID', async () => {
+    mockGetRouterParam.mockImplementation((_, key: string) =>
+      key === 'userId' ? '@rat_one' : 'default'
+    );
+    mockFetch
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(Response.json([{ game_mode: 'pve' }]))
+      .mockResolvedValueOnce(progressResponse())
+      .mockResolvedValueOnce(modeProgressResponse({ level: 24 }))
+      .mockResolvedValueOnce(preferencesResponse());
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    const result = await handler(mockEvent as H3Event);
+    expect(result).toMatchObject({ mode: 'pve', visibility: 'public' });
+    expect(result).not.toHaveProperty('userId');
+    expect(String(mockFetch.mock.calls[0]?.[0])).toContain(
+      '/rest/v1/profile_handles?select=user_id&handle=eq.rat_one&limit=1'
+    );
+    expect(String(mockFetch.mock.calls[1]?.[0])).toContain('profile_public=is.true');
+    expect(String(mockFetch.mock.calls[3]?.[0])).toContain('game_mode=eq.pve');
+  });
+  it.each([
+    ['handle lookup disconnect', 'pve', [], new Error('network error'), 503],
+    [
+      'default-mode lookup disconnect',
+      'default',
+      [progressResponse()],
+      new Error('network error'),
+      503,
+    ],
+    ['lookup timeout', 'pve', [], { statusCode: 504 }, 504],
+  ])('normalizes a %s', async (_label, mode, earlierResponses, failure, statusCode) => {
+    mockGetRouterParam.mockImplementation((_, key: string) =>
+      key === 'userId' ? '@rat_one' : mode
+    );
+    for (const response of earlierResponses) mockFetch.mockResolvedValueOnce(response);
+    mockFetch.mockRejectedValueOnce(failure);
+    const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode });
+  });
+  it.each([
+    ['private mode', false, preferencesResponse(), 404],
+    ['Streamer Mode', true, preferencesResponse(true), 404],
+    ['public mode with unavailable preferences', true, { ok: false, status: 500 }, 503],
+    ['private mode with unavailable preferences', false, { ok: false, status: 500 }, 404],
+  ])(
+    'does not reveal a handle profile with %s',
+    async (_label, isPublic, preferences, statusCode) => {
+      mockGetRouterParam.mockImplementation((_, key: string) =>
+        key === 'userId' ? '@rat_one' : 'pvp'
+      );
+      mockFetch
+        .mockResolvedValueOnce(progressResponse())
+        .mockResolvedValueOnce(progressResponse())
+        .mockResolvedValueOnce(modeProgressResponse({ level: 24 }, isPublic))
+        .mockResolvedValueOnce(preferences);
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode });
+    }
+  );
   it.each(['pvp', 'pve', 'seasonal'])(
     'returns the %s effective baseline without modifying recorded progress',
     async (mode) => {
@@ -242,7 +336,7 @@ describe('Shared Profile API', () => {
     const urls = mockFetch.mock.calls.map(([url]) => url as string);
     expect(urls).toContain('https://test.supabase.co/auth/v1/user');
     const restUrls = urls.filter((url) => url.includes('/rest/v1/'));
-    expect(restUrls).toHaveLength(3);
+    expect(restUrls).toHaveLength(4);
     for (const url of urls) {
       expect(url).not.toContain('source=config');
       expect(url).not.toContain('#fragment');
@@ -382,6 +476,36 @@ describe('Shared Profile API', () => {
       statusMessage: 'Profile not found',
     });
   });
+  it.each(['pvp', 'pve', 'seasonal'])(
+    'does not distinguish absent, private or missing %s mode profiles',
+    async (mode) => {
+      mockGetRouterParam.mockImplementation((_, key: string) =>
+        key === 'userId' ? '11111111-1111-4111-8111-111111111111' : mode
+      );
+      const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
+      for (const state of ['absent', 'private', 'missing_mode']) {
+        mockFetch.mockReset();
+        if (mode === 'seasonal') mockFetch.mockResolvedValueOnce({ ok: true, json: async () => 2 });
+        mockFetch
+          .mockResolvedValueOnce(
+            state === 'absent' ? { ok: true, json: async () => [] } : progressResponse()
+          )
+          .mockResolvedValueOnce(
+            state === 'private'
+              ? modeProgressResponse({ displayName: 'PrivatePlayer', level: 42 }, false)
+              : { ok: true, json: async () => [] }
+          )
+          .mockResolvedValueOnce(preferencesResponse());
+        await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+          statusCode: 404,
+          statusMessage: 'Profile not found',
+          message: 'Profile not found',
+          data: undefined,
+        });
+        expect(mockOverlay).not.toHaveBeenCalled();
+      }
+    }
+  );
   it('returns public shared profile when mode is public', async () => {
     mockFetch
       .mockResolvedValueOnce(progressResponse())
@@ -399,7 +523,7 @@ describe('Shared Profile API', () => {
     const restCalls = mockFetch.mock.calls
       .map(([url]) => new URL(String(url)))
       .filter((url) => url.pathname.includes('/rest/v1/'));
-    expect(restCalls).toHaveLength(3);
+    expect(restCalls).toHaveLength(4);
     expect(
       restCalls.find((url) => url.pathname.endsWith('/user_progress'))?.searchParams.get('select')
     ).toBe('user_id,game_edition');
@@ -411,7 +535,10 @@ describe('Shared Profile API', () => {
       .mockResolvedValueOnce(preferencesResponse(false, { pvp: true }))
       .mockResolvedValueOnce({ ok: true, json: async () => [{ pvp_data: { level: 39 } }] });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({ statusCode: 403 });
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: 404,
+      statusMessage: 'Profile not found',
+    });
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
   it('returns empty progress for public normalized placeholders without reading legacy data', async () => {
@@ -424,7 +551,8 @@ describe('Shared Profile API', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [{ pvp_data: { level: 39 } }] });
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     expect(await handler(mockEvent as H3Event)).toMatchObject({ data: {}, gameEdition: 3 });
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(String(mockFetch.mock.calls[3]?.[0])).toContain('/shared_profile_supporter_badges?');
   });
   it('loads Seasonal profiles from the active season row', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) => {
@@ -447,7 +575,7 @@ describe('Shared Profile API', () => {
       visibility: 'public',
     });
   });
-  it('treats a missing Seasonal row as private instead of not found', async () => {
+  it('conceals a missing Seasonal row with the generic not-found response', async () => {
     mockGetRouterParam.mockImplementation((_, key: string) => {
       if (key === 'userId') return '11111111-1111-4111-8111-111111111111';
       if (key === 'mode') return 'seasonal';
@@ -459,7 +587,10 @@ describe('Shared Profile API', () => {
       .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(preferencesResponse());
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: 404,
+      statusMessage: 'Profile not found',
+    });
   });
   it('returns an empty owner payload when the Seasonal row does not exist yet', async () => {
     mockGetRequestHeader.mockImplementation((_, key: string) => {
@@ -512,6 +643,7 @@ describe('Shared Profile API', () => {
         })
       )
       .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -542,7 +674,7 @@ describe('Shared Profile API', () => {
       );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
-    expect(mockFetch.mock.calls[3]?.[0]).toBe('https://json.tarkov.dev/pve/tasks');
+    expect(mockFetch.mock.calls.map(([url]) => url)).toContain('https://json.tarkov.dev/pve/tasks');
     expect(result.mode).toBe('pve');
     expect(result.data?.taskCompletions).toMatchObject({
       '597a0f5686f774273b74f676': { active: false, complete: true, failed: true },
@@ -561,6 +693,7 @@ describe('Shared Profile API', () => {
         })
       )
       .mockResolvedValueOnce(preferencesResponse())
+      .mockResolvedValueOnce({ ok: true, json: async () => [] })
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ data: { tasks: {} } }), {
           headers: { 'Content-Type': 'application/json' },
@@ -569,7 +702,9 @@ describe('Shared Profile API', () => {
       );
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     await handler(mockEvent as H3Event);
-    expect(mockFetch.mock.calls[3]?.[0]).toBe('https://json-mirror.example/regular/tasks');
+    expect(mockFetch.mock.calls.map(([url]) => url)).toContain(
+      'https://json-mirror.example/regular/tasks'
+    );
   });
   it('removes non-progress fields from shared profile payload', async () => {
     mockFetch
@@ -642,7 +777,10 @@ describe('Shared Profile API', () => {
       .mockResolvedValueOnce(modeProgressResponse({ level: 17 }, false))
       .mockResolvedValueOnce(preferencesResponse());
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-    await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: 404,
+      statusMessage: 'Profile not found',
+    });
   });
   it('allows owner to view private profile without service key', async () => {
     runtimeConfig.supabaseServiceKey = '';
@@ -661,6 +799,7 @@ describe('Shared Profile API', () => {
     const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
     const result = await handler(mockEvent as H3Event);
     expect(result.visibility).toBe('owner');
+    expect(result).toHaveProperty('profilePublic', false);
     expect(result.data).toEqual({ level: 12 });
   });
   it('returns unavailable when service key is missing for non-owner view', async () => {
@@ -687,19 +826,33 @@ describe('Shared Profile API', () => {
         let season = 2;
         let lookupOk = true;
         let level = 24;
+        let showBadge = true;
         vi.spyOn(Date, 'now').mockImplementation(() => now);
         mockFetch.mockImplementation(async (url: string) => {
           if (url.includes('/rpc/')) return { ok: lookupOk, json: async () => season };
           if (url.includes('/user_game_mode_progress?')) return modeProgressResponse({ level });
           if (url.includes('/user_progress?')) return progressResponse();
           if (url.includes('/user_preferences?')) return preferencesResponse();
+          if (url.includes('/shared_profile_supporter_badges?')) {
+            return { ok: true, json: async () => (showBadge ? [{ badge: 'supporter' }] : []) };
+          }
           throw new Error(`Unexpected test request: ${url}`);
         });
         const { default: handler } = await import('@/server/api/profile/[userId]/[mode].get');
-        expect((await handler(mockEvent as H3Event)).data).toEqual({ level: 24 });
+        expect(await handler(mockEvent as H3Event)).toMatchObject({
+          data: { level: 24 },
+          supporterBadge: 'supporter',
+        });
         now = 30;
         level = 30;
-        expect((await handler(mockEvent as H3Event)).data).toEqual({ level: 24 });
+        expect(await handler(mockEvent as H3Event)).toMatchObject({
+          data: { level: 24 },
+          supporterBadge: 'supporter',
+        });
+        showBadge = false;
+        const cached = await handler(mockEvent as H3Event);
+        expect(cached.data).toEqual({ level: 24 });
+        expect(cached).not.toHaveProperty('supporterBadge');
         now = 60;
         season = 3;
         expect((await handler(mockEvent as H3Event)).data).toEqual({ level: 30 });

@@ -1,4 +1,4 @@
-export type FetchSuccess<T> = { data: T };
+export type FetchSuccess<T> = { data: T; dataOverlay?: { fetchedAt?: string } };
 export type FetchError = { error: string | Record<string, unknown> };
 export type FetchResponse<T> = FetchSuccess<T> | FetchError;
 export const isFetchError = (value: unknown): value is FetchError => {

@@ -126,12 +126,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-project
         with:
-          install-dependencies: 'false'
-      - name: Dependency Security before installation
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/checks/dependency-security.mjs
-      - uses: ./.github/actions/setup-project
+          check-dependency-security: 'true'
       - name: Build Cloudflare Pages app
         run: pnpm run build
         env:
@@ -144,9 +139,12 @@ jobs:
           # layout shift, third-party cookies) varies with the streamer's live
           # status, which made the Lighthouse gate non-deterministic.
           NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED: 'false'
+      - name: Seed local Lighthouse catalogs
+        run: node scripts/checks/seed-lighthouse-catalog.mjs "$RUNNER_TEMP/lighthouse-kv"
       - name: Start preview server
         run: |
           pnpm exec wrangler pages dev dist \
+            --persist-to "$RUNNER_TEMP/lighthouse-kv" \
             --port 3000 \
             --ip 127.0.0.1 \
             --local-protocol http \

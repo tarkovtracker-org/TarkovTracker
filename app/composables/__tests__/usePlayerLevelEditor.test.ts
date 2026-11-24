@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { parsePlayerLevel } from '@/composables/usePlayerLevelEditor';
 import DrawerLevel from '@/features/drawer/DrawerLevel.vue';
-import PlayerLevelCard from '@/features/settings/PlayerLevelCard.vue';
+import PlayerLevelField from '@/features/settings/PlayerLevelField.vue';
 import { actions, defaultState, getters, type UserState } from '@/stores/progressState';
 const { metadata, toastAdd } = vi.hoisted(() => ({
   metadata: {
@@ -12,6 +12,7 @@ const { metadata, toastAdd } = vi.hoisted(() => ({
     minPlayerLevel: 1,
     maxPlayerLevel: 79,
     playerLevels: [] as { level: number }[],
+    prestigeLevels: [],
   },
   toastAdd: vi.fn(),
 }));
@@ -20,6 +21,7 @@ const useLevelTestStore = defineStore('playerLevelEditorTest', {
   state: (): UserState => structuredClone(defaultState),
   getters: {
     getCurrentGameMode: getters.getCurrentGameMode,
+    getCurrentProgressData: getters.getCurrentProgressData,
     playerLevel: getters.playerLevel,
   },
   actions: {
@@ -34,7 +36,7 @@ mockNuxtImport('useToast', () => () => ({ add: toastAdd }));
 const STUBS = { AppTooltip: { template: '<span><slot /></span>' }, UIcon: true };
 const mountDrawer = () =>
   mountSuspended(DrawerLevel, { props: { isCollapsed: false }, global: { stubs: STUBS } });
-const mountCard = () => mountSuspended(PlayerLevelCard, { global: { stubs: STUBS } });
+const mountCard = () => mountSuspended(PlayerLevelField, { global: { stubs: STUBS } });
 type Wrapper = Awaited<ReturnType<typeof mountCard>>;
 const cardInput = (wrapper: Wrapper) => wrapper.get<HTMLInputElement>('input[name="player-level"]');
 const applyButton = (wrapper: Wrapper) => wrapper.get<HTMLButtonElement>('button[type="submit"]');
@@ -81,7 +83,7 @@ describe('parsePlayerLevel', () => {
     expect(parsePlayerLevel(raw, bounds)).toEqual({ ok: false, error });
   });
 });
-describe('Settings current level card', () => {
+describe('Settings player level field', () => {
   it('uses metadata bounds for hints, validation, and saves', async () => {
     metadata.minPlayerLevel = 10;
     metadata.maxPlayerLevel = 40;

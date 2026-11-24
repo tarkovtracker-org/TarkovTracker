@@ -22,7 +22,7 @@ import {
   type OwnedRealtimeChannel,
   type SupabaseRealtimeChannel,
 } from '@/utils/realtimeChannel';
-import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
+import { isRealtimeSuspended, subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
 import type { MemberProfile, TeamGetters, TeamState } from '@/types/tarkov';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Store } from 'pinia';
@@ -270,16 +270,36 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     release.hold(owned, removeOwnedChannel(owned, 'TeamStore'));
     await release.release(owned.topic);
   };
+  const retryRecoveryLeave = async (
+    retryVersion: number,
+    owned: OwnedRealtimeChannel | null
+  ): Promise<boolean> => {
+    if (!owned || (await release.release(owned.topic))) return canBuild(retryVersion);
+    if (!canBuild(retryVersion)) return false;
+    const removal = removeOwnedChannel(owned, 'TeamStore');
+    release.hold(owned, removal);
+    return await removal;
+  };
+  const recover = async (retryVersion: number, owned: OwnedRealtimeChannel | null) => {
+    if (!canBuild(retryVersion)) return;
+    try {
+      if (await retryRecoveryLeave(retryVersion, owned)) await refreshForRequest(retryVersion);
+    } catch (error) {
+      logger.warn('[TeamStore] Channel recovery failed', error);
+    }
+    if (!channel.value && deps.getTeamId()) queueRecovery(retryVersion, owned);
+  };
+  const queueRecovery = (retryVersion: number, owned: OwnedRealtimeChannel | null) => {
+    if (!canBuild(retryVersion)) return;
+    retryTimeout = setTimeout(() => {
+      retryTimeout = null;
+      void recover(retryVersion, owned);
+    }, CHANNEL_RETRY_DELAY_MS);
+  };
   const scheduleRecovery = () => {
+    const owned = channel.value;
     const retryVersion = ++version;
-    void cleanup().then(() => {
-      if (disposed || retryVersion !== version) return;
-      retryTimeout = setTimeout(() => {
-        retryTimeout = null;
-        if (disposed || retryVersion !== version) return;
-        void refresh();
-      }, CHANNEL_RETRY_DELAY_MS);
-    });
+    void cleanup().then(() => queueRecovery(retryVersion, owned));
   };
   const recordStatusFailure = (status: string, error?: Error) => {
     const failed = logChannelSubscribeFailure('TeamStore', status, error, {
@@ -312,8 +332,7 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     dispatchHydration(teamId);
   };
   /**
-   * A closed or failed channel is no longer joined, so drop the binding and let
-   * the next membership event rebuild it.
+   * Drop the joined binding on failure and rebuild a terminally closed channel.
    *
    * Recovery can replace the owned channel before it rejoins, so the
    * missed-progress refresh is carried across that replacement.
@@ -327,7 +346,8 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     if (previouslyJoined.has(owned)) hydrationTeam = teamId;
     joinedTeamId = null;
     joinedFilter = undefined;
-    recordStatusFailure(status, error);
+    if (status === 'CLOSED') scheduleRecovery();
+    else recordStatusFailure(status, error);
   };
   /**
    * Reacts to every subscribe status rather than only `SUBSCRIBED`.
@@ -379,7 +399,9 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     const owned: OwnedTeamChannel = { channel: next, client, topic };
     channel.value = owned;
     if (client.realtime && isRealtimeSuspended(client.realtime)) previouslyJoined.add(owned);
-    next.subscribe((status, error) => handleStatus(owned, teamId, progressFilter, status, error));
+    subscribeRealtimeChannel(client.realtime, next, (status, error) =>
+      handleStatus(owned, teamId, progressFilter, status, error)
+    );
   };
   const canBuild = (setupVersion: number): boolean => !disposed && setupVersion === version;
   const setup = async (setupVersion: number): Promise<void> => {
@@ -439,12 +461,12 @@ export const createTeamChannelController = (deps: TeamChannelDeps): TeamChannelC
     dispatchHydration(joinedTeamId);
     return true;
   };
-  const refresh = async (): Promise<void> => {
-    const requestVersion = ++version;
+  const refreshForRequest = async (requestVersion: number): Promise<void> => {
     if (!(await refreshMembersForRequest(requestVersion))) return;
     if (reuseCurrentBinding()) return;
     await setup(requestVersion);
   };
+  const refresh = (): Promise<void> => refreshForRequest(++version);
   return {
     cleanup,
     dispose: () => {
@@ -475,6 +497,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
   let latestMembersRequestVersion = 0;
   let disposed = false;
   let authSessionVersion = 0;
+  type MembersRead = { teamId: string; result: Promise<boolean> };
+  let latestMembersRead: MembersRead | null = null;
+  let initialTeamRefresh: Promise<void> | null = null;
   // Successful reads fence delayed snapshots, including reads that cancel the warning.
   let authoritativeDeadlineTeamId: string | null = null;
   let authoritativeOwnerTeamId: string | null = null;
@@ -493,6 +518,8 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     refreshInFlight = null;
     refreshInFlightTeamId = null;
     refreshContext = null;
+    latestMembersRead = null;
+    initialTeamRefresh = null;
     lastMembersRefreshAt = 0;
   };
   listenerScope.run(() => {
@@ -534,7 +561,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     return typeof owner === 'string' || owner === null ? { owner } : {};
   };
   // Custom data handler that transforms DB data before patching to store
-  const handleTeamData = (data: Record<string, unknown> | null) => {
+  const handleTeamData = (data: Record<string, unknown> | null, refreshRoster: boolean) => {
     if (disposed) return;
     if (data) {
       // Transform database fields to client fields BEFORE patching
@@ -557,7 +584,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
         transformed.joinCode = null;
       }
       teamStore.$patch(transformed as Partial<TeamState>);
-      void refreshMembers(true);
+      if (refreshRoster) void refreshMembers(true);
     } else {
       invalidateRefresh();
       teamStore.$reset();
@@ -680,6 +707,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       queued: false,
     };
     const inFlightRequest = runRefresh(refreshContext, force);
+    latestMembersRead = { teamId: currentTeamId, result: inFlightRequest };
     refreshInFlight = inFlightRequest;
     refreshInFlightTeamId = currentTeamId;
     try {
@@ -700,6 +728,27 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     getTeamId: () => getTeamIdFromSystemStore(systemStore),
     refreshMembers,
   });
+  const failedLatestMembersRead = async (teamId: string): Promise<MembersRead | null> => {
+    const read = latestMembersRead;
+    if (read?.teamId !== teamId) return null;
+    const succeeded = await read.result;
+    if (read !== latestMembersRead) return failedLatestMembersRead(teamId);
+    return succeeded ? null : read;
+  };
+  const recoverInitialRoster = async (teamId: string, initialRefresh: Promise<void>) => {
+    await initialRefresh;
+    // Membership events can supersede channel setup while the roster read is pending.
+    const failed = await failedLatestMembersRead(teamId);
+    if (failed !== latestMembersRead || initialRefresh !== initialTeamRefresh) return;
+    if (failed?.teamId === getTeamIdFromSystemStore(systemStore)) await teamChannel.refresh();
+  };
+  const handleInitialTeamData = (data: Record<string, unknown> | null) => {
+    handleTeamData(data, false);
+    const initialRefresh = initialTeamRefresh;
+    if (typeof data?.id === 'string' && initialRefresh) {
+      void recoverInitialRoster(data.id, initialRefresh);
+    }
+  };
   // Setup Supabase listener with custom onData handler
   // Mapping and deadline freshness belong to our handler, not the listener's generic patch.
   const listenerState = listenerScope.run(() =>
@@ -709,7 +758,9 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
       patchStore: false,
       filter: teamFilter,
       storeId: 'team',
-      onData: handleTeamData,
+      onData: (data) => handleTeamData(data, true),
+      // The team channel's filter watcher already starts the initial roster read.
+      onInitialData: handleInitialTeamData,
       scope: listenerScope,
     })
   );
@@ -719,7 +770,7 @@ export function useTeamStoreWithSupabase(): TeamStoreInstance {
     watch(
       teamFilter,
       () => {
-        void teamChannel.refresh();
+        initialTeamRefresh = teamChannel.refresh();
       },
       { immediate: true }
     );

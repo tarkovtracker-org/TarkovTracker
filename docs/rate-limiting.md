@@ -330,6 +330,11 @@ Important:
 2. Allow and record max **3 attempts / 60s** in the same transaction
 3. Atomically claim the deletion job through `claim_account_deletion_job`
 
+User-facing requests first require verified OAuth authentication within five minutes and the
+explicit `delete_account` action. After billing eligibility, `claim_requested_account_deletion_job`
+checks the matching live session and authentication age under the claim locks before delegating
+to the existing fenced job. Trusted retry/retention workers use their existing claim path.
+
 This is **not** wired through `consume_mutation_rate_limit` today. It remains a second pattern for
 “sensitive mutation limiting” because the dedicated table also retains the deletion audit history.
 Both RPCs are service-role-only. A job claim holds a 15-minute lease; the daily
@@ -337,6 +342,9 @@ Both RPCs are service-role-only. A job claim holds a 15-minute lease; the daily
 and recovers stale `in_progress` jobs after that lease, but a fencing token prevents the stale worker
 from overwriting its replacement. Each failed retry rolls back and consumes one attempt. Only an
 explicit user request can reset and revive dead-lettered work.
+
+Billing prerequisites, shared deletion guards and rollout order are documented in
+[Account retention — requested deletion](./account-retention.md#requested-account-deletion-with-billing).
 
 Preferred future shape: add an `account-delete` scope to the shared mutation limiter and keep
 `account_deletion_attempts` only if audit history is still needed.

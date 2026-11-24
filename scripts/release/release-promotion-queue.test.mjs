@@ -19,6 +19,16 @@ const { requireReviewAdmission, readAdmissionArchive } = await import(
 const head = 'b'.repeat(40),
   source = 'a'.repeat(40);
 beforeEach(() => vi.clearAllMocks());
+function trigger(repo, run, kind) {
+  if (kind === 'release')
+    return { repo, eventName: 'workflow_run', payload: { workflow_run: structuredClone(run) } };
+  return {
+    repo,
+    ref: 'refs/heads/main',
+    eventName: 'workflow_dispatch',
+    payload: { inputs: { admission_run_id: String(run.id), admission_run_attempt: '1' } },
+  };
+}
 function fixture(kind = 'admission') {
   const repo = { owner: 'owner', repo: 'repo' };
   const run = {
@@ -110,7 +120,8 @@ function fixture(kind = 'admission') {
   candidateEvidence.mockResolvedValue({ baseSha: source });
   return {
     github,
-    context: { repo, eventName: 'workflow_run', payload: { workflow_run: structuredClone(run) } },
+    context: trigger(repo, run, kind),
+    sleep: vi.fn(async () => {}),
     operations,
     run,
     preparation,
@@ -150,6 +161,109 @@ it('completed Release wakeup retries admission that raced the unfinished prepara
   expect(early.operations.submit).not.toHaveBeenCalled();
   const later = fixture('release');
   expect((await queueReleasePromotion(later)).state).toBe('QUEUED');
+});
+it('waits for the dispatching admission attempt to complete before reading any receipt', async () => {
+  const f = fixture();
+  f.run.status = 'in_progress';
+  f.run.conclusion = null;
+  f.sleep.mockImplementation(async () => {
+    expect(f.github.paginate).not.toHaveBeenCalled();
+    expect(f.operations.submit).not.toHaveBeenCalled();
+    f.run.status = 'completed';
+    f.run.conclusion = 'success';
+  });
+  expect((await queueReleasePromotion(f)).state).toBe('QUEUED');
+  expect(f.sleep).toHaveBeenCalledExactlyOnceWith(5000);
+  expect(f.github.rest.actions.getWorkflowRun).toHaveBeenCalledTimes(2);
+});
+it('an unfinished dispatch source times out without authorizing promotion', async () => {
+  const f = fixture();
+  f.run.status = 'in_progress';
+  await expect(queueReleasePromotion(f)).rejects.toThrow('did not complete within 60 seconds');
+  expect(f.sleep).toHaveBeenCalledTimes(12);
+  expect(f.github.paginate).not.toHaveBeenCalled();
+  expect(f.operations.submit).not.toHaveBeenCalled();
+});
+it('a source attempt superseded while dispatch waits cannot enqueue', async () => {
+  const f = fixture();
+  f.run.status = 'in_progress';
+  f.sleep.mockImplementation(async () => {
+    f.run.run_attempt = 2;
+  });
+  expect((await queueReleasePromotion(f)).state).toBe('SKIPPED');
+  expect(f.github.paginate).not.toHaveBeenCalled();
+  expect(f.operations.submit).not.toHaveBeenCalled();
+});
+it.each(['failure', 'cancelled'])(
+  'an admission attempt ending with %s after dispatch cannot enqueue',
+  async (conclusion) => {
+    const f = fixture();
+    f.run.status = 'in_progress';
+    f.sleep.mockImplementation(async () => {
+      f.run.status = 'completed';
+      f.run.conclusion = conclusion;
+    });
+    await expect(queueReleasePromotion(f)).rejects.toThrow('did not succeed');
+    expect(f.github.paginate).not.toHaveBeenCalled();
+    expect(f.operations.submit).not.toHaveBeenCalled();
+  }
+);
+it.each([undefined, '', '0', '-1', '1.5', '1e2', ' 456', '9007199254740992', 456])(
+  'dispatch locators reject malformed or unsafe identity %s before API work',
+  async (value) => {
+    for (const key of ['admission_run_id', 'admission_run_attempt']) {
+      const f = fixture();
+      f.context.payload.inputs[key] = value;
+      await expect(queueReleasePromotion(f)).rejects.toThrow();
+      expect(f.github.rest.actions.getWorkflowRun).not.toHaveBeenCalled();
+      expect(f.operations.submit).not.toHaveBeenCalled();
+    }
+  }
+);
+it.each([
+  [
+    'non-main dispatch',
+    (f) => {
+      f.context.ref = 'refs/heads/untrusted';
+    },
+  ],
+  [
+    'different run ID',
+    (f) => {
+      f.run.id++;
+    },
+  ],
+  [
+    'release run substituted for admission',
+    (f) => {
+      f.run.path = '.github/workflows/release.yml';
+    },
+  ],
+])('rejects %s at dispatch intake', async (_label, change) => {
+  const f = fixture();
+  change(f);
+  await expect(queueReleasePromotion(f)).rejects.toThrow();
+  expect(f.github.paginate).not.toHaveBeenCalled();
+  expect(f.operations.submit).not.toHaveBeenCalled();
+});
+it('revocation between candidate validation and live submission still blocks promotion', async () => {
+  const { AdmissionPending } = await import('../ci/review-admission-policy.mjs');
+  const f = fixture();
+  requireReviewAdmission
+    .mockResolvedValueOnce(f.receipt)
+    .mockRejectedValueOnce(new AdmissionPending('Approval revoked'));
+  expect((await queueReleasePromotion(f)).reason).toBe('Review Admission is pending.');
+  expect(requireReviewAdmission).toHaveBeenCalledTimes(2);
+  expect(f.operations.submit).not.toHaveBeenCalled();
+});
+it('another queue submission during candidate validation is not duplicated', async () => {
+  const f = fixture();
+  candidateEvidence.mockImplementationOnce(async () => {
+    f.state.queued = true;
+    return { baseSha: source };
+  });
+  expect((await queueReleasePromotion(f)).reason).toBe('Release PR is already queued.');
+  expect(f.operations.submit).not.toHaveBeenCalled();
 });
 it.each(['release', 'ordinary'])(
   'pull_request_target admission uses trusted policy ancestry for a %s PR, not candidate ancestry',

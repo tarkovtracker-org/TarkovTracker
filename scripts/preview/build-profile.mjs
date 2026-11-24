@@ -9,12 +9,13 @@ const PRODUCTION_PASSTHROUGH = [
   'GA_MEASUREMENT_ID',
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
-  'CODECOV_TOKEN',
 ];
 function productionEnv(env) {
   return {
     NODE_ENV: 'production',
     APP_URL: 'https://tarkovtracker.org',
+    CODECOV_TOKEN: '',
+    CODECOV_USE_OIDC: env.GITHUB_ACTIONS === 'true' ? 'true' : '',
     ...Object.fromEntries(PRODUCTION_PASSTHROUGH.map((key) => [key, env[key] ?? ''])),
   };
 }

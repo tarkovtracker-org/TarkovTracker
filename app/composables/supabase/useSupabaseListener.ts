@@ -7,7 +7,7 @@ import {
   removeOwnedChannel,
   type OwnedRealtimeChannel,
 } from '@/utils/realtimeChannel';
-import { isRealtimeSuspended } from '@/utils/realtimeVisibility';
+import { isRealtimeSuspended, subscribeRealtimeChannel } from '@/utils/realtimeVisibility';
 import { clearStaleState, resetStore, safePatchStore } from '@/utils/storeHelpers';
 import type { RemoteStateMerge, WithRemoteSnapshot } from '@/utils/pendingState';
 import type { PostgrestError, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
@@ -23,6 +23,8 @@ export interface SupabaseListenerConfig<
   primaryKey?: string; // Defaults to 'id' or 'user_id'
   storeId?: string;
   onData?: (data: TData | null) => void;
+  /** Overrides onData for the first read after selecting a filter. */
+  onInitialData?: (data: TData | null) => void;
   patchStore?: boolean;
   /** Optional sync controller to pause during remote updates */
   syncController?: {
@@ -93,6 +95,7 @@ export function useSupabaseListener<
   filter,
   storeId,
   onData,
+  onInitialData,
   patchStore = true,
   syncController,
   scope,
@@ -121,7 +124,7 @@ export function useSupabaseListener<
     hasInitiallyLoaded.value = true;
     return null;
   };
-  const applyFetchedData = (data: TData | null) => {
+  const applyFetchedData = (data: TData | null, notify = onData) => {
     if (patchStore) {
       if (data) {
         safePatchStore(store, data as Partial<TStoreState>);
@@ -130,7 +133,7 @@ export function useSupabaseListener<
         resetStore(store);
       }
     }
-    onData?.(data);
+    notify?.(data);
   };
   const reconcileData = (data: TData | null, reconcile?: RemoteStateMerge): TData | null => {
     if (!reconcile) return data;
@@ -191,7 +194,12 @@ export function useSupabaseListener<
   };
   const applyFetchResult = (
     result: { data: TData | null; error: PostgrestError | null },
-    context: { pendingBeforeRead: boolean; reconcile?: RemoteStateMerge; reconnecting: boolean }
+    context: {
+      pendingBeforeRead: boolean;
+      reconcile?: RemoteStateMerge;
+      reconnecting: boolean;
+      notify: typeof onData;
+    }
   ): void => {
     if (result.error && reportFetchError(result.error)) return;
     if (
@@ -200,7 +208,7 @@ export function useSupabaseListener<
       hasInitiallyLoaded.value = true;
       return;
     }
-    applyFetchedData(reconcileData(result.data, context.reconcile));
+    applyFetchedData(reconcileData(result.data, context.reconcile), context.notify);
     hasInitiallyLoaded.value = true;
   };
   const reportFetchFailure = (error: unknown, signal: AbortSignal): void => {
@@ -210,7 +218,11 @@ export function useSupabaseListener<
     hasInitiallyLoaded.value = true;
   };
   // Initial fetch
-  const fetchData = async (reconnecting = false, reconcile = captureRemoteMerge()) => {
+  const fetchData = async (
+    reconnecting: boolean,
+    reconcile: RemoteStateMerge | undefined,
+    notify: typeof onData
+  ) => {
     const pendingBeforeRead = hasPendingSaves();
     const fetchVersion = ++latestFetchVersion;
     const fetchController = beginFetch();
@@ -221,17 +233,17 @@ export function useSupabaseListener<
       const result = await runSingleRowQuery(filterQuery, fetchController.signal);
       // A newer request superseded this one, so its response is no longer current.
       if (fetchVersion !== latestFetchVersion) return;
-      applyFetchResult(result, { pendingBeforeRead, reconcile, reconnecting });
+      applyFetchResult(result, { pendingBeforeRead, reconcile, reconnecting, notify });
     } catch (error) {
       reportFetchFailure(error, fetchController.signal);
     } finally {
       endFetch(fetchController);
     }
   };
-  const readData = (reconnecting = false) => {
+  const readData = (reconnecting = false, notify = onData) => {
     const version = cleanupVersion;
     const read = (reconcile = captureRemoteMerge()) =>
-      version === cleanupVersion ? fetchData(reconnecting, reconcile) : Promise.resolve();
+      version === cleanupVersion ? fetchData(reconnecting, reconcile, notify) : Promise.resolve();
     return syncController?.withSnapshot ? syncController.withSnapshot(read) : read();
   };
   const listenerTopic = (currentFilter: string) => `public:${table}:${currentFilter}`;
@@ -243,59 +255,57 @@ export function useSupabaseListener<
     const client = $supabase.client;
     const suspended = () => Boolean(client.realtime && isRealtimeSuspended(client.realtime));
     let needsSnapshot = suspended();
-    const nextChannel = client
-      .channel(listenerTopic(currentFilter))
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: table,
-          filter: currentFilter,
-        },
-        (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+    const nextChannel = client.channel(listenerTopic(currentFilter)).on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: table,
+        filter: currentFilter,
+      },
+      (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+        if (subscriptionVersion !== cleanupVersion) return;
+        latestFetchVersion += 1;
+        activeFetchController?.abort();
+        syncController?.pause();
+        try {
           if (subscriptionVersion !== cleanupVersion) return;
-          latestFetchVersion += 1;
-          activeFetchController?.abort();
-          syncController?.pause();
-          try {
-            if (subscriptionVersion !== cleanupVersion) return;
-            const reconcile = syncController?.captureRemoteMerge?.();
-            if (!reconcile && syncController?.hasPendingChanges?.()) {
-              hasInitiallyLoaded.value = true;
-              return;
-            }
-            const data = payload.eventType === 'DELETE' ? null : (payload.new as TData);
-            applyFetchedData(reconcileData(data, reconcile));
+          const reconcile = syncController?.captureRemoteMerge?.();
+          if (!reconcile && syncController?.hasPendingChanges?.()) {
             hasInitiallyLoaded.value = true;
-            loadError.value = null;
-          } finally {
-            if (subscriptionVersion === cleanupVersion) {
-              if (pendingSyncResumeTimeout) clearTimeout(pendingSyncResumeTimeout);
-              pendingSyncResumeTimeout = setTimeout(() => {
-                pendingSyncResumeTimeout = null;
-                if (subscriptionVersion === cleanupVersion) syncController?.resume();
-              }, VUE_REACTIVITY_SETTLE_MS);
-            }
+            return;
+          }
+          const data = payload.eventType === 'DELETE' ? null : (payload.new as TData);
+          applyFetchedData(reconcileData(data, reconcile));
+          hasInitiallyLoaded.value = true;
+          loadError.value = null;
+        } finally {
+          if (subscriptionVersion === cleanupVersion) {
+            if (pendingSyncResumeTimeout) clearTimeout(pendingSyncResumeTimeout);
+            pendingSyncResumeTimeout = setTimeout(() => {
+              pendingSyncResumeTimeout = null;
+              if (subscriptionVersion === cleanupVersion) syncController?.resume();
+            }, VUE_REACTIVITY_SETTLE_MS);
           }
         }
-      )
-      .subscribe((status: string, error?: Error) => {
-        // Cleanup can start while the join is still pending; a disposed channel
-        // must not flip `isSubscribed` back on or log for a listener that is gone.
-        if (subscriptionVersion !== cleanupVersion) return;
-        if (suspended()) {
-          isSubscribed.value = false;
-          needsSnapshot = true;
-          return;
-        }
-        isSubscribed.value = status === 'SUBSCRIBED';
-        if (isSubscribed.value) {
-          if (needsSnapshot) void readData(true);
-          needsSnapshot = true;
-        }
-        logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
-      });
+      }
+    );
+    subscribeRealtimeChannel(client.realtime, nextChannel, (status, error) => {
+      // Cleanup can start while the join is still pending; a disposed channel
+      // must not flip `isSubscribed` back on or log for a listener that is gone.
+      if (subscriptionVersion !== cleanupVersion) return;
+      if (suspended()) {
+        isSubscribed.value = false;
+        needsSnapshot = true;
+        return;
+      }
+      isSubscribed.value = status === 'SUBSCRIBED';
+      if (isSubscribed.value) {
+        if (needsSnapshot) void readData(true);
+        needsSnapshot = true;
+      }
+      logChannelSubscribeFailure(storeIdForLogging, status, error, { table });
+    });
     channel.value = { channel: nextChannel, client, topic: listenerTopic(currentFilter) };
   };
   /**
@@ -367,7 +377,7 @@ export function useSupabaseListener<
           return;
         }
         hasInitiallyLoaded.value = false;
-        readData();
+        readData(false, onInitialData ?? onData);
         setupSubscription();
       },
       { immediate: true }

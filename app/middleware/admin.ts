@@ -1,6 +1,6 @@
 import { useSystemStoreWithSupabase } from '@/stores/useSystemStore';
 import { logger } from '@/utils/logger';
-import { ensureSupabaseReadyForRoute } from '@/utils/supabaseGuard';
+import { ensureSupabaseReadyForRoute, handleSupabaseReadinessFailure } from '@/utils/supabaseGuard';
 import { hydrateUserFromSession } from '@/utils/userHydration';
 /**
  * Gets the admin watch timeout from runtime config with validation
@@ -28,8 +28,9 @@ function getAdminWatchTimeout(): number {
  */
 export default defineNuxtRouteMiddleware(async () => {
   const { $supabase } = useNuxtApp();
-  if (!(await ensureSupabaseReadyForRoute($supabase, 'Admin middleware'))) {
-    return navigateTo('/login');
+  const readiness = await ensureSupabaseReadyForRoute($supabase, 'Admin middleware');
+  if (readiness !== 'ready') {
+    return handleSupabaseReadinessFailure(readiness);
   }
   const ensureAuthenticated = async () => {
     if ($supabase.user.loggedIn) return true;

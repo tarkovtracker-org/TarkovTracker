@@ -6,7 +6,7 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 
 ### CI (`ci.yml`)
 
-**Trigger:** Push to `main` and `wip/**` branches, PRs targeting `main`, manual dispatch
+**Trigger:** Push to `main`, PRs targeting `main`, merge-queue checks, and manual dispatch
 **Concurrency:** Outdated runs are automatically cancelled for the same PR or branch.
 **Jobs:**
 
@@ -31,13 +31,14 @@ Automated CI/CD and maintenance workflows for TarkovTracker.
 - `Fallow audit` — changed-file dead code, duplication, and complexity gate
 - `Type Check` — `vue-tsc` / Nuxt type checking
 - `Test (shard 1/4)` … `Test (shard 4/4)` — Vitest with coverage, sharded across 4 parallel jobs. The `github-actions` reporter annotates failed tests directly on the PR diff so the failing test name and assertion are visible without digging into logs. Shards report imported files only and skip thresholds; Codecov merges their lcov uploads.
-- `Coverage thresholds` — merges the shard blob reports with the full `app/**/*.{ts,vue}` denominator (`scripts/ci/vitest-merged-coverage.mjs`) and enforces the `vitest.config.ts` thresholds. Uploads `coverage-final` for metrics.
+- `Coverage thresholds` — merges the shard blob reports with the full `app/**/*.{ts,vue}` denominator (`scripts/ci/vitest-merged-coverage.mjs`) and enforces the `vitest.config.ts` thresholds.
 - `Validate` — Nuxt build for full or preview-required validation, including forks; preview builds export a validated artifact and main builds export the production artifact
 - `Supabase DB` — Reset + pgTAP regressions + lint local migrations
 - `Systems drift check` — verifies `docs/systems/` invariants against the codebase
 - `Workers` - Verify immutable frontend contracts pins, then fetch the exact tagged API source,
   compare compiled contracts, run its standalone types/schema/API/workerd/dry-run checks, and
-  run all-mode frontend integration tests. No local gateway workspace remains.
+  run all-mode frontend integration tests. It also runs the Supabase Edge Function Deno tests and
+  the progress-diagnostics workerd check, which keeps the Vitest shards evenly loaded. No local gateway workspace remains.
 
 Heavy jobs run in parallel after classification; systems drift runs independently.
 Lighthouse scope detection runs independently of PR metadata.
@@ -53,7 +54,18 @@ or merge the locale PR. Untranslated strings use the English fallback until then
 workflow manually when translations must ship sooner. It never uploads local translations. The
 existing `locales` branch supplies translation PRs targeting `main`.
 
-Repository secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` authenticate to Crowdin only.
+Environment secrets `CROWDIN_PROJECT_ID` and `CROWDIN_PERSONAL_TOKEN` in `merge-queue` must authenticate
+to Crowdin only. GitHub must restrict that environment to the exact `main` branch (no tag rules).
+No repository or inherited organization copies may remain: a branch can remove any inline ref
+guard or environment reference from its workflow. GitHub cannot export existing secret values:
+enter replacement values into this protected environment before removing the repository copies;
+do not print or commit them. Run
+`node scripts/ci/crowdin-secret-boundary.mjs` with administrative metadata access to verify the
+cutover. The check reads names and deployment rules only, fails on incomplete/API-error responses,
+and does not replace GitHub's source-independent environment enforcement. Rotate the Crowdin
+token after migration if historical exposure cannot be excluded.
+The validator rejects lists larger than its 100-entry API page; the error identifies when a
+paginated metadata collection is required. An incomplete page never counts as a successful check.
 Synchronization, branch updates, CI dispatch, and a strict-mode merge use the built-in
 `GITHUB_TOKEN`; queue submission uses the
 [Queue Submitter App](../../docs/merge-queue-rollout.md#queue-submitter-provisioning).
@@ -139,18 +151,17 @@ for this workflow: the upstream Action prints its environment in debug mode.
 
 ### Crowdin locale PRs
 
-`CI`, `PR Checks`, and `Security` report for translation-only PRs. The classifier selects
-formatting, i18n, and systems drift for locale-only pull requests; the aggregate `CI Result` still
-reports, and Crowdin dispatches a preview so `Preview Result` reports on the PR head; both are
-required. Non-English locale formatting exclusions remain
-intact. See the rollout record in `docs/workflow-automation.md`.
+`CI` (including its reusable `Security` jobs) and `PR Checks` report for translation-only PRs. The
+classifier selects formatting, i18n, and systems drift. `CI Result` still reports, and Crowdin
+dispatches a preview so the required `Preview Result` reports on the PR head. Non-English locale
+formatting exclusions remain intact. See the rollout record in `docs/workflow-automation.md`.
 
 Crowdin Sync creates PRs using `GITHUB_TOKEN`. It explicitly dispatches and awaits full CI in addition to
 direct validation before auto-merging safe translation updates.
 
 ### Security (`security.yml`)
 
-**Trigger:** Push to `main`, PRs, weekly schedule
+**Trigger:** Reusable call from CI and a standalone weekly schedule
 **Jobs:** `Security Scan` (audit + checksum-verified Gitleaks CLI), `CodeQL` (static analysis)
 
 ### Release (`release.yml`)
@@ -179,7 +190,8 @@ edit the title to re-run it.
 **Trigger:** PR opened/updated/reopened
 **Jobs:** `PR Meta` (labels, size), `Lighthouse scope` (lightweight detection), `Lighthouse` (conditional on UI file changes, Lighthouse configuration/workflow changes, or `ui`/`performance` labels)
 **Lighthouse server:** Builds the Cloudflare Pages app and serves it with `wrangler pages dev`
-so `/api/*` routes are available during audits. The build sets
+so `/api/*` routes are available during audits. Setup checks dependency security before
+installing the frozen workspace. The build sets
 `NUXT_PUBLIC_PROMOTED_TWITCH_ENABLED=false` so audits measure the app itself rather than the
 promoted Twitch embed, whose heavy third-party iframe (script eval, layout shift, third-party
 cookies) loads only when the streamer is live and previously made scores non-deterministic.
@@ -198,7 +210,7 @@ performance/accessibility work instead of treating the current floors as long-te
 
 ### Dependabot Auto Merge (`dependabot-auto-merge.yml`)
 
-**Trigger:** Dependabot PR opened/updated/reopened/ready for review
+**Trigger:** Completion of CI for a Dependabot PR
 **Jobs:** `Auto-merge safe Dependabot PR` (Dependabot-authored and Dependabot-triggered only, npm
 tooling allowlist gate, wait for check runs and legacy status contexts, verify and match the
 validated head SHA, then squash merge in `strict` mode or, in `queue`/`strict-queue`, await

@@ -1,0 +1,175 @@
+import type { MapMarkerGlyphKind } from '@/features/maps/utils/markerGlyphs';
+import type { MapObjectiveColorMode } from '@/features/maps/utils/objectiveColors';
+import type { MapMarkerColors } from '@/utils/theme-colors';
+type TranslateFn = (key: string) => string;
+type Toggle = { value: boolean };
+/** How a layer row draws its swatch: an extract/transit glyph chip or a marker dot. */
+export type MapLayerSwatch = MapMarkerGlyphKind | 'objective' | 'spawn';
+export interface MapLayerItem {
+  key: string;
+  label: string;
+  hint?: string;
+  color: string;
+  swatch: MapLayerSwatch;
+  visible: Toggle;
+}
+export interface MapLayerGroup {
+  key: string;
+  label: string;
+  items: MapLayerItem[];
+}
+export interface MapLayerGroupsInput {
+  t: TranslateFn;
+  colors: MapMarkerColors;
+  /** Outside category mode the Regular, Pinned and Team rows filter but no longer set colors. */
+  objectiveColorMode?: MapObjectiveColorMode;
+  objectives: { self: Toggle; pinned: Toggle; team: Toggle };
+  extracts: { pmc: Toggle; scav: Toggle; shared: Toggle; coop: Toggle };
+  transit: Toggle;
+  spawns: Toggle;
+  /** Whether the selected map has each marker type (task rows are always listed). */
+  available: {
+    pmc: boolean;
+    scav: boolean;
+    shared: boolean;
+    unknownFaction: boolean;
+    coop: boolean;
+    transit: boolean;
+    spawns: boolean;
+  };
+}
+type Candidate = MapLayerItem & { available: boolean };
+const keepAvailable = (items: Candidate[]): MapLayerItem[] =>
+  items.filter((item) => item.available).map(({ available: _available, ...item }) => item);
+/** Neutral swatch for the category rows while chips are colored by quest or objective type. */
+export const NEUTRAL_OBJECTIVE_SWATCH = '#9ca3af';
+function objectiveItems({
+  t,
+  colors,
+  objectives,
+  objectiveColorMode = 'category',
+}: MapLayerGroupsInput): Candidate[] {
+  const swatch = (color: string) =>
+    objectiveColorMode === 'category' ? color : NEUTRAL_OBJECTIVE_SWATCH;
+  return [
+    {
+      key: 'self',
+      label: t('maps.legend.regular'),
+      color: swatch(colors.SELF_OBJECTIVE),
+      swatch: 'objective',
+      visible: objectives.self,
+      available: true,
+    },
+    {
+      key: 'pinned',
+      label: t('maps.legend.pinned'),
+      color: swatch(colors.PINNED_OBJECTIVE),
+      swatch: 'objective',
+      visible: objectives.pinned,
+      available: true,
+    },
+    {
+      key: 'team',
+      label: t('common.team'),
+      color: swatch(colors.TEAM_OBJECTIVE),
+      swatch: 'objective',
+      visible: objectives.team,
+      available: true,
+    },
+  ];
+}
+function extractItems({ t, colors, extracts, available }: MapLayerGroupsInput): Candidate[] {
+  return [
+    {
+      key: 'pmc',
+      label: t('maps.factions.pmc'),
+      color: colors.PMC_EXTRACT,
+      swatch: 'pmc',
+      visible: extracts.pmc,
+      available: available.pmc,
+    },
+    {
+      key: 'scav',
+      label: t('common.scav'),
+      color: colors.SCAV_EXTRACT,
+      swatch: 'scav',
+      visible: extracts.scav,
+      available: available.scav,
+    },
+    {
+      key: 'shared',
+      label: t(available.unknownFaction ? 'maps.layers.shared_or_unknown' : 'maps.layers.shared'),
+      hint: t(
+        available.unknownFaction ? 'maps.layers.shared_or_unknown_hint' : 'maps.layers.shared_hint'
+      ),
+      color: colors.SHARED_EXTRACT,
+      swatch: 'shared',
+      visible: extracts.shared,
+      available: available.shared,
+    },
+    {
+      key: 'coop',
+      label: t('maps.layers.coop'),
+      hint: t('maps.layers.coop_hint'),
+      color: colors.COOP_EXTRACT,
+      swatch: 'coop',
+      visible: extracts.coop,
+      available: available.coop,
+    },
+  ];
+}
+function locationItems({
+  t,
+  colors,
+  transit,
+  spawns,
+  available,
+}: MapLayerGroupsInput): Candidate[] {
+  return [
+    {
+      key: 'transit',
+      label: t('maps.layers.transit'),
+      color: colors.TRANSIT,
+      swatch: 'transit',
+      visible: transit,
+      available: available.transit,
+    },
+    {
+      key: 'spawns',
+      label: t('maps.layers.pmc_spawns'),
+      color: colors.PMC_SPAWN,
+      swatch: 'spawn',
+      visible: spawns,
+      available: available.spawns,
+    },
+  ];
+}
+/**
+ * One list for both the legend and the layer toggles: every row toggles exactly one marker type
+ * and shows it as the map draws it, except that the Regular, Pinned and Team rows show a neutral
+ * swatch while chips are colored by quest or objective type. Layers the current map lacks are
+ * omitted.
+ */
+export function buildMapLayerGroups(input: MapLayerGroupsInput): MapLayerGroup[] {
+  const groups: MapLayerGroup[] = [
+    { key: 'tasks', label: input.t('common.tasks'), items: keepAvailable(objectiveItems(input)) },
+    {
+      key: 'extracts',
+      label: input.t('maps.layers.groups.extracts'),
+      items: keepAvailable(extractItems(input)),
+    },
+    {
+      key: 'locations',
+      label: input.t('maps.layers.groups.locations'),
+      items: keepAvailable(locationItems(input)),
+    },
+  ];
+  return groups.filter((group) => group.items.length > 0);
+}
+/** Number of rows currently hidden, shown on the collapsed Layers button. */
+export function countHiddenLayers(groups: MapLayerGroup[]): number {
+  return groups.reduce(
+    (total, group) => total + group.items.filter((item) => !item.visible.value).length,
+    0
+  );
+}

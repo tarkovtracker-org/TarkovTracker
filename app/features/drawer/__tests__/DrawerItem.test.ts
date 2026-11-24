@@ -20,7 +20,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 const mountSettingsDrawerItem = (extraProps: Record<string, unknown> = {}) => {
   return mount(DrawerItem, {
     props: {
-      icon: 'i-mdi-cog-outline',
+      icon: 'i-mdi-cog',
       isCollapsed: false,
       localeKey: 'common.settings',
       to: '/settings',
@@ -55,7 +55,7 @@ describe('DrawerItem', () => {
       const wrapper = mountSettingsDrawerItem();
       expect(wrapper.get('a').classes()).toContain('border-primary-500');
       expect(wrapper.getComponent({ name: 'DrawerItemIcon' }).props('colorClass')).toBe(
-        'text-white light:text-surface-50'
+        'text-white transition-opacity light:text-surface-50'
       );
     }
   );
@@ -64,7 +64,7 @@ describe('DrawerItem', () => {
     const wrapper = mountSettingsDrawerItem();
     expect(wrapper.get('a').classes()).not.toContain('border-primary-500');
     expect(wrapper.getComponent({ name: 'DrawerItemIcon' }).props('colorClass')).toBe(
-      'text-surface-300 group-hover:text-white light:group-hover:text-surface-50'
+      'text-surface-300 opacity-75 transition-opacity group-hover:text-white group-hover:opacity-100 light:group-hover:text-surface-50'
     );
   });
   it('translates the full locale key passed by the caller', () => {

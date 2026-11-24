@@ -195,6 +195,17 @@ change the version and the `SHA256` value to the `digest` GitHub records for the
 The four Vitest shards, dedicated Deno tests, Supabase validation, Worker validation, and production
 build retain their existing commands and environment behavior. Tests in `scripts/workflow-tests/` use
 Node's built-in runner via `pnpm run test:workflow`; their filenames deliberately avoid Vitest discovery.
+On pull requests whose full plan changes only `app/` code, `scripts/ci/workflow-test-selection.mjs`
+runs just its own regressions. Pull requests that change only `app/utils/changelog.ts` and its unit
+test keep the release tests as well. Locale files, `app/utils/locales.ts`, changelog files mixed
+with other paths, any path outside `app/`, and every merge-group, push and dispatch run select the
+whole suite.
+The [dependency-security portability workflow](../.github/workflows/dependency-security-portability.yml)
+runs its isolated suite without installation on native Windows; CI's `pnpm run test:workflow` covers
+Linux. See the workflow's
+test command, [test-only subprocess adapter](../scripts/workflow-tests/helpers/dependency-cli-loader.mjs),
+and [offline source-comparison tool](../scripts/checks/review-release-source.mjs) for execution and
+receipt details. These fixtures verify security checks; host CLI installation is outside their scope.
 
 #### Local validation selection
 
@@ -260,6 +271,20 @@ per-PR CI and release timings as JSON. Run it with authenticated `gh` and save s
 node scripts/ci/workflow-metrics.mjs --before <rollout-ISO-time>
 node scripts/ci/workflow-metrics.mjs --after <rollout-ISO-time> --count 20
 ```
+
+For full PR plans, the **Observe Supabase DB selection** step records a shadow decision. Only
+Vue and CSS changes in `app/{assets,components,features,layouts,pages,shell}/` qualify.
+Match the decision to the same run ID and attempt in the collector output.
+
+All checks still run as selected by the regular plan. For each full attempt with a successful
+CI Result, `ci_balance` reports Supabase and coverage job durations plus the full job and Vitest
+step duration for each shard. A missing Vitest step duration is reported as null. An incomplete
+shard set or missing Supabase, coverage, or shard job duration omits the entire balance record.
+
+The estimated Supabase gate gap is the time between Supabase and the last other validation job
+when Supabase finishes last. It assumes unchanged scheduling and excludes CI Result and Codebase
+metrics. Compare Vitest step durations across runs to distinguish uneven test assignments from
+setup or shard 1’s extra checks.
 
 The follow-up selects the first 20 merges after the boundary; record the actual rollout timestamp.
 Compare categories separately (documentation, translations, mixed documentation/translations,
@@ -356,8 +381,11 @@ compare refs. Comparisons also reject different `.fallowrc.json` fingerprints so
 analyzer rules cannot masquerade as a code-health improvement. CRAP maxima and threshold counts
 come from all scored files, including functions below the reporting thresholds.
 
-CI runs `--base <event-base-sha>` as an advisory step after the Fallow gate and writes the table
-to the job summary. The step cannot fail the build. Model and CLI tests live in `scripts/ci/metrics*.test.mjs`.
+CI does not run this comparison; Codecov reports coverage changes on pull requests. For a
+measured local comparison, follow the steps in [`scripts/ci/README.md`](../scripts/ci/README.md):
+generate both reports in this checkout, the base one at `git merge-base HEAD <ref>` and the head
+one from a clean working tree, then pass `--base <ref>`, `--base-coverage` and `--coverage`.
+Model and CLI tests live in `scripts/ci/metrics*.test.mjs`.
 
 ### 2. Security Scanning (`.github/workflows/security.yml`)
 
@@ -572,6 +600,11 @@ Enhanced PR validation:
 - `Lighthouse scope` - decides whether the Lighthouse audit is relevant
 - `Lighthouse` - Performance checks (runs when the PR touches `app/components/`, `app/features/`,
   `.github/lighthouserc.json`, or the PR Checks workflow, or carries the `performance` or `ui` label)
+
+Lighthouse uses the production public catalog, which the SEO prerender already reads
+during build. The job verifies each snapshot's release ID, size, and digest before seeding
+isolated local Wrangler KV. Transient HTTP failures get bounded retries. An unavailable
+or inconsistent release fails the job before the audit opens the compiled Pages app.
 
 **Lighthouse collection (`.github/lighthouserc.json`):** each selected URL is audited once per Lighthouse
 job. Repeated runs are reserved for investigating a failure or for dedicated performance analysis;
@@ -793,17 +826,6 @@ and the PR base is current main; otherwise the result stays pending. Crowdin, De
 standalone release candidates read the head status. A briefly missing test merge is retried and
 the result stays pending. The hourly fallback re-evaluates that head once the test merge
 becomes available after the event retry. One required context appears per PR.
-
-**Late-build shadow:** `gh workflow run finalization-shadow.yml --ref main -f pull_request=<pr-number> -f ci_run_id=<ci-run-id>`.
-Only a maintain/admin actor can request this non-authoritative rehearsal. It checks the current
-PR, base, test merge, CI run and attempt, then builds a deployable candidate in an isolated
-credential-free container unless the PR has no deployable changes. A trusted host step rejects links and special
-files before upload; a fresh trusted runner seals the output as
-`pages-preview-shadow`. The shadow does not deploy, publish `CI Result`/`Preview Result`, or change
-merge behavior. Ordinary PR CI continues to build and upload `pages-preview`. Re-dispatch after a
-push or base change; dispatch from `main` so the trusted default-branch workflow definition runs.
-Requests without deployable changes recheck the revision before finishing. Fork runs without a CI API base snapshot
-fail closed in the shadow; the existing protected `preview-fork` deployment path is unaffected.
 
 **Trusted automation:** Crowdin translation merges and release staging request one preview after
 their dispatched CI run succeeds on the exact candidate SHA. Allowlisted Dependabot auto-merge
@@ -1137,10 +1159,13 @@ pnpm run build
 
 ### Coverage Reports
 
-- Coverage is uploaded to Codecov by the CI `test` job. Repo-level config is in `.github/codecov.yml`; results are reported as `codecov/*` statuses and PR comments are disabled. Uses the org-level `CODECOV_TOKEN` secret for token-authenticated uploads (required on protected branches).
-- Bundle analysis is uploaded by the CI `validate` job during `pnpm run build` via `@codecov/nuxt-plugin` (configured in `nuxt.config.ts`). The plugin only activates when `CODECOV_TOKEN` holds a non-empty value, so local builds without that variable and fork pull requests are unaffected. A fork pull request receives no org secrets, so the secret expression expands to an empty string rather than being absent; the emptiness check is what keeps the plugin from loading without a usable upload token.
-- The `validate` job's production build runs on fork pull requests too. It needs no secrets: `SUPABASE_URL` and `SUPABASE_ANON_KEY` expand to empty strings and the app builds in its offline configuration, which still exercises the same TypeScript, bundling, and Nitro output. Coverage and bundle uploads stay fork-skipped because those do require the org token.
+- Coverage and test results are uploaded by the CI `test` job using Codecov's GitHub OIDC authentication. Repo-level config is in `.github/codecov.yml`; results are reported as `codecov/*` statuses and PR comments are disabled. The upload steps use short-lived, repository/ref-bound identity rather than a reusable upload token.
+- Main bundle analysis uses `@codecov/nuxt-plugin` with `oidc.useGitHubOIDC` during the CI `validate` build. Profile resolution enables `CODECOV_USE_OIDC` only for production Actions builds and explicitly clears it for anonymous previews; it never exports an incoming `CODECOV_TOKEN`. Local builds do not enable reporting by default.
+- Platform cutover is required: remove this repository's inherited org `CODECOV_TOKEN` access before considering credential isolation complete. An organization-wide secret with visibility `all` cannot exclude one repository: either move it to an explicit selection of the other repositories, or shadow this repository's `CODECOV_TOKEN` with a non-credential sentinel while retaining other repositories' existing access. No real repository-scoped copy may remain. Rotate the previously exposed token at Codecov after verifying all consumers. GitHub workflow conditions alone cannot enforce secret isolation against a modified branch workflow.
+- Audit every Actions environment's secret names too: an environment-scoped `CODECOV_TOKEN` overrides the repository sentinel. Remove any static environment copy before declaring the cutover complete, retain environment branch protections, and verify coverage, test-result and trusted-main bundle uploads with OIDC after changing the secret settings.
+- Fork pull requests build the anonymous preview profile with an offline configuration, exercising TypeScript, bundling, and Nitro output without credentials. Coverage/test uploads remain fork-skipped, and the preview profile disables bundle reporting.
 - Test results (JUnit XML) are uploaded via `codecov/codecov-action` with `report_type: test_results`. Vitest outputs `test-report.junit.xml` when `CI=true` (configured in `vitest.config.ts`). The upload step is `!cancelled()`-gated so failing shards' reports still reach Codecov.
+- Coverage and test-result reporting is best effort at the upload-step boundary, including OIDC acquisition failures. Deno tests, Vitest shards and the coverage-threshold job remain blocking; reporting outages cannot turn a failed test or coverage check green.
 - The CI `test` job runs as a 4-way shard matrix (`Test (shard 1/4)` through `Test (shard 4/4)`). Each shard sets `VITEST_SHARD=N/4`, which enables the `github-actions` reporter (annotates failed tests on the PR diff), disables per-shard coverage thresholds, and reports only files imported by that shard. Codecov merges the per-shard lcov uploads and enforces an absolute floor via the `absolute-floor` project status in `.github/codecov.yml`.
 - Local `pnpm run test` / `pnpm run test:coverage` remain unsharded. Coverage runs retain the full `app/**/*.{ts,vue}` denominator and enforce the Vitest thresholds.
 - The measured logic baseline, current module mapping, coverage floors, and reproduction commands are documented in [testing-coverage.md](testing-coverage.md). Run Nuxt-generating checks separately from coverage to avoid regeneration races.

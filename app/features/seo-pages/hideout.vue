@@ -1,21 +1,19 @@
 <template>
-  <ClientOnly>
-    <HideoutPage>
-      <template #header>
+  <div class="px-3 sm:px-6">
+    <div
+      class="mx-auto flex max-w-350 flex-col lg:has-data-hideout-map:min-h-[calc(100dvh-var(--shell-bar-h))] lg:has-data-hideout-map:max-w-none"
+    >
+      <div class="pt-6">
         <PageHeader v-bind="header" />
-      </template>
-    </HideoutPage>
-    <template #fallback>
-      <div class="px-3 py-6 sm:px-6">
-        <div class="mx-auto max-w-350">
-          <PageHeader v-bind="header" />
-        </div>
+        <PublicHideoutRequirements />
       </div>
-    </template>
-  </ClientOnly>
+      <ClientOnly><HideoutPage /></ClientOnly>
+    </div>
+  </div>
 </template>
 <script setup lang="ts">
   import PageHeader from '@/components/ui/PageHeader.vue';
+  import PublicHideoutRequirements from '@/features/hideout/PublicHideoutRequirements.vue';
   import HideoutPage from '@/pages/hideout.vue';
   const { t } = useI18n({ useScope: 'global' });
   const header = computed(() => ({

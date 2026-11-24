@@ -1,0 +1,188 @@
+<template>
+  <div
+    v-if="layout === 'row'"
+    data-testid="needed-item-group"
+    class="relative flex items-center gap-3 px-3 py-2.5 transition-colors sm:px-4"
+    :class="look.surface"
+  >
+    <NeededItemThumb
+      class="z-10 cursor-pointer"
+      :image-item="group.item"
+      :item="group.item"
+      :complete="isComplete"
+      @click="open"
+    />
+    <!-- Phones put the total under the name so it stays readable. -->
+    <div class="flex min-w-0 flex-1 flex-col gap-x-3 gap-y-2 sm:flex-row sm:items-center">
+      <div class="min-w-0 flex-1">
+        <div class="flex min-w-0 items-center gap-1.5">
+          <h3 class="text-surface-50 truncate text-sm leading-snug font-semibold">
+            {{ group.item.name }}
+          </h3>
+          <ItemIndicators v-bind="indicators" class="relative z-10" @craft="goToCraftStation" />
+        </div>
+        <p class="text-surface-50 mt-1 text-sm font-semibold tabular-nums">
+          {{ remainingLabel }}
+        </p>
+        <NeededItemGroupBreakdown class="mt-1" :sections="sections" />
+        <button type="button" :class="openButtonClass" :aria-label="openLabel" @click="open">
+          {{ requirementsLabel }}
+          <UIcon name="i-mdi-chevron-right" class="size-4 shrink-0" aria-hidden="true" />
+        </button>
+      </div>
+      <NeededItemGroupTracking
+        v-if="trackingRows.length"
+        :rows="trackingRows"
+        :label="trackingLabel"
+        @set-count="setCount"
+      />
+      <NeededItemGroupProgress
+        v-else
+        class="w-full sm:w-36"
+        :current="group.currentCount"
+        :total="group.total"
+      />
+    </div>
+    <UIcon name="i-mdi-chevron-right" class="text-surface-500 size-5 shrink-0" aria-hidden="true" />
+  </div>
+  <article
+    v-else
+    data-testid="needed-item-group"
+    class="relative flex h-full flex-col overflow-hidden rounded-lg border transition-colors"
+    :class="look.tile"
+  >
+    <NeededItemThumb
+      class="z-10 aspect-video w-full cursor-pointer"
+      fill
+      :image-item="group.item"
+      :item="group.item"
+      :complete="isComplete"
+      @click="open"
+    />
+    <ItemIndicators
+      v-bind="indicators"
+      class="bg-surface-900/85 absolute top-1.5 right-1.5 z-10 backdrop-blur-sm"
+      @craft="goToCraftStation"
+    />
+    <div class="flex flex-1 flex-col gap-1.5 p-2.5">
+      <h3
+        class="text-surface-50 line-clamp-2 min-h-10 text-center text-sm leading-snug font-semibold"
+      >
+        {{ group.item.name }}
+      </h3>
+      <p class="text-surface-50 text-center text-sm font-semibold tabular-nums">
+        {{ remainingLabel }}
+      </p>
+      <NeededItemGroupBreakdown centered :sections="sections" />
+      <div class="mt-auto pt-1">
+        <NeededItemGroupTracking
+          v-if="trackingRows.length"
+          wide
+          :rows="trackingRows"
+          :label="trackingLabel"
+          @set-count="setCount"
+        />
+        <NeededItemGroupProgress v-else :current="group.currentCount" :total="group.total" />
+      </div>
+      <button
+        type="button"
+        :class="[openButtonClass, 'justify-center text-center']"
+        :aria-label="openLabel"
+        @click="open"
+      >
+        {{ requirementsLabel }}
+        <UIcon name="i-mdi-chevron-right" class="size-4 shrink-0" aria-hidden="true" />
+      </button>
+    </div>
+  </article>
+</template>
+<script setup lang="ts">
+  import { useCraftableItem } from '@/composables/useCraftableItem';
+  import ItemIndicators from '@/features/neededitems/ItemIndicators.vue';
+  import NeededItemGroupBreakdown from '@/features/neededitems/NeededItemGroupBreakdown.vue';
+  import NeededItemGroupProgress from '@/features/neededitems/NeededItemGroupProgress.vue';
+  import NeededItemGroupTracking from '@/features/neededitems/NeededItemGroupTracking.vue';
+  import NeededItemThumb from '@/features/neededitems/NeededItemThumb.vue';
+  import { useGroupedItemTracking } from '@/features/neededitems/useGroupedItemTracking';
+  import { useLocaleNumberFormatter } from '@/utils/formatters';
+  import type {
+    GroupedNeededItem,
+    NeededItemHideoutModule,
+    NeededItemTaskObjective,
+  } from '@/types/tarkov';
+  type Need = NeededItemTaskObjective | NeededItemHideoutModule;
+  /**
+   * One item with every quest and hideout need for it added together. Opening it shows
+   * the per-need breakdown and Smart Fill; FIR and Non-FIR totals are tracked in place.
+   */
+  const props = withDefaults(
+    defineProps<{
+      group: GroupedNeededItem;
+      needs: Need[];
+      layout?: 'row' | 'tile';
+    }>(),
+    { layout: 'row' }
+  );
+  const emit = defineEmits<{ open: [itemId: string] }>();
+  const { t } = useI18n({ useScope: 'global' });
+  const {
+    rows: trackingRows,
+    sections,
+    remaining,
+    setCount,
+  } = useGroupedItemTracking(
+    () => props.needs,
+    () => props.group.item.name
+  );
+  const trackingLabel = (fir: boolean) =>
+    t('needed_items.inline_counts.label', {
+      name: props.group.item.name,
+      type: t(fir ? 'common.fir' : 'needed_items.non_fir'),
+    });
+  const remainingCount = computed(() =>
+    props.needs.length ? remaining.value : Math.max(0, props.group.total - props.group.currentCount)
+  );
+  const formatNumber = useLocaleNumberFormatter();
+  const remainingLabel = computed(() =>
+    t('needed_items.remaining_count', {
+      count: formatNumber(remainingCount.value),
+    })
+  );
+  const requirementsLabel = computed(() =>
+    t('needed_items.view_requirements', { count: props.needs.length }, props.needs.length)
+  );
+  const openLabel = computed(() =>
+    t('needed_items.view_requirements_for', {
+      requirements: requirementsLabel.value,
+      name: props.group.item.name,
+    })
+  );
+  const { isCraftable, craftableIconClass, craftableTitle, goToCraftStation } = useCraftableItem(
+    () => props.group.item.id
+  );
+  // The whole entry opens the details; nested controls sit above this stretched target. The
+  // thumbnail sits above it too so its context menu (wiki, tarkov.dev, copy name) still works.
+  const openButtonClass =
+    'text-primary-400 mt-1 inline-flex items-center gap-1 text-xs leading-snug underline underline-offset-2 after:absolute after:inset-0 after:rounded-lg focus-visible:outline-hidden focus-visible:after:ring-2 focus-visible:after:ring-primary-400 focus-visible:after:ring-inset';
+  const isComplete = computed(() => remainingCount.value === 0);
+  const look = computed(() =>
+    isComplete.value
+      ? {
+          surface: 'bg-success-500/5 hover:bg-success-500/10',
+          tile: 'border-success-500/30 bg-success-500/5',
+        }
+      : {
+          surface: 'hover:bg-surface-800/60',
+          tile: 'border-surface-700 bg-surface-850 hover:border-surface-600',
+        }
+  );
+  const indicators = computed(() => ({
+    foundInRaid: false,
+    isCraftable: isCraftable.value,
+    craftableTitle: craftableTitle.value,
+    craftableIconClass: craftableIconClass.value,
+  }));
+  function open() {
+    emit('open', props.group.item.id);
+  }
+</script>

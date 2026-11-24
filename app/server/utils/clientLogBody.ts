@@ -51,7 +51,7 @@ export function hasSafeClientLogDepth(args: unknown[]): boolean {
 function isClientLogRequest(request: Request): boolean {
   if (request.method !== 'POST') return false;
   const path = decodeLogPath(new URL(request.url).pathname).replace(/\/+$/, '');
-  return path === '/api/logs/client';
+  return path === '/api/logs/client' || path === '/api/logs/progress';
 }
 export async function boundedClientLogRequest(request: Request): Promise<Request | Response> {
   if (!isClientLogRequest(request) || !request.body) return request;

@@ -1,8 +1,9 @@
 /**
- * CLI entry for the tasks-core precompute run.
+ * Publish neutral catalogs, per-language strings, and whole English import snapshots.
  *
  * Invoked by .github/workflows/precompute-tarkov-data.yml on a 12h schedule
- * and via workflow_dispatch for targeted busts. Filters arrive as env vars
+ * and via workflow_dispatch. Filtered runs refresh selected English imports only.
+ * Filters arrive as env vars
  * (PRECOMPUTE_LANG / PRECOMPUTE_GAME_MODE) so workflow_dispatch inputs never
  * pass through a shell, or as --lang / --game-mode flags for local runs.
  *
@@ -13,9 +14,12 @@
  */
 import { writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
+import * as catalogBuilders from '@/server/utils/neutralCatalog';
+import { fetchNeutralOverlay } from '@/server/utils/neutralOverlay';
+import { catalogReleaseReport } from './catalog-release';
 import { runImportPrecompute } from './import-snapshots';
 import { createKvRestWriter } from './kv';
-import { runPrecompute, validatePrecomputeFilter } from './precompute';
+import { validatePrecomputeFilter } from './precompute';
 function fail(message: string): never {
   console.error(`[precompute] ${message}`);
   process.exit(1);
@@ -24,6 +28,16 @@ function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) fail(`Missing required environment variable ${name}`);
   return value;
+}
+async function writeReport(report: Record<string, unknown>) {
+  try {
+    await writeFile(
+      'precompute-manifest.json',
+      JSON.stringify({ completedAt: Date.now(), ...report }, null, 2)
+    );
+  } catch (error) {
+    console.warn('[precompute] Could not write local diagnostic manifest:', error);
+  }
 }
 const { values: flags } = parseArgs({
   options: {
@@ -43,40 +57,27 @@ const kv = createKvRestWriter({
   namespaceId: requireEnv('TARKOV_DATA_KV_NAMESPACE_ID'),
 });
 try {
-  const result = await runPrecompute(kv, filter);
-  const imports = await runImportPrecompute(
-    kv,
-    filter,
-    process.env.EXPECTED_OVERLAY_SHA || result.manifest[0]?.overlay.sha256
-  );
-  try {
-    await writeFile(
-      'precompute-manifest.json',
-      JSON.stringify(
-        { completedAt: Date.now(), entries: result.manifest, failures: result.failures, imports },
-        null,
-        2
-      )
-    );
-  } catch (error) {
-    console.warn('[precompute] Could not write local diagnostic manifest:', error);
-  }
+  const snapshot = await fetchNeutralOverlay();
+  const sha = snapshot.meta.sha256;
+  if (!sha || (process.env.EXPECTED_OVERLAY_SHA && sha !== process.env.EXPECTED_OVERLAY_SHA))
+    throw new Error('Neutral overlay differs from the requested release');
+  const imports = await runImportPrecompute(kv, filter, sha);
+  const full = !filter.lang && !filter.gameMode;
+  const neutral =
+    full && !imports.failures.length
+      ? await catalogReleaseReport(kv, catalogBuilders, sha)
+      : undefined;
+  await writeReport({ imports, ...neutral });
   console.log(
-    JSON.stringify(
-      {
-        durationMs: result.durationMs,
-        failed: result.failures.length,
-        failures: result.failures,
-        succeeded: result.successes.length,
-        importSnapshots: imports,
-      },
-      null,
-      2
-    )
+    JSON.stringify({
+      catalogObjects: Object.keys(neutral?.catalogRelease?.entries ?? {}).length,
+      imports,
+      catalogReleaseError: neutral?.catalogReleaseError,
+    })
   );
-  // Non-zero exit surfaces partial failures in the Actions UI; existing KV
-  // entries (7-day TTL) keep serving until the next successful run.
-  if (result.failures.length > 0 || imports.failures.length > 0) process.exit(1);
+  if (neutral?.catalogReleaseError || imports.failures.length) process.exitCode = 1;
 } catch (error) {
-  fail(error instanceof Error ? error.message : String(error));
+  const message = error instanceof Error ? error.message : String(error);
+  await writeReport({ error: message });
+  fail(message);
 }

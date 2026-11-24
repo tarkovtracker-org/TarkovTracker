@@ -34,6 +34,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_billing_subscriptions: {
+        Row: { user_id: string; stripe_subscription_id: string }
+        Insert: { user_id: string; stripe_subscription_id: string }
+        Update: { user_id?: string; stripe_subscription_id?: string }
+        Relationships: []
+      }
       account_deletion_attempts: {
         Row: {
           attempted_at: string
@@ -980,8 +986,24 @@ export type Database = {
         }
         Returns: undefined
       }
+      clear_ended_deletion_subscription: {
+        Args: { p_claim_token: string; p_subscription_id: string | null; p_customer_id: string | null; p_subscription_ids: string[]; p_user_id: string }
+        Returns: boolean
+      }
+      record_account_billing_subscription: {
+        Args: { p_user_id: string; p_subscription_id: string }
+        Returns: undefined
+      }
       claim_account_deletion_job: {
         Args: { p_create_if_missing?: boolean; p_user_id: string }
+        Returns: {
+          claim_token: string | null
+          claimed: boolean
+          status: string
+        }[]
+      }
+      claim_requested_account_deletion_job: {
+        Args: { p_user_id: string; p_session_id: string; p_authenticated_at: string }
         Returns: {
           claim_token: string | null
           claimed: boolean

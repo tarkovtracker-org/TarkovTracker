@@ -1,10 +1,18 @@
 <template>
   <div class="flex min-h-full overflow-x-hidden">
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
-      <div class="mx-auto max-w-350">
+      <div class="mx-auto" :class="pageWidthClass">
         <slot name="header" />
         <TaskLoadingState v-if="isLoading" />
         <div v-else>
+          <TaskLinkUnavailable
+            :key="`${catalogMode}:${unavailableTaskId}`"
+            :task-id="unavailableTaskId"
+            :mode="catalogMode"
+            :switch-error="switchModeError"
+            @switch-mode="switchMode"
+            @dismiss="dismissTaskLink"
+          />
           <!-- Narrow Graph shows only its explanation; v-show keeps the bar's selection watchers. -->
           <TaskFilterBar
             v-show="!isNarrowGraphView"
@@ -23,7 +31,7 @@
           <TaskGraphView v-if="showGraphView" :allowed-task-ids="graphVisibleTaskIds" />
           <template v-else>
             <div v-if="showMapDisplay" ref="mapContainerRef" class="mb-6">
-              <div class="bg-surface-800/50 rounded-lg p-4">
+              <div class="bg-surface-800/50 rounded-lg p-2 sm:p-4">
                 <div class="mb-3 flex items-center justify-between gap-3">
                   <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
                     <h3 class="min-w-0 flex-1">
@@ -121,19 +129,28 @@
                   <div v-show="isMapPanelExpanded" id="tasks-map-panel-content">
                     <template v-if="selectedMapData">
                       <MapTaskVisibilityPanel
+                        v-model:minimum-reputation="minimumMapReputation"
+                        :reputation-options="mapReputationOptions"
                         :tasks="mapPlanTasks"
                         :hidden-task-ids="hiddenTaskIds"
+                        :task-colors="mapTaskColors"
+                        :highlighted-task-id="highlightedMapTaskId"
+                        :locked-task-id="lockedMapTaskId"
+                        @highlight="setLegendMapTask"
+                        @toggle-highlight-lock="toggleLockedMapTask"
                       />
                       <LeafletMapComponent
                         ref="leafletMapRef"
                         :task-visibility-actions="mapTaskVisibilityActions"
+                        :highlighted-task-id="highlightedMapTaskId"
                         :map="selectedMapData"
                         :marks="mapObjectiveMarks"
-                        :show-extracts="true"
+                        :show-extracts="preferencesStore.getShowMapExtracts"
                         :show-extract-toggle="true"
                         :show-legend="true"
                         :show-fullscreen-toggle="true"
                         :height="mapHeight"
+                        @objective-hover="setMarkerMapTask"
                         @toggle-fullscreen="openMapFullscreen"
                       />
                       <AppTooltip
@@ -145,6 +162,7 @@
                           role="separator"
                           aria-orientation="horizontal"
                           :aria-label="t('page.tasks.map.resize_handle')"
+                          :aria-description="t('maps.tooltips.drag_to_resize')"
                           :aria-valuemin="mapHeightMin"
                           :aria-valuemax="mapHeightMax"
                           :aria-valuenow="mapHeight"
@@ -152,6 +170,7 @@
                           class="group hover:border-primary-500/40 focus-visible:ring-primary-500 focus-visible:ring-offset-surface-900 mt-3 flex h-3.5 w-full cursor-ns-resize touch-none items-center justify-center rounded-md border border-transparent transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                           :class="{ 'ring-primary-500 ring-1': isResizing }"
                           @pointerdown="startResize"
+                          @dblclick="resetMapHeight"
                           @keydown="onResizeKeydown"
                         >
                           <span
@@ -178,8 +197,12 @@
                 </Transition>
               </div>
             </div>
-            <div v-if="filteredTasks.length === 0" class="py-6">
-              <TaskEmptyState :is-searching="isSearchActive" />
+            <div v-if="mapReputationFilteredTasks.length === 0" class="py-6">
+              <TaskEmptyState
+                :is-searching="isSearchActive"
+                :reputation-filtered="filteredTasks.length > 0"
+                @clear-reputation="minimumMapReputation = null"
+              />
               <MapTaskVisibilityNotice
                 v-if="showMapTaskVisibilityNotice"
                 class="mt-4"
@@ -289,11 +312,7 @@
               <MapTaskVisibilityNotice
                 v-if="
                   showMapTaskVisibilityNotice &&
-                  (mapSpecificTasksInSlice.length > 0 ||
-                    ((focusedTaskInSlice.length > 0 || pinnedTasksInSlice.length > 0) &&
-                      globalTasksInSlice.length === 0 &&
-                      mapSpecificTasksInSlice.length === 0 &&
-                      mapCompleteTasksCountOnMap > 0))
+                  (mapSpecificTasksInSlice.length > 0 || globalTasksInSlice.length === 0)
                 "
                 class="mb-6"
                 :count="mapCompleteTasksCountOnMap"
@@ -514,15 +533,26 @@
             </AppTooltip>
           </div>
           <div v-if="selectedMapData" class="bg-surface-900 px-4 pt-3">
-            <MapTaskVisibilityPanel :tasks="mapPlanTasks" :hidden-task-ids="hiddenTaskIds" />
+            <MapTaskVisibilityPanel
+              v-model:minimum-reputation="minimumMapReputation"
+              :reputation-options="mapReputationOptions"
+              :tasks="mapPlanTasks"
+              :hidden-task-ids="hiddenTaskIds"
+              :task-colors="mapTaskColors"
+              :highlighted-task-id="highlightedMapTaskId"
+              :locked-task-id="lockedMapTaskId"
+              @highlight="setLegendMapTask"
+              @toggle-highlight-lock="toggleLockedMapTask"
+            />
           </div>
           <div v-if="selectedMapData" class="flex min-h-0 flex-1">
             <LeafletMapComponent
               ref="fullscreenLeafletMapRef"
               :task-visibility-actions="mapTaskVisibilityActions"
+              :highlighted-task-id="highlightedMapTaskId"
               :map="selectedMapData"
               :marks="mapObjectiveMarks"
-              :show-extracts="true"
+              :show-extracts="preferencesStore.getShowMapExtracts"
               :show-extract-toggle="true"
               :show-legend="true"
               :show-fullscreen-toggle="true"
@@ -530,6 +560,7 @@
               fill
               :initial-view="fullscreenMapView"
               :initial-floor="fullscreenInitialFloor"
+              @objective-hover="setMarkerMapTask"
               @toggle-fullscreen="closeMapFullscreen"
             />
           </div>
@@ -545,6 +576,7 @@
     type DashboardFocusProgressInteraction,
     useDashboardFocusAnalytics,
   } from '@/composables/useDashboardFocusAnalytics';
+  import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { useInfiniteScroll } from '@/composables/useInfiniteScroll';
   import { useMapObjectiveMarks } from '@/composables/useMapObjectiveMarks';
   import { useMapObjectivePopup } from '@/composables/useMapObjectivePopup';
@@ -558,9 +590,12 @@
   import { useTaskFiltering } from '@/composables/useTaskFiltering';
   import { useTaskNotification } from '@/composables/useTaskNotification';
   import { useTaskRouteSync } from '@/composables/useTaskRouteSync';
+  import { useMapTaskHighlight } from '@/features/maps/composables/useMapTaskHighlight';
   import MapTaskVisibilityPanel from '@/features/maps/MapTaskVisibilityPanel.vue';
   import {
     getHiddenMapTaskIds,
+    getMapReputationOptions,
+    meetsMapReputationMinimum,
     type MapTaskVisibilityActions,
   } from '@/features/maps/utils/mapTaskVisibility';
   import { useTaskFilters } from '@/features/tasks/composables/useTaskFilters';
@@ -582,6 +617,7 @@
   } from '@/features/tasks/task-context';
   import TaskCard from '@/features/tasks/TaskCard.vue';
   import TaskEmptyState from '@/features/tasks/TaskEmptyState.vue';
+  import TaskLinkUnavailable from '@/features/tasks/TaskLinkUnavailable.vue';
   import TaskLoadingState from '@/features/tasks/TaskLoadingState.vue';
   import TaskSearchScopeHint from '@/features/tasks/TaskSearchScopeHint.vue';
   import {
@@ -593,8 +629,10 @@
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { isGameMode } from '@/utils/constants';
   import { debounce, isDebounceRejection } from '@/utils/debounce';
   import { logger } from '@/utils/logger';
+  import { getQueryString, queueQueryWrite } from '@/utils/routeHelpers';
   import { STORAGE_KEYS } from '@/utils/storageKeys';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { MapViewState } from '@/composables/useLeafletMap';
@@ -670,6 +708,10 @@
   const showMapDisplay = computed(() => {
     return getTaskPrimaryView.value === 'maps' && getTaskMapView.value !== 'all';
   });
+  // The map needs the room, so Maps widens past the other views on large screens.
+  const pageWidthClass = computed(() =>
+    getTaskPrimaryView.value === 'maps' ? 'max-w-350 xl:max-w-440 2xl:max-w-560' : 'max-w-350'
+  );
   const taskCardGapClass = 'pb-2';
   const taskSectionGapClass = 'mb-4';
   const showGraphView = computed(() => {
@@ -750,6 +792,7 @@
     startResize,
     stopResize,
     onResizeKeydown,
+    resetHeight: resetMapHeight,
   } = useMapResize();
   const isMapPanelExpanded = useStorage<boolean>(STORAGE_KEYS.tasksMapPanelExpanded, true);
   const toggleMapPanelVisibility = () => {
@@ -764,6 +807,21 @@
   };
   // Set from the deep-link pin below; the map shows exactly the tasks the list shows.
   const mapFocusTaskId = ref<string | null>(null);
+  const minimumMapReputation = ref<number | null>(null);
+  const mapReputationOptions = computed(() => getMapReputationOptions(tasks.value));
+  watchEffect(() => {
+    const minimum = minimumMapReputation.value;
+    if (
+      minimum &&
+      taskDetailsReady.value &&
+      metadataStore.tasksRewardsHydrated &&
+      !mapReputationOptions.value.includes(minimum)
+    ) {
+      minimumMapReputation.value = null;
+    }
+  });
+  const matchesMapReputation = (task: Task) =>
+    task.id === mapFocusTaskId.value || meetsMapReputationMinimum(task, minimumMapReputation.value);
   const userHiddenMapTaskIds = computed(() =>
     getListHiddenTaskIds(getHiddenTaskIds.value, {
       searchActive: isSearchActive.value,
@@ -771,18 +829,30 @@
       focusTaskId: mapFocusTaskId.value,
     })
   );
+  const isIncludedMapTask = (task: Task) =>
+    !userHiddenMapTaskIds.value.has(task.id) && matchesMapReputation(task);
   const sourceMapTasks = computed(() =>
-    (isSearchActive.value ? filteredTasks.value : visibleTasks.value).filter(
-      (task) => !userHiddenMapTaskIds.value.has(task.id)
-    )
+    (isSearchActive.value ? filteredTasks.value : visibleTasks.value).filter(isIncludedMapTask)
   );
-  const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, hiddenTaskIds } =
+  const { mapObjectiveMarks, mapObjectiveVisibility, mapTaskIds, hiddenTaskIds, mapTaskColors } =
     useMapObjectiveMarks({
       mapId: selectedMapId,
       shouldShowCompletedObjectives,
       shouldShowLockedObjectives,
       tasks: sourceMapTasks,
     });
+  const {
+    highlightedTaskId: highlightedMapTaskId,
+    lockedTaskId: lockedMapTaskId,
+    setMarkerTask: setMarkerMapTask,
+    setLegendTask: setLegendMapTask,
+    toggleLockedTask: toggleLockedMapTask,
+  } = useMapTaskHighlight({
+    shownTaskIds: computed(
+      () => new Set(mapTaskIds.value.filter((taskId) => !hiddenTaskIds.value.has(taskId)))
+    ),
+    enabled: computed(() => preferencesStore.getMapObjectiveColorMode === 'task'),
+  });
   const mapPlanTasks = computed(() => {
     const taskIds = new Set(mapTaskIds.value);
     return sourceMapTasks.value.filter((task) => taskIds.has(task.id));
@@ -887,6 +957,8 @@
       fullscreenMapView.value = inlineMap.getViewState();
       fullscreenInitialFloor.value = inlineMap.getFloor();
     }
+    // The overlay covers whichever marker was hovered, which then never fires mouseout.
+    setMarkerMapTask(null);
     isMapFullscreen.value = true;
   };
   const closeMapFullscreen = () => {
@@ -895,6 +967,9 @@
     isMapFullscreen.value = false;
     fullscreenMapView.value = null;
     fullscreenInitialFloor.value = undefined;
+    // The overlay unmounts only after its leave transition, so release its marker hover now. Only
+    // the marker source is cleared; a legend hover or a locked quest is kept.
+    setMarkerMapTask(null);
     restoreInlineMapFloor(overlayFloor);
     if (overlayView) nextTick(() => restoreInlineMapView(overlayView));
   };
@@ -963,8 +1038,9 @@
     }
   });
   watch(showMapDisplay, (isMapView) => {
-    if (isMapView || !isMapFullscreen.value) return;
-    closeMapFullscreen();
+    if (isMapView) return;
+    minimumMapReputation.value = null;
+    if (isMapFullscreen.value) closeMapFullscreen();
   });
   // Jumping to an objective of a hidden quest shows that quest again so its marker can open.
   const revealObjectiveTask = (objectiveId: string) => {
@@ -1017,7 +1093,32 @@
     preferencesStore.setHideCompletedMapObjectives(!getHideCompletedMapObjectives.value);
   };
   const route = useRoute();
+  const router = useRouter();
   useTaskRouteSync({ maps, traders: sortedTraders });
+  const { dataLoading, switchMode, switchModeError } = useGameModeSwitch();
+  const linkedTaskId = computed(() => getQueryString(route.query.task));
+  const catalogMode = computed(() => {
+    const mode = metadataStore.currentGameMode;
+    return isGameMode(mode) ? mode : undefined;
+  });
+  const unavailableTaskId = computed(() => {
+    const id = linkedTaskId.value;
+    if (!id || !tasks.value.length) return undefined;
+    return metadataStore.getTaskById(id) ? undefined : id;
+  });
+  watch(linkedTaskId, () => {
+    switchModeError.value = '';
+  });
+  const dismissTaskLink = (taskId: string) => {
+    const path = router.currentRoute.value.path;
+    void queueQueryWrite(async () => {
+      const current = router.currentRoute.value;
+      if (current.path !== path || getQueryString(current.query.task) !== taskId) return;
+      await router.replace({
+        query: { ...current.query, task: undefined, highlightObjective: undefined },
+      });
+    }).catch((error) => logger.error('[Tasks] Failed to dismiss the quest link:', error));
+  };
   const canRefreshVisibleTasks = computed(
     () =>
       metadataStore.hasInitialized &&
@@ -1111,15 +1212,15 @@
     { immediate: true, flush: 'post' }
   );
   const isLoading = computed(
-    () => !canRefreshVisibleTasks.value || !hasRefreshedVisibleTasks.value
+    () => dataLoading.value || !canRefreshVisibleTasks.value || !hasRefreshedVisibleTasks.value
   );
   const {
     filteredTasks,
     mapCompleteTasksCountOnMap,
+    mapReputationFilteredTasks,
     searchStatusCounts,
     showMapTaskVisibilityNotice,
   } = useTaskFilters({
-    excludedTaskIds: userHiddenMapTaskIds,
     calculateFilteredTasksForOptions: (taskList, options, hideCompletedMapObjectives, overrides) =>
       calculateFilteredTasksForOptions(
         taskList,
@@ -1129,7 +1230,9 @@
       ),
     getTaskMapView,
     hideCompletedMapObjectives: getHideCompletedMapObjectives,
+    isIncludedMapTask,
     mapTaskVisibilityFilterOptions,
+    matchesMapReputation,
     normalizedSearch,
     showMapDisplay,
     tasks,
@@ -1182,7 +1285,7 @@
     })
   );
   const unorderedListedTasks = computed(() =>
-    filteredTasks.value.filter(
+    mapReputationFilteredTasks.value.filter(
       (task) => !hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
     )
   );
@@ -1200,12 +1303,12 @@
       : unorderedListedTasks.value
   );
   const hiddenListTasks = computed(() =>
-    filteredTasks.value.filter(
+    mapReputationFilteredTasks.value.filter(
       (task) => hiddenListTaskIds.value.has(task.id) && !userHiddenListTaskIds.value.has(task.id)
     )
   );
   const userHiddenListTasks = computed(() =>
-    filteredTasks.value.filter((task) => userHiddenListTaskIds.value.has(task.id))
+    mapReputationFilteredTasks.value.filter((task) => userHiddenListTaskIds.value.has(task.id))
   );
   const unhideListedTasks = () => {
     preferencesStore.unhideTasks(userHiddenListTasks.value.map((task) => task.id));

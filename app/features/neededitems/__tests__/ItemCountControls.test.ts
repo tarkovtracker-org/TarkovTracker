@@ -23,6 +23,7 @@ function mountComponent(props: {
   currentCount: number;
   neededCount: number;
   size?: 'xs' | 'sm' | 'responsive';
+  minimumCount?: number;
 }): Wrapper {
   const wrapper = mount(ItemCountControls, {
     props,
@@ -152,6 +153,17 @@ describe('ItemCountControls inline edit', () => {
     const input = await startEditing(wrapper);
     expect(input.attributes('min')).toBe('0');
     expect(input.attributes('max')).toBe('10');
+  });
+  it('protects the completed-parent minimum for buttons and typed counts', async () => {
+    const wrapper = mountComponent({ currentCount: 3, neededCount: 10, minimumCount: 3 });
+    expect(
+      wrapper.get('button[aria-label="needed_items.aria.decrease_count"]').attributes('disabled')
+    ).toBeDefined();
+    const input = await startEditing(wrapper);
+    expect(input.attributes('min')).toBe('3');
+    await input.setValue('0');
+    await input.trigger('keydown', { key: 'Enter' });
+    expect(emittedCounts(wrapper)).toEqual([3]);
   });
   it('keeps decrease, increase, and toggle event contracts', async () => {
     const wrapper = mountComponent({ currentCount: 2, neededCount: 10 });

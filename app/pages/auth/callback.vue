@@ -20,8 +20,11 @@
   import { useProductAnalytics } from '@/composables/useProductAnalytics';
   import { buildDiagnosticReport, getErrorSummary } from '@/utils/errorDiagnostics';
   import { sanitizeInternalRedirect } from '@/utils/redirect';
+  import { SupabaseCallbackPendingError } from '@/utils/supabaseReadiness';
   const AUTH_CALLBACK_HASH_SETTLE_TIMEOUT_MS = 500;
   const AUTH_SESSION_SETTLE_TIMEOUT_MS = 5000;
+  type CallbackResult =
+    { authenticated: true } | { authenticated: false; description: string; report: string };
   const { clearPendingLoginProvider, trackLoginSucceeded } = useProductAnalytics();
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
@@ -77,13 +80,37 @@
         'OAuth provider returned an error.',
     };
   };
-  const finalizeLoginTracking = () => {
-    if ($supabase.user.loggedIn) {
+  const finalizeLoginTracking = (authenticated: boolean) => {
+    if (authenticated) {
       trackLoginSucceeded();
       return;
     }
     clearPendingLoginProvider();
   };
+  const callbackTimeoutFailure = () =>
+    buildFailureResult('oauth_callback_timeout', {
+      code: 'OAUTH_SESSION_TIMEOUT',
+      message: 'Session was not established after OAuth callback.',
+    });
+  const waitForPendingCallback = (): Promise<CallbackResult> =>
+    new Promise((resolve) => {
+      const timeoutId = window.setTimeout(
+        () => resolve(callbackTimeoutFailure()),
+        AUTH_SESSION_SETTLE_TIMEOUT_MS
+      );
+      const finish = (result: CallbackResult) => {
+        window.clearTimeout(timeoutId);
+        resolve(result);
+      };
+      $supabase.ready().then(
+        () => finish($supabase.user.loggedIn ? { authenticated: true } : callbackTimeoutFailure()),
+        (error: unknown) => finish(buildFailureResult('oauth_callback_ready', error))
+      );
+    });
+  const callbackReadinessFailure = (error: unknown) =>
+    error instanceof SupabaseCallbackPendingError
+      ? waitForPendingCallback()
+      : buildFailureResult('oauth_callback_ready', error);
   const waitForAuthenticatedSession = async () => {
     try {
       const callbackError = getCallbackError();
@@ -102,14 +129,9 @@
       if ($supabase.user.loggedIn) {
         return { authenticated: true as const };
       }
-      return await new Promise<
-        { authenticated: true } | { authenticated: false; description: string; report: string }
-      >((resolve) => {
+      return await new Promise<CallbackResult>((resolve) => {
         let settled = false;
-        const finish = (
-          value:
-            { authenticated: true } | { authenticated: false; description: string; report: string }
-        ) => {
+        const finish = (value: CallbackResult) => {
           if (settled) {
             return;
           }
@@ -127,22 +149,17 @@
           }
         );
         const timeoutId = window.setTimeout(() => {
-          finish(
-            buildFailureResult('oauth_callback_timeout', {
-              code: 'OAUTH_SESSION_TIMEOUT',
-              message: 'Session was not established after OAuth callback.',
-            })
-          );
+          finish(callbackTimeoutFailure());
         }, AUTH_SESSION_SETTLE_TIMEOUT_MS);
       });
     } catch (error) {
-      return buildFailureResult('oauth_callback_ready', error);
+      return callbackReadinessFailure(error);
     }
   };
   onMounted(async () => {
     const isPopup = window.opener && !window.opener.closed;
     const result = await waitForAuthenticatedSession();
-    finalizeLoginTracking();
+    finalizeLoginTracking(result.authenticated);
     if (isPopup) {
       window.opener.postMessage(
         result.authenticated

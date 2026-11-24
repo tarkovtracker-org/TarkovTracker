@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { setTimeout as delay } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
+import { promotionBranch } from '../release/release-promotion.mjs';
 import { approvalCommandPrefix, currentAdminAttestation } from './review-admission-attestation.mjs';
 import {
   activeQueueGroup,
@@ -16,6 +18,11 @@ import { codeRabbitCommentEvent, readCodeRabbitComments } from './review-admissi
 import { crowdinEligibility } from './review-admission-crowdin.mjs';
 import { dependencyEligibility } from './review-admission-dependencies.mjs';
 import { requireQueueIssuer, requireReceiptIssuer } from './review-admission-issuer.mjs';
+import {
+  linkedReviewTarget,
+  recoverMergedReview,
+  unlinkedReview,
+} from './review-admission-merged-review.mjs';
 import {
   admissionDecision,
   AdmissionHeld,
@@ -50,7 +57,7 @@ async function evidence(github, repo, pr) {
     filter: 'latest',
   });
   const threads = await reviewThreads(github, repo, pr.number);
-  const trusted = await trustedActors(github, repo, reviews, comments);
+  const trusted = await trustedActors(github, repo, reviews, comments, pr);
   const crowdinSafe = await crowdinEligibility(github, pr, files);
   const dependencySafe = await dependencyEligibility(github, pr, files);
   const releaseSafe = await releaseAssetsEligibility(github, pr, files);
@@ -147,12 +154,21 @@ async function checkedAdmission({ github, context, pr, group, source, statusSha 
   );
   return result;
 }
-async function uploadedReceipt(github, context, sha) {
-  const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
-    ...context.repo,
-    run_id: Number(context.runId),
-  });
-  const matches = artifacts.filter((artifact) => artifact.name === `review-admission-${sha}`);
+async function uploadedReceipt(github, context, sha, wait) {
+  async function listMatches() {
+    const artifacts = await allPages(github, github.rest.actions.listWorkflowRunArtifacts, {
+      ...context.repo,
+      run_id: Number(context.runId),
+    });
+    return artifacts.filter((artifact) => artifact.name === `review-admission-${sha}`);
+  }
+  let matches = await listMatches();
+  // A successful upload can take time to appear in the artifact listing.
+  for (const retryDelay of [1000, 2000, 4000, 8000]) {
+    if (matches.length > 0) break;
+    await wait(retryDelay);
+    matches = await listMatches();
+  }
   requireEvidence(matches.length === 1, 'Uploaded admission receipt is missing or ambiguous.');
   requireEvidence(!matches[0].expired, 'Uploaded admission receipt expired.');
   const result = JSON.parse(await readFile(`review-admission-evidence/${sha}.json`, 'utf8'));
@@ -176,7 +192,7 @@ async function currentReceiptDecision(github, context, result) {
   if (group) await requireReleaseSource(github, context.repo, pr, group, live.files);
   const decision = admissionDecision(live);
   await publicationRevision(github, context, pr, group);
-  return decision;
+  return { decision, pr };
 }
 async function publicationGroup(github, context, pr, result) {
   if (result.statusSha === pr.head.sha) return null;
@@ -215,13 +231,14 @@ function admissionSummary(decision) {
     `Verified ${decision.review.provider} review; ${decision.risk} risk admission approved.`
   );
 }
-export async function publishReviewAdmission({ github, context, sha }) {
+export async function publishReviewAdmission({ github, context, sha, wait = delay }) {
   requireEvidence(SHA.test(sha), 'Publication requires exact admission SHA.');
   try {
-    const result = await uploadedReceipt(github, context, sha);
-    const decision = await currentReceiptDecision(github, context, result);
+    const result = await uploadedReceipt(github, context, sha, wait);
+    const { decision, pr } = await currentReceiptDecision(github, context, result);
     requireSameDecision(result, decision);
     await status(github, context, sha, 'success', admissionSummary(decision));
+    return pr;
   } catch (error) {
     await status(github, context, sha, 'failure', error.message);
     throw error;
@@ -243,18 +260,20 @@ async function groupForRun(github, repo, run) {
   const { data: commit } = await github.rest.git.getCommit({ ...repo, commit_sha: run.head_sha });
   return { ...run, base_ref: 'refs/heads/main', base_sha: commit.parents?.[0]?.sha };
 }
-async function targets(github, context) {
+async function targets(github, context, signal) {
   const queued = queueRun(context.payload);
   if (queued) return queueTarget(github, context.repo, queued);
   const direct = directNumber(context.payload);
   if (direct) return [{ number: direct }];
   if (context.eventName !== 'workflow_run') return [];
-  return signalTargets(github, context);
+  return signalTargets(github, context, signal);
 }
-async function signalTargets(github, context) {
-  const run = await validatedSignalRun(github, context);
+async function signalTargets(github, context, signal) {
+  const run = signal ?? (await validatedSignalRun(github, context));
   if (run.event === 'check_suite') return suiteTargets(github, context.repo, run);
-  return linkedPullTarget(run.pull_requests, context.repo);
+  if (unlinkedReview(run)) return [await recoverMergedReview(github, context, run)];
+  const [target] = linkedPullTarget(run.pull_requests, context.repo);
+  return [await linkedReviewTarget(github, context, run, target)];
 }
 function linkedPullTarget(pulls, repo) {
   requireEvidence(
@@ -402,6 +421,7 @@ async function requireSignal(github, context) {
     ].every(Boolean),
     'Admission signal did not complete for this exact run attempt.'
   );
+  return run;
 }
 async function scopeStatuses(github, context, shas, state, description) {
   for (const sha of shas) await status(github, context, sha, state, description);
@@ -469,38 +489,54 @@ function relevantPrComment(payload) {
 }
 async function successfulSignal(github, context) {
   if (context.payload.workflow_run.conclusion !== 'success') return false;
-  await requireSignal(github, context);
-  return true;
+  const signal = await requireSignal(github, context);
+  // Authenticate the target before joining the global publication queue. This only discards
+  // signals already proven obsolete by the publisher; ambiguity and API errors still throw.
+  return !obsoleteSignalNotice(await targets(github, context, signal));
 }
 export async function filterAdmission({ github, context }) {
   if (context.eventName === 'issue_comment') return relevantPrComment(context.payload);
   if (context.eventName === 'workflow_run') return successfulSignal(github, context);
   return true;
 }
-export async function runReviewAdmission({ github, context, core }) {
+function obsoleteSignalNotice(selected) {
+  if (selected === null) {
+    return 'Provider suite on a merge-queue commit is not review evidence; no status changed.';
+  }
+  if (selected.length === 1 && selected[0].obsoleteMergedReview) {
+    return `Review signal for merged PR #${selected[0].number} is obsolete; no status changed.`;
+  }
+  return null;
+}
+function publicationClient(github, createPublisher) {
+  return createPublisher ? createPublisher() : github;
+}
+export async function runReviewAdmission({ github, context, core, createPublisher }) {
   if (context.eventName === 'issue_comment' && !relevantComment(context.payload)) {
     core.notice('Unrelated issue comment does not affect review admission.');
     return;
   }
   const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   requireEvidence(SHA.test(source), 'Trusted checkout source is not immutable.');
-  await requireSignal(github, context);
-  const selected = await targets(github, context);
-  if (selected === null) {
-    core.notice(
-      'Provider suite on a merge-queue commit is not review evidence; no status changed.'
-    );
+  const signal = await requireSignal(github, context);
+  const selected = await targets(github, context, signal);
+  const obsolete = obsoleteSignalNotice(selected);
+  if (obsolete) {
+    core.notice(obsolete);
     return;
   }
   requireEvidence(selected.length === 1, 'No exact-head pull request could be identified.');
-  await evaluateScope(github, context, core, selected[0], source);
+  // A relevant event may become obsolete while queued. Do not initialize the protected App
+  // until fresh source/target checks have established actual publication work.
+  const publisher = await publicationClient(github, createPublisher);
+  await evaluateScope(publisher, context, core, selected[0], source);
 }
 // Workflow entry point. A policy hold (draft or closed PR, review missing, open findings, sensitive approval
 // missing) has already failed every scope status, which is the actual gate, so the run ends green
 // with a notice instead of producing a red run for every review event. Integrity, identity and
 // API errors still fail the run. A hold after any receipt output was set stays a failure so later
 // upload/publication steps cannot run.
-export async function runReviewAdmissionStep({ github, context, core }) {
+export async function runReviewAdmissionStep({ github, context, core, createPublisher }) {
   const outputs = new Set();
   const tracked = Object.assign(Object.create(core), {
     setOutput(name, value) {
@@ -509,7 +545,7 @@ export async function runReviewAdmissionStep({ github, context, core }) {
     },
   });
   try {
-    await runReviewAdmission({ github, context, core: tracked });
+    await runReviewAdmission({ github, context, core: tracked, createPublisher });
   } catch (error) {
     if (!(error instanceof AdmissionHeld) || receiptOutput(outputs)) throw error;
     core.notice(`Review admission held: ${error.message}`);
@@ -520,10 +556,16 @@ function receiptOutput(outputs) {
 }
 export async function publishReviewScope({ github, context, head, queued }) {
   const shas = [head, queued].filter(Boolean);
+  const published = [];
   try {
-    for (const sha of shas) await publishReviewAdmission({ github, context, sha });
+    for (const sha of shas) published.push(await publishReviewAdmission({ github, context, sha }));
+    return requestPromotion(published[0], queued, context.repo);
   } catch (error) {
     await scopeStatuses(github, context, shas, 'failure', error.message);
     throw error;
   }
+}
+function requestPromotion(pr, queued, repo) {
+  if (!pr || queued) return false;
+  return Boolean(promotionBranch(pr, repo));
 }

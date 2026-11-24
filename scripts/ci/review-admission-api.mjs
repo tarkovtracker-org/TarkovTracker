@@ -1,4 +1,5 @@
 import { expectedPublisherBot, requireReceiptIssuer } from './review-admission-issuer.mjs';
+import { approvalCommand } from './review-admission-attestation.mjs';
 import { requireQueueConfiguration } from './queue-configuration.mjs';
 import { AdmissionPending, CONTEXT, SHA, requireEvidence } from './review-admission-policy.mjs';
 export async function allPages(github, endpoint, params) {
@@ -42,8 +43,21 @@ async function collaborator(github, repo, username) {
     throw error;
   }
 }
-export async function trustedActors(github, repo, reviews, comments) {
-  const actors = [...reviews, ...comments].filter((item) => item.user?.type === 'User');
+function approvalReview(review, pr) {
+  return [
+    review.state === 'APPROVED',
+    review.commit_id === pr.head.sha,
+    review.user?.id !== pr.user.id,
+  ].every(Boolean);
+}
+export async function trustedActors(github, repo, reviews, comments, pr) {
+  // Findings and withdrawals still use every review/comment. Only permission reads are narrowed
+  // to identities which could grant this exact head approval; no live role result is cached.
+  const approvals = [
+    ...reviews.filter((review) => approvalReview(review, pr)),
+    ...comments.filter((comment) => approvalCommand(comment.body, pr.head.sha)),
+  ];
+  const actors = approvals.filter((item) => item.user?.type === 'User');
   const names = [...new Set(actors.map((item) => item.user.login))];
   const trusted = new Set();
   for (const name of names) {

@@ -257,5 +257,6 @@ try {
   if (created)
     query(`DELETE FROM private.supporter_chargebacks WHERE customer_id='cus_concurrency_${user.replaceAll('-', '')}';
      DELETE FROM public.supporters WHERE user_id='${user}';
+    DELETE FROM public.account_billing_subscriptions WHERE user_id='${user}';
     DELETE FROM auth.users WHERE id='${user}'; DELETE FROM public.stripe_events WHERE event_id='${event}'`);
 }

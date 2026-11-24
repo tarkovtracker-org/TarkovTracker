@@ -61,3 +61,4 @@ export const isTaskRequirementSatisfied = (
   getRequiredTaskStatuses(statuses).some((status) =>
     requirementChecks[status](completion, isUnlockable)
   );
+export const COMPACT_REQUIREMENT_LIMIT = 3;

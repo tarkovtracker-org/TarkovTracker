@@ -21,6 +21,51 @@ test('changelog-only PRs retain release controls and selection regressions', () 
   }
   assert.ok(all.length > retained.length);
 });
+const appFile = 'app/features/tasks/TaskCard.vue';
+const pullRequestPlan = (plan) => ({
+  WORKFLOW_TEST_EVENT: 'pull_request',
+  WORKFLOW_TEST_PLAN: JSON.stringify(plan),
+});
+test('app-only PRs run only the selection regressions', () => {
+  const selection = ['scripts/workflow-tests/workflow-test-selection.mjs'];
+  for (const paths of [
+    [appFile],
+    ['app/server/api/tarkov/catalog.ts', 'app/stores/useProgressStore.ts'],
+    ['app/components/ui/__tests__/StatusTabBar.test.ts', 'app/assets/css/main.css'],
+  ])
+    assert.deepEqual(selectWorkflowTests(all, environment(paths)), selection, paths.join());
+});
+test('locale, tooling-read, traversal and non-app paths keep the full suite', () => {
+  for (const path of [
+    'app/locales/en.json',
+    'app/locales/fr.json',
+    'app/utils/locales.ts',
+    'app/pages/../../scripts/ci/validation-plan.mjs',
+    'app/',
+    'apps/web/index.ts',
+  ]) {
+    assert.deepEqual(selectWorkflowTests(all, environment([path])), all, path);
+    assert.deepEqual(selectWorkflowTests(all, environment([appFile, path])), all, path);
+  }
+  assert.deepEqual(selectWorkflowTests(all, environment([helper, 'app/pages/index.vue'])), all);
+});
+test('non-string plan paths keep the full suite', () => {
+  const valid = classifyPaths([appFile]);
+  for (const extra of [42, null, { toString: () => 'app/a.vue' }]) {
+    const plan = { ...valid, paths: [...valid.paths, extra] };
+    assert.deepEqual(selectWorkflowTests(all, pullRequestPlan(plan)), all, String(extra));
+  }
+});
+test('app-only selection applies to pull requests with a complete inventory only', () => {
+  for (const event of ['push', 'merge_group', 'workflow_dispatch'])
+    assert.deepEqual(
+      selectWorkflowTests(all, { ...environment([appFile]), WORKFLOW_TEST_EVENT: event }),
+      all,
+      event
+    );
+  const incomplete = all.filter((file) => !file.endsWith('/workflow-test-selection.mjs'));
+  assert.deepEqual(selectWorkflowTests(incomplete, environment([appFile])), incomplete);
+});
 test('tooling, workflow, config, mixed and unknown changes retain every test', () => {
   for (const path of [
     'scripts/release/release-commit.sh',

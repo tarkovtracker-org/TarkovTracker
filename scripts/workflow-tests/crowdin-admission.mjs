@@ -196,6 +196,8 @@ test('mixed, renamed, deleted, English, nested or incomplete inventories require
   for (const path of [
     '.github/workflows/ci.yml',
     'app/locales/en.json',
+    // A Crowdin target that is not in the pinned locale list.
+    'app/locales/hu.json',
     'app/locales/nested/fr.json',
     'app/components/Task.vue',
   ]) {
@@ -428,7 +430,8 @@ test('only the supported non-English locale inventory can use the exemption', as
   const codes = [...readFileSync('app/utils/locales.ts', 'utf8').matchAll(/'([a-z]{2})'/g)]
     .map((match) => match[1])
     .filter((code) => code !== 'en');
-  assert.equal(codes.length, 12);
+  assert.equal(codes.length, 13);
+  assert.ok(codes.includes('tr'));
   for (const code of codes) {
     const f = fixture();
     f.files[0].filename = `app/locales/${code}.json`;
@@ -492,12 +495,12 @@ test('skipped or unfinished optional reviews do not reinstate a review requireme
 });
 test('complete inventory means all changed files, not every supported locale on every PR', () => {
   const f = fixture();
-  const codes = ['cs', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'uk', 'zh'];
+  const codes = ['cs', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pl', 'pt', 'ru', 'tr', 'uk', 'zh'];
   f.files = codes.map((code) => ({ ...f.files[0], filename: `app/locales/${code}.json` }));
-  f.pr.changed_files = 12;
+  f.pr.changed_files = 13;
   assert.equal(crowdinCandidate(f.pr, f.files), true);
   assert.equal(crowdinCandidate(f.pr, f.files.slice(1)), false);
-  f.pr.changed_files = 11;
+  f.pr.changed_files = 12;
   assert.equal(crowdinCandidate(f.pr, f.files.slice(1)), true);
 });
 test('arbitrary later provider comments cannot erase an unresolved exact-head finding', async () => {

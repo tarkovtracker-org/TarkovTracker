@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <a
         href="https://api.tarkovtracker.org"
         target="_blank"
@@ -9,16 +9,33 @@
       >
         {{ t('page.settings.card.apitokens.open_api_documentation') }}
       </a>
-      <UButton
-        color="primary"
-        variant="soft"
-        icon="i-mdi-key-plus"
-        :disabled="!userLoggedIn || creating || tokenCapReached"
-        @click="showCreateDialog = true"
-      >
-        {{ t('page.settings.card.apitokens.new_token_expand') }}
-      </UButton>
+      <div class="flex flex-wrap gap-2">
+        <UButton
+          color="neutral"
+          variant="soft"
+          icon="i-mdi-chart-timeline-variant"
+          aria-controls="api-token-activity"
+          :aria-expanded="activityScope === 'account'"
+          @click="toggleActivity('account')"
+        >
+          {{ t('page.settings.card.apitokens.activity.account') }}
+        </UButton>
+        <UButton
+          color="primary"
+          variant="soft"
+          icon="i-mdi-key-plus"
+          :disabled="!userLoggedIn || creating || tokenCapReached"
+          @click="showCreateDialog = true"
+        >
+          {{ t('page.settings.card.apitokens.new_token_expand') }}
+        </UButton>
+      </div>
     </div>
+    <ApiTokenActivityDisclosure
+      id="api-token-activity"
+      :open="activityScope === 'account'"
+      :title="t('page.settings.card.apitokens.activity.account')"
+    />
     <div class="space-y-3">
       <UAlert
         v-if="!supportsRawTokens"
@@ -51,14 +68,15 @@
         />
       </div>
       <div v-else class="space-y-2">
-        <UCard
+        <article
           v-for="token in tokens"
           :key="token.id"
-          class="bg-surface-900 border border-white/10"
-          :ui="{ body: 'space-y-3' }"
+          class="bg-surface-900 @container rounded-lg border border-white/10 p-3 sm:p-4"
         >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="w-full space-y-2">
+          <header class="flex flex-wrap items-start justify-between gap-3">
+            <div
+              class="min-w-0 space-y-1 @min-[32rem]:flex @min-[32rem]:items-center @min-[32rem]:gap-3 @min-[32rem]:space-y-0"
+            >
               <ApiTokenNameEditor
                 :name="token.note"
                 :editing="editingTokenId === token.id"
@@ -68,116 +86,87 @@
                 @cancel="cancelTokenNameEdit"
                 @save="renameToken(token, $event)"
               />
-              <div class="flex flex-wrap gap-1.5 text-xs">
-                <UBadge
-                  :color="
-                    token.gameMode === 'pve'
-                      ? 'info'
-                      : token.gameMode === 'seasonal'
-                        ? 'warning'
-                        : 'primary'
-                  "
-                  variant="solid"
-                  size="xs"
-                >
-                  {{ formatGameMode(token.gameMode) }}
-                </UBadge>
-                <UBadge
-                  v-for="perm in token.permissions"
-                  :key="perm"
-                  color="info"
-                  variant="soft"
-                  size="xs"
-                >
-                  {{ permissionLabel(perm) }}
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="text-surface-300">{{ formatGameMode(token.gameMode) }}</span>
+                <UBadge v-if="!token.isActive" color="warning" variant="subtle" size="sm">
+                  {{ t('page.settings.card.apitokens.list.revoked') }}
                 </UBadge>
               </div>
+            </div>
+            <UButton
+              color="neutral"
+              variant="soft"
+              icon="i-mdi-chart-timeline-variant"
+              size="sm"
+              :aria-controls="`api-activity-${token.id}`"
+              :aria-label="activityAction(token, true)"
+              :aria-expanded="activityScope === token.id"
+              @click="toggleActivity(token.id)"
+            >
+              {{ activityAction(token) }}
+            </UButton>
+          </header>
+          <div class="my-3 border-y border-white/10 py-3">
+            <ApiTokenDetails v-bind="{ token, permissionLabels }" />
+          </div>
+          <footer class="flex flex-wrap items-end justify-between gap-3">
+            <div
+              class="min-w-full flex-1 @min-[24rem]:min-w-0 @min-[32rem]:flex @min-[32rem]:items-center @min-[32rem]:gap-3"
+            >
+              <p class="text-surface-300 mb-1 text-xs @min-[32rem]:mb-0 @min-[32rem]:shrink-0">
+                {{ t('page.settings.card.apitokens.list.token_value') }}
+              </p>
               <div
-                class="bg-surface-950/50 flex items-center gap-2 rounded border border-white/5 p-2"
-                :class="{ 'opacity-70': !token.tokenValue }"
+                class="bg-surface-950/60 flex min-w-0 flex-1 items-start gap-2 rounded-md border border-white/10"
               >
-                <code class="text-surface-300 flex-1 font-mono text-xs">
-                  <template v-if="token.tokenValue">
-                    {{
-                      visibleTokens.has(token.id) ? token.tokenValue : maskToken(token.tokenValue)
-                    }}
-                  </template>
-                  <template v-else>
-                    {{
-                      supportsRawTokens
-                        ? t('page.settings.card.apitokens.token_value_missing')
-                        : t('page.settings.card.apitokens.token_value_hidden')
-                    }}
-                  </template>
+                <code class="text-surface-100 min-w-0 flex-1 px-2.5 py-2 text-sm wrap-anywhere">
+                  {{ displayedToken(token) }}
                 </code>
-                <div class="flex items-center gap-1">
+                <div class="flex shrink-0 items-center">
                   <UButton
                     :icon="visibleTokens.has(token.id) ? 'i-mdi-eye-off' : 'i-mdi-eye'"
                     color="neutral"
                     variant="ghost"
-                    size="xs"
-                    :padded="false"
+                    size="sm"
                     :disabled="!token.tokenValue"
-                    :aria-label="
-                      visibleTokens.has(token.id)
-                        ? t('page.settings.card.apitokens.hide_token')
-                        : t('page.settings.card.apitokens.show_token')
-                    "
+                    :aria-label="tokenVisibilityLabel(token.id)"
                     @click="toggleTokenVisibility(token.id)"
                   />
                   <UButton
                     icon="i-mdi-content-copy"
                     color="neutral"
                     variant="ghost"
-                    size="xs"
-                    :padded="false"
+                    size="sm"
                     :disabled="!token.tokenValue"
                     :aria-label="t('page.settings.card.apitokens.copy_token')"
                     @click="copyTokenValue(token.tokenValue)"
                   />
                 </div>
               </div>
-              <div class="text-surface-400 flex items-center gap-2 text-xs">
-                <span>
-                  {{ t('page.settings.card.apitokens.list.created') }}:
-                  {{ formatDate(token.createdAt) }}
-                </span>
-                <span>
-                  {{
-                    t('page.settings.card.apitokens.list.usage_count', {
-                      count: token.usageCount ?? 0,
-                    })
-                  }}
-                </span>
-                <UTooltip :text="lastUsedTooltip(token.lastUsedAt)">
-                  <button
-                    type="button"
-                    class="inline-flex items-center justify-center"
-                    :aria-label="lastUsedTooltip(token.lastUsedAt)"
-                  >
-                    <UIcon name="i-mdi-clock-outline" class="text-surface-500 h-3.5 w-3.5" />
-                  </button>
-                </UTooltip>
-              </div>
             </div>
-            <div class="flex items-center gap-2">
-              <UBadge v-if="!token.isActive" color="warning" variant="subtle" size="xs">
-                {{ t('page.settings.card.apitokens.list.revoked') }}
-              </UBadge>
-              <UButton
-                color="error"
-                variant="ghost"
-                icon="i-mdi-close-circle"
-                size="xs"
-                :loading="revokingId === token.id"
-                :disabled="renamingId === token.id"
-                @click="revokeToken(token.id)"
-              >
-                {{ t('page.settings.card.apitokens.revoke_button') }}
-              </UButton>
-            </div>
-          </div>
-        </UCard>
+            <UButton
+              color="error"
+              variant="ghost"
+              size="sm"
+              class="ms-auto"
+              :loading="revokingId === token.id"
+              :disabled="renamingId === token.id"
+              :aria-label="
+                t('page.settings.card.apitokens.revoke_named', { name: activityTitle(token) })
+              "
+              @click="revokeToken(token.id)"
+            >
+              {{ t('page.settings.card.apitokens.revoke_button') }}
+            </UButton>
+          </footer>
+          <ApiTokenActivityDisclosure
+            :id="`api-activity-${token.id}`"
+            class="mt-3"
+            :open="activityScope === token.id"
+            :token-id="token.id"
+            :title="activityTitle(token)"
+          />
+        </article>
       </div>
     </div>
     <UModal v-model:open="showCreateDialog">
@@ -206,11 +195,21 @@
                 item: 'rounded-lg border border-surface-700 bg-surface-800/50 px-3 py-3 data-[state=checked]:border-primary-500 data-[state=checked]:bg-primary-500/10',
                 label: 'text-sm font-medium text-white light:text-surface-50',
               }"
-            />
+            >
+              <template #label="{ item }">
+                <span class="inline-flex items-center gap-1">
+                  <GameModeBadge :mode="item.value" class="-my-2" />
+                  {{ item.label }}
+                </span>
+              </template>
+            </URadioGroup>
           </UFormField>
           <div class="space-y-2">
             <p class="text-surface-200 text-sm font-semibold">
               {{ t('page.settings.card.apitokens.form.permissions_title') }}
+            </p>
+            <p class="text-surface-400 text-xs">
+              {{ t('page.settings.card.apitokens.form.permissions_help') }}
             </p>
             <div class="grid gap-2 md:grid-cols-2">
               <UCheckbox
@@ -292,8 +291,11 @@
   </div>
 </template>
 <script setup lang="ts">
+  import GameModeBadge from '@/components/GameModeBadge.vue';
   import { useEdgeFunctions } from '@/composables/api/useEdgeFunctions';
   import { useDiagnosticToast } from '@/composables/useDiagnosticToast';
+  import ApiTokenActivityDisclosure from '@/features/settings/ApiTokenActivityDisclosure.vue';
+  import ApiTokenDetails from '@/features/settings/ApiTokenDetails.vue';
   import ApiTokenNameEditor from '@/features/settings/ApiTokenNameEditor.vue';
   import {
     API_PERMISSIONS,
@@ -335,6 +337,7 @@
   const revokingId = ref<string | null>(null);
   const renamingId = ref<string | null>(null);
   const editingTokenId = ref<string | null>(null);
+  const activityScope = ref<string | null>(null);
   const tokens = ref<TokenRow[]>([]);
   const selectedGameMode = ref<GameMode>(GAME_MODES.PVP);
   const selectedPermissions = ref<TokenPermission[]>(['GP']);
@@ -346,10 +349,15 @@
   let loadTokensRequestId = 0;
   let renameTokenRequestId = 0;
   const userLoggedIn = computed(() => $supabase.user.loggedIn);
+  const permissionLabels = computed<Record<string, string>>(() => ({
+    GP: t('page.settings.card.apitokens.list.permission_personal_read'),
+    TP: t('page.settings.card.apitokens.list.permission_team_read'),
+    WP: t('page.settings.card.apitokens.list.permission_write'),
+  }));
   const permissionOptions = computed(() =>
     Object.entries(API_PERMISSIONS).map(([key, value]) => ({
       value: key as TokenPermission,
-      label: value.title,
+      label: permissionLabels.value[key] ?? value.title,
     }))
   );
   const gameModes = computed(() =>
@@ -375,16 +383,25 @@
       !!selectedGameMode.value &&
       !tokenCapReached.value
   );
-  const formatDate = (date: string | null) => {
-    if (!date) return '';
-    return new Date(date).toLocaleString();
+  const toggleActivity = (scope: string) => {
+    activityScope.value = activityScope.value === scope ? null : scope;
   };
-  const lastUsedTooltip = (lastUsedAt: string | null) => {
-    const value = lastUsedAt
-      ? formatDate(lastUsedAt)
-      : t('page.settings.card.apitokens.list.never');
-    return t('page.settings.card.apitokens.list.last_used_tooltip', { value });
+  const activityTitle = (token: TokenRow) =>
+    token.note || t('page.settings.card.apitokens.default_note');
+  const activityAction = (token: TokenRow, named = false) => {
+    const action = activityScope.value === token.id ? 'hide' : 'view';
+    const key = named ? `${action}_named` : action;
+    return t(`page.settings.card.apitokens.activity.${key}`, { name: activityTitle(token) });
   };
+  const displayedToken = (token: TokenRow) => {
+    if (token.tokenValue) {
+      return visibleTokens.value.has(token.id) ? token.tokenValue : maskToken(token.tokenValue);
+    }
+    const unavailable = supportsRawTokens.value ? 'token_value_missing' : 'token_value_hidden';
+    return t(`page.settings.card.apitokens.${unavailable}`);
+  };
+  const tokenVisibilityLabel = (id: string) =>
+    t(`page.settings.card.apitokens.${visibleTokens.value.has(id) ? 'hide_token' : 'show_token'}`);
   const formatGameMode = (mode: GameMode) => {
     const option = GAME_MODE_OPTIONS.find((entry) => entry.value === mode);
     return option
@@ -393,9 +410,6 @@
           mode === GAME_MODES.SEASONAL ? 'Seasonal PvP' : mode === GAME_MODES.PVE ? 'PvE' : 'PvP'
         )
       : t('common.pvp', 'PvP');
-  };
-  const permissionLabel = (value: TokenPermission) => {
-    return permissionOptions.value.find((perm) => perm.value === value)?.label || value;
   };
   const tableClient = (): SupabaseTable | null => {
     return (
@@ -427,6 +441,7 @@
     renameTokenRequestId += 1;
   };
   const resetUserScopedState = () => {
+    activityScope.value = null;
     invalidateTokenCreates();
     invalidateTokenLoads();
     invalidateTokenRenames();

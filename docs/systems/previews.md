@@ -80,6 +80,9 @@ PR update → CI (selected validation + security + preview build + manifest + ar
           → freshness recheck → Preview Result success [preview <digest12> v<profile>]
 ```
 
+The trusted smoke suite reads expected SEO copy as JSON from the exact verified deployment revision.
+The default branch still defines the route inventory, canonical URLs, and robots assertions.
+
 The smoke runner finishes shared readiness before starting two browser workers. Files may overlap;
 tests within each file keep their existing order and intentional serial groups. Each test retains
 its own browser context, and Access sessions remain scoped to the preview origin and process.
@@ -235,25 +238,27 @@ still needs current revision evidence.
   analytics, Turnstile, Stripe, and log-forwarding values; the anonymous build sets `APP_URL` to the
   controlled branch alias so host trust covers the unique deployment URL, and the app's offline
   Supabase fallback activates on `pages.dev`. Public game data still flows through `/api/tarkov/*`.
-- Preview `TARKOV_DATA` binds a dedicated namespace shared by all preview branches, separate from
-  production. Seed/refresh its three English core keys and three English import snapshot keys
-  explicitly with a reviewed producer and seven-day TTL; the production precompute workflow does
-  not refresh preview data. A maintainer owns this manual refresh. Until
-  [#1161](https://github.com/tarkovtracker-org/TarkovTracker/pull/1161) merges, select its
-  independently reviewed snapshot-producer revision: this configuration change does not add that
-  producer, and main's existing core-only runner cannot seed import snapshots. The producer is
-  `scripts/precompute/run.ts` (`pnpm run precompute:tarkov`) from that selected revision, with
-  `PRECOMPUTE_LANG=en`, a pinned `EXPECTED_OVERLAY_SHA`, and `TARKOV_DATA_KV_NAMESPACE_ID` set to
-  the preview namespace. An approved broker writer can invoke the same exported `runPrecompute`
-  and `runImportPrecompute` functions without exposing credentials. Refresh before import
-  verification and at least every six days while an import preview remains active.
-  Missing or expired import snapshots return 503 and block import verification until a valid
-  release is reseeded; ordinary preview smoke tests do not establish import-snapshot readiness.
-  Every approved preview runtime has read/write/delete access to this shared, expendable store.
-  Only merged public game catalogs belong there, never raw overlays, credentials, or user progress;
-  revalidate the seeded release before importing because another preview can change these keys.
-  The trusted deployment job reads `wrangler.toml` from the default branch, so binding changes
-  take effect only after that configuration is merged and the preview is redeployed.
+- Preview `TARKOV_DATA` binds a dedicated namespace shared by all preview branches,
+  separate from production. Neutral readers need the complete release of 30 mode
+  catalogs and 13 language bundles, plus the three whole English import snapshots.
+  Seed it explicitly from a reviewed, merged producer with a pinned
+  `EXPECTED_OVERLAY_SHA` and both language/mode filters empty. The production
+  precompute workflow refreshes only production. An approved broker writer or
+  authorized operator can run the existing producer against the preview namespace
+  without exposing credentials to candidate code. A historical English-only core
+  seed cannot satisfy the neutral reader. Validate the complete manifest, immutable
+  object readbacks, and all three import results before testing catalog-dependent
+  UI. Refresh before expiry and at least every six days while an import preview
+  remains active. Unavailable or expired English imports always return 503.
+  Neutral catalog readers can return a last-good per-colo copy marked `STALE`
+  when KV is unavailable, or 503 when no copy exists. Only a current release
+  passes verification. Ordinary preview smoke tests do not certify the complete
+  catalog or import release. Every approved preview runtime has read/write/delete
+  access to this shared expendable store. Only merged public game catalogs belong
+  there. Revalidate the seeded identity before testing because another preview can
+  change the shared release. The trusted deployment job reads `wrangler.toml` from
+  the default branch, so binding changes take effect after that configuration is
+  merged and the preview is redeployed.
 - Nuxt's Turnstile key-pair validation runs only for production `build`/`generate` commands, not for
   `pnpm install`'s `nuxt prepare`; deployable builds still reject a one-sided key configuration.
 - Smoke tests run in a separate credential-free job against the unique deployment URL and require
@@ -284,8 +289,8 @@ Current gates consume `CI Result` and `Preview Result` on the validated head for
 standalone branch candidates. Both come from GitHub
 Actions (app id 15368), and waiting automation re-reads them from the API rather than trusting
 `target_url` or a payload snapshot. The app id does not authenticate a workflow definition: a
-same-repository PR can edit its `pull_request` workflow and request `statuses: write`. The opt-in
-shadow below never publishes a merge result; a separate trusted publisher boundary is required
+same-repository PR can edit its `pull_request` workflow and request `statuses: write`. A separate
+trusted publisher boundary is required
 before moving the ordinary preview build out of CI. When an aggregate accepts a job during a
 documented compatibility window, the window
 applies only to that job's absence; a reported non-success outcome still fails the aggregate, and
@@ -336,25 +341,6 @@ schema, expression and shell check; unsupported values or changed lock/cancellat
 
 Live activation/canary and rollback remain gated by [merge queue rollout](../merge-queue-rollout.md).
 
-### Opt-in finalization shadow
-
-`.github/workflows/finalization-shadow.yml` is a non-authoritative rehearsal of a late build.
-A maintain/admin actor dispatches it from `main` with an open non-draft PR number and its successful
-exact-head CI run id. The trusted planner checks the live head/base/test-merge parents and tree,
-the CI run's PR snapshot, and the attempt-specific `CI Result` job. Docs-only changes skip build.
-The `github-script` handoff passes the repository explicitly because spreading its context drops
-the computed `repo` property; missing repository identity fails planning before any build.
-Docs-only runs still receive a terminal revision recheck. GitHub's workflow-run API may omit the
-PR/base snapshot for fork runs; the shadow rejects those runs until an authenticated historical
-base source is available. This does not change the existing approved fork-preview path.
-Deployable changes build the test merge in a digest-pinned Node container without repository
-write credentials, Actions runtime/cache token, OIDC, deployment secrets, or Docker socket. A
-trusted host step rejects links, special files, and oversized output before the artifact uploader
-can read it. A separate clean runner treats the candidate build artifact as hostile, safely extracts it, rechecks
-the live revision, and seals `pages-preview-shadow` with a digest and versioned manifest. Competing
-same-PR dispatches cancel; pushes and base changes invalidate the old request. The shadow neither
-deploys nor publishes required statuses. Ordinary CI still builds/uploads `pages-preview`.
-
 ### Efficiency evidence
 
 The optional `benchmark` tests in `scripts/workflow-tests/preview.mjs` and
@@ -382,8 +368,6 @@ becomes available later; ordinary synchronize events still wait for current succ
 - `.github/workflows/preview.yml` — explicit trusted controller: plan, deploy, smoke, result jobs
 - `.github/workflows/preview-request.yml`, `scripts/preview/comment-request.mjs` — trusted
   maintainer comment request, current CI selection, and dispatch
-- `.github/workflows/finalization-shadow.yml`, `scripts/preview/finalization-shadow.mjs`,
-  `scripts/preview/shadow-container.sh` — opt-in late-build rehearsal, no deployment or required result
 - `.github/workflows/ci.yml` — `Validate` build profile, manifest, `pages-preview` artifact; `security` call
 - `.github/workflows/security.yml` — reusable audit/Gitleaks/CodeQL workflow plus weekly schedule
 - `scripts/preview/profile.mjs` — project identity, branch alias derivation, anonymous build env

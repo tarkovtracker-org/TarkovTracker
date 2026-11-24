@@ -82,6 +82,7 @@
               {{ $t('common.reset') }}
             </UButton>
           </div>
+          <MapObjectiveColorControls class="border-surface-700 border-b pb-3" />
           <div class="grid gap-2 sm:grid-cols-2">
             <label
               v-for="option in mapColorOptions"
@@ -113,6 +114,7 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
   const { t } = useI18n({ useScope: 'global' });

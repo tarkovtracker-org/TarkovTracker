@@ -12,11 +12,12 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseArgs } from 'node:util';
+import { isDeepStrictEqual, parseArgs } from 'node:util';
 import {
   assertComparable,
   classifyPath,
@@ -56,7 +57,20 @@ function collectLoc(root) {
     paths.map((path) => ({ path, lines: countLines(readFileSync(join(root, path), 'utf8')) }))
   );
 }
-function collectHealth(root, coverage) {
+function structuredFallowError(stdout) {
+  try {
+    const { error, message } = JSON.parse(stdout);
+    return [error === true, typeof message === 'string'].every(Boolean) ? message : undefined;
+  } catch {
+    // Some failures produce plain stderr instead of a JSON error envelope.
+  }
+}
+function fallowFailure(result) {
+  const status = result.signal ? `signal ${result.signal}` : `exit ${result.status}`;
+  const detail = structuredFallowError(result.stdout) || result.stderr.trim() || 'no diagnostic';
+  return new Error(`fallow health failed (${status}): ${detail}`);
+}
+function runHealth(root, coverage) {
   const args = [
     'health',
     '--root',
@@ -77,18 +91,107 @@ function collectHealth(root, coverage) {
     maxBuffer: 256 << 20,
   });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`fallow health failed: ${result.stderr.trim()}`);
+  if (result.status !== 0) throw fallowFailure(result);
   return summarizeHealth(JSON.parse(result.stdout));
 }
-const snapshot = (root, coverage) => ({
-  commit: git(['-C', root, 'rev-parse', 'HEAD']),
-  dirty: gitOutput(['-C', root, 'status', '--porcelain', '--untracked-files=all']).length > 0,
-  analysis_config: createHash('sha256')
-    .update(readFileSync(join(root, '.fallowrc.json')))
-    .digest('hex'),
-  loc: collectLoc(root),
-  health: collectHealth(root, coverage),
-});
+function collectHealth(root, coverage) {
+  const health = runHealth(root, coverage);
+  if (coverage && health.crap.model !== 'istanbul') {
+    throw new Error(`Expected Istanbul coverage for ${root}, got ${health.crap.model}`);
+  }
+  return health;
+}
+// Reports from both CI revisions use the source checkout's absolute paths. Fallow
+// must receive paths belonging to the actual checkout being analyzed.
+function coveragePath(path, source, root) {
+  const local = relative(source, resolve(source, path));
+  if (isAbsolute(local) || local === '..' || local.startsWith(`..${sep}`)) {
+    throw new Error(`Coverage path is outside the source checkout: ${path}`);
+  }
+  return join(root, local);
+}
+function readCoverage(coverage) {
+  const input = resolve(coverage);
+  try {
+    return readFileSync(input, 'utf8');
+  } catch (error) {
+    if (error.code !== 'EISDIR') throw error;
+    return readFileSync(join(input, 'coverage-final.json'), 'utf8');
+  }
+}
+function isSyntheticElse(branch) {
+  return [
+    branch?.type === 'if',
+    isDeepStrictEqual(branch?.locations?.[1], { start: {}, end: {} }),
+  ].every(Boolean);
+}
+function normalizeBranchHits(hits, branch) {
+  if (!Array.isArray(hits) || hits.length !== 2) return hits;
+  // ast-v8-to-istanbul#207 can derive a negative count for the unlocated implicit else.
+  const negativeImplicitElse = [
+    isSyntheticElse(branch),
+    Number.isInteger(hits[1]),
+    hits[1] < 0,
+  ].every(Boolean);
+  return negativeImplicitElse ? [hits[0], 0] : hits;
+}
+function assertNonNegativeHits(hits, path, counter) {
+  for (const [id, value] of Object.entries(hits ?? {})) {
+    if ([value].flat().some((count) => count < 0)) {
+      throw new Error(`Negative Istanbul counter ${counter}[${id}] in ${path}`);
+    }
+  }
+}
+function normalizeCoverageCounters(data, path) {
+  if (data.b) {
+    data.b = Object.fromEntries(
+      Object.entries(data.b).map(([id, hits]) => [
+        id,
+        normalizeBranchHits(hits, data.branchMap?.[id]),
+      ])
+    );
+  }
+  for (const counter of ['s', 'f', 'b', 'bT']) {
+    assertNonNegativeHits(data[counter], path, counter);
+  }
+}
+function measuredHealth(root, coverage, source) {
+  if (!coverage) return collectHealth(root);
+  const report = JSON.parse(readCoverage(coverage));
+  const entries = Object.entries(report).map(([path, data]) => {
+    const target = coveragePath(path, source, root);
+    normalizeCoverageCounters(data, path);
+    return [target, { ...data, path: coveragePath(data.path ?? path, source, root) }];
+  });
+  const directory = mkdtempSync(join(tmpdir(), 'tarkovtracker-coverage-'));
+  try {
+    const normalized = join(directory, 'coverage-final.json');
+    writeFileSync(normalized, JSON.stringify(Object.fromEntries(entries)));
+    return collectHealth(root, normalized);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+function snapshotHealth(root, coverage, source, commit) {
+  try {
+    return measuredHealth(root, coverage, source);
+  } catch (error) {
+    const revision = root === source ? 'head' : 'base';
+    throw new Error(`${revision} ${commit}: ${error.message}`, { cause: error });
+  }
+}
+function snapshot(root, coverage, source = root) {
+  const commit = git(['-C', root, 'rev-parse', 'HEAD']);
+  return {
+    commit,
+    dirty: gitOutput(['-C', root, 'status', '--porcelain', '--untracked-files=all']).length > 0,
+    analysis_config: createHash('sha256')
+      .update(readFileSync(join(root, '.fallowrc.json')))
+      .digest('hex'),
+    loc: collectLoc(root),
+    health: snapshotHealth(root, coverage, source, commit),
+  };
+}
 // Fallow resolves Nuxt auto-imports through the generated .nuxt context, which is not tracked,
 // so the base checkout borrows the current one, as scripts/checks/fallow-audit.mjs does.
 function checkoutBase(source, base, directory) {
@@ -116,12 +219,12 @@ function checkoutBase(source, base, directory) {
   );
   return destination;
 }
-function snapshotBase(source, ref) {
+function snapshotBase(source, ref, coverage) {
   const commit = git(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`]);
   const base = git(['merge-base', 'HEAD', commit]);
   const directory = mkdtempSync(join(tmpdir(), 'tarkovtracker-metrics-'));
   try {
-    return snapshot(checkoutBase(source, base, directory));
+    return snapshot(checkoutBase(source, base, directory), coverage, source);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -131,14 +234,27 @@ function readOptions() {
     options: {
       base: { type: 'string' },
       coverage: { type: 'string' },
+      'base-coverage': { type: 'string' },
       summary: { type: 'string' },
     },
   });
+  validateOptions(values);
   return values;
 }
 function emit(text, summary) {
   process.stdout.write(text);
   if (summary) appendFileSync(summary, text);
+}
+function validateBaseCoverage(options) {
+  if (options['base-coverage'] && !(options.coverage && options.base)) {
+    throw new Error('--base-coverage requires --coverage and --base');
+  }
+}
+function validateOptions(options) {
+  validateBaseCoverage(options);
+  if (options.base && options.coverage && !options['base-coverage']) {
+    throw new Error('--coverage with --base requires --base-coverage');
+  }
 }
 function main() {
   const options = readOptions();
@@ -148,7 +264,7 @@ function main() {
     emit(`${JSON.stringify(head, null, 2)}\n`, options.summary);
     return;
   }
-  const base = snapshotBase(source, options.base);
+  const base = snapshotBase(source, options.base, options['base-coverage']);
   assertComparable(base, head);
   const rows = compareSnapshots(base, head);
   const crapModel = head.health.crap.model;

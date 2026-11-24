@@ -50,6 +50,7 @@ export interface AuthErrorResponse {
  * Successful authentication result
  */
 export interface AuthSuccess {
+  claims: Readonly<Record<string, unknown>>;
   user: {
     id: string;
     email?: string;
@@ -78,13 +79,14 @@ export async function authenticateUser(
     : null;
   const userId = claims?.sub;
   const userEmail = claims?.email;
-  if (error || typeof userId !== "string" || userId.length === 0) {
+  if (!claims || error || typeof userId !== "string" || userId.length === 0) {
     return {
       error: "Invalid authentication token",
       status: 401,
     };
   }
   return {
+    claims,
     user: {
       id: userId,
       email: typeof userEmail === "string" ? userEmail : undefined,

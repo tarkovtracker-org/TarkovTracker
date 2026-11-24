@@ -24,22 +24,11 @@
         />
       </template>
     </AppTooltip>
-    <div class="flex min-w-0 flex-1 items-center gap-1">
-      <AppTooltip :text="cyclingTooltip">
-        <a
-          v-if="displayPrimaryUrl"
-          :href="displayPrimaryUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-link hover:text-link-hover focus-visible:ring-primary-500 flex min-w-0 items-center gap-0.5 rounded-sm text-xs font-bold no-underline focus:outline-none focus-visible:ring-2"
-        >
-          <span class="truncate">{{ displayName }}</span>
-          <UIcon name="i-mdi-open-in-new" class="text-surface-400 h-2.5 w-2.5 shrink-0" />
-        </a>
-        <span v-else class="text-surface-100 block truncate text-xs font-semibold">
-          {{ displayName }}
-        </span>
-      </AppTooltip>
+    <TaskItemLinks
+      :item="currentItem ?? undefined"
+      :label="displayName"
+      :tooltip-text="cyclingTooltip"
+    >
       <AcceptedItemsPopover
         v-if="hasAlternatives"
         v-model:open="acceptedItemsOpen"
@@ -47,27 +36,13 @@
         :cycling="isCycling"
         trigger-class="bg-surface-700/80 text-surface-200 px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-white/5"
       />
-      <AppTooltip v-if="displayDevUrl" :text="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')">
-        <a
-          :href="displayDevUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-surface-400 hover:text-surface-200 inline-flex items-center self-center rounded p-0.5 transition-colors"
-        >
-          <img
-            src="/img/logos/tarkovdevlogo.webp"
-            :alt="t('common.view_on_tarkov_dev', 'View on Tarkov.dev')"
-            class="h-4 w-4"
-          />
-        </a>
-      </AppTooltip>
-    </div>
+    </TaskItemLinks>
   </span>
 </template>
 <script setup lang="ts">
   import { useCyclingItem } from '@/composables/useCyclingItem';
-  import { useWikiLink } from '@/composables/useWikiLink';
-  import { getKeyDevUrl, getKeyPrimaryUrl } from '@/utils/tarkovKeyHelpers';
+  import TaskItemLinks from '@/features/tasks/TaskItemLinks.vue';
+  import { getItemDisplayIcon } from '@/utils/tarkovKeyHelpers';
   import type { TarkovItem } from '@/types/tarkov';
   const props = defineProps<{
     /** Primary/fallback item (canonical for the objective). */
@@ -80,7 +55,6 @@
     paused?: boolean;
   }>();
   const { t } = useI18n({ useScope: 'global' });
-  const { toWikiUrl } = useWikiLink();
   const acceptedItems = computed(() =>
     (props.acceptedItems ?? []).filter((entry): entry is TarkovItem => Boolean(entry?.id))
   );
@@ -96,22 +70,10 @@
     if (!item) return null;
     return item.properties?.defaultPreset ?? item;
   });
-  const linkItem = computed(() => currentItem.value ?? imageItem.value ?? undefined);
   const displayName = computed(
     () => currentItem.value?.name || currentItem.value?.shortName || props.fallbackName
   );
-  const displayIcon = computed(() => {
-    const img = imageItem.value;
-    const item = currentItem.value;
-    return (
-      img?.iconLink ||
-      img?.image512pxLink ||
-      img?.image8xLink ||
-      item?.iconLink ||
-      item?.image512pxLink ||
-      undefined
-    );
-  });
+  const displayIcon = computed(() => getItemDisplayIcon(currentItem.value));
   const displayPreview = computed(() => {
     const img = imageItem.value;
     const item = currentItem.value;
@@ -124,10 +86,6 @@
       undefined
     );
   });
-  const displayDevUrl = computed(() => (linkItem.value ? getKeyDevUrl(linkItem.value) : undefined));
-  const displayPrimaryUrl = computed(() =>
-    linkItem.value ? toWikiUrl(getKeyPrimaryUrl(linkItem.value)) : undefined
-  );
   const cyclingTooltip = computed(() => {
     if (hasAlternatives.value) {
       return t(

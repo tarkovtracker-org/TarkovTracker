@@ -117,9 +117,9 @@
                   </span>
                   <ItemCountControls
                     size="sm"
-                    :current-count="progress.storedCountOf(obj)"
+                    :current-count="handoverCount(obj)"
                     :needed-count="neededCountOf(obj)"
-                    :disabled="!isTargetGameModeActive"
+                    :disabled="isTaskObjectiveDisabled(obj)"
                     :decrease-label="
                       t('needed_items.aria.decrease_objective_count', {
                         task_name: getTaskName(obj.taskId),
@@ -217,6 +217,7 @@
     neededCountOf,
     useNeededItemProgress,
   } from '@/features/neededitems/useNeededItemProgress';
+  import { useNeedSelfCompletion } from '@/features/neededitems/useNeedSelfCompletion';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
@@ -258,11 +259,19 @@
     sortHideoutModules,
   } = useItemDistribution();
   const taskObjectivesList = shallowRef([...props.taskObjectives]);
+  const { isCompletedHandover } = useNeedSelfCompletion();
+  const editableTaskObjectives = computed(() =>
+    taskObjectivesList.value.filter((need) => !isCompletedHandover(need))
+  );
+  const handoverCount = (need: NeededItemTaskObjective | NeededItemHideoutModule) =>
+    isCompletedHandover(need) ? neededCountOf(need) : progress.storedCountOf(need);
   const hideoutModulesList = shallowRef([...props.hideoutModules]);
   const targetGameMode = ref<GameMode>(tarkovStore.getCurrentGameMode());
   const isTargetGameModeActive = computed(
     () => targetGameMode.value === tarkovStore.getCurrentGameMode()
   );
+  const isTaskObjectiveDisabled = (need: NeededItemTaskObjective) =>
+    !isTargetGameModeActive.value || isCompletedHandover(need);
   const canMutateTargetGameMode = () => {
     if (targetGameMode.value === tarkovStore.getCurrentGameMode()) return true;
     emit('update:open', false);
@@ -302,7 +311,7 @@
   };
   const addNeed = (totals: NeedTotals, need: NeededItemTaskObjective | NeededItemHideoutModule) => {
     const needed = neededCountOf(need);
-    const current = Math.min(progress.storedCountOf(need), needed);
+    const current = Math.min(handoverCount(need), needed);
     const source = need.foundInRaid ? 'fir' : 'nonFir';
     totals.needed += needed;
     totals.current += current;
@@ -310,15 +319,20 @@
     totals[`${source}Current`] += current;
     return totals;
   };
-  const totals = computed(() =>
-    [...taskObjectivesList.value, ...hideoutModulesList.value].reduce(addNeed, {
+  const summarize = (needs: (NeededItemTaskObjective | NeededItemHideoutModule)[]) =>
+    needs.reduce(addNeed, {
       needed: 0,
       current: 0,
       firNeeded: 0,
       nonFirNeeded: 0,
       firCurrent: 0,
       nonFirCurrent: 0,
-    })
+    });
+  const totals = computed(() =>
+    summarize([...taskObjectivesList.value, ...hideoutModulesList.value])
+  );
+  const handedOverTotals = computed(() =>
+    summarize(taskObjectivesList.value.filter(isCompletedHandover))
   );
   const firInput = ref(0);
   const nonFirInput = ref(0);
@@ -351,9 +365,9 @@
     if (!canMutateTargetGameMode()) return;
     try {
       const result = distributeItems(
-        firInput.value,
-        nonFirInput.value,
-        taskObjectivesList.value,
+        Math.max(0, firInput.value - handedOverTotals.value.firCurrent),
+        Math.max(0, nonFirInput.value - handedOverTotals.value.nonFirCurrent),
+        editableTaskObjectives.value,
         hideoutModulesList.value
       );
       applyDistribution(result);
@@ -369,9 +383,9 @@
   const handleReset = () => {
     if (!canMutateTargetGameMode()) return;
     try {
-      resetObjectives(taskObjectivesList.value, hideoutModulesList.value);
-      firInput.value = 0;
-      nonFirInput.value = 0;
+      resetObjectives(editableTaskObjectives.value, hideoutModulesList.value);
+      firInput.value = handedOverTotals.value.firCurrent;
+      nonFirInput.value = handedOverTotals.value.nonFirCurrent;
     } catch (error) {
       logger.error('Failed to reset needed items.', error);
       toast.add({

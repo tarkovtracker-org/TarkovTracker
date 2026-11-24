@@ -1,19 +1,6 @@
-/**
- * Shared contract for precomputed heavy-route payloads stored in Cloudflare KV.
- *
- * The scheduled GitHub Actions precompute workflow
- * (.github/workflows/precompute-tarkov-data.yml, via scripts/precompute) runs
- * the heavy fetch/adapt/overlay pipeline off the request path and writes the
- * final payload to KV. The Nitro request handlers read it back through
- * edgeCache, which keeps every colo warm without ever running the multi-MB
- * transform inside a request invocation (the cause of Cloudflare Error 1102
- * on cold, low-traffic colos).
- *
- * Both sides import this module so key format and envelope shape stay in sync.
- */
+/** Shared KV binding for neutral catalogs and envelope validation for English import snapshots. */
 const PRECOMPUTED_KV_BINDING = 'TARKOV_DATA';
 const PRECOMPUTED_ENVELOPE_VERSION = 2;
-const TASKS_CORE_PRECOMPUTED_VERSION = 'json-v3';
 export type PrecomputedEnvelope<T> = {
   payload: T;
   overlay: { version: string; sha256: string } | null;
@@ -23,9 +10,9 @@ export type PrecomputedEnvelope<T> = {
 export type PrecomputedKvReader = {
   get: (key: string, type: 'json' | 'text') => Promise<unknown>;
 };
-export function buildTasksCorePrecomputedKey(lang: string, gameMode: string): string {
-  return `tasks-core-${TASKS_CORE_PRECOMPUTED_VERSION}-${lang}-${gameMode}`;
-}
+export type CatalogKvReader = PrecomputedKvReader & {
+  get: (key: string, type: 'stream') => Promise<unknown>;
+};
 const overlayMeta = (payload: unknown) =>
   (payload as { dataOverlay?: { version?: unknown; sha256?: unknown } })?.dataOverlay;
 const nonemptyString = (value: unknown): value is string =>
@@ -66,12 +53,12 @@ export function isPrecomputedEnvelope<T>(value: unknown): value is PrecomputedEn
     candidate.payload !== undefined
   );
 }
-export function getPrecomputedStore(event: unknown): PrecomputedKvReader | null {
+export function getPrecomputedStore(event: unknown): CatalogKvReader | null {
   if (!event || typeof event !== 'object') return null;
   const context = (event as { context?: { cloudflare?: { env?: Record<string, unknown> } } })
     .context;
   const binding = context?.cloudflare?.env?.[PRECOMPUTED_KV_BINDING];
   if (!binding || typeof binding !== 'object') return null;
   if (typeof (binding as { get?: unknown }).get !== 'function') return null;
-  return binding as PrecomputedKvReader;
+  return binding as CatalogKvReader;
 }

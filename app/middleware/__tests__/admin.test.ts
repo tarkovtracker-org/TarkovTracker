@@ -3,7 +3,9 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import adminMiddleware from '@/middleware/admin';
+import { SupabaseCallbackPendingError } from '@/utils/supabaseReadiness';
 const {
+  abortNavigationMock,
   getSessionMock,
   hydrateUserFromSessionMock,
   loggerMock,
@@ -12,6 +14,7 @@ const {
   state,
   useSystemStoreWithSupabaseMock,
 } = vi.hoisted(() => ({
+  abortNavigationMock: vi.fn(() => false as const),
   getSessionMock: vi.fn(),
   hydrateUserFromSessionMock: vi.fn(),
   loggerMock: {
@@ -52,6 +55,7 @@ mockNuxtImport('useRuntimeConfig', () => () => ({
   },
 }));
 mockNuxtImport('navigateTo', () => navigateToMock);
+mockNuxtImport('abortNavigation', () => abortNavigationMock);
 mockNuxtImport(
   'defineNuxtRouteMiddleware',
   () => (handler: (...args: unknown[]) => unknown) => handler
@@ -104,6 +108,26 @@ describe('admin middleware', () => {
         },
       },
     }));
+  });
+  it('blocks admin navigation while linking without clearing the session or checking roles', async () => {
+    Object.assign(state.user, { loggedIn: true, id: 'admin-1', email: 'admin@example.com' });
+    readyMock.mockRejectedValueOnce(new SupabaseCallbackPendingError());
+    window.history.replaceState(null, '', '/settings?discord_linked=1&code=pending#account');
+    try {
+      const result = await runMiddleware();
+      expect(result).toBe(false);
+      expect(abortNavigationMock).toHaveBeenCalledTimes(1);
+      expect(navigateToMock).not.toHaveBeenCalled();
+      expect(hydrateUserFromSessionMock).not.toHaveBeenCalled();
+      expect(getSessionMock).not.toHaveBeenCalled();
+      expect(useSystemStoreWithSupabaseMock).not.toHaveBeenCalled();
+      expect(state.user).toEqual({ loggedIn: true, id: 'admin-1', email: 'admin@example.com' });
+      expect(window.location.pathname + window.location.search + window.location.hash).toBe(
+        '/settings?discord_linked=1&code=pending#account'
+      );
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
   });
   it('waits for Supabase hydration before authenticating admin routes', async () => {
     state.sessionUser = { id: 'admin-1', email: 'admin@example.com' };

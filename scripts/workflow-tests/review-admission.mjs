@@ -1,14 +1,21 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { generateKeyPairSync, verify } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fixture as automationFixture } from './helpers/automation-fixture.mjs';
 import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
-const { activeQueueGroup, admissionRun, reviewThreads, queueIdentity, validateAdmissionReceipt } =
-  await import('../ci/review-admission-api.mjs');
+import { countApiCalls } from './helpers/api-count.mjs';
+const {
+  activeQueueGroup,
+  admissionRun,
+  reviewThreads,
+  queueIdentity,
+  validateAdmissionReceipt,
+  trustedActors,
+} = await import('../ci/review-admission-api.mjs');
 const { readAdmissionArchive, requireReviewAdmission } =
   await import('../ci/review-admission-binding.mjs');
 const { safeDependencyManifests, dependencyEligibility } =
@@ -21,6 +28,7 @@ const { AdmissionPending, admissionDecision, classifyRisk } =
 const { createReviewPublisher, publisherConfig, requireReceiptIssuer } =
   await import('../ci/review-admission-issuer.mjs');
 const { safeLockfileChange } = await import('../ci/review-admission-lock.mjs');
+const { recoverMergedReview } = await import('../ci/review-admission-merged-review.mjs');
 const {
   evaluateAdmission,
   publishReviewAdmission,
@@ -1348,19 +1356,112 @@ test('successful publication records exact receipt while final refreshed finding
     assert.equal(changed.statuses.at(-1).state, 'failure');
   });
 });
-test('publisher cannot turn failed/missing evidence upload into success', async () => {
+test('publisher waits for the exact uploaded receipt to appear', async () => {
   await withReceiptDirectory(async () => {
     const f = publishingFixture();
     await evaluateAdmission({ github: f.github, context: f.context, number: 1, source: base });
     f.context.payload = { pull_request: { number: 1 } };
-    f.f.artifacts = [];
     f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
-    await assert.rejects(
-      publishReviewAdmission({ github: f.github, context: f.context, sha: head })
+    const unrelated = { name: `review-admission-${queued}`, expired: false };
+    const receipt = { name: `review-admission-${head}`, expired: false };
+    const delays = [];
+    let reads = 0;
+    const paginate = f.github.paginate;
+    f.github.paginate = async (endpoint, params) => {
+      if (endpoint !== 'artifacts') return paginate(endpoint, params);
+      assert.equal(params.run_id, Number(f.context.runId));
+      return ++reads === 1 ? [unrelated] : [unrelated, receipt];
+    };
+    await publishReviewAdmission({
+      github: f.github,
+      context: f.context,
+      sha: head,
+      wait: async (delay) => delays.push(delay),
+    });
+    assert.deepEqual(delays, [1000]);
+    assert.equal(reads, 2);
+    assert.deepEqual(
+      f.statuses.map(({ state }) => state),
+      ['pending', 'success']
     );
-    assert.equal(f.statuses.at(-1).state, 'failure');
-    assert.ok(!f.statuses.some((status) => status.state === 'success'));
   });
+});
+const publishedArtifact = { name: `review-admission-${head}`, expired: false };
+for (const { kind, artifacts, delays, error } of [
+  {
+    kind: 'missing',
+    artifacts: [],
+    delays: [1000, 2000, 4000, 8000],
+    error: /missing or ambiguous/,
+  },
+  {
+    kind: 'duplicate',
+    artifacts: [publishedArtifact, publishedArtifact],
+    delays: [],
+    error: /missing or ambiguous/,
+  },
+  {
+    kind: 'expired',
+    artifacts: [{ ...publishedArtifact, expired: true }],
+    delays: [],
+    error: /expired/,
+  },
+]) {
+  test(`publisher fails closed when the uploaded receipt is ${kind}`, async () => {
+    await withReceiptDirectory(async () => {
+      const f = publishingFixture();
+      await evaluateAdmission({ github: f.github, context: f.context, number: 1, source: base });
+      f.context.payload = { pull_request: { number: 1 } };
+      f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+      f.f.artifacts = artifacts;
+      const waits = [];
+      await assert.rejects(
+        publishReviewAdmission({
+          github: f.github,
+          context: f.context,
+          sha: head,
+          wait: async (delay) => waits.push(delay),
+        }),
+        error
+      );
+      assert.deepEqual(waits, delays);
+      assert.deepEqual(
+        f.statuses.map(({ state }) => state),
+        ['pending', 'failure']
+      );
+    });
+  });
+}
+function promotionPublishingFixture(kind) {
+  const f = publishingFixture();
+  f.f.pr.user = { id: 41898282, type: 'Bot' };
+  f.f.pr.head.ref = 'wip/release-1.2.4-123-1';
+  if (kind === 'ordinary') f.f.pr.head.ref = 'fix/app';
+  if (kind === 'wrong actor') f.f.pr.user.id = 999;
+  if (kind === 'malformed branch') f.f.pr.head.ref = 'wip/release-untrusted';
+  return f;
+}
+test('publication requests promotion only for a canonical release after every live approval check', async () => {
+  for (const kind of ['release', 'ordinary', 'wrong actor', 'malformed branch', 'revoked']) {
+    await withReceiptDirectory(async () => {
+      const f = promotionPublishingFixture(kind);
+      await evaluateAdmission({ github: f.github, context: f.context, number: 1, source: base });
+      f.context.payload = { pull_request: { number: 1 } };
+      f.f.artifacts = [{ name: `review-admission-${head}`, expired: false }];
+      f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
+      if (kind === 'revoked') {
+        f.f.reviews.push(human('CHANGES_REQUESTED'));
+        await assert.rejects(publishReviewScope({ github: f.github, context: f.context, head }));
+        assert.equal(f.statuses.at(-1).state, 'failure');
+      } else {
+        assert.equal(
+          await publishReviewScope({ github: f.github, context: f.context, head }),
+          kind === 'release'
+        );
+        assert.equal(f.statuses.at(-1).state, 'success');
+      }
+    });
+  }
 });
 function signalPull() {
   return {
@@ -1400,11 +1501,279 @@ function signalFixture(f = publishingFixture()) {
   ];
   return { ...f, run };
 }
+function mergedSignalFixture(event = 'pull_request_review', linked = false) {
+  const f = signalFixture(queuedControlFixture());
+  const repository = {
+    id: 7,
+    full_name: 'example/repo',
+    url: 'https://api.github.com/repos/example/repo',
+  };
+  Object.assign(f.f.pr, {
+    url: 'https://api.github.com/repos/example/repo/pulls/1',
+    state: 'closed',
+    merged: true,
+    merged_at: '2026-11-01T00:00:00Z',
+  });
+  f.f.pr.head.repo = { ...repository };
+  f.f.pr.base.repo = { ...repository };
+  Object.assign(f.run, {
+    event,
+    head_branch: f.f.pr.head.ref,
+    head_repository: { ...repository },
+    repository: { ...repository },
+    pull_requests: linked ? [signalPull()] : [],
+  });
+  f.context.payload = { repository, workflow_run: { ...f.run } };
+  const lookup = { candidates: [structuredClone(f.f.pr)], active: [], reads: [] };
+  const paginate = f.github.paginate;
+  f.github.rest.pulls.list = 'pulls';
+  f.github.paginate = async (endpoint, params) => {
+    if (endpoint !== 'pulls') return paginate(endpoint, params);
+    lookup.reads.push(params);
+    assert.equal(params.base, 'main');
+    assert.equal(params.per_page, 100);
+    if (params.state === lookup.failState) throw new Error('lookup unavailable');
+    if (params.state === 'open') return lookup.active;
+    assert.equal(params.state, 'all');
+    assert.equal(
+      params.head,
+      `${f.run.head_repository.full_name.split('/')[0]}:${f.run.head_branch}`
+    );
+    return lookup.candidates;
+  };
+  return { ...f, lookup };
+}
+test('merged review signals are obsolete without changing statuses or receipts', async () => {
+  for (const event of ['pull_request_review', 'pull_request_review_comment']) {
+    for (const linked of [false, true]) {
+      const f = mergedSignalFixture(event, linked);
+      const core = stepCore();
+      const before = structuredClone(f.statuses);
+      await withReceiptDirectory(async () => {
+        await runReviewAdmissionStep({ github: f.github, context: f.context, core });
+        assert.equal(existsSync('review-admission-evidence'), false);
+      });
+      assert.deepEqual(f.statuses, before);
+      assert.deepEqual(core.outputs, {});
+      assert.match(core.notices.join('\n'), /merged PR #1.*obsolete/);
+    }
+  }
+});
+test('merged review recovery rejects absent, ambiguous, active and mismatched targets', async (t) => {
+  const sourceError = 'Merged review signal source identity mismatch.';
+  const targetError = 'Merged review signal PR identity mismatch.';
+  const countError = 'Merged review signal target is missing or ambiguous.';
+  const activeError = 'Merged review signal conflicts with an active PR.';
+  const changedError = 'Merged review signal target changed or was not merged.';
+  const cases = [
+    [
+      'missing repository',
+      'Missing review signal repository identity.',
+      (f) => delete f.context.payload.repository,
+    ],
+    ['foreign run repository ID', sourceError, (f) => (f.run.repository.id = 8)],
+    ['foreign run repository URL', sourceError, (f) => (f.run.repository.url += '-other')],
+    ['missing source repository', sourceError, (f) => delete f.run.head_repository],
+    ['invalid source repository ID', sourceError, (f) => (f.run.head_repository.id = 0)],
+    ['foreign source repository ID', targetError, (f) => (f.run.head_repository.id = 8)],
+    ['foreign source repository URL', sourceError, (f) => (f.run.head_repository.url += '-other')],
+    ['missing source branch', sourceError, (f) => delete f.run.head_branch],
+    ['wrong source branch', targetError, (f) => (f.run.head_branch = 'different')],
+    [
+      'synthetic source SHA',
+      targetError,
+      (f) => {
+        f.run.head_sha = 'd'.repeat(40);
+        f.context.payload.workflow_run.head_sha = f.run.head_sha;
+        f.f.jobs[0].head_sha = f.run.head_sha;
+      },
+    ],
+    ['missing target', countError, (f) => (f.lookup.candidates = [])],
+    [
+      'multiple targets',
+      countError,
+      (f) => f.lookup.candidates.push(structuredClone(f.lookup.candidates[0])),
+    ],
+    ['active target', targetError, (f) => (f.lookup.candidates[0].state = 'open')],
+    ['unmerged target', targetError, (f) => (f.lookup.candidates[0].merged_at = null)],
+    ['foreign target URL', targetError, (f) => (f.lookup.candidates[0].url += '-other')],
+    ['foreign base repository', targetError, (f) => (f.lookup.candidates[0].base.repo.id = 8)],
+    ['foreign source repository', targetError, (f) => (f.lookup.candidates[0].head.repo.id = 8)],
+    [
+      'wrong base branch',
+      'Admission only targets main.',
+      (f) => (f.lookup.candidates[0].base.ref = 'develop'),
+    ],
+    ['wrong target branch', targetError, (f) => (f.lookup.candidates[0].head.ref = 'different')],
+    ['wrong target SHA', targetError, (f) => (f.lookup.candidates[0].head.sha = 'd'.repeat(40))],
+    [
+      'reused active branch',
+      activeError,
+      (f) => {
+        const active = structuredClone(f.f.pr);
+        active.state = 'open';
+        active.head.sha = 'd'.repeat(40);
+        f.lookup.active.push(active);
+      },
+    ],
+    [
+      'same SHA on another active branch',
+      activeError,
+      (f) => {
+        const active = structuredClone(f.f.pr);
+        active.state = 'open';
+        active.head.ref = 'different';
+        f.lookup.active.push(active);
+      },
+    ],
+    ['fresh target reopened', targetError, (f) => (f.f.pr.state = 'open')],
+    ['fresh target unmerged', changedError, (f) => (f.f.pr.merged = false)],
+    [
+      'fresh target number changed',
+      changedError,
+      (f) => {
+        f.f.pr.number = 2;
+        f.f.pr.url = 'https://api.github.com/repos/example/repo/pulls/2';
+      },
+    ],
+    ['fresh target head changed', targetError, (f) => (f.f.pr.head.sha = 'd'.repeat(40))],
+    ['fresh target repository changed', targetError, (f) => (f.f.pr.head.repo.id = 8)],
+    ['lookup API failed', 'lookup unavailable', (f) => (f.lookup.failState = 'all'), ['all']],
+    [
+      'active PR API failed',
+      'lookup unavailable',
+      (f) => (f.lookup.failState = 'open'),
+      ['all', 'open'],
+    ],
+    [
+      'fresh PR API failed',
+      'PR unavailable',
+      (f) => {
+        f.github.rest.pulls.get = async () => {
+          throw new Error('PR unavailable');
+        };
+      },
+      ['all', 'open'],
+    ],
+  ];
+  for (const [name, message, change, expectedReads] of cases) {
+    await t.test(name, async () => {
+      const f = mergedSignalFixture();
+      const core = stepCore();
+      const before = structuredClone(f.statuses);
+      change(f);
+      await withReceiptDirectory(async () => {
+        await assert.rejects(
+          runReviewAdmissionStep({ github: f.github, context: f.context, core }),
+          { message }
+        );
+        assert.equal(existsSync('review-admission-evidence'), false);
+      });
+      if (expectedReads)
+        assert.deepEqual(
+          f.lookup.reads.map((read) => read.state),
+          expectedReads
+        );
+      assert.deepEqual(f.statuses, before);
+      assert.deepEqual(core.outputs, {});
+      assert.deepEqual(core.notices, []);
+    });
+  }
+});
+test('merged review recovery still authenticates the exact signal run and job first', async (t) => {
+  const cases = [
+    ['run ID', (f) => (f.run.id = 3)],
+    ['attempt', (f) => (f.run.run_attempt = 2)],
+    ['event', (f) => (f.run.event = 'pull_request')],
+    ['workflow', (f) => (f.run.path = '.github/workflows/other.yml')],
+    ['repository', (f) => (f.run.repository.full_name = 'foreign/repo')],
+    ['run conclusion', (f) => (f.run.conclusion = 'failure')],
+    ['job SHA', (f) => (f.f.jobs[0].head_sha = 'd'.repeat(40))],
+    ['job attempt', (f) => (f.f.jobs[0].run_attempt = 2)],
+    ['job run', (f) => (f.f.jobs[0].run_id = 3)],
+    ['missing job', (f) => (f.f.jobs = [])],
+    ['duplicate job', (f) => f.f.jobs.push({ ...f.f.jobs[0] })],
+    ['failed job', (f) => (f.f.jobs[0].conclusion = 'failure')],
+  ];
+  for (const [name, change] of cases) {
+    await t.test(name, async () => {
+      const f = mergedSignalFixture();
+      const core = stepCore();
+      const before = structuredClone(f.statuses);
+      change(f);
+      await assert.rejects(
+        runReviewAdmissionStep({ github: f.github, context: f.context, core }),
+        /Admission signal/
+      );
+      assert.deepEqual(f.lookup.reads, []);
+      assert.deepEqual(f.statuses, before);
+      assert.deepEqual(core.outputs, {});
+    });
+  }
+});
+test('merged review guard regressions fail when identity protections are removed', async () => {
+  const mutations = [
+    ['unlinkedReview(run)', (f) => (f.run.pull_requests = [signalPull()])],
+    [
+      'sameRepository(run.repository, repository)',
+      (f) => {
+        f.context.payload.repository = { ...f.context.payload.repository, id: 8 };
+      },
+    ],
+    [
+      'sameRepository(pr.base.repo, run.repository)',
+      (f) => {
+        f.lookup.candidates[0].base.repo.id = 8;
+      },
+    ],
+    [
+      'sameRepository(pr.head.repo, run.head_repository)',
+      (f) => {
+        f.lookup.candidates[0].head.repo.id = 8;
+      },
+    ],
+    ['pr.head.ref === run.head_branch', (f) => (f.lookup.candidates[0].head.ref = 'other')],
+    ['pr.head.sha === run.head_sha', (f) => (f.lookup.candidates[0].head.sha = 'd'.repeat(40))],
+    ["pr.state === 'closed'", (f) => (f.lookup.candidates[0].state = 'open')],
+    ['candidates.length === 1', (f) => f.lookup.candidates.push(structuredClone(f.f.pr))],
+    [
+      '!active.some((pr) => conflictsWithSignal(pr, run))',
+      (f) => {
+        f.lookup.active.push({ ...structuredClone(f.f.pr), state: 'open' });
+      },
+    ],
+    [
+      'current.number === candidate.number',
+      (f) => {
+        f.f.pr.number = 2;
+        f.f.pr.url = 'https://api.github.com/repos/example/repo/pulls/2';
+      },
+    ],
+    ['current.merged === true', (f) => (f.f.pr.merged = false)],
+  ];
+  for (const [guard, change] of mutations) {
+    const f = mergedSignalFixture();
+    change(f);
+    await assert.rejects(recoverMergedReview(f.github, f.context, f.run));
+    // Target the call rather than the function declaration for the event guard.
+    const before = guard === 'unlinkedReview(run)' ? 'requireEvidence(unlinkedReview(run),' : guard;
+    const after = guard === 'unlinkedReview(run)' ? 'requireEvidence(true,' : 'true';
+    const mutant = await importMutationSource('review-admission-merged-review.mjs', before, after);
+    const result = await mutant.recoverMergedReview(f.github, f.context, f.run);
+    assert.equal(result.obsoleteMergedReview, true, guard);
+  }
+});
 test('review signals bind service-owned PR identity independently of signal commit SHA', async () => {
   for (const event of ['pull_request_review', 'pull_request_review_comment']) {
     for (const change of [
       (f) => {
         f.f.reviews = [];
+      },
+      (f) => {
+        f.f.reviews = [
+          human('APPROVED', { submitted_at: '2026-11-14T00:00:00Z' }),
+          human('DISMISSED', { id: 21, submitted_at: '2026-11-14T00:01:00Z' }),
+        ];
       },
       (f) => {
         f.f.reviews.push(human('CHANGES_REQUESTED'));
@@ -1572,7 +1941,7 @@ test('workflow step still fails for integrity errors and for holds after a recei
       context: identity.context,
       core: stepCore(),
     }),
-    /Signal PR identity is missing or ambiguous/
+    /Missing review signal repository identity/
   );
   // Findings appear after the PR head was admitted but before the queue group is evaluated.
   const raced = signalFixture(queuedControlFixture());
@@ -1709,7 +2078,7 @@ test('provider suites on merge-queue commits select no target and leave every st
 test('signal regression controls detect synthetic-SHA targeting and provider identity bypass', async () => {
   const old = await importMutationSource(
     'review-admission.mjs',
-    'return linkedPullTarget(run.pull_requests, context.repo);',
+    'return [await linkedReviewTarget(github, context, run, target)];',
     'return run.pull_requests.filter(pr => pr.head.sha === run.head_sha).map(pr => ({ number: pr.number }));'
   );
   const f = signalFixture(queuedControlFixture());
@@ -1800,6 +2169,8 @@ test('revoked sensitive approval and changes requested invalidate an already-gre
 test('healthy PR evidence prepares and publishes separate authenticated head and queue receipts', async () => {
   await withReceiptDirectory(async () => {
     const f = queuedControlFixture();
+    f.f.pr.user = { id: 41898282, type: 'Bot' };
+    f.f.pr.head.ref = 'wip/release-1.2.4-123-1';
     const outputs = {};
     f.core.setOutput = (key, value) => {
       outputs[key] = value;
@@ -1812,7 +2183,10 @@ test('healthy PR evidence prepares and publishes separate authenticated head and
       expired: false,
     }));
     f.github.rest.actions = { listWorkflowRunArtifacts: 'artifacts' };
-    await publishReviewScope({ github: f.github, context: f.context, head, queued });
+    assert.equal(
+      await publishReviewScope({ github: f.github, context: f.context, head, queued }),
+      false
+    );
     assert.equal(f.statuses.filter((status) => status.sha === queued).at(-1).state, 'success');
     assert.equal(
       JSON.parse(readFileSync(`review-admission-evidence/${queued}.json`, 'utf8')).headSha,
@@ -1993,8 +2367,8 @@ function importMutationSource(filename, before, after) {
   const source = original
     .replace(before, after)
     .replace(
-      /from '(\.\/[^']+)'/g,
-      (match, path) => `from '${new URL(`../ci/${path.slice(2)}`, import.meta.url).href}'`
+      /from '(\.\.?\/[^']+)'/g,
+      (match, path) => `from '${new URL(path, new URL(`../ci/${filename}`, import.meta.url)).href}'`
     );
   return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 }
@@ -2080,7 +2454,7 @@ test('trusted workflow isolates candidate signals, status writes and artifact ev
   assert.match(job, /persist-credentials: false/);
   assert.match(job, /if-no-files-found: error/);
   assert.ok(!workflow.includes('pnpm install'));
-  assert.match(job, /environment:\n      name: review-admission\n      deployment: false/);
+  assert.match(job, /environment:\n {6}name: review-admission\n {6}deployment: false/);
   assert.equal(
     (
       job.match(
@@ -2742,7 +3116,12 @@ function assertAdmissionSecurity(workflow) {
   }
   const filter = jobBlock(workflow, 'filter');
   assert.doesNotMatch(filter, /statuses: write|secrets\.|environment:|concurrency:/);
-  assertPermissionMap(filter, ['actions: read', 'contents: read']);
+  assertPermissionMap(filter, [
+    'actions: read',
+    'checks: read',
+    'contents: read',
+    'pull-requests: read',
+  ]);
   assert.match(filter, /ref: main/);
   assert.match(filter, /filterAdmission\(\{ github, context \}\)/);
 }
@@ -2807,6 +3186,214 @@ test('Cubic event filtering skips unsuccessful signals and uses the exact commen
       relevantComment(payload)
     );
   }
+});
+test('admission preflight rejects only authenticated obsolete signals before publication', async () => {
+  for (const linked of [false, true]) {
+    const f = mergedSignalFixture('pull_request_review', linked);
+    const statuses = structuredClone(f.statuses);
+    assert.equal(await filterAdmission({ github: f.github, context: f.context }), false);
+    assert.deepEqual(f.statuses, statuses);
+  }
+  const queue = suiteSignalFixture();
+  Object.assign(queue.suite, {
+    head_sha: queued,
+    head_branch: `gh-readonly-queue/main/pr-1-${base}`,
+    pull_requests: [],
+  });
+  assert.equal(await filterAdmission({ github: queue.github, context: queue.context }), false);
+  // Neither a stale signal SHA nor a current policy denial makes an active target obsolete.
+  const active = signalFixture(queuedControlFixture());
+  active.run.head_sha = 'd'.repeat(40);
+  active.context.payload.workflow_run = { ...active.run };
+  active.f.jobs[0].head_sha = active.run.head_sha;
+  active.f.reviews = [human('CHANGES_REQUESTED')];
+  assert.equal(await filterAdmission({ github: active.github, context: active.context }), true);
+  for (const action of ['created', 'edited', 'deleted']) {
+    assert.equal(
+      await filterAdmission({
+        context: {
+          eventName: 'issue_comment',
+          payload: {
+            ...commentPayload(),
+            action,
+            changes: { body: { from: `/approve ${head}` } },
+          },
+        },
+      }),
+      true
+    );
+  }
+});
+test('admission preflight fails closed on foreign, ambiguous, missing-receipt and API failures', async () => {
+  for (const change of [
+    (f) => {
+      f.suite.app.id = 15368;
+    },
+    (f) => {
+      f.suite.pull_requests.push(signalPull());
+    },
+    (f) => {
+      f.suite.pull_requests[0].url = 'https://api.github.com/repos/foreign/repo/pulls/1';
+    },
+    (f) => {
+      f.f.artifacts = [];
+    },
+    (f) => {
+      f.github.rest.checks.getSuite = async () => {
+        throw new Error('API unavailable');
+      };
+    },
+  ]) {
+    const f = suiteSignalFixture();
+    change(f);
+    const statuses = structuredClone(f.statuses);
+    await assert.rejects(filterAdmission({ github: f.github, context: f.context }));
+    assert.deepEqual(f.statuses, statuses);
+  }
+});
+test('publisher initialization follows fresh target authentication and skips obsolete queued work', async () => {
+  const obsolete = mergedSignalFixture('pull_request_review', true);
+  let initializations = 0;
+  const createPublisher = async () => {
+    initializations += 1;
+    throw new Error('publisher unavailable');
+  };
+  await runReviewAdmission({
+    github: obsolete.github,
+    context: obsolete.context,
+    core: obsolete.core,
+    createPublisher,
+  });
+  assert.equal(initializations, 0);
+  const active = signalFixture(queuedControlFixture());
+  await assert.rejects(
+    runReviewAdmission({
+      github: active.github,
+      context: active.context,
+      core: active.core,
+      createPublisher,
+    }),
+    /publisher unavailable/
+  );
+  assert.equal(initializations, 1);
+  const foreign = signalFixture();
+  foreign.run.repository.full_name = 'foreign/repo';
+  await assert.rejects(
+    runReviewAdmission({
+      github: foreign.github,
+      context: foreign.context,
+      core: foreign.core,
+      createPublisher,
+    })
+  );
+  assert.equal(initializations, 1);
+});
+test('deferred publisher uses its returned App client instead of the read-only client', async () => {
+  const f = signalFixture(queuedControlFixture());
+  const published = [];
+  const publisher = {
+    ...f.github,
+    rest: {
+      ...f.github.rest,
+      repos: {
+        ...f.github.rest.repos,
+        createCommitStatus: async (params) => {
+          published.push(params);
+        },
+      },
+    },
+  };
+  f.github.rest.repos.createCommitStatus = async () => {
+    throw new Error('unwrapped status writer');
+  };
+  const args = {
+    github: f.github,
+    context: f.context,
+    core: f.core,
+    createPublisher: async () => publisher,
+  };
+  const mutant = await importMutationSource(
+    'review-admission.mjs',
+    'const publisher = await publicationClient(github, createPublisher);',
+    'const publisher = github;'
+  );
+  await withReceiptDirectory(async () => {
+    await runReviewAdmission(args);
+    assert.ok(published.some((item) => item.sha === head));
+    assert.ok(published.some((item) => item.sha === queued));
+    await assert.rejects(mutant.runReviewAdmission(args), /unwrapped status writer/);
+  });
+});
+test('signal run metadata is read once per stage and freshly authenticated after queueing', async () => {
+  const f = signalFixture(queuedControlFixture());
+  let reads = 0;
+  const read = f.github.rest.actions.getWorkflowRunAttempt;
+  f.github.rest.actions.getWorkflowRunAttempt = async (...args) => {
+    reads += 1;
+    return read(...args);
+  };
+  assert.equal(await filterAdmission({ github: f.github, context: f.context }), true);
+  assert.equal(reads, 1);
+  await withReceiptDirectory(async () => {
+    await runReviewAdmission({ github: f.github, context: f.context, core: f.core });
+  });
+  assert.equal(reads, 2);
+  const before = structuredClone(f.statuses);
+  f.run.run_attempt += 1;
+  await assert.rejects(runReviewAdmission({ github: f.github, context: f.context, core: f.core }));
+  assert.equal(reads, 3);
+  assert.deepEqual(f.statuses, before);
+});
+test('permission lookup budget ignores inert participants while retaining live approval actors', async () => {
+  const pr = fixture().pr;
+  const comments = Array.from({ length: 100 }, (_, id) => ({
+    id,
+    body: 'ordinary discussion',
+    user: { id: id + 100, login: `commenter-${id}`, type: 'User' },
+  }));
+  comments.push({ body: `/approve ${head}`, user: human().user });
+  const reviews = Array.from({ length: 100 }, (_, id) =>
+    human('COMMENTED', {
+      id,
+      user: { id: id + 200, login: `reviewer-${id}`, type: 'User' },
+    })
+  );
+  reviews.push(human(), human('APPROVED', { commit_id: base }), human('CHANGES_REQUESTED'));
+  const github = {
+    rest: {
+      repos: { getCollaboratorPermissionLevel: async () => ({ data: { permission: 'write' } }) },
+    },
+    paginate: () => {},
+    graphql: () => {},
+  };
+  const counts = countApiCalls(github);
+  assert.deepEqual(
+    await trustedActors(github, repo, reviews, comments, pr),
+    new Set(['maintainer'])
+  );
+  assert.equal(counts.total, 1);
+  github.rest.repos.getCollaboratorPermissionLevel = async () => ({ data: { permission: 'read' } });
+  assert.deepEqual(await trustedActors(github, repo, reviews, comments, pr), new Set());
+});
+test('workflow defers App initialization and grants only read scopes to target preflight', () => {
+  const source = readFileSync('.github/workflows/review-admission.yml', 'utf8');
+  const evaluate = workflowStep(
+    jobBlock(source, 'admission'),
+    'Evaluate current immutable review evidence'
+  );
+  assert.match(
+    evaluate,
+    /createPublisher: \(\) => createReviewPublisher\(\{ github, context, core \}\)/
+  );
+  assert.doesNotMatch(evaluate, /await createReviewPublisher/);
+  const filter = jobBlock(source, 'filter');
+  assertPermissionMap(filter, [
+    'actions: read',
+    'checks: read',
+    'contents: read',
+    'pull-requests: read',
+  ]);
+  assert.doesNotMatch(filter, /secrets\.|environment:|concurrency:|statuses: write/);
 });
 test('Cubic guard mutations expose unknown peer names, JWT, 0.x, PR reuse and anonymous-request bypasses', async () => {
   const peer = simpleLock()

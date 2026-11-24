@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPromiseStore } from '@/stores/tarkov/promiseStore';
 import { useMetadataStore } from '@/stores/useMetadata';
+import { STORAGE_KEYS } from '@/utils/storageKeys';
 import * as cacheUtils from '@/utils/tarkovCache';
 import { createDeferred } from '@/utils/test-helpers';
 import type { GameEdition, SeasonalPerk, StoryChapter } from '@/types/tarkov';
@@ -45,11 +46,174 @@ describe('useMetadataStore fetchEditionsData', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    localStorage.clear();
   });
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    localStorage.clear();
   });
+  it.each(['success', 'failure'] as const)(
+    'retries an editions response crossing an observed purge and preserves last-good on %s',
+    async (outcome) => {
+      const store = useMetadataStore();
+      const kept = createEdition('kept', 1, 'Last good');
+      const current = createEdition('current', 2, 'Current');
+      store.editions = [kept];
+      const old = createDeferred<object>();
+      const retry = createDeferred<object>();
+      const write = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+      vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+      vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+      const editions = vi.fn().mockReturnValueOnce(old.promise).mockReturnValue(retry.promise);
+      vi.stubGlobal(
+        '$fetch',
+        vi.fn((endpoint) =>
+          endpoint === '/api/tarkov/cache-meta'
+            ? Promise.resolve({ data: { lastPurgeAt: '2026-11-18T13:00:00Z' } })
+            : editions()
+        )
+      );
+      const request = store.fetchEditionsData();
+      await vi.waitFor(() => expect(editions).toHaveBeenCalledOnce());
+      await store.checkCachePurge();
+      old.resolve({
+        data: { editions: [createEdition('obsolete', 3, 'Obsolete')], storyChapters: [] },
+      });
+      await vi.waitFor(() => expect(editions).toHaveBeenCalledTimes(2));
+      expect(store.editions).toEqual([kept]);
+      expect(write).not.toHaveBeenCalled();
+      if (outcome === 'success')
+        retry.resolve({ data: { editions: [current], storyChapters: [] } });
+      else retry.reject(new Error('Fresh generation unavailable'));
+      await request;
+      expect(store.editions).toEqual([outcome === 'success' ? current : kept]);
+      expect(write).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 0);
+      expect(store.hasRevalidatedCatalog('regular-en')).toBe(outcome === 'success');
+      expect(store.editionsLoading).toBe(false);
+    }
+  );
+  it('does not retry a purged editions request after a newer request takes ownership', async () => {
+    const store = useMetadataStore();
+    const old = createDeferred<object>();
+    const current = createEdition('current', 2, 'Current');
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    const write = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+    const editions = vi
+      .fn()
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValue({ data: { editions: [current], storyChapters: [] } });
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn((endpoint) =>
+        endpoint === '/api/tarkov/cache-meta'
+          ? Promise.resolve({ data: { lastPurgeAt: '2026-11-18T13:00:00Z' } })
+          : editions()
+      )
+    );
+    const first = store.fetchEditionsData();
+    await vi.waitFor(() => expect(editions).toHaveBeenCalledOnce());
+    await store.checkCachePurge();
+    await store.fetchEditionsData(true);
+    old.resolve({ data: { editions: [], storyChapters: [] } });
+    await first;
+    expect(editions).toHaveBeenCalledTimes(2);
+    expect(store.editions).toEqual([current]);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(store.editionsError).toBeNull();
+  });
+  it('bounds editions retries when both responses cross a purge generation', async () => {
+    const store = useMetadataStore();
+    const kept = createEdition('kept', 1, 'Last good');
+    store.editions = [kept];
+    vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+    const write = vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    const editions = vi.fn(async () => {
+      localStorage.setItem(
+        STORAGE_KEYS.cachePurgeAt,
+        `2026-11-18T13:00:0${editions.mock.calls.length}Z`
+      );
+      return { data: { editions: [], storyChapters: [] } };
+    });
+    vi.stubGlobal('$fetch', editions);
+    await store.fetchEditionsData();
+    expect(editions).toHaveBeenCalledTimes(2);
+    expect(store.editions).toEqual([kept]);
+    expect(write).not.toHaveBeenCalled();
+    expect(store.hasRevalidatedCatalog('regular-en')).toBe(false);
+    expect(store.editionsLoading).toBe(false);
+  });
+  it('rejects an editions cache read completed after a newer purge', async () => {
+    const store = useMetadataStore();
+    const cached = createDeferred<object>();
+    const current = createEdition('current', 2, 'Current');
+    vi.spyOn(cacheUtils, 'getCachedData').mockReturnValue(cached.promise);
+    vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+    vi.spyOn(cacheUtils, 'clearAllCache').mockResolvedValue();
+    const network = createDeferred<object>();
+    vi.stubGlobal(
+      '$fetch',
+      vi.fn((endpoint) =>
+        endpoint === '/api/tarkov/cache-meta'
+          ? Promise.resolve({ data: { lastPurgeAt: '2026-11-18T13:00:00Z' } })
+          : network.promise
+      )
+    );
+    const request = store.fetchEditionsData();
+    await vi.waitFor(() => expect(cacheUtils.getCachedData).toHaveBeenCalledOnce());
+    await store.checkCachePurge();
+    cached.resolve({
+      editions: [createEdition('obsolete', 1, 'Obsolete')],
+      storyChapters: [createStoryChapter('obsolete', 1, 'Obsolete')],
+    });
+    await flushPromises();
+    expect(store.editions).toEqual([]);
+    expect(store.storyChapters).toEqual([]);
+    network.resolve({ data: { editions: [current], storyChapters: [] } });
+    await request;
+    expect(store.editions).toEqual([current]);
+    expect(store.hasRevalidatedCatalog('regular-en')).toBe(true);
+  });
+  it.each(['en', 'de'])(
+    'keeps newer IndexedDB editions when the %s language catalog expired in memory',
+    async (language) => {
+      vi.spyOn(Date, 'now').mockReturnValue(1_000);
+      const old = {
+        editions: [createEdition('old', 1, 'Old edition')],
+        storyChapters: [createStoryChapter('old', 1, 'Old chapter')],
+      };
+      const current = {
+        editions: [createEdition('current', 1, 'Current edition')],
+        storyChapters: [createStoryChapter('current', 1, 'Current chapter')],
+      };
+      vi.spyOn(cacheUtils, 'setCachedData').mockResolvedValue();
+      const read = vi.spyOn(cacheUtils, 'getCachedData').mockResolvedValue(null);
+      vi.stubGlobal('$fetch', vi.fn().mockResolvedValue({ data: old }));
+      const store = useMetadataStore();
+      await store.fetchEditionsData(true);
+      expect(store.editions[0]?.id).toBe('old');
+      vi.mocked(Date.now).mockReturnValue(3_602_000);
+      store.languageCode = language;
+      read.mockImplementation(
+        async (type) =>
+          ({
+            'tasks-core': { tasks: [{ id: 'task', name: 'Task' }], maps: [], traders: [] },
+            hideout: { hideoutStations: [{ id: 'station', name: 'Station', levels: [] }] },
+            prestige: { prestige: [] },
+            editions: current,
+          })[type as 'editions'] as never
+      );
+      const cached = await store.loadCriticalCacheData();
+      for (const type of ['tasks-core', 'hideout', 'prestige', 'editions'])
+        expect(read).toHaveBeenCalledWith(type, 'neutral-v1-regular', 'en');
+      expect(cached?.editions.editions?.[0]?.id).toBe('current');
+      expect(cached).not.toBeNull();
+      store.applyCriticalCachedData(cached!);
+      expect(store.editions[0]?.id).toBe('current');
+      expect(store.storyChapters[0]?.id).toBe('current');
+    }
+  );
   it('clears stale Seasonal perks when an edition response omits them', async () => {
     const store = useMetadataStore();
     store.currentGameMode = 'seasonal';
@@ -143,7 +307,6 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(payload).toEqual({
       editions: [createEdition('standard', 1, 'Standard')],
       storyChapters: [],
-      seasonalPerks: [],
     });
     // IndexedDB stores values with the structured clone algorithm, which throws
     // DataCloneError on a Vue reactive proxy. Reaching the cache with reactive
@@ -397,7 +560,7 @@ describe('useMetadataStore fetchEditionsData', () => {
     expect(store.editions).toEqual([refreshedEdition]);
     expect(store.storyChapters).toEqual([refreshedChapter]);
   });
-  it('revalidates a retired cached scope without a cache bust', async () => {
+  it('shares a fresh neutral catalog across language scopes', async () => {
     const store = useMetadataStore();
     store.currentGameMode = 'pve';
     store.languageCode = 'de';
@@ -417,20 +580,20 @@ describe('useMetadataStore fetchEditionsData', () => {
     await flushPromises();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith('/api/tarkov/editions', {
-      query: { lang: 'de', gameMode: 'pve' },
+      query: { gameMode: 'pve' },
     });
     await store.ensureEditionsData();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    // Returning after retiring the live catalog must check the cached copy again.
+    // A language change reuses the already verified neutral mode catalog.
     store.languageCode = 'en';
     await store.fetchEditionsData();
     await flushPromises();
     store.languageCode = 'de';
     await store.fetchEditionsData();
     await flushPromises();
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenLastCalledWith('/api/tarkov/editions', {
-      query: { lang: 'de', gameMode: 'pve' },
+      query: { gameMode: 'pve' },
     });
     expect(store.editions[0]?.id).toBe('fresh-edition');
     expect(store.storyChapters[0]?.id).toBe('fresh-chapter');
@@ -446,14 +609,15 @@ describe('useMetadataStore fetchEditionsData', () => {
     await store.fetchEditionsData(true);
     expect(store.storyChapters).toEqual([chapter]);
     expect(fetch).toHaveBeenCalledWith('/api/tarkov/editions', {
-      query: { lang: 'de', gameMode: 'pve', cacheBust: '1' },
+      query: { gameMode: 'pve', cacheBust: '1' },
     });
     expect(cacheWrite).toHaveBeenCalledWith(
       'editions',
-      'overlay-v3-pve',
-      'de',
+      'neutral-v1-pve',
+      'en',
       expect.any(Object),
-      expect.any(Number)
+      expect.any(Number),
+      expect.any(Function)
     );
   });
   it('retries a mode whose obsolete request settled after switching away', async () => {

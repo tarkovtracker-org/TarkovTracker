@@ -19,7 +19,12 @@ the focused task remains visible after route preferences synchronize.
 
 The route picks the view (`app/utils/taskRouteView.ts`): `/tasks` is the list of every trader's
 tasks, `/tasks/traders` one trader at a time (`trader` param, picked from a strip of traders with
-tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. Tabs in the
+tasks left and their counts), `/tasks/maps` one map and `/tasks/graph` the trader graph. The Maps
+view widens past the other views on large screens (`xl` and `2xl`) so the map gets the room. Its
+map picker (`TaskFilterBar.vue`) wraps every map and its count onto as many rows as needed from
+`sm` up; below `sm` it stays one scrolling row and scrolls the selected map into view. The selected
+map and trader use the accent fill and border (`getPickerTabClass` in `app/utils/statusTones.ts`),
+and the selected map also shows a marker icon. Tabs in the
 page header (`app/features/tasks/TaskViewTabs.vue`) switch views and carry the search `q` across,
 including a search still being debounced into the URL; sort, trader and map come back from
 preferences, and so does status everywhere except Graph, which always shows every status without
@@ -66,6 +71,16 @@ keeping upstream order within each group, so it has no sort setting. Maxed cards
 "Max station level reached", so there is no page-wide collapse setting either; each card keeps its
 own collapse toggle. The drawer holds only the availability requirements. The legacy
 `hideout_sort_ready_first` and `hideout_collapse_completed` columns are no longer read or written.
+
+## Quest links
+
+The Quest links chip works on both collapsed and expanded cards. Hover over it, or activate it
+with a click, tap, or keyboard, to see links to named quests in the selected mode. It groups mutual
+choices, quests that fail when this one is completed, and quests whose completion fails this one.
+It also shows follow-up quests and previous quests according to the corresponding card settings.
+Previous quests already linked in the visible Requirements are omitted from the popover.
+Downstream impact appears inside Quest links when a relationship is listed, or in the header when
+there is impact without a visible relationship.
 
 ## Hidden tasks
 
@@ -284,12 +299,18 @@ response cannot replace the core catalog's gates.
 The result carries availability and blockers for levels, loyalty, reputation, quest statuses,
 failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
 is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
-card builds one requirement list with `useTaskRequirements`: while a card is locked, its header
-lists only the unmet requirements as chips (three, then an inline "+N more"), and the expanded body
-has a collapsible Requirements row that marks every level, trader, prerequisite and server-side
-(`otherRequirements`) requirement met or unmet. Cards carry no separate level or trader requirement badges. Comparisons are worded in
-plain language by `requirement-format.ts` (`15+`, `exactly 1`, never `>=`); the dashboard's
-`useTaskBlockerText` sentences use the same formatter. Shared/non-current profile
+card builds its requirement views with `useTaskRequirements`. A collapsed locked card shows
+blockers as chips (three, then an inline "+N more"). An expanded card shows the Requirements
+list with blockers first and each level, trader, quest, and server-side requirement
+marked met or unmet. The list starts open while any requirement is unmet and collapsed once all
+are met; its header toggles it like Objectives. Trader rows with the same requirement, status,
+and current value merge into one row (`Loyalty 3+: Therapist, Skier`). Server-side and trader
+unlock rows use short labels (`Trader conversation`, `Unlock Mechanic`). When the label drops
+detail, such as a story unlock objective, the full `useTaskBlockerText` sentence opens from an
+info button on hover, focus, or tap. Gates the tracker cannot observe keep a visible Mark available
+hint. Quest links skips only prerequisite links that the open Requirements list shows. Cards carry no separate level or trader
+requirement badges. Comparisons use the plain-language formatter in `requirement-format.ts`
+(`15+`, `exactly 1`); the dashboard's `useTaskBlockerText` sentences use the same formatter. Shared/non-current profile
 views call the same evaluator with their own mode progress. Profile task/objective, prestige and
 story catalogs load for the selected mode without mutating the active metadata store; obsolete
 mode/language requests are aborted on scope change or unmount and late responses are ignored.
@@ -300,6 +321,9 @@ editions, falling back to the active catalog while unavailable. Missing core/obj
 remain fatal.
 Explicit objective `unlocks` with `type: 'trader'` supply trader gates shared by dashboard cards
 and every pending task owned by that trader, including tasks without their own story requirements.
+Once the selected mode's task and reward catalogs load, the dashboard shows an unlinked warning
+for a configured unlock only if neither its task ID nor any task's trader rewards match. It shows
+a neutral status while the necessary catalog data is unavailable.
 Only a unique objective placement is authoritative; an omitted trader ID resolves only through a
 unique same-name chapter trader reference. Chapter summaries and objective wording never imply a
 gate. Exact objective completion (including the producer-declared tutorial baseline) opens the
@@ -319,10 +343,29 @@ instead of showing a raw ID.
 Players can recover a missing configured unlock task from explicit completion notifications through
 the [bounded EFT log-import path](./imports.md#eft-log-import), even before its metadata returns.
 
+Time gates are information only. `tarkov-json.ts` carries upstream `availableDelaySecondsMin/Max`
+onto the task core only when positive and finite (upstream reports no delay as `0`). The card header
+shows the stated delay ("Unlocks 10h after prerequisites are complete", or a min–max range) on
+unfinished tasks through `TaskTimeGateNote.vue` and `task-time-gate.ts`. It explains why the game
+can still withhold a task the tracker shows as available. The evaluator, sorting and Mark available
+ignore it, and there is no countdown: tracker completion times cannot reconstruct when the
+prerequisite was finished in game (#922). The fields are additive to `tasks-core-json-v3`, so cache
+keys stay unchanged and they appear once the scheduled precompute and browser caches refresh.
+
 Dashboard Up next follow-up counts use canonical prerequisite availability intersected with the
 current profile's edition, prestige and faction eligibility. Ineligible children contribute no
 “Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)
 do not remove an otherwise eligible follow-up from that count.
+
+Up next also shows one continuation for an incomplete auto-started or already-progressed Storyline
+chapter from the current mode's catalog. “Next tracked step” follows the existing timeline, skips
+automatic tutorial completion and optional steps, and does not claim in-game availability. Unresolved
+route choices link to the chapter without selecting a branch; missing/exhausted objective data asks
+the player to review the chapter rather than inferring completion. Benefits retain source qualifiers;
+“Opens” counts only eligible pending tasks whose every remaining gate is that exact story objective.
+The unfiltered, non-searching personal Available list reuses this guidance when empty. Known story
+objective blockers deep-link to that objective; unknown references retain the task requirements link.
+Search, content filters, teammate views and other task statuses keep their existing empty states.
 
 Completed and failed tasks are terminal.
 The explicit Accept workflow stores `active: true`; a neutral write stores `active: false`.
@@ -390,6 +433,223 @@ not import quest completions and therefore has no trader/task backfill path.
   contract changes still require the separate compatible-producer/preseed/consumer rollout in
   [overlay release verification](./overlay-and-precompute.md#release-verification).
 
+## Map transit layer
+
+The map's independent **Transit** layer shows transit locations from the active mode's
+`json.tarkov.dev` map payload. It defaults on and the toggle appears only when the selected
+map has transit coordinates. Labels use upstream localized descriptions (with the existing
+English fallback), the transit glyph, and a dashed border; the marker color is configurable
+alongside the extract and spawn colors. Extract and spawn toggles do not affect transits.
+Extract and transit labels remain visible across floors. Elevation arrows point toward the
+marker from the selected floor as a single badge (the level count is added beyond one level); no
+badge is shown for unknown
+height or a volume spanning the selected floor. Transit conditions are not displayed;
+this layer identifies locations, not whether a particular player can use them in a raid.
+No overlay additions or additional upstream requests are required.
+
+`app/features/maps/LeafletMap.vue` renders the layer and `useLeafletMapControls` derives its
+visibility. `app/composables/useLeafletMap.ts` owns layer creation and cleanup.
+
+## Map location accuracy and elevation
+
+`mapLocations.ts` rejects missing/non-finite horizontal positions for extracts and transits
+before layer availability and rendering. Ground Zero also checks its render bounds: upstream
+`regular`, `pve`, and `pvp-season` catalogs checked on 2026-11-10 incorrectly included UN Roadblock,
+Scav Bunker (Woods), and Pinewood Basement (Streets). Their coordinates are not repaired or moved.
+Transits belong to their containing source map; their `map` field identifies the destination.
+Other maps retain edge extracts outside artwork bounds. Existing cached catalogs receive the
+same presentation validation, without waiting for a server cache refresh.
+
+`app/data/mapFloors.json` contains reviewed height ranges and spatial extents from
+[the-hideout/tarkov-dev maps.json at a7cb849](https://github.com/the-hideout/tarkov-dev/blob/a7cb849a9c881bb1fa12ffb666c20e46aa5d1038/src/data/maps.json).
+The `order` is lowest to highest **selectable** floor, independent of SVG stacking order.
+Layer names map to our existing floor IDs (Labs `Second Level` becomes `Second_Level`).
+Keep spatial bounds with the heights when refreshing this metadata: low outdoor Ground Zero
+locations are not necessarily in Garage, and the showroom has a local second-floor exception.
+Maps lacking reviewed floor metadata, including Terminal, show no inferred arrows.
+
+`mapElevation.ts` classifies points and vertical volumes using half-open height intervals and
+scoped spatial exceptions before the base layer. A volume spanning several levels uses the
+nearest supported level toward the selected floor; a selected floor within that span needs no
+arrow. Task-zone positions and vertical bounds survive mark construction and participate in
+mark hashes. Legacy two-dimensional GPS has unknown height, never a fabricated zero.
+Extract/transit pins and task markers update floor badges on floor changes: a solid up/down arrow,
+plus the level count when it is more than one, with translated accessible descriptions. Markers
+on another floor stay visible but fade (pins also desaturate and return to full strength on hover
+or tap); their floor badge keeps full contrast. Counts describe displayed levels, not stair routes
+or guaranteed in-game access. Raw coordinates and their upstream provenance remain unchanged.
+
+## Extract requirement cues and details
+
+Extract pins show always-visible requirement icons beside the pin head, ahead of the on-demand
+name label, in the Layers panel's "Extract icons" key order. Up to three icons show, then `+N`;
+the co-op handshake is skipped on co-op pins because the glyph already shows it. Selecting an
+extract (or pressing Enter on its marker) opens a compact plain-text popup above the pin head, so
+the pin and its name stay visible: one icon row per requirement with a short instruction and an
+optional qualifier (price variance, train window). The data source and the not-live notice appear
+once per map, in a line at the map's lower-left corner, instead of in every popup. It names the
+game client version for the current mode, says when the map also uses curated cues, and gives
+the full client build and curation note on hover. Money, item handover, keys, gear, empty
+backpack/armor slots, flares, activation, green smoke, train, timer, conditional availability,
+and unknown requirements have distinct icons. These cues supplement faction glyphs and floor
+badges; they never indicate live raid availability or replace the in-raid extraction list.
+
+The rules come from the data overlay, because the public static API omits equipment
+restrictions, opening chances, timers, and requirement references. The overlay's `eft:extracts`
+generates its `extractRequirements` section from the game client's `/client/locations` and
+`/client/globals` definitions, read from the private RemoteSession worker, and keys each entry by
+map ID and the tarkov.dev extract ID matched on the raw exit name. Hand-curated scene cues live in
+its separate `extractCues` section, each with a public reference. Both record only client builds
+and a definitions hash, never capture dates, hosts, or session data. Production never contacts
+the capture tooling.
+
+`GET /api/tarkov/extract-requirements` serves both sections together for every mode
+([overlay ownership](./overlay-and-precompute.md#endpoint-ownership-and-precedence)). Its `data`
+is null until the overlay publishes valid sections, and the route returns 503 without an overlay.
+`useExtractRuleData` requests the route once per page load and holds no rule data until a
+payload passes the shared `app/utils/extractRuleData.ts` checks; the app ships no bundled copy
+([#1407](https://github.com/tarkovtracker-org/TarkovTracker/issues/1407)). Without rule data
+(still loading, a null `data`, a malformed payload, or an unavailable overlay, including local
+runs without `OVERLAY_TOKEN`) every extract shows the unknown-requirements cue plus any tarkov.dev
+transfer cost, never the "No requirements listed" line, and the map omits the source line. Co-op
+classification then falls back to the extract name. The map redraws extract pins and the source
+line when the data arrives.
+
+Rules shared by the Regular and Seasonal captures sit in `rules`; otherwise `pvp` and `seasonal`
+keep their own lists, and a mode without a capture has no rules (an unknown-requirements cue).
+PvE has no session of its own, so it reads the regular definitions' `countPve` / `percentPve` /
+`minPve` / `maxPve` values. A chance that is 100% in the current mode shows nothing, so an exit closed only in PvE shows its chance only in PvE. Never join translated names or assume a
+same-named exit on another map has the same requirements. Unmatched or incomplete exits keep an
+unknown-requirements cue, and raw switch references alone do not imply a power requirement.
+
+`Reference` resolves through `globals.config.RequirementReferences`, including Alpinist's
+Paracord, Red Rebel, and empty `ArmorVest` slot. `Empty` uses its actual `RequiredSlot`.
+`TransferItem` is distinct from `HasItem`, and a shared-timer transfer is a vehicle. Train counts
+are never treated as money. Costs are base configuration amounts, not reputation-adjusted prices.
+In particular Ground Zero's vehicle is 20,000 roubles in regular/Seasonal and 5,000 in the PvE
+field; Interchange's PvE base cost is still 20,000. A configured `Chance` is not a live status
+signal. Timers describe the configured arrival/activation window, not a guarantee an exit remains
+usable afterward. Lighthouse's PvE train window differs from PvP's and is shown per mode.
+
+Curated cues cover what the definitions do not describe: green flares for
+Mira Avenue,
+Railroad Passage,
+Power Line Passage, and
+Klimov Street; a flare of
+unconfirmed color for Path to River; green smoke for
+ZB-016,
+ZB-014 (with its key), and
+Old Gas Station;
+and the Factory emergency exit key beside ZB-013's activation requirement. Smoke is an
+availability signal, not a flare the player must bring. Additional activation steps and cues are
+not invented when data is missing. Refresh both sections in the overlay; the app keeps no copy.
+
+## Map markers, legend, and sizing
+
+Extract and transit markers are pins: a 30 px shaded teardrop with a white border, a dark outer
+ring, a drop shadow and a small ground shadow, so they stand out on light and dark map areas. The
+teardrop's tip is the exact map position, and the pin grows slightly on hover or when opened. A
+white glyph inside uses the familiar running-through-a-door exit symbol for shared and
+unknown-faction extracts, including Armored Train. PMC-only (shield), Scav-only (skull), co-op
+(handshake), and transit (transfer) retain distinct glyphs so access restrictions remain readable
+without relying on color. Shared and unknown-faction extracts keep their separate colors and
+their existing layer classification; sharing a glyph does not imply a known faction.
+`app/features/maps/utils/markerGlyphs.ts` owns the classification, path data, and pin markup; head
+colors come from the customizable marker palette. A pin's name appears beside it on hover, when
+it is tapped or clicked (until another pin or the map is clicked), for every pin once the view is
+zoomed in at least one level past the whole-map fit, or always when **Always show names** is on
+(`map_always_show_names`). The accessible label includes the name, floor direction, and requirement
+badges. Extract pins enter the keyboard tab order so Enter opens their details; transit pins stay
+out of it. The map surface keeps its own keyboard controls.
+
+Objective markers are 26 px raised chips: a white border, a top highlight, an inner bottom shade, a
+dark outline and a drop shadow keep them readable on light and dark map areas, whatever their fill
+(the outline doubles with `prefers-contrast: more`). A zone also gets one at its centre. The glyph
+on each chip names the action the objective's upstream `type` asks for: visit or locate (eye),
+plant, stash or install (tray with a down arrow), find or pick up (magnifier), mark with an MS2000
+Marker (beacon), eliminate (pistol), use an item such as a signal flare (pointing hand), extract
+(the extract pins' exit glyph), and a flag for any other type.
+`app/features/maps/utils/objectiveGlyphs.ts` owns the type mapping, path data, and chip markup. The
+glyph is white or near-black, whichever has the higher WCAG contrast against the fill
+(`colorContrast.ts`), so a light fill never hides it. Chips are non-interactive Leaflet markers in
+their own pane above the overlay pane and below the extract pins. Under each chip sits an invisible
+dot of the same size that takes hover, click and the stacked-objective hit test; the dot (or its
+zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades when the
+objective is on another floor and returns to full strength on hover. Its floor badge sits 2 px to
+the left of the chip. A zone's outline and fill are drawn only while the zone is at least 2 chips
+(52 px) wide or tall on screen, rechecked after every zoom; smaller zones show just their chip, so
+no outline peeks out around it. Hovering the zone or its chip shows the outline at any size
+(`app/features/maps/utils/objectiveZoneOutline.ts`).
+
+**Map Colors > Objective colors** (in the map toolbar and **Settings > Maps**) chooses what the fill
+shows (#920): the task **Category** (Regular, Pinned, Team colors; the default), the **Quest**, or
+the **Objective type**. Quest and type colors come from a color-blind-safe palette: Okabe-Ito (7
+colors, the default), Tol bright (6) or Tol muted (9). A test keeps every pair of palette colors
+apart under simulated protanopia, deuteranopia and tritanopia. In Quest mode `assignTaskColors`
+assigns automatic colors over `mapTaskIds` (before hiding): they repeat only once a map has more
+quests than the palette has colors, and hiding or "show only" never changes them. Completing,
+unlocking or filtering quests changes `mapTaskIds` and may move automatic colors. A picked quest
+color never changes and never moves another quest's color, though it may match one. Type mode
+colors the seven action types in
+legend order and keeps the generic flag pale grey; the Layers panel's Objective icons key shows
+those colors. Outside Category mode the Regular, Pinned and Team rows still filter markers but show
+a neutral swatch. `app/features/maps/utils/objectiveColors.ts` owns the modes, palettes and
+assignment.
+
+Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`, helpers in
+`app/features/maps/utils/objectivePopup.ts`). The header shows the trader's portrait and name
+(#1394), the full task name (a wiki link when one is trusted), the minimum player level when above
+1, and a tarkov.dev link. A details panel names the action with its chip and shows the objective
+description, the item involved (the MS2000 Marker for a mark, the quest item for a quest pickup or
+stash, otherwise the first accepted item plus how many alternatives exist, or, when no item is
+accepted, the weapon or gear an elimination must use) with its icon, item quantity when applicable
+and a FIR badge. The panel lists each required key group (`A / B` when any one works) and shows a
+progress bar when the objective counts more than one. Weapon and clothing labels omit the
+elimination count.
+The footer has a labeled **Mark complete** / **Completed** toggle, a **Task list** button that
+scrolls to and highlights the objective, and the show-only and hide quest buttons. Compact tooltip
+density keeps the layout and makes the footer buttons icon-only.
+Read-only popups omit the toggle and progress. The stacked list shows each entry's trader
+portrait with the action chip on it.
+
+The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
+controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by
+`app/features/maps/utils/mapLayerGroups.ts`). Rows are grouped as Tasks (Regular, Pinned, Team),
+Extracts (PMC, Scav, Shared / unknown, Co-op), and Locations (Transit, PMC Spawns). Each row depicts
+the markers it controls, including combined rows; hidden rows stay listed, dimmed with an
+eye-off icon. Task rows are always listed; extract and location rows appear only when the selected
+map has that marker type. The collapsed button shows how many rows are hidden, and the panel offers
+**Show all layers** while any are hidden. The Shared row shows one exit glyph in the shared color.
+Only when the selected map has drawable extracts without a known faction does its label become
+Shared / unknown, with a hint that faction data was not supplied. It still shows one glyph and
+controls either-faction exits and unclassified exits without assigning a faction to the latter.
+Shared and co-op extracts have their own toggles and start visible when either faction's extracts
+start visible; extracts without a known faction follow the
+Shared row, which is listed whenever such extracts exist. Extracts start visible or hidden from
+**Settings > Maps > Show Extracts by Default** (`showMapExtracts`, synced as `show_map_extracts`).
+Turning an extract, transit or spawn row on or off (or using **Show all layers**) is remembered
+across refreshes, page changes and the full-screen map in `mapLayerVisibility`, which is local
+only, like `mapHiddenTaskIds`; `app/features/maps/utils/mapLayerVisibility.ts` owns the row keys.
+A remembered row wins over the default. Changing **Show Extracts by Default** clears remembered
+extract rows so the new default applies; if the preference arrives from account sync while a map
+is open, it applies only to rows without a remembered choice. The
+panel opens by default when the map is at least 480 px wide, remembers an explicit open or close
+in `map_layers_panel_open`, and is capped at 45% of the viewport height (scrolling inside) in
+containers narrower than 30rem. Below the rows, collapsible **Objective icons** and **Extract
+icons** keys list every objective glyph and extract requirement badge.
+
+The inline map's height follows the window (75%, clamped to 320 px and 85% of the window) until
+the user drags or keys the resize handle (arrow keys step, Home/End jump to the limits). That
+choice persists in `tasks_map_height_choice`; double-clicking the handle or pressing Enter on it
+returns to the automatic height. On first load, a value in the old `tasks_map_height` key moves
+to the new key unless it equals the old default `520`, which the old code wrote on first visit
+and therefore means "never resized"; the old key is then removed. An untouched view refits the
+map bounds whenever its container resizes; a panned or zoomed view is kept.
+Leaflet's native window-resize handler is disabled so the ResizeObserver can decide whether to
+refit before invalidating size and changing the center.
+In containers narrower than 30rem, the toolbar and floor picker stack above the map instead of
+covering it.
+
 ## Map objective visibility and required items
 
 **Summary.** The Tasks map derives objective visibility once for map markers and the required-item
@@ -420,6 +680,29 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
    (via `LeafletMap`'s `taskVisibilityActions`) edit the single `mapHiddenTaskIds` list. In map view
    `tasks.vue` moves hidden map quests out of the main list into the collapsed
    `MapHiddenTasksSection`, so the list matches the map.
+6. In Quest color mode, `useMapObjectiveMarks` returns `mapTaskColors` and sets each mark's `color`;
+   every mark also carries its `taskId`. `MapTaskVisibilityPanel` then shows a quest legend (shown
+   quests only) and a color picker per quest under **Choose quests**; a picked color replaces the
+   automatic one until it is reset. Hovering or focusing a legend entry, or hovering one of the
+   quest's markers, highlights that quest: its chips grow, its zone outlines show and every other
+   chip fades. Clicking a legend entry keeps the highlight (for touch screens) until it is clicked
+   again, the quest is hidden or leaves the map, or quest coloring is turned off; a lock does not
+   return by itself when the quest comes back. The legend and the map report their hovers
+   separately (a marker hover wins over a legend hover or focus, which wins over the lock), so
+   leaving one never clears the other. The map releases a hover it reported when it redraws its
+   markers or unmounts, `tasks.vue` drops the marker hover when the fullscreen map opens or
+   closes over it, and the legend forgets an entry that leaves it, since none of these fires
+   mouseout. `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
+   and fullscreen maps; `LeafletMap` toggles chip classes for it without redrawing markers.
+7. **Trader reputation** beside **Choose quests** filters the map, its quest list, and the
+   required-item summary by completion rewards. **Any gain** stays available even if the catalog
+   has no positive rewards. The numbered minimums come from the current mode's rewards in
+   [map task visibility](../../app/features/maps/utils/mapTaskVisibility.ts). The selection carries
+   across maps and fullscreen and clears when leaving Tasks → Maps. A numbered minimum also
+   clears if the loaded catalog no longer offers it. Quests opened from a direct link stay in focus.
+   The reputation no-match alert offers a reset even when the map is collapsed.
+   Manually hidden quests retain their hidden status. The list of hidden quests shows entries
+   that meet the active reputation filter.
 
 ### Files
 
@@ -435,6 +718,8 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
 - `app/features/maps/utils/mapTaskVisibility.ts` — hidden-quest helpers and popup action type.
 - `app/features/maps/MapTaskVisibilityPanel.vue` and `app/features/tasks/TaskMapVisibilityToggles.vue`
   — hide / "show only" controls above the map and on task cards (via `mapTaskVisibilityKey`).
+- `app/features/maps/utils/objectiveColors.ts`, `app/features/maps/MapObjectiveColorControls.vue`,
+  `app/features/maps/MapQuestLegend.vue` and `app/features/maps/composables/useMapTaskHighlight.ts` — objective color modes, quest colors and quest highlight.
 - `app/features/tasks/MapHiddenTasksSection.vue` — collapsed list section for hidden map quests.
 
 ### Invariants
@@ -469,7 +754,10 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
   current map's `mapTaskIds` and un-hides the chosen one; quests unlocked later are shown by
   default. "Show all" un-hides the current map's quests only.
 - `mapHiddenTaskIds` persists in user-scoped local preferences storage and is not part of the
-  Supabase `user_preferences` sync payload (no column exists).
+  Supabase `user_preferences` sync payload (no column exists). The same holds for
+  `mapObjectiveColorMode`, `mapObjectivePalette` and the per-quest `mapTaskColors`.
+- Color is never the only cue: the glyph names the objective type in every color mode, and the quest
+  legend names each quest beside its color.
 - Jumping to an objective of a hidden quest un-hides that quest first so its popup can open.
 - Hovering or clicking an objective marker hit-tests every visible zone and point in container
   pixels. When more than one distinct objective is under the pointer, the popup is a compact stacked
@@ -485,6 +773,13 @@ strip. The popover renders at most 50 items per page; larger pools can be search
 name and paged through without changing progress. Single-item sales still show the item directly.
 Cycling pauses for completed objectives and completed or failed parent tasks, while browsing stays
 available.
+
+Shoot objectives with multiple weapons in a flat alternatives list use the same display and
+popover. The equipment strip groups single-mod alternatives and wearable choices that share a
+known equipment kind. Gear with mixed or unknown kinds stays inline. Outfit choices can be shown
+per slot when the source lists every valid combination of the items in those slots. Each
+alternative key group has its own popover. Consolidated find-and-handover rows show a shared
+accepted-item list when every objective in the row accepts the same set.
 
 Weapon-build task objectives show their base weapon and explicit `containsAll` parts beneath the
 objective statement. `TaskWeaponBuildItems.vue` consumes the same `neededItemTaskObjectives`
@@ -511,6 +806,9 @@ skeleton/reward reflow and an initial list filtered without edition eligibility.
 request is scoped to the tasks page; other routes retain the store's idle scheduling. Edition
 responses, errors, and cleanup apply only to the current promise; superseded cache reads and
 network requests cannot overwrite current eligibility, cache payloads, or loading state.
+When the objective catalog fails to load, cards awaiting objectives show a retry action. It
+uses the cached, deduplicated loader for the current mode and language, including its overlay
+provenance check. Already loaded objectives stay visible.
 Normalize edition and chapter network payloads before applying either, preserving existing
 data if normalization fails. Empty cached editions do not replace loaded eligibility.
 
@@ -564,9 +862,62 @@ database column for older clients; this UI change requires no column removal or 
 
 Collapse-by-default and hide-rewards remain independent preferences, both off by default.
 Collapse-by-default applies to list cards; map cards start expanded. Matching deep links expand
-their card. The dedicated chevron controls card expansion in both views. Hide-rewards applies
-to both list and map cards. Missing database columns use the existing preference-sync fallback,
-so new settings remain local until the compact-list preference migration is deployed.
+their card. If a linked quest is absent from the current mode's catalog, the Tasks page explains
+why and offers to switch to any mode where the quest ID matches. The link stays active until
+the quest opens or the player dismisses the notice.
+
+The dedicated chevron controls card expansion in both views. When rewards are visible, the footer
+shows rewards in labeled rows for progression, items and cash, and purchase unlocks. Only
+categories with rewards appear. Items use the same thumbnail and links as objective items.
+Short labels use catalog names with variant qualifiers where available, and full names when
+the short labels would be ambiguous.
+Every reward stays visible. Thumbnails show the full item name and larger image on hover, keyboard
+focus, or tap. The Wiki and tarkov.dev links sit next to the image. Currency rewards use the same
+thumbnails and links with a localized amount and currency symbol. Hide-rewards applies to both list
+and map cards.
+Missing database columns use the existing preference-sync fallback, so new settings remain local
+until the compact-list preference migration is deployed.
+
+### Needed Items views
+
+Two independent toolbar choices replace the former list, grid and combined views and the grid
+card-style toggle:
+
+- **Show each item once** (`groupByItem`): when enabled, every quest and hideout need for an
+  item is added together. When disabled, each task objective or hideout requirement has its own
+  entry. The switch defaults on only when no grouping choice was saved; existing true/false
+  choices, layouts and filters are preserved.
+- **Layout**: _List_ (divided rows) or _Grid_ (tiles), stored as `neededItemsViewMode`.
+
+Every combination is built from the same pieces in `app/features/neededitems/`: `NeededItemEntry`
+(one need, `row` or `tile`), `NeededItemGroupEntry` (one item), `NeededItemThumb`,
+`NeededItemSource` (quest or station link, lock and level hints, status, teammates) and
+`NeededItemCounter`. Each requirement uses a collect toggle for single
+items, a stepper for counted ones, a read-only count once the parent is done, and a teammate
+note for needs kept only for teammates. Phones keep the stepper inline under the item name; no
+layout opens a modal to track a single need. Grouped entries use `NeededItemGroupTracking` with
+inline steppers and typed counts for the available FIR and Non-FIR totals, alongside the remaining
+quantity (clamped at zero). Only the changed quantity is distributed: additions follow existing task/hideout priority,
+and removals use reverse priority, preserving other allocations. Finished parent quests and
+built modules stay read-only and contribute a protected minimum. Counts and Undo are scoped to
+the current account and game mode; Undo survives a filtered-out card and rejects newer progress.
+The optional _See where it’s needed_ action opens per-need details and the existing Smart Fill
+replacement flow. The source badges count requirements in both modes; the result summary
+always states its units and also counts unique items when the switch is enabled.
+A checked handover displays its full quantity on the quest and moves to Completed in Needed
+Items, even while the quest is still open. A pending teammate's requirement can still appear in
+Needs. Unchecking restores the player's saved count.
+
+With Hide owned enabled, grouped counters and their source breakdown retain the full matching
+requirements, keeping tracked quantities and denominators stable as allocations fill. The
+remaining count determines whether an item is still needed; fully collected items disappear.
+
+`neededItemsCardStyle` remains a synced preference column for compatibility but no longer
+affects rendering. The `needed_items_view` analytics event keeps `view_mode`
+(`combined`, `list` or `grid`) and adds `layout`; switching layout in Items mode is tracked.
+Entries render in batches of 24 after an initial 30 rows or 24 tiles (half on narrow screens).
+Each entry looks up its task with the metadata store's indexed `getTaskById` instead of scanning
+every task; the station lookup scans the short hideout station list.
 
 ### Needed Items pooled objective search and grouping
 
@@ -590,9 +941,10 @@ item's displayed total stays aligned with its visible direct needs (#882: a LEDX
 added every "sell N of any item" pool). Progress writes stay bound to the objective ID regardless
 of which item identity is displayed.
 
-The grouped card total uses `filteredItems`, including the ownership filter. Its modal target list
-uses the same view filters except ownership, so owned direct needs can remain editable and resettable
-even when hidden from the card total. Resolve the modal's accepted-item suppression against the
+Result membership and underlying grouped data use `filteredItems`, including the ownership filter.
+Rendered grouped counters, their source breakdown and modal targets use the matching need list
+without ownership filtering, so owned direct needs remain counted, editable and resettable while
+the item is still needed. Resolve the modal's accepted-item suppression against the
 visible `filteredItems` set; recalculating it over the expanded modal targets can incorrectly hide a
 pooled objective that the card displays. Snapshot modal targets and collected totals when the modal
 opens, and close it if the active game mode changes. Mutations must be guarded against writing the

@@ -42,6 +42,8 @@ export const MAP_MARKER_COLORS = {
   COOP_EXTRACT: '#2b7b82',
   /** PMC spawns - --color-info-500 */
   PMC_SPAWN: '#2280c3',
+  /** Transit locations - matches --color-error-400 */
+  TRANSIT: '#cf5959',
   /** Default extract - --color-secondary-500 */
   DEFAULT_EXTRACT: '#339199',
   /** Marker border - white */
@@ -73,6 +75,7 @@ const LEGACY_MAP_MARKER_COLOR_KEYS: MapMarkerColorKey[] = [
   'MARKER_BORDER',
   'EXTRACT_DOT_BORDER',
 ];
+/** Build translated labels for the marker colors users can customize. */
 export const getMapColorOptions = (t: MapColorOptionTranslator): MapColorOption[] => {
   return [
     { key: 'SELF_OBJECTIVE', label: t('settings.interface.maps.colors.self_objective') },
@@ -84,6 +87,7 @@ export const getMapColorOptions = (t: MapColorOptionTranslator): MapColorOption[
     { key: 'SHARED_EXTRACT', label: t('settings.interface.maps.colors.shared_extract') },
     { key: 'COOP_EXTRACT', label: t('settings.interface.maps.colors.coop_extract') },
     { key: 'PMC_SPAWN', label: t('common.pmc_spawn') },
+    { key: 'TRANSIT', label: t('maps.layers.transit') },
   ];
 };
 export const normalizeMapMarkerColors = (value: unknown): MapMarkerColors => {

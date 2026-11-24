@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, reactive } from 'vue';
 type QueryRecord = Record<string, string | undefined>;
 const routeState = reactive({
+  hash: '',
   query: reactive<QueryRecord>({}),
 });
 const applyRouteQuery = (query: QueryRecord) => {
@@ -48,6 +49,7 @@ describe('useHideoutRouteSync', () => {
     vi.resetModules();
     vi.clearAllMocks();
     storeState.hideoutPrimaryView = 'available';
+    routeState.hash = '';
     applyRouteQuery({});
     vi.doMock('pinia', async () => {
       const actual = await vi.importActual<typeof import('pinia')>('pinia');
@@ -74,6 +76,7 @@ describe('useHideoutRouteSync', () => {
     vi.useRealTimers();
   });
   it('populates URL with stored view when no query param present', async () => {
+    routeState.hash = '#requirements-workbench-level-2';
     storeState.hideoutPrimaryView = 'locked';
     const { useHideoutRouteSync } = await import('@/composables/useHideoutRouteSync');
     const TestHarness = defineComponent({
@@ -84,8 +87,11 @@ describe('useHideoutRouteSync', () => {
     });
     const wrapper = mount(TestHarness);
     await flushRouteSync();
-    expect(replace).toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledWith({ query: { view: 'locked' }, hash: routeState.hash });
     expect(routeState.query.view).toBe('locked');
+    setHideoutPrimaryView('all');
+    await flushRouteSync();
+    expect(push).toHaveBeenCalledWith({ query: { view: 'all' }, hash: routeState.hash });
     wrapper.unmount();
   });
   it('syncs URL view param to store on init', async () => {

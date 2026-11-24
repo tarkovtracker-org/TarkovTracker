@@ -1,6 +1,6 @@
 <template>
   <section
-    v-if="state !== 'empty'"
+    v-if="isVisible"
     class="bg-surface-900 mb-8 rounded-lg border border-white/12 text-sm"
     data-testid="dashboard-up-next"
     :data-state="state"
@@ -16,6 +16,7 @@
         {{ t('page.dashboard.up_next.filtered_badge') }}
       </span>
       <NuxtLink
+        v-if="!inTaskList"
         to="/tasks"
         class="text-primary-400 hover:text-primary-300 light:text-primary-800 ml-auto flex items-center gap-1 font-medium transition-colors hover:underline"
       >
@@ -23,13 +24,17 @@
         <UIcon name="i-mdi-arrow-right" class="h-4 w-4" aria-hidden="true" />
       </NuxtLink>
     </header>
-    <ol v-if="items.length" class="divide-y divide-white/8 border-t border-white/8">
-      <li v-for="(item, index) in items" :key="item.taskId">
-        <DashboardUpNextRow :item="item" :index="index" />
-      </li>
-    </ol>
+    <p v-if="inTaskList" class="text-surface-400 px-4 pb-3">
+      {{ t('page.tasks.no_available_tasks_description') }}
+    </p>
+    <DashboardUpNextList
+      v-if="hasRecommendations"
+      :items="items"
+      :story-step="storyStep"
+      :track-clicks="!inTaskList"
+    />
     <NuxtLink
-      v-else-if="state === 'filtered'"
+      v-if="state === 'filtered'"
       to="/tasks"
       class="text-warning-300 flex items-center gap-3 border-t border-white/8 px-4 py-2.5 transition-colors hover:bg-white/4"
       data-testid="up-next-filtered"
@@ -38,7 +43,7 @@
       {{ hiddenLabel }}
     </NuxtLink>
     <p
-      v-else
+      v-else-if="!hasRecommendations"
       class="text-surface-400 border-t border-white/8 px-4 py-2.5"
       data-testid="up-next-message"
     >
@@ -48,12 +53,20 @@
 </template>
 <script setup lang="ts">
   import { useDashboardUpNext } from '@/composables/useDashboardUpNext';
+  import DashboardUpNextList from '@/features/dashboard/DashboardUpNextList.vue';
+  const props = defineProps<{ inTaskList?: boolean }>();
   const { t } = useI18n({ useScope: 'global' });
-  const { filtersActive, hiddenAvailableCount, items, state } = useDashboardUpNext();
+  const { filtersActive, hiddenAvailableCount, items, state, storyStep } = useDashboardUpNext();
+  const hasRecommendations = computed(() => items.value.length > 0 || Boolean(storyStep.value));
+  const isVisible = computed(
+    () => state.value !== 'empty' || Boolean(storyStep.value) || props.inTaskList
+  );
   const title = computed(() =>
-    state.value === 'blocked'
-      ? t('page.dashboard.up_next.blocked_title')
-      : t('page.dashboard.up_next.title')
+    props.inTaskList
+      ? t('page.tasks.no_available_tasks')
+      : state.value === 'blocked' && !storyStep.value
+        ? t('page.dashboard.up_next.blocked_title')
+        : t('page.dashboard.up_next.title')
   );
   const hiddenLabel = computed(() =>
     hiddenAvailableCount.value === 1

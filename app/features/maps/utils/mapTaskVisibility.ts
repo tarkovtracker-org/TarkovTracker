@@ -1,3 +1,21 @@
+import type { Task } from '@/types/tarkov';
+const isPositiveReputation = (amount: number): boolean => Number.isFinite(amount) && amount > 0;
+/** The selectable minimums come from individual rewards across the current mode's catalog. */
+export const getMapReputationOptions = (
+  tasks: readonly Pick<Task, 'finishRewards'>[]
+): number[] => {
+  const amounts = tasks.flatMap((task) =>
+    (task.finishRewards?.traderStanding ?? []).map(({ standing }) => standing)
+  );
+  return [...new Set(amounts.filter(isPositiveReputation))].sort((first, second) => first - second);
+};
+/** A quest matches when at least one individual trader reward meets the minimum. */
+export const meetsMapReputationMinimum = (task: Task, minimum: number | null): boolean => {
+  if (minimum === null) return true;
+  return (task.finishRewards?.traderStanding ?? []).some(
+    ({ standing }) => isPositiveReputation(standing) && standing >= minimum
+  );
+};
 /**
  * Quests the user hid from the Tasks map (#918).
  *

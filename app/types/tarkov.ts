@@ -212,6 +212,8 @@ export interface TaskObjective {
     map?: { id: string };
     outline?: Array<{ x: number; y: number; z: number }>;
     position?: { x: number; y: number; z: number };
+    top?: number;
+    bottom?: number;
   }>;
   possibleLocations?: Array<{
     map?: { id: string };
@@ -225,6 +227,8 @@ export interface TaskObjective {
   markerItem?: TarkovItem;
   /** Item that counts for quest completion/requirements */
   questItem?: TarkovItem;
+  /** Verified quest-inventory item with no confirmed objective-to-template mapping. */
+  questInventoryOnly?: boolean;
   count?: number;
   type?: string;
   foundInRaid?: boolean;
@@ -240,17 +244,21 @@ export interface TaskObjective {
   status?: string[];
   /** All items that must be contained */
   containsAll?: TarkovItem[];
+  /** Item categories that a weapon build must include. */
+  containsCategory?: string[];
   /** Any of these items can be used */
   useAny?: TarkovItem[];
-  /** Weapon that must be used */
-  usingWeapon?: TarkovItem;
+  /** Accepted weapons; legacy catalogs may supply a scalar reference. */
+  usingWeapon?: ObjectiveEquipment;
   /** Weapon mods that must be equipped */
-  usingWeaponMods?: TarkovItem[];
+  usingWeaponMods?: ObjectiveEquipment;
   /** Items that must be worn */
-  wearing?: TarkovItem[];
+  wearing?: ObjectiveEquipment;
   /** Items that must not be worn */
-  notWearing?: TarkovItem[];
+  notWearing?: ObjectiveEquipment;
 }
+/** Source equipment lists/groups, also accepting legacy scalar references. Keep group boundaries. */
+export type ObjectiveEquipment = TarkovItem | (TarkovItem | TarkovItem[])[];
 export interface TaskRequirement {
   task: { id: string; name?: string };
   status?: string[];
@@ -309,6 +317,12 @@ export interface Task {
   /** In-game trader task-list group from the overlay; absent when unknown. Never a gate. */
   traderTaskGroup?: TraderTaskGroup;
   minPlayerLevel?: number;
+  /**
+   * Upstream in-game delay, in seconds, between the prerequisites completing and the task being
+   * offered. Present only when positive. Displayed as static information; never a gate or timer.
+   */
+  availableDelaySecondsMin?: number;
+  availableDelaySecondsMax?: number;
   requiredPrestige?: TaskPrestigeReference;
   /**
    * Declared gates dropped because they could not be interpreted. The evaluator turns each one
@@ -345,6 +359,15 @@ export interface MapPosition {
   y: number;
   z: number;
 }
+/** A transit location on the source map; `map` identifies its destination. */
+export interface MapTransit {
+  id: string;
+  description: string;
+  map: string;
+  position?: MapPosition;
+  top?: number;
+  bottom?: number;
+}
 export interface MapSpawn {
   zoneName?: string;
   position: MapPosition;
@@ -355,6 +378,8 @@ export interface MapSpawn {
  * Extraction point on a map
  */
 export interface MapExtract {
+  /** Upstream transfer cost; static JSON uses an item ID, adapted payloads may embed the item. */
+  transferItem?: { item: string | { id: string; name?: string }; count: number };
   id: string;
   name: string;
   /** Faction that can use this extract: 'pmc', 'scav', 'shared', or null */
@@ -402,6 +427,7 @@ export interface TarkovMap {
   spawns?: MapSpawn[];
   /** Extraction points available on this map */
   extracts?: MapExtract[];
+  transits?: MapTransit[];
   /** Whether the map is unavailable for display */
   unavailable?: boolean;
   svg?: string | MapSvgConfig;
@@ -629,7 +655,7 @@ export interface NeededItemHideoutModule extends NeededItemBase {
 }
 export type GroupedItemInfo = Pick<
   TarkovItem,
-  'id' | 'iconLink' | 'image512pxLink' | 'wikiLink' | 'link'
+  'id' | 'iconLink' | 'image512pxLink' | 'wikiLink' | 'link' | 'backgroundColor'
 > & {
   /** Item display name (required - items without names are filtered out during grouping) */
   name: string;

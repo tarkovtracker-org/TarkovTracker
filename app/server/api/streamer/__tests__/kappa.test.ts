@@ -102,6 +102,7 @@ describe('Streamer Kappa API', () => {
             visibility: 'public',
           };
         }
+        if (input === '/api/tarkov/strings') return { data: { strings: {} } };
         if (input === '/api/tarkov/tasks-core') {
           return { data: { tasks: [{ id: 'task-1' }] } };
         }
@@ -138,14 +139,16 @@ describe('Streamer Kappa API', () => {
           host: 'tarkovtracker.org',
           'x-forwarded-for': '203.0.113.5',
         },
-        query: { gameMode: 'regular', lang: 'en' },
+        query: { gameMode: 'regular' },
+        onResponse: expect.any(Function),
       });
       expect(mockDollarFetch).toHaveBeenCalledWith('/api/tarkov/tasks-objectives', {
         headers: {
           host: 'tarkovtracker.org',
           'x-forwarded-for': '203.0.113.5',
         },
-        query: { gameMode: 'regular', lang: 'en' },
+        query: { gameMode: 'regular' },
+        onResponse: expect.any(Function),
       });
       expect(mockSetResponseHeader).toHaveBeenCalledWith(
         mockEvent,
@@ -217,17 +220,93 @@ describe('Streamer Kappa API', () => {
     const sinkBodies = logSinkFetch.mock.calls.map(([, init]) => String(init?.body)).join('\n');
     expect(sinkBodies).not.toContain(token);
   });
-  it('maps private shared profiles to a 403 response', async () => {
+  it('conceals legacy private shared profile errors with the generic not-found response', async () => {
     mockDollarFetch.mockRejectedValueOnce({
       statusCode: 403,
       statusMessage: 'Profile is private for this mode',
     });
     const { default: handler } = await import('@/server/api/streamer/[userId]/[mode]/kappa.get');
-    await expect(handler(mockEvent as H3Event)).rejects.toThrow('Profile is private for this mode');
+    await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+      statusCode: 404,
+      statusMessage: 'Profile not found',
+    });
   });
   it('maps non-private 403 shared profile errors to service unavailable', async () => {
     mockDollarFetch.mockRejectedValueOnce({ statusCode: 403, statusMessage: 'Forbidden' });
     const { default: handler } = await import('@/server/api/streamer/[userId]/[mode]/kappa.get');
     await expect(handler(mockEvent as H3Event)).rejects.toThrow('Shared profiles unavailable');
   });
+  it.each([
+    ['pvp', 'regular'],
+    ['pve', 'pve'],
+    ['seasonal', 'pvp-season'],
+  ])(
+    'retries a complete %s snapshot and always requests English strings',
+    async (mode, gameMode) => {
+      mockGetRouterParam.mockImplementation((_, key) => (key === 'mode' ? mode : USER_ID));
+      let coreRequests = 0;
+      const key = '@tt:regular:tasks:name';
+      mockDollarFetch.mockImplementation(async (input: string, options) => {
+        if (input.startsWith('/api/profile/')) return { data: {}, visibility: 'public' };
+        if (!input.startsWith('/api/tarkov/')) return {};
+        if (input.endsWith('/tasks-core')) coreRequests++;
+        const release = input.endsWith('/strings') || coreRequests > 1 ? '2' : '1';
+        options.onResponse({
+          response: { headers: new Headers({ 'X-Catalog-Release': release }) },
+        });
+        if (input.endsWith('/strings')) return { data: { strings: { [key]: 'Second release' } } };
+        if (input.endsWith('/tasks-core'))
+          return { data: { tasks: [{ id: 'task-1', name: key, experience: coreRequests }] } };
+        return {
+          data: { tasks: [{ id: 'task-1', objectives: [{ id: 'objective', description: key }] }] },
+        };
+      });
+      const { default: handler } = await import('@/server/api/streamer/[userId]/[mode]/kappa.get');
+      await handler(mockEvent as H3Event);
+      expect(coreRequests).toBe(2);
+      expect(mockProcessTaskData).toHaveBeenCalledWith([
+        expect.objectContaining({
+          id: 'task-1',
+          name: 'Second release',
+          experience: 2,
+          objectives: [{ id: 'objective', description: 'Second release' }],
+        }),
+      ]);
+      const requests = mockDollarFetch.mock.calls.filter(([url]) => url.startsWith('/api/tarkov/'));
+      expect(requests).toHaveLength(6);
+      for (const [url, options] of requests) {
+        expect(options.query).toEqual(url.endsWith('/strings') ? { lang: 'en' } : { gameMode });
+      }
+    }
+  );
+  it.each(['skew', 'missing-key', 'unavailable'])(
+    'returns 503 after bounded snapshot failure: %s',
+    async (failure) => {
+      let coreRequests = 0;
+      mockDollarFetch.mockImplementation(async (input: string, options) => {
+        if (input.startsWith('/api/profile/')) return { data: {}, visibility: 'public' };
+        if (!input.startsWith('/api/tarkov/')) return {};
+        if (input.endsWith('/tasks-core')) coreRequests++;
+        if (failure === 'unavailable') throw { statusCode: 503 };
+        const table = input.endsWith('/strings');
+        options.onResponse({
+          response: {
+            headers: new Headers({ 'X-Catalog-Release': table && failure === 'skew' ? '2' : '1' }),
+          },
+        });
+        if (table)
+          return {
+            data: { strings: failure === 'missing-key' ? {} : { '@tt:key': 'Wrong release' } },
+          };
+        return { data: { tasks: [{ id: 'task-1', name: '@tt:key' }] } };
+      });
+      const { default: handler } = await import('@/server/api/streamer/[userId]/[mode]/kappa.get');
+      await expect(handler(mockEvent as H3Event)).rejects.toMatchObject({
+        statusCode: 503,
+        statusMessage: 'Catalog snapshot unavailable',
+      });
+      expect(coreRequests).toBe(2);
+      expect(mockComputeStreamerKappaMetrics).not.toHaveBeenCalled();
+    }
+  );
 });

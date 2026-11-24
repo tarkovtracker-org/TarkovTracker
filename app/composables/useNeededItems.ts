@@ -5,7 +5,9 @@ import {
   getNeededItemId,
   isNonFirSpecialEquipment,
   itemMatchesQuery,
+  neededCountOf,
 } from '@/features/neededitems/neededItemFilters';
+import { useNeedSelfCompletion } from '@/features/neededitems/useNeedSelfCompletion';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
@@ -43,7 +45,6 @@ type FullItemsLoadOptions = {
   delayMs?: number;
 };
 type NeededItemsViewMode = 'list' | 'grid';
-type NeededItemsCardStyle = 'compact' | 'expanded';
 export interface UseNeededItemsOptions {
   perfDebug?: boolean | Ref<boolean> | ComputedRef<boolean>;
   search?: Ref<string>;
@@ -61,7 +62,6 @@ export interface UseNeededItemsReturn {
   sortBy: WritableComputedRef<NeededItemsSortBy>;
   sortDirection: WritableComputedRef<NeededItemsSortDirection>;
   viewMode: WritableComputedRef<NeededItemsViewMode>;
-  cardStyle: WritableComputedRef<NeededItemsCardStyle>;
   allItems: ComputedRef<(NeededItemTaskObjective | NeededItemHideoutModule)[]>;
   filteredItems: ComputedRef<(NeededItemTaskObjective | NeededItemHideoutModule)[]>;
   groupedItems: ComputedRef<GroupedNeededItem[]>;
@@ -78,6 +78,7 @@ export interface UseNeededItemsReturn {
   >;
   filterTabsWithCounts: ComputedRef<FilterTab[]>;
   itemsReady: ComputedRef<boolean>;
+  stashImportReady: ComputedRef<boolean>;
   itemsError: ComputedRef<Error | null>;
   itemsFullLoaded: ComputedRef<boolean>;
   ensureNeededItemsData: () => void;
@@ -87,6 +88,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const { perfDebug: perfDebugOption = false, search = ref(''), t } = options;
   const metadataStore = useMetadataStore();
   const progressStore = useProgressStore();
+  const { isCompletedHandover } = useNeedSelfCompletion();
   const preferencesStore = usePreferencesStore();
   const tarkovStore = useTarkovStore();
   const defaultTranslations: Record<string, string> = {
@@ -143,10 +145,6 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     get: () => preferencesStore.getNeededItemsHideOwned,
     set: (value) => preferencesStore.setNeededItemsHideOwned(value),
   });
-  const cardStyle = computed({
-    get: () => preferencesStore.getNeededItemsCardStyle as NeededItemsCardStyle,
-    set: (value) => preferencesStore.setNeededItemsCardStyle(value),
-  });
   const hideTeamItems = computed({
     get: () => preferencesStore.itemsTeamAllHidden,
     set: (value) => preferencesStore.setItemsTeamHideAll(value),
@@ -202,6 +200,12 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const itemsLoaded = computed(() => (items.value?.length ?? 0) > 0);
   const itemsError = computed(() => metadataStore.itemsError);
   const itemsReady = computed(() => itemsLoaded.value && !itemsError.value);
+  const stashImportReady = computed(
+    () =>
+      itemsReady.value &&
+      metadataStore.tasksObjectivesHydrated &&
+      metadataStore.hideoutStations.length > 0
+  );
   const fullItemsQueued = ref(false);
   const { sortNeededItems, sortGroupedItems } = useNeededItemsSorting({
     sortBy,
@@ -395,10 +399,14 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     }
     return false;
   };
+  const isCompletedNeed = (need: NeededItemTaskObjective | NeededItemHideoutModule): boolean =>
+    isParentCompleted(need) || isCompletedHandover(need);
+  const countsInCurrentView = (need: NeededItemTaskObjective | NeededItemHideoutModule): boolean =>
+    countsForSelf(need) && (activeFilter.value === 'completed' || !isCompletedHandover(need));
   const filterTabsWithCounts = computed((): FilterTab[] => {
     const counts = { tasks: 0, hideout: 0, completed: 0, incomplete: 0 };
     for (const item of allItems.value.filter(countsForSelf)) {
-      const completed = isParentCompleted(item);
+      const completed = isCompletedNeed(item);
       if (completed) {
         counts.completed++;
       } else {
@@ -456,16 +464,20 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     const task = metadataStore.getTaskById(need.taskId);
     return task?.kappaRequired === true;
   };
+  const taskNeedCount = (need: NeededItemTaskObjective, count: number): number =>
+    isCompletedHandover(need)
+      ? count
+      : Math.min(tarkovStore.getObjectiveCount(need.id) ?? 0, count);
   const passesOwnershipFilter = (
     item: NeededItemTaskObjective | NeededItemHideoutModule
   ): boolean => {
     // A teammate-only need is listed because a teammate still lacks it, so the
     // user's own count does not make it owned.
-    if (!countsForSelf(item)) return true;
-    const count = item.count ?? 1;
+    if (!countsInCurrentView(item)) return true;
+    const count = neededCountOf(item);
     const currentCount =
       item.needType === 'taskObjective'
-        ? tarkovStore.getObjectiveCount(item.id)
+        ? taskNeedCount(item, count)
         : tarkovStore.getHideoutPartCount(item.id);
     return (currentCount ?? 0) < count;
   };
@@ -479,10 +491,12 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
   const passesCompletionFilter = (
     item: NeededItemTaskObjective | NeededItemHideoutModule
   ): boolean => {
-    if (activeFilter.value === 'completed') {
-      return isParentCompleted(item);
+    if (activeFilter.value === 'completed') return isCompletedNeed(item);
+    if (isParentCompleted(item)) return false;
+    if (item.needType === 'taskObjective' && isCompletedHandover(item)) {
+      return neededByTeammate(item);
     }
-    return !isParentCompleted(item);
+    return true;
   };
   const passesTypeFilter = (item: NeededItemTaskObjective | NeededItemHideoutModule): boolean => {
     if (activeFilter.value === 'tasks') {
@@ -551,17 +565,31 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     if (item.needType === 'hideoutModule') return stationMatchesSearch(item);
     return false;
   };
+  // Every view filter except ownership and search. The fuzzy search is the costly check, so
+  // it always runs after these.
+  const cheapViewFilters = [
+    passesCompletionFilter,
+    passesTypeFilter,
+    passesFirFilter,
+    passesSpecialEquipmentFilter,
+    passesKappaToggleFilter,
+    passesTeamToggleFilter,
+  ];
+  const passesCheapViewFilters = (item: NeededItemTaskObjective | NeededItemHideoutModule) =>
+    cheapViewFilters.every((passes) => passes(item));
+  // Every view filter except ownership, with search last. The grouped details modal uses this
+  // set so its Smart Fill targets do not disappear while counts change.
+  const passesViewFilters = (item: NeededItemTaskObjective | NeededItemHideoutModule) =>
+    passesCheapViewFilters(item) && passesSearchFilter(item);
+  // One pass over the list instead of a chain of array copies; owned needs skip the search.
   const filteredItems = computed(() => {
     const startedAt = perfDebug.value ? perfNow() : 0;
-    const result = allItems.value
-      .filter(passesCompletionFilter)
-      .filter(passesTypeFilter)
-      .filter(passesFirFilter)
-      .filter(passesSpecialEquipmentFilter)
-      .filter(passesKappaToggleFilter)
-      .filter(passesOwnershipToggleFilter)
-      .filter(passesTeamToggleFilter)
-      .filter(passesSearchFilter);
+    const result = allItems.value.filter(
+      (item) =>
+        passesCheapViewFilters(item) &&
+        passesOwnershipToggleFilter(item) &&
+        passesSearchFilter(item)
+    );
     const sorted = sortNeededItems(result);
     if (perfDebug.value) {
       logPerf('filtered-items', {
@@ -649,7 +677,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     );
     return resolved.filter((entry) => !isAcceptedRekey(entry) || !directIds.has(entry.target.id));
   };
-  const selfFilteredItems = computed(() => filteredItems.value.filter(countsForSelf));
+  const selfFilteredItems = computed(() => filteredItems.value.filter(countsInCurrentView));
   const groupedNeeds = computed((): GroupedNeed[] => resolveGroupedNeeds(selfFilteredItems.value));
   // Needs folded into the Group by item groups; teammate-only needs are not among them.
   const groupedNeedCount = computed(() => groupedNeeds.value.length);
@@ -666,6 +694,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
             name: itemName,
             iconLink: itemData.iconLink,
             image512pxLink: itemData.image512pxLink,
+            backgroundColor: itemData.backgroundColor,
             wikiLink: itemData.wikiLink,
             link: itemData.link,
           },
@@ -680,11 +709,10 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
         });
       }
       const group = groups.get(itemId)!;
-      const count = need.count || 1;
+      const count = neededCountOf(need);
       let needCurrentCount: number;
       if (need.needType === 'taskObjective') {
-        const objectiveCount = tarkovStore.getObjectiveCount(need.id);
-        needCurrentCount = Math.min(objectiveCount ?? 0, count);
+        needCurrentCount = taskNeedCount(need, count);
         if (need.foundInRaid) {
           group.taskFir += count;
           group.taskFirCurrent += needCurrentCount;
@@ -728,15 +756,9 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     // Keep the modal's Smart Fill targets stable when item progress changes.
     // Ownership filtering is count-based, so build this from the same view
     // filters as `filteredItems` except `passesOwnershipToggleFilter`.
-    const modalNeeds = allItems.value
-      .filter(passesCompletionFilter)
-      .filter(passesTypeFilter)
-      .filter(passesFirFilter)
-      .filter(passesSpecialEquipmentFilter)
-      .filter(passesKappaToggleFilter)
-      .filter(passesTeamToggleFilter)
-      .filter(passesSearchFilter)
-      .filter(countsForSelf);
+    const modalNeeds = allItems.value.filter(
+      (item) => passesViewFilters(item) && countsInCurrentView(item)
+    );
     const map = new Map<
       string,
       {
@@ -782,7 +804,6 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     sortBy,
     sortDirection,
     viewMode,
-    cardStyle,
     allItems,
     filteredItems,
     groupedItems,
@@ -791,6 +812,7 @@ export function useNeededItems(options: UseNeededItemsOptions = {}): UseNeededIt
     objectivesByItemId,
     filterTabsWithCounts,
     itemsReady,
+    stashImportReady,
     itemsError,
     itemsFullLoaded,
     ensureNeededItemsData,
