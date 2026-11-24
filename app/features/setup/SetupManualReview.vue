@@ -23,6 +23,13 @@
         :blocked-tiers="blockedTiers"
         @select-level="levels.set($event.id, $event.level)"
       />
+      <UAlert v-if="waitingForDetails" color="info" variant="soft" :title="detailMessage">
+        <template #actions>
+          <UButton variant="soft" :loading="detailsLoading" @click="loadTaskDetails">
+            {{ $t('setup.retry_details') }}
+          </UButton>
+        </template>
+      </UAlert>
       <div class="flex flex-wrap items-center gap-3">
         <UButton :disabled="!canSave" :loading="saving" icon="i-mdi-check" @click="apply">
           {{ $t(saveFailed ? 'setup.retry_save' : 'setup.save_changes') }}
@@ -94,6 +101,7 @@
   const saving = ref(false);
   const saveFailed = ref(false);
   const saved = ref(false);
+  const detailsLoading = ref(false);
   const saveMessage = computed(() => {
     if (saveFailed.value) return t('setup.save_failed');
     return saved.value ? t('setup.saved') : '';
@@ -101,6 +109,7 @@
   const catalogReady = computed(
     () =>
       !metadata.loading &&
+      !metadata.tasksCoreRefreshing &&
       metadata.tasksCoreGameMode === mode &&
       metadata.hideoutStations.length > 0
   );
@@ -142,6 +151,7 @@
     )
   );
   const blockedTiers = computed(() => {
+    if (!metadata.tasksRewardsHydrated) return [];
     const blocked = new Set(
       previewBlockedHideoutTiers(tarkov, {
         moduleIds: upgrades.value.map((level) => level.id),
@@ -157,9 +167,36 @@
         }))
     );
   });
-  const canSave = computed(
-    () => !saving.value && !blockedTiers.value.length && (hasChanges.value || saveFailed.value)
+  const detailsReady = computed(
+    () => metadata.tasksObjectivesHydrated && metadata.tasksRewardsHydrated
   );
+  const needsDetails = computed(
+    () => questCompletions.value.length > 0 || upgrades.value.length > 0
+  );
+  const waitingForDetails = computed(() => needsDetails.value && !detailsReady.value);
+  const detailMessage = computed(() =>
+    t(detailsLoading.value ? 'setup.details_loading' : 'setup.details_unavailable')
+  );
+  const hasSaveableDraft = computed(
+    () => hasChanges.value && !waitingForDetails.value && !blockedTiers.value.length
+  );
+  const canRetrySave = computed(() => saveFailed.value && !hasChanges.value);
+  const canSave = computed(() => !saving.value && (hasSaveableDraft.value || canRetrySave.value));
+  async function loadTaskDetails() {
+    if (detailsLoading.value || detailsReady.value || !catalogReady.value) return;
+    detailsLoading.value = true;
+    try {
+      await Promise.allSettled([
+        metadata.fetchTaskObjectivesData(),
+        metadata.fetchTaskRewardsData(),
+      ]);
+    } finally {
+      detailsLoading.value = false;
+    }
+  }
+  watch([catalogReady, () => metadata.tasksCoreRevision], () => void loadTaskDetails(), {
+    immediate: true,
+  });
   function clearDraft() {
     choices.clear();
     levels.clear();
