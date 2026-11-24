@@ -10,7 +10,7 @@ CI job planning, result gates, and GitHub automation helpers used by the workflo
 | `validation-tools.mjs`        | Resolves trusted absolute paths for `git` and `pnpm`.                        | `validate-changes.mjs`, `preview/`                |
 | `change-brief.mjs`            | Pre-edit brief: consumers, owning docs, scoped rules, tests, checks.         | `brief`; see `workflow-automation.md`             |
 | `change-brief-lib.mjs`        | Pure briefing model for `change-brief.mjs`; I/O is injected.                 | `change-brief.mjs`                                |
-| `metrics.mjs`                 | Codebase size and Fallow health snapshot, optionally compared with a base.   | `metrics` (by hand); see `workflow-automation.md` |
+| `metrics.mjs`                 | Codebase size and Fallow health snapshot, optionally compared with a base.   | `metrics`, `ci.yml`; see `workflow-automation.md` |
 | `metrics-lib.mjs`             | Pure model for `metrics.mjs`: path categories, health summary, deltas.       | `metrics.mjs`                                     |
 | `check-ci-result.mjs`         | Final CI gate: fails if any job the plan selected did not pass.              | `ci.yml`                                          |
 | `report-dispatched-ci.mjs`    | Publishes the gate result as a commit status for dispatched CI runs.         | `ci.yml`                                          |
