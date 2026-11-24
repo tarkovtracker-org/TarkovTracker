@@ -2320,7 +2320,7 @@
     "level_summary": "Level {level}",
     "level_prestige_summary": "Level {level} · {prestige}",
     "prestige_link": "{prestige}, open prestige settings",
-    "resources_overview": "Resources overview"
+    "resources_toggle": "Toggle resource pages"
   },
   "profile": {
     "season_short": "S{season}"

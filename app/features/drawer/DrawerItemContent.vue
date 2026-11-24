@@ -3,7 +3,7 @@
     v-if="isNuxtLink"
     :to="props.to ?? undefined"
     :aria-label="props.labelText ?? ''"
-    :aria-current="isActive ? 'page' : undefined"
+    :aria-current="isCurrentPage ? 'page' : undefined"
     class="group flex items-center rounded-sm border-l-2 px-3 text-sm font-medium transition-colors duration-150"
     :class="[
       props.isCollapsed ? 'justify-center' : '',
@@ -99,4 +99,7 @@
   const isNuxtLink = computed(() => !isDisabled.value && !!props.to && !props.href);
   const isAnchor = computed(() => !isDisabled.value && !isNuxtLink.value && !!props.href);
   const isActive = computed(() => isNavigationRouteActive(props.to, route.path));
+  const isCurrentPage = computed(() =>
+    props.to === '/resources' ? route.path === props.to : isActive.value
+  );
 </script>
