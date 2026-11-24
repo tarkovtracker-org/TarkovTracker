@@ -625,8 +625,10 @@ only its original local archive and socket. Never substitute production bytes.
 
 Apply through the normal integration from merged main after all gates pass. The migration uses
 one transaction, a one-second lock timeout, a twenty-second statement timeout and `DROP COLUMN
-RESTRICT`. An unexpected reader or dependency aborts it. Verify the ledger and affected catalogs
-and confirm normalized reads/saves, team progress, prestige and backup/import. Physical reclamation
+RESTRICT`. Lock acquisition can time out, and unexpected dependent database objects abort the
+transaction. Before deployment, verify that supported deployed readers no longer select the
+retired columns. After deployment, verify the ledger, affected catalogs, normalized reads/saves,
+team progress, prestige and backup/import. Physical reclamation
 requires separate low-traffic maintenance authorization, headroom and a lock/outage plan.
 
 ### Durable leave and kick cooldown rollout (#1031)

@@ -15,13 +15,17 @@ own dry-run and activation controls.
 
 ### Rollback
 
-With explicit authorization, restore strict freshness before changing the queue or retention.
-Read back the live rulesets and verify `strict-queue` before proceeding. Keep equivalent required
-checks active at every step.
+With explicit authorization, restore strict freshness and read back the live rulesets. Confirm
+`strict-queue`, all three required contexts, and review-thread resolution.
 
 ```sh
 gh api -X PUT repos/tarkovtracker-org/TarkovTracker/rulesets/23539975 -f enforcement=active
 ```
+
+This rollback keeps the queue active. The strict freshness ruleset alone lacks App-pinned
+`Review Admission` and thread resolution. Queue retirement requires a separately approved
+replacement that preserves those gates, `CI Result`, and `Preview Result` before disabling
+the queue ruleset. Roll back preview retention independently through the preview procedure.
 
 ## Review Admission
 
