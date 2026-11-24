@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed, defineComponent, ref, unref } from 'vue';
 import { useModifierPlanner } from '@/features/seasonal-modifiers/useModifierPlanner';
 import { seasonTwoModifiersStorageKey } from '@/utils/storageKeys';
@@ -92,6 +92,40 @@ describe('seasonal modifier selection persistence', () => {
     localStorage.removeItem(key);
     window.dispatchEvent(new StorageEvent('storage', { key, storageArea: localStorage }));
     expect([...unref(planner.selected)]).toEqual([]);
+    planner.close();
+  });
+  it('warns when a selection fails to save and retries the same picks', () => {
+    const key = seasonTwoModifiersStorageKey(null);
+    const planner = openPlanner();
+    vi.spyOn(localStorage, 'setItem').mockImplementationOnce(() => {
+      throw new DOMException('Storage full', 'QuotaExceededError');
+    });
+    toggle(planner, drawback);
+    expect(planner.saveFailed.value).toBe(true);
+    expect([...unref(planner.selected)]).toEqual([drawback.id]);
+    expect(localStorage.getItem(key)).toBeNull();
+    window.dispatchEvent(new StorageEvent('storage', { key, storageArea: localStorage }));
+    expect(planner.saveFailed.value).toBe(true);
+    expect([...unref(planner.selected)]).toEqual([drawback.id]);
+    planner.retrySave();
+    expect(planner.saveFailed.value).toBe(false);
+    expect(localStorage.getItem(key)).toBe(JSON.stringify([drawback.id]));
+    planner.close();
+  });
+  it('lets users retry a failed Clear all with the current plan empty', () => {
+    const key = seasonTwoModifiersStorageKey(null);
+    const planner = openPlanner();
+    toggle(planner, drawback);
+    vi.spyOn(localStorage, 'removeItem').mockImplementationOnce(() => {
+      throw new DOMException('Storage unavailable', 'SecurityError');
+    });
+    planner.clear();
+    expect(planner.saveFailed.value).toBe(true);
+    expect([...unref(planner.selected)]).toEqual([]);
+    expect(localStorage.getItem(key)).toBe(JSON.stringify([drawback.id]));
+    planner.retrySave();
+    expect(planner.saveFailed.value).toBe(false);
+    expect(localStorage.getItem(key)).toBeNull();
     planner.close();
   });
 });

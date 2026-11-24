@@ -2259,6 +2259,8 @@
       "order_high": "Points · High to low",
       "selected": "Selected ({count})",
       "clear_all": "Clear all",
+      "save_failed": "Couldn’t save your modifier selections",
+      "save_failed_description": "Your latest changes may be lost if you leave this page.",
       "drawbacks": "Negative modifiers",
       "perks": "Positive modifiers",
       "drawbacks_hint": "Drawbacks lower net cost",

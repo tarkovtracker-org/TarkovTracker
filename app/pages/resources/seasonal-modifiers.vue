@@ -53,6 +53,21 @@
         :suggestion="suggestion"
         @apply="applySuggestion"
       />
+      <UAlert
+        v-if="saveFailed"
+        role="alert"
+        color="warning"
+        variant="soft"
+        icon="i-mdi-alert-outline"
+        :title="t('page.seasonal_modifiers.save_failed')"
+        :description="t('page.seasonal_modifiers.save_failed_description')"
+      >
+        <template #actions>
+          <UButton size="sm" color="warning" variant="soft" @click="retrySave">
+            {{ t('common.retry') }}
+          </UButton>
+        </template>
+      </UAlert>
       <p
         v-if="blocked"
         role="alert"
@@ -155,6 +170,8 @@
     floor,
     suggestion,
     blocked,
+    saveFailed,
+    retrySave,
     toggle,
     clear,
     applySuggestion,

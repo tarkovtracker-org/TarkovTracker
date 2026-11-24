@@ -25,7 +25,8 @@ Battlestate's provisional source link. The browser loads it from a noindex
 client-rendered document. Point suggestions only balance the published preview values.
 Season 2 modifier selections are saved in the current browser, separately for
 each signed-in account and for guests. The planner shows saved modifiers that
-are present in the current catalog.
+are present in the current catalog. If browser storage rejects a change, the
+planner keeps the current selection on the page and offers to retry saving it.
 Empty exclusions leave compatibility unknown. The fetch uses the existing server-only,
 read-only overlay credential and rejects redirects. The isolate shares a pending read
 and retains the validated immutable catalog for reuse.

@@ -20,10 +20,11 @@ export function useModifierPlanner(
   userId: Readonly<Ref<string | null>>
 ) {
   const storageKey = computed(() => seasonTwoModifiersStorageKey(userId.value));
-  const savedIds = ref(new Set<string>());
-  const picked = computed(() => items.value.filter((item) => savedIds.value.has(item.id)));
+  const selectedIds = ref(new Set<string>());
+  const saveFailed = ref(false);
+  const picked = computed(() => items.value.filter((item) => selectedIds.value.has(item.id)));
   const selected = computed(() => new Set(picked.value.map((item) => item.id)));
-  const available = computed(() => items.value.filter((item) => !savedIds.value.has(item.id)));
+  const available = computed(() => items.value.filter((item) => !selectedIds.value.has(item.id)));
   const spent = computed(() => netCostOf(picked.value.filter((item) => item.netCost > 0)));
   const earned = computed(() => -netCostOf(picked.value.filter((item) => item.netCost < 0)));
   const net = computed(() => spent.value - earned.value);
@@ -31,27 +32,34 @@ export function useModifierPlanner(
   const suggestion = computed(() => suggestBalance(net.value, available.value));
   const blocked = ref<{ name: string; attempted: number; minimum: number } | null>(null);
   function restoreSelection() {
-    savedIds.value = new Set(readSelection(storageKey.value));
+    selectedIds.value = new Set(readSelection(storageKey.value));
+    saveFailed.value = false;
     blocked.value = null;
   }
   onMounted(() => {
     watch(storageKey, restoreSelection, { immediate: true, flush: 'sync' });
   });
   useEventListener('storage', (event) => {
+    if (saveFailed.value) return;
     if (event.key === storageKey.value || event.key === null) restoreSelection();
   });
   function saveSelection(ids: Set<string>) {
-    savedIds.value = ids;
+    selectedIds.value = ids;
     try {
       if (ids.size) localStorage.setItem(storageKey.value, JSON.stringify([...ids]));
       else localStorage.removeItem(storageKey.value);
+      saveFailed.value = false;
     } catch (error) {
+      saveFailed.value = true;
       logger.warn('[ModifierPlanner] Could not save modifier selections', error);
     }
   }
+  function retrySave() {
+    saveSelection(selectedIds.value);
+  }
   function toggle(item: ModifierDisplay, event: Event) {
     blocked.value = null;
-    const next = new Set(savedIds.value);
+    const next = new Set(selectedIds.value);
     if (next.delete(item.id)) {
       saveSelection(next);
       return;
@@ -72,7 +80,7 @@ export function useModifierPlanner(
   }
   function applySuggestion() {
     const additions = suggestion.value.additions.map((item) => item.id);
-    saveSelection(new Set([...savedIds.value, ...additions]));
+    saveSelection(new Set([...selectedIds.value, ...additions]));
     blocked.value = null;
   }
   return {
@@ -83,6 +91,8 @@ export function useModifierPlanner(
     floor,
     suggestion,
     blocked,
+    saveFailed,
+    retrySave,
     toggle,
     clear,
     applySuggestion,
