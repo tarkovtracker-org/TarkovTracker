@@ -44,6 +44,23 @@
         </output>
       </div>
     </template>
+    <UModal
+      v-if="saveFailed"
+      :title="$t('setup.leave_failed_save_title')"
+      :description="$t('setup.leave_failed_save_description')"
+    >
+      <UButton color="neutral" variant="ghost" :disabled="saving">
+        {{ $t('setup.leave_failed_save_action') }}
+      </UButton>
+      <template #footer="{ close }">
+        <UButton color="neutral" variant="ghost" @click="close">
+          {{ $t('common.cancel') }}
+        </UButton>
+        <UButton color="warning" :disabled="saving" @click="emit('finishAfterFailure')">
+          {{ $t('setup.leave_failed_save_action') }}
+        </UButton>
+      </template>
+    </UModal>
   </section>
 </template>
 <script setup lang="ts">
@@ -60,7 +77,12 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
   import { completeTaskForProgress } from '@/utils/taskProgress';
-  const emit = defineEmits<{ busy: [value: boolean]; dirty: [value: boolean]; saved: [] }>();
+  const emit = defineEmits<{
+    busy: [value: boolean];
+    dirty: [value: boolean];
+    saved: [];
+    finishAfterFailure: [];
+  }>();
   const { t } = useI18n({ useScope: 'global' });
   const metadata = useMetadataStore();
   const tarkov = useTarkovStore();

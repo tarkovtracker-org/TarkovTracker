@@ -47,6 +47,7 @@
           @busy="manualBusy = $event"
           @dirty="manualDirty = $event"
           @saved="manualSaved = true"
+          @finish-after-failure="go('done')"
         />
         <p v-if="manualDirty" class="text-surface-400 text-sm">{{ $t('setup.draft_pending') }}</p>
         <div class="flex flex-wrap items-center gap-2">
