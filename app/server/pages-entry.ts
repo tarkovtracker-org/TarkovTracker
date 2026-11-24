@@ -1,6 +1,3 @@
-// Nuxt resolves this installed adapter through the alias in nuxt.config.ts; Fallow cannot
-// resolve that transitive package subpath. Typecheck and the compiled-workerd test verify it.
-// fallow-ignore-next-line unresolved-import
 import nitroWorker from 'nitropack/presets/cloudflare/runtime/cloudflare-pages';
 import { sendCatalogGzip } from '@/server/utils/catalogEncoding';
 import { boundedClientLogRequest } from '@/server/utils/clientLogBody';
