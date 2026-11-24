@@ -44,8 +44,8 @@
                 ? 'ring-primary-400/40 ring-1'
                 : 'text-surface-200 light:hover:text-surface-50 hover:text-white',
             ]"
-            :label="filter.label"
-            @click="activeCategory = filter.id"
+            :label="`${filter.label} (${filter.count})`"
+            @click="setActiveCategory(filter.id)"
           />
         </div>
         <p v-if="isSearching" class="text-surface-400 text-sm" aria-live="polite">
@@ -62,7 +62,10 @@
       </div>
       <div v-if="visibleSections.length" class="space-y-8">
         <section v-for="section in visibleSections" :key="section.category" class="space-y-2.5">
-          <h2 class="text-primary-300/90 text-xs font-semibold tracking-[0.25em] uppercase">
+          <h2
+            v-if="showSectionHeaders"
+            class="text-primary-300/90 text-xs font-semibold tracking-[0.25em] uppercase"
+          >
             {{ section.label }}
             <span class="text-surface-500 ml-2 tracking-normal normal-case">
               · {{ section.resources.length }}
@@ -136,6 +139,7 @@
   import ResourceCard from '@/features/resources/ResourceCard.vue';
   import {
     CATEGORY_LABEL_FALLBACKS,
+    isResourceCategory,
     matchesResourceSearch,
     RESOURCE_CATEGORIES,
     RESOURCES,
@@ -144,10 +148,32 @@
   } from '@/features/resources/resourceData';
   type CategoryFilterId = 'all' | ResourceCategory;
   const { t } = useI18n({ useScope: 'global' });
+  const route = useRoute();
+  const router = useRouter();
   definePageMeta({ layout: 'default' });
   const searchInputId = useId();
   const searchQuery = ref('');
-  const activeCategory = ref<CategoryFilterId>('all');
+  const resolveCategoryFromQuery = (value: unknown): CategoryFilterId => {
+    const raw = Array.isArray(value) ? value[0] : value;
+    return isResourceCategory(raw) ? raw : 'all';
+  };
+  const activeCategory = ref<CategoryFilterId>(resolveCategoryFromQuery(route.query.category));
+  watch(
+    () => route.query.category,
+    (next) => {
+      activeCategory.value = resolveCategoryFromQuery(next);
+    }
+  );
+  const setActiveCategory = (category: CategoryFilterId) => {
+    activeCategory.value = category;
+    const query = { ...route.query };
+    if (category === 'all') {
+      delete query.category;
+    } else {
+      query.category = category;
+    }
+    void router.replace({ query });
+  };
   const isSearching = computed(() => searchQuery.value.trim().length > 0);
   const filterGroupLabel = computed(() =>
     t('page.resources.filter_label', 'Filter resources by category')
@@ -156,10 +182,12 @@
     {
       id: 'all' as const,
       label: t('common.all', 'All'),
+      count: RESOURCES.length,
     },
     ...RESOURCE_CATEGORIES.map((category) => ({
       id: category,
       label: t(`page.resources.categories.${category}`, CATEGORY_LABEL_FALLBACKS[category]),
+      count: RESOURCES.filter((resource) => resource.category === category).length,
     })),
   ]);
   const getResourceName = (resource: Resource) =>
@@ -184,6 +212,7 @@
     );
   });
   const showCategoryBadges = computed(() => isSearching.value);
+  const showSectionHeaders = computed(() => activeCategory.value === 'all');
   const visibleSections = computed(() => {
     const categories =
       activeCategory.value === 'all' ? RESOURCE_CATEGORIES : [activeCategory.value];
@@ -203,6 +232,6 @@
   });
   const clearFilters = () => {
     searchQuery.value = '';
-    activeCategory.value = 'all';
+    setActiveCategory('all');
   };
 </script>

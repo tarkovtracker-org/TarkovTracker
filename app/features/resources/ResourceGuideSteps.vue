@@ -1,9 +1,5 @@
 <template>
-  <ResourceGuideSection
-    id="setup"
-    :title="t('common.getting_started', 'Getting Started')"
-    icon="i-mdi-playlist-check"
-  >
+  <ResourceGuideSection id="setup" :title="sectionTitle" icon="i-mdi-playlist-check">
     <ol class="space-y-5">
       <li
         v-for="n in resource.guide?.steps ?? 0"
@@ -30,6 +26,11 @@
 <script setup lang="ts">
   import ResourceGuideSection from '@/features/resources/ResourceGuideSection.vue';
   import type { Resource } from '@/features/resources/resourceData';
-  defineProps<{ resource: Resource }>();
+  const props = defineProps<{ resource: Resource }>();
   const { t } = useI18n({ useScope: 'global' });
+  const sectionTitle = computed(() => {
+    const key = props.resource.guide?.stepsHeadingKey;
+    const fallback = props.resource.guide?.stepsHeadingFallback;
+    return key ? t(key, fallback ?? '') : t('common.getting_started', 'Getting Started');
+  });
 </script>

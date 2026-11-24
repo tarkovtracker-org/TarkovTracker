@@ -1,5 +1,27 @@
 <template>
   <div class="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-5 sm:px-6">
+    <nav
+      class="text-surface-400 flex flex-wrap items-center gap-1.5 text-sm"
+      :aria-label="t('page.resources.breadcrumb', 'Breadcrumb')"
+    >
+      <NuxtLink to="/resources" class="hover:text-primary-300 transition-colors">
+        {{ t('page.resources.title', 'Resources & Guides') }}
+      </NuxtLink>
+      <UIcon name="i-mdi-chevron-right" class="h-4 w-4 shrink-0 opacity-60" />
+      <NuxtLink
+        :to="{ path: '/resources', query: { category: 'calculators_and_reference' } }"
+        class="hover:text-primary-300 transition-colors"
+      >
+        {{
+          t(
+            'page.resources.categories.calculators_and_reference',
+            CATEGORY_LABEL_FALLBACKS.calculators_and_reference
+          )
+        }}
+      </NuxtLink>
+      <UIcon name="i-mdi-chevron-right" class="h-4 w-4 shrink-0 opacity-60" />
+      <span class="text-surface-200">{{ t('page.seasonal_modifiers.title') }}</span>
+    </nav>
     <PageHeader
       :title="t('page.seasonal_modifiers.title')"
       :description="t('page.seasonal_modifiers.season')"
@@ -125,6 +147,7 @@
 </template>
 <script setup lang="ts">
   import PageHeader from '@/components/ui/PageHeader.vue';
+  import { CATEGORY_LABEL_FALLBACKS } from '@/features/resources/resourceData';
   import ModifierBoards from '@/features/seasonal-modifiers/ModifierBoards.vue';
   import ModifierBudget from '@/features/seasonal-modifiers/ModifierBudget.vue';
   import { modifierCategories, type ModifierOrder } from '@/features/seasonal-modifiers/planner';

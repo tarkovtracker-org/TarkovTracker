@@ -29,7 +29,7 @@ const mountCard = (resource: Resource, showCategoryBadge = false) =>
           template:
             '<div data-testid="more-menu"><slot /><div v-for="group in items" :key="group.length"><a v-for="item in group" :key="item.label" :href="item.href || item.to">{{ item.label }}</a></div></div>',
         },
-        UIcon: true,
+        UIcon: { props: ['name'], template: '<i :data-icon="name" />' },
       },
     },
   });
@@ -110,10 +110,11 @@ describe('ResourceCard', () => {
     expect(wrapper.get('a[href="/resources/tarkovtracker_org_vs_io"]').text()).toBe('Read guide');
     expect(wrapper.find('[data-testid="more-menu"]').exists()).toBe(false);
   });
-  it('renders the placeholder icon and external primary action when configured', () => {
+  it('renders a custom fallback icon and external primary action when configured', () => {
     const wrapper = mountCard({
       slug: 'cultistcircle',
       logo: null,
+      icon: 'i-mdi-circle-double',
       category: 'calculators_and_reference',
       hasGuide: false,
       primaryAction: 'website',
@@ -124,6 +125,6 @@ describe('ResourceCard', () => {
     expect(wrapper.find('a[href="/resources/cultistcircle"]').exists()).toBe(false);
     expect(wrapper.get('a[href="https://cultistcircle.com"]').text()).toBe('Open calculator');
     expect(wrapper.find('[data-testid="more-menu"]').exists()).toBe(false);
-    expect(wrapper.findComponent({ name: 'UIcon' }).exists()).toBe(true);
+    expect(wrapper.find('i[data-icon="i-mdi-circle-double"]').exists()).toBe(true);
   });
 });

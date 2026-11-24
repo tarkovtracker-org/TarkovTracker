@@ -28,12 +28,35 @@
         :meta-line="metaLine"
         :compatibility-text="compatibilityText"
       />
-      <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_13rem]">
-        <ResourceGuideArticle
-          :resource="resource"
-          :guide-title="guideTitle"
-          :overview="overviewText"
-        />
+      <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-8">
+        <div class="min-w-0 space-y-10">
+          <ResourceGuideArticle
+            :resource="resource"
+            :guide-title="guideTitle"
+            :overview="overviewText"
+          />
+          <nav
+            class="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6"
+            :aria-label="t('page.resources.back_to_hub', 'Back to Resources')"
+          >
+            <UButton
+              to="/resources"
+              color="neutral"
+              variant="soft"
+              icon="i-mdi-arrow-left"
+              :label="t('page.resources.back_to_hub', 'Back to Resources')"
+            />
+            <UButton
+              :to="{ path: '/resources', query: { category: resource.category } }"
+              color="neutral"
+              variant="ghost"
+              trailing-icon="i-mdi-arrow-right"
+              :label="
+                t('page.resources.browse_category', { category: categoryLabel }, categoryLabel)
+              "
+            />
+          </nav>
+        </div>
         <ResourceGuideToc :items="tocItems" :active-id="activeSectionId" @select="onTocClick" />
       </div>
     </div>
@@ -85,11 +108,7 @@
     const category = resource.value?.category;
     if (!category) return '';
     return RESOURCE_META_ITEMS[category]
-      .map((item) =>
-        item.useCategoryLabel
-          ? categoryLabel.value
-          : t(item.labelKey ?? '', item.labelFallback ?? '')
-      )
+      .map((item) => t(item.labelKey, item.labelFallback))
       .join(' · ');
   });
   const compatibilityText = computed(() =>
@@ -97,19 +116,26 @@
       ? t(`page.resources.guides.${slug.value}.compatibility`, '')
       : ''
   );
+  const setupSectionLabel = computed(() => {
+    const guide = resource.value?.guide;
+    if (guide?.stepsHeadingKey) {
+      return t(guide.stepsHeadingKey, guide.stepsHeadingFallback ?? '');
+    }
+    return t('common.getting_started', 'Getting Started');
+  });
   const tocItems = computed<ResourceGuideTocItem[]>(() => {
     const guide = resource.value?.guide;
     const candidates: Array<ResourceGuideTocItem & { enabled: boolean }> = [
       { id: 'overview', label: t('common.overview', 'Overview'), enabled: true },
       {
+        id: 'setup',
+        label: setupSectionLabel.value,
+        enabled: Boolean(guide?.steps),
+      },
+      {
         id: 'video',
         label: t('page.resources.guide_sections.video_walkthrough', 'Video Walkthrough'),
         enabled: Boolean(resource.value?.videoId),
-      },
-      {
-        id: 'setup',
-        label: t('common.getting_started', 'Getting Started'),
-        enabled: Boolean(guide?.steps),
       },
       {
         id: 'troubleshooting',

@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-wrap items-center gap-2">
+  <div v-if="hasActions" class="flex flex-wrap items-center gap-2">
     <UButton
       v-if="primaryAction"
       :href="primaryAction.href"
@@ -14,6 +14,20 @@
     >
       <span class="text-center sm:truncate">
         {{ t(primaryAction.labelKey, primaryAction.labelFallback) }}
+      </span>
+    </UButton>
+    <UButton
+      v-for="(action, index) in quickActions"
+      :key="action.href"
+      :to="action.href"
+      :size="!primaryAction && index === 0 ? 'md' : 'sm'"
+      :color="!primaryAction && index === 0 ? 'primary' : 'neutral'"
+      :variant="!primaryAction && index === 0 ? 'solid' : 'soft'"
+      class="min-h-10 w-full justify-center sm:w-auto"
+      :icon="action.icon"
+    >
+      <span class="text-center sm:truncate">
+        {{ t(action.labelKey, action.labelFallback) }}
       </span>
     </UButton>
     <UButton
@@ -36,11 +50,19 @@
 <script setup lang="ts">
   import {
     getGuidePrimaryAction,
+    getGuideQuickActions,
     getGuideSecondaryLinks,
     type Resource,
   } from '@/features/resources/resourceData';
   const props = defineProps<{ resource: Resource }>();
   const { t } = useI18n({ useScope: 'global' });
   const primaryAction = computed(() => getGuidePrimaryAction(props.resource));
+  const quickActions = computed(() => getGuideQuickActions(props.resource));
   const secondaryLinks = computed(() => getGuideSecondaryLinks(props.resource));
+  const hasActions = computed(
+    () =>
+      Boolean(primaryAction.value) ||
+      quickActions.value.length > 0 ||
+      secondaryLinks.value.length > 0
+  );
 </script>

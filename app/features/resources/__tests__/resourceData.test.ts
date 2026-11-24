@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 import {
   CATEGORY_LABEL_FALLBACKS,
   getGuidePrimaryAction,
+  getGuideQuickActions,
   getGuideSecondaryLinks,
   getPrimaryAction,
   getSecondaryActions,
+  isResourceCategory,
   matchesResourceSearch,
   RESOURCE_CATEGORIES,
   RESOURCES,
@@ -21,6 +23,7 @@ const en = JSON.parse(readFileSync(join(process.cwd(), 'app/locales/en.json'), '
       categories: Record<string, string>;
       category_badges: Record<string, string>;
       actions: Record<string, string>;
+      guide_sections: Record<string, string>;
     };
   };
 };
@@ -57,6 +60,13 @@ describe('resourceData locale parity', () => {
   it('does not include a self-referential TarkovTracker featured card', () => {
     expect(RESOURCES.some((resource) => resource.slug === 'tarkovtracker')).toBe(false);
   });
+  it('validates resource categories safely', () => {
+    for (const category of RESOURCE_CATEGORIES) {
+      expect(isResourceCategory(category)).toBe(true);
+    }
+    expect(isResourceCategory('unknown')).toBe(false);
+    expect(isResourceCategory(undefined)).toBe(false);
+  });
   it('covers every category with at least one resource', () => {
     for (const category of RESOURCE_CATEGORIES) {
       expect(
@@ -80,10 +90,11 @@ describe('resourceData locale parity', () => {
     }
   );
   it.each(RESOURCES.map((resource) => [resource.slug, resource] as const))(
-    'defines a primary action and secondary links for %s',
+    'defines a non-empty primary action and secondary links for %s',
     (_slug, resource) => {
       const primary = getPrimaryAction(resource);
       expect(primary).not.toBeNull();
+      expect(nonEmptyString(primary?.labelFallback)).toBe(true);
       expect(resource.keywords.length).toBeGreaterThan(0);
       const secondary = getSecondaryActions(resource);
       if (primary?.external) {
@@ -99,6 +110,16 @@ describe('resourceData locale parity', () => {
     const guideConfig = resource.guide;
     if (!guideConfig) {
       throw new Error(`${slug} hasGuide without guide config`);
+    }
+    if (guideConfig.stepsHeadingKey) {
+      const sectionKey = guideConfig.stepsHeadingKey.split('.').pop() ?? '';
+      expect(nonEmptyString(resourcesLocale.guide_sections[sectionKey])).toBe(true);
+      expect(nonEmptyString(guideConfig.stepsHeadingFallback)).toBe(true);
+    }
+    for (const action of getGuideQuickActions(resource)) {
+      const actionKey = action.labelKey.split('.').pop() ?? '';
+      expect(nonEmptyString(resourcesLocale.actions[actionKey])).toBe(true);
+      expect(nonEmptyString(action.labelFallback)).toBe(true);
     }
     const guideLocale = resourcesLocale.guides[slug];
     if (!guideLocale) {
@@ -146,6 +167,12 @@ describe('resourceData locale parity', () => {
       }
       expect.fail(`unrecognized guide locale key ${slug}.${key}`);
     }
+  });
+  it('assigns distinct fallback icons to resources without a logo', () => {
+    const seasonal = RESOURCES.find((entry) => entry.slug === 'seasonal_modifiers');
+    const cultist = RESOURCES.find((entry) => entry.slug === 'cultistcircle');
+    expect(seasonal?.icon).toBe('i-mdi-tune-variant');
+    expect(cultist?.icon).toBe('i-mdi-circle-double');
   });
   it('does not declare guide configs for resources without hasGuide', () => {
     for (const resource of RESOURCES.filter((entry) => !entry.hasGuide)) {

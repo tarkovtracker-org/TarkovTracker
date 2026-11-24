@@ -33,16 +33,16 @@
     const guide = props.resource.guide;
     return [
       {
-        id: 'video',
-        component: ResourceGuideVideo,
-        enabled: Boolean(props.resource.videoId),
-        props: { resource: props.resource, guideTitle: props.guideTitle },
-      },
-      {
         id: 'setup',
         component: ResourceGuideSteps,
         enabled: Boolean(guide.steps),
         props: { resource: props.resource },
+      },
+      {
+        id: 'video',
+        component: ResourceGuideVideo,
+        enabled: Boolean(props.resource.videoId),
+        props: { resource: props.resource, guideTitle: props.guideTitle },
       },
       {
         id: 'troubleshooting',

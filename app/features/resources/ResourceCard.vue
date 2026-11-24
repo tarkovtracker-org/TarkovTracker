@@ -18,7 +18,7 @@
         v-else
         class="bg-primary-500/15 text-primary-300 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
       >
-        <UIcon name="i-mdi-bookmark" class="h-5 w-5" />
+        <UIcon :name="resource.icon ?? 'i-mdi-bookmark'" class="h-5 w-5" />
       </div>
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-start justify-between gap-2">
