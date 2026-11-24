@@ -27,6 +27,7 @@ const CLIENT_PAGE_KEYS = {
   '/tasks/maps': 'tasks_maps',
   '/tasks/graph': 'tasks_graph',
   '/settings': 'settings',
+  '/setup': 'setup',
   '/progression': 'progression',
   '/prestige': 'prestige',
   '/preferences': 'preferences',

@@ -1,3 +1,4 @@
+import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -42,6 +43,7 @@ import {
   recordImpliedStoryObjectives,
 } from '@/utils/taskProgress';
 import { getCompletionFlags } from '@/utils/taskStatus';
+import { getCurrentSupabaseUserId } from '@/utils/userScopedStorage';
 import type { Task } from '@/types/tarkov';
 const UNKNOWN_MODE = 'unknown' as const;
 export type EftLogsImportState = 'idle' | 'preview' | 'success' | 'error';
@@ -255,7 +257,8 @@ const applyModeImports = async (
   activeMode: GameMode,
   taskSets: ImportTaskSets,
   onModeSwitched: (mode: GameMode) => void,
-  requireTraders: boolean
+  requireTraders: boolean,
+  ownsSession: () => boolean
 ): Promise<GameMode> => {
   const tasksMap = new Map((catalogs.get(mode) ?? []).map((task) => [task.id, task]));
   const filter = (ids: Set<string>) => new Set([...ids].filter((id) => tasksMap.has(id)));
@@ -270,6 +273,7 @@ const applyModeImports = async (
     onModeSwitched(mode);
     await store.switchGameMode(mode);
   }
+  if (!ownsSession()) return mode;
   applyCompletedImports(
     store,
     tasksMap,
@@ -307,7 +311,8 @@ const applyAllModeImports = async (
   catalogs: Map<GameMode, Task[]>,
   originalMode: GameMode,
   taskSets: ImportTaskSets,
-  requireTraders: boolean
+  requireTraders: boolean,
+  ownsSession: () => boolean
 ): Promise<{ activeMode: GameMode; error: unknown }> => {
   let activeMode = originalMode;
   const trackMode = (mode: GameMode) => {
@@ -315,6 +320,7 @@ const applyAllModeImports = async (
   };
   try {
     for (const mode of GAME_MODE_VALUES) {
+      if (!ownsSession()) break;
       activeMode = await applyModeImports(
         store,
         catalogs,
@@ -322,7 +328,8 @@ const applyAllModeImports = async (
         activeMode,
         taskSets,
         trackMode,
-        requireTraders
+        requireTraders,
+        ownsSession
       );
     }
     return { activeMode, error: null };
@@ -330,6 +337,11 @@ const applyAllModeImports = async (
     return { activeMode, error };
   }
 };
+function captureImportOwner() {
+  const owner = getCurrentSupabaseUserId();
+  const ownsGeneration = captureStartupOwnership();
+  return () => ownsGeneration() && getCurrentSupabaseUserId() === owner;
+}
 /** Coordinates bounded log reading, isolated metadata loading, preview selection, and guarded progress application. */
 export function useEftLogsImport(): UseEftLogsImportReturn {
   const { t } = useI18n({ useScope: 'global' });
@@ -349,6 +361,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const sourceFileName = ref(t('settings.log_import.selected_files'));
   const scannedEntriesCount = ref(0);
   let parseFilesRequestId = 0;
+  let ownsPreview = () => false;
   let activeRead: AbortController | null = null;
   let catalogs = new Map<GameMode, Task[]>();
   function getTaskIds(): string[] {
@@ -379,7 +392,12 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       sourceFileName: sourceFileName.value,
     };
   }
-  const canEditPreview = () => !isImporting.value && importState.value === 'preview';
+  function canEditPreview(): boolean {
+    if (isImporting.value || importState.value !== 'preview') return false;
+    if (ownsPreview()) return true;
+    reset();
+    return false;
+  }
   /** Copies transient selections so caller mutations cannot change an in-flight import. */
   function setSelection(next: EftLogImportSelection): void {
     if (!canEditPreview()) return;
@@ -420,6 +438,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   function reset(): void {
     if (isImporting.value) return;
     parseFilesRequestId++;
+    ownsPreview = () => false;
     activeRead?.abort();
     activeRead = null;
     catalogs = new Map();
@@ -440,7 +459,9 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     if (isImporting.value) return;
     reset();
     const requestId = parseFilesRequestId;
-    const isActiveRequest = () => requestId === parseFilesRequestId;
+    const ownsRequest = captureImportOwner();
+    ownsPreview = ownsRequest;
+    const isActiveRequest = () => requestId === parseFilesRequestId && ownsRequest();
     if (!Array.isArray(files) || files.length === 0) {
       importState.value = 'error';
       importError.value = t('settings.log_import.errors.no_files_selected');
@@ -526,11 +547,17 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       importError.value = normalizeErrorMessage(error, t);
       logger.error('[EftLogsImport] Parse error:', error);
     } finally {
-      if (isActiveRequest()) {
-        isParsing.value = false;
-        activeRead = null;
-      }
+      finishParsing(requestId);
     }
+  }
+  function finishParsing(requestId: number): void {
+    if (requestId !== parseFilesRequestId) return;
+    if (!ownsPreview()) {
+      reset();
+      return;
+    }
+    isParsing.value = false;
+    activeRead = null;
   }
   /** Routes a single selected file through the same guarded multi-source import flow. */
   async function parseFile(file: File): Promise<void> {
@@ -581,24 +608,33 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     if (!preview) return;
     const taskSets = validateImport(preview, targetMode);
     if (!taskSets) return;
+    await applySelection(taskSets);
+  }
+  async function applySelection(taskSets: ImportTaskSets) {
     const originalMode = tarkovStore.getCurrentGameMode();
+    const ownsSession = ownsPreview;
     isImporting.value = true;
-    const requireTraders = preferencesStore.getTasksRequireTraderLevels;
-    const applied = await applyAllModeImports(
-      tarkovStore,
-      catalogs,
-      originalMode,
-      taskSets,
-      requireTraders
-    );
-    const importFailure = await restoreImportMode(
-      tarkovStore,
-      applied.activeMode,
-      originalMode,
-      applied.error
-    );
-    isImporting.value = false;
-    finishImport(importFailure);
+    try {
+      const applied = await applyAllModeImports(
+        tarkovStore,
+        catalogs,
+        originalMode,
+        taskSets,
+        preferencesStore.getTasksRequireTraderLevels,
+        ownsSession
+      );
+      if (!ownsSession()) return;
+      const failure = await restoreImportMode(
+        tarkovStore,
+        applied.activeMode,
+        originalMode,
+        applied.error
+      );
+      if (ownsSession()) finishImport(failure);
+    } finally {
+      isImporting.value = false;
+      if (!ownsSession()) reset();
+    }
   }
   /** Converts the completed application result into a translated error or success state. */
   function finishImport(importFailure: unknown): void {

@@ -430,6 +430,87 @@
       "title": "Failed to undo action: {description}"
     }
   },
+  "setup": {
+    "title": "Bring over your progress",
+    "resume": "Resume setup",
+    "back": "Back",
+    "entry_description": "Recover what you can from a backup, game logs, or your Tarkov.dev profile, then fill in what is missing.",
+    "choose_mode": "Which mode are you setting up?",
+    "working_mode": "Tracker mode: {mode}",
+    "open_dashboard": "Open dashboard",
+    "steps": {
+      "start": "What can you import?",
+      "backup": "TarkovTracker backup",
+      "eft_logs": "EFT game logs",
+      "tarkov_dev": "Tarkov.dev profile",
+      "review": "Fill in missing progress",
+      "done": "Review your setup"
+    },
+    "start": {
+      "backup": {
+        "label": "I have a backup",
+        "description": "Restore an exported TarkovTracker backup first."
+      },
+      "eft_logs": {
+        "label": "I have game logs",
+        "description": "Recover quest progress from the logs you still have."
+      },
+      "tarkov_dev": {
+        "label": "I don’t have logs",
+        "description": "Look up your character and import level, skills, and other profile details."
+      }
+    },
+    "source_help": {
+      "backup": "Select a TarkovTracker backup to preview the modes and progress it contains.",
+      "eft_logs": "Select your EFT Logs folder, or use files or a ZIP you saved. Even recent logs can restore some quest progress.",
+      "tarkov_dev": "Look up your character on Tarkov.dev, open the matching mode, and paste its profile link below."
+    },
+    "skip": {
+      "backup": "Continue without a backup",
+      "eft_logs": "Continue without logs",
+      "tarkov_dev": "Continue without a profile"
+    },
+    "outcome": {
+      "imported": "Imported",
+      "skipped": "Skipped",
+      "failed": "Import failed"
+    },
+    "catalog_loading": "Loading quests and hideout stations…",
+    "catalog_unavailable": "Quest and hideout data is unavailable for this mode. You can return to setup later.",
+    "quest_title": "Which quests are you on?",
+    "quest_help": "Add a few quests you know are active or completed. You can review any required earlier quests we find.",
+    "quest_search": "Search by quest or trader",
+    "quest_no_matches": "No matching quests available to add.",
+    "add_quest": "Add",
+    "add_quest_label": "Add {quest}",
+    "remove_quest_label": "Remove {quest}",
+    "quest_status_label": "Status for {quest}",
+    "quest_active": "Active",
+    "quest_completed": "Completed",
+    "include_prerequisites": "Also complete the suggested earlier quests",
+    "review_prerequisites": "Review {count} suggested earlier quest | Review {count} suggested earlier quests",
+    "hideout_title": "Hideout stations",
+    "hideout_help": "Choose the levels you’ve built in-game. Earlier tiers of those stations will be marked built too.",
+    "station_level": "Level {level}",
+    "station_unbuilt": "Unbuilt",
+    "save_changes": "Save changes",
+    "retry_save": "Retry saving",
+    "save_failed": "Progress could not be saved. Retry before leaving setup.",
+    "saved": "Changes saved.",
+    "finish": "Review setup",
+    "finish_later": "Continue to summary",
+    "summary_help": "You can add logs later and review untracked quests, hideout tiers, storyline progress, and item counts as you play.",
+    "review_storyline": "Review storyline",
+    "review_items": "Review items or import a stash screenshot",
+    "connect_monitor": "Set up TarkovMonitor",
+    "restart": "Start setup again",
+    "dashboard_dismiss": "Dismiss setup prompt",
+    "select_log_files": "Select log files or a ZIP",
+    "draft_pending": "Save or clear your selections to continue.",
+    "clear_selections": "Clear selections",
+    "edit_level": "Review player level",
+    "continue": "Continue"
+  },
   "common": {
     "cancel": "Cancel",
     "close": "Close",
@@ -569,52 +650,7 @@
       "summary": "Pick a quick guide for this page or the full setup path.",
       "page_guide": "Guide this page",
       "page_guide_unavailable": "No page guide here yet. Use onboarding instead.",
-      "onboarding": "New user onboarding",
-      "onboarding_description": "Start with imports, finish the basics, then verify tasks.",
       "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
-    },
-    "onboarding": {
-      "title": "Getting set up",
-      "summary": "This is the recommended first pass for new or returning users. Use the action buttons to jump into the real pages.",
-      "actions": {
-        "account": "Open account",
-        "login": "Sign in"
-      },
-      "steps": {
-        "import": {
-          "title": "Import progress first",
-          "description": "Use imports before touching manual setup. They are the fastest way to get most of your tracker into a usable state.",
-          "bullets": {
-            "one": "Import your Tarkov.dev profile first when you have it. That usually fills most of the account basics and tracked progress.",
-            "two": "Import your EFT logs next. That can backfill quests and other progress with almost no manual clicking.",
-            "three": "If both imports land cleanly, manual setup becomes a quick verification pass instead of rebuilding everything by hand."
-          },
-          "actions": {
-            "open": "Open imports"
-          }
-        },
-        "profile": {
-          "title": "Finish the basics",
-          "description": "After imports, lock in the core profile fields and decide whether you want your progress synced to an account.",
-          "bullets": {
-            "one": "Set your game mode, edition, level, faction, and display name so filters and unlock requirements line up with your real account.",
-            "two": "Signing in unlocks teams, API-backed features, and cloud storage so progress is easier to keep across devices.",
-            "three": "If you are not ready to sign in yet, you can still track locally first and attach that progress to an account later."
-          },
-          "actions": {
-            "settings": "Open settings"
-          }
-        },
-        "tasks": {
-          "title": "Sanity-check tasks",
-          "description": "The last high-impact cleanup step is task availability. Once that is accurate, the rest of the site becomes much more reliable.",
-          "bullets": {
-            "one": "On the tasks page, mark the quests you currently have available in-game for each trader. That backfills prerequisite chains much faster than manually completing old tasks one by one.",
-            "two": "When something looks wrong, use the task card menu to report a data issue instead of forcing your tracker into a bad state.",
-            "three": "After this pass, use the app-bar help button on any supported page to reopen the page guide or this onboarding flow."
-          }
-        }
-      }
     },
     "dashboard": {
       "title": "Dashboard guide",
@@ -2104,10 +2140,10 @@
           "overview": "TarkovTracker exists on two domains. TarkovTracker.io is the original site created by the TarkovTracker project founder and hosts the original codebase. TarkovTracker.org is the actively maintained continuation run by a long-time contributor and former maintainer of the original project, as a free and open-source fork under the same GNU GPLv3 license. This guide explains the differences and the supported ways to rebuild your progress on TarkovTracker.org.",
           "step_1_title": "Create or sign in to your TarkovTracker.org account",
           "step_1_desc": "Create a TarkovTracker.org account or sign in to the account where you want to track your current wipe progress.",
-          "step_2_title": "Import your Tarkov.dev profile metadata",
-          "step_2_desc": "Open Settings, choose Imports, and use the Tarkov.dev profile import to restore supported profile details such as level, faction, and skills.",
-          "step_3_title": "Import your EFT game logs",
-          "step_3_desc": "In the same Imports tab, select your EFT logs folder to recover quest start and completion events that are still present in your local logs.",
+          "step_2_title": "Import your EFT game logs",
+          "step_2_desc": "Open Bring over your progress from Help or the dashboard and select your EFT logs folder. This can recover quest activity that is still in your local logs.",
+          "step_3_title": "Import your Tarkov.dev profile metadata",
+          "step_3_desc": "Continue to the profile step to restore level, faction, and skills. If you do not have logs, you can begin here.",
           "step_4_title": "Verify tasks and hideout progress",
           "step_4_desc": "Check your task list and hideout, then manually restore progress that Tarkov.dev and your available game logs could not recover.",
           "step_5_title": "Connect supported companion tools",
@@ -3200,6 +3236,10 @@
     "site_name": "TarkovTracker",
     "application_description": "Track Escape from Tarkov tasks, hideout upgrades, Kappa requirements, storyline quests, and needed items across PvP, PvE, and Seasonal modes.",
     "routes": {
+      "setup": {
+        "title": "Bring Over Your Tarkov Progress",
+        "description": "Import Escape from Tarkov progress and set up your quests and hideout in TarkovTracker."
+      },
       "home": {
         "title": "Escape from Tarkov Progress Tracker · TarkovTracker.org",
         "description": "Track Escape from Tarkov tasks, hideout upgrades, Kappa requirements, storyline quests, and needed items across PvP, PvE, and Seasonal modes.",

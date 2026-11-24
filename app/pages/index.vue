@@ -3,6 +3,7 @@
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350 xl:max-w-400 2xl:max-w-450">
         <slot name="header" />
+        <ClientOnly><SetupDashboardPrompt /></ClientOnly>
         <DashboardSupportBanner :completed-tasks="dashboardStats.completedTasks.value" />
         <DashboardProgressSummary>
           <template #actions>
@@ -89,6 +90,7 @@
 </template>
 <script setup lang="ts">
   import { resolveTraderUnlock } from '@/features/dashboard/traderLockStatus';
+  import SetupDashboardPrompt from '@/features/setup/SetupDashboardPrompt.vue';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';

@@ -2,6 +2,21 @@
 
 Part of the [systems spec](./README.md): summary, flow, files, and invariants per system.
 
+## Guided progress setup
+
+The empty dashboard and Help menu link to `/setup`. Setup uses the same import controls and
+confirmation rules as Settings. A TarkovTracker backup can establish the baseline, followed by
+available EFT logs and the matching Tarkov.dev snapshot. Players without logs can start with the
+profile. All imports can be skipped. The browser remembers the current step and import outcomes
+for the current account on that device. Import files, previews, and unsaved manual selections
+stay in memory.
+
+Manual review accepts active or completed quest selections. Suggestions follow explicit
+completion-only quest requirements, stop at story routes, and preserve existing progress. They
+require the player to opt in before saving. Choosing a hideout station level adds the missing
+tiers of that station. Detailed storyline, handover, item, and companion setup remain available
+from the summary.
+
 ## Stash screenshot import
 
 Needed Items → Import items from a screenshot reads one PNG, JPEG, or WebP on the device. Players

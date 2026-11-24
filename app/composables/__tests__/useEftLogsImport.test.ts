@@ -1,5 +1,6 @@
 import { strToU8, zipSync } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { invalidateStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { ACTIVE_SEASON, TASK_ID_REGISTRY } from '@/utils/constants';
 import * as logFileReader from '@/utils/eftLogFileReader';
 import { EftLogImportBudgetError } from '@/utils/eftLogImportBudget';
@@ -132,6 +133,44 @@ describe('useEftLogsImport', () => {
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStore.switchGameMode.mockImplementation(async () => undefined);
+  });
+  it('discards results from a log read that outlives its progress owner', async () => {
+    const importer = await loadComposable();
+    const reading = importer.parseFile(new File([completionLog()], 'notifications.log'));
+    invalidateStartupOwnership();
+    await reading;
+    expect(importer.importState.value).toBe('idle');
+    expect(importer.isParsing.value).toBe(false);
+    expect(importer.previewData.value).toBeNull();
+  });
+  it('rejects a previously parsed preview after a change in progress ownership', async () => {
+    const importer = await loadComposable();
+    await importer.parseFile(new File([completionLog()], 'notifications.log'));
+    expect(importer.importState.value).toBe('preview');
+    invalidateStartupOwnership();
+    const confirmation = importer.confirmImport('pvp');
+    expect(importer.isImporting.value).toBe(false);
+    await confirmation;
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    expect(importer.importState.value).toBe('idle');
+    expect(importer.previewData.value).toBeNull();
+  });
+  it('stops applying a log when progress ownership changes during a mode switch', async () => {
+    const importer = await loadComposable();
+    const log =
+      '2026-02-21 10:00:00.000|Info|output|application|Session mode: Pve\n' +
+      completionLog().replace('|push-notifications|', '|output|push-notifications|');
+    await importer.parseFile(new File([log], 'output_000.log'));
+    expect(importer.importState.value).toBe('preview');
+    tarkovStore.switchGameMode.mockImplementationOnce(async () => {
+      invalidateStartupOwnership();
+    });
+    await importer.confirmImport('pve');
+    expect(tarkovStore.switchGameMode).toHaveBeenCalledExactlyOnceWith('pve');
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    expect(importer.isImporting.value).toBe(false);
+    expect(importer.importState.value).toBe('idle');
+    expect(importer.previewData.value).toBeNull();
   });
   it('imports output-only notification mirrors through the public file API', async () => {
     const importer = await loadComposable();

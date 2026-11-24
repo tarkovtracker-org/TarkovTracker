@@ -8,9 +8,8 @@
     :description="activeDataFlowBlockedDescription"
     class="mb-4"
   />
-  <template v-if="showImportTools">
+  <template v-if="showProfileImport">
     <GenericCard
-      v-if="!isBlockedByOtherDataFlow && !isBackupOrEftLogsImportPreviewActive && !eftLogsIsParsing"
       icon="mdi-account-arrow-up"
       icon-color="info"
       highlight-color="info"
@@ -370,8 +369,9 @@
         </div>
       </template>
     </GenericCard>
+  </template>
+  <template v-if="showLogImport">
     <GenericCard
-      v-if="!isBlockedByOtherDataFlow && !isTarkovDevImportPreviewActive"
       icon="mdi-folder-upload-outline"
       icon-color="info"
       highlight-color="info"
@@ -406,6 +406,24 @@
             >
               {{ $t('settings.data_management.import_eft_logs_folder_button') }}
             </UButton>
+            <template v-if="props.view === 'eft-logs'">
+              <input
+                ref="eftLogsFilesInputRef"
+                type="file"
+                accept=".log,.zip"
+                multiple
+                class="hidden"
+                @change="handleEftLogsFolderChange"
+              />
+              <UButton
+                icon="i-mdi-file-upload-outline"
+                variant="soft"
+                :disabled="isAnyImportActive"
+                @click="eftLogsFilesInputRef?.click()"
+              >
+                {{ $t('setup.select_log_files') }}
+              </UButton>
+            </template>
             <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
               <p class="text-surface-300 text-xs font-semibold">
                 {{ $t('settings.log_import.upload_hint') }}
@@ -773,12 +791,6 @@
   </template>
   <template v-if="showBackupTools">
     <GenericCard
-      v-if="
-        !isBlockedByOtherDataFlow &&
-        !isTarkovDevImportPreviewActive &&
-        !isEftLogsPreviewActive &&
-        !eftLogsIsParsing
-      "
       icon="mdi-backup-restore"
       icon-color="primary"
       highlight-color="primary"
@@ -799,8 +811,11 @@
             {{ $t('settings.data_management.backup_restore_section_description') }}
           </p>
           <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
-            <div class="grid gap-3 md:grid-cols-2">
-              <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
+            <div class="grid gap-3" :class="{ 'md:grid-cols-2': !props.restoreOnly }">
+              <div
+                v-if="!props.restoreOnly"
+                class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4"
+              >
                 <div class="flex items-start gap-3">
                   <div
                     class="bg-primary-900/70 light:bg-primary-100 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
@@ -860,6 +875,7 @@
             </div>
           </template>
           <RecoveryCopiesPanel
+            v-if="!props.restoreOnly || recoveryCopiesImport"
             :backup="dataManagementSession.backup"
             :parsing="backupImportState === 'parsing'"
             :locked="isAnyImportActive"
@@ -1109,7 +1125,7 @@
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   import type { BackupImportTargetModes } from '@/composables/useDataBackup';
   const TARKOV_DEV_ARENA_MODE = 'arena' as const;
-  type DataManagementView = 'all' | 'imports' | 'backup';
+  type DataManagementView = 'all' | 'imports' | 'backup' | 'eft-logs' | 'tarkov-dev';
   type TarkovDevRefetchMode = GameMode | typeof TARKOV_DEV_ARENA_MODE;
   type TarkovDevRefetchModeOption = {
     disabled: boolean;
@@ -1121,6 +1137,7 @@
   const props = withDefaults(
     defineProps<{
       session?: DataManagementSession;
+      restoreOnly?: boolean;
       view?: DataManagementView;
     }>(),
     {
@@ -1290,6 +1307,7 @@
   const eftSessionFolderExamplePath = computed(() =>
     t('settings.log_import.session_folder_example_path')
   );
+  const eftLogsFilesInputRef = ref<HTMLInputElement | null>(null);
   const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
   const eftLogsFolderButtonRef = ref<{ $el?: HTMLElement } | null>(null);
   const eftLogsTargetMode = ref<GameMode>();
@@ -1752,8 +1770,6 @@
     return labels.length ? labels.join(' + ') : t('common.unknown');
   });
   const editionLabelFromBackup = computed(() => getEditionLabel(backupPreview.value?.gameEdition));
-  const showImportTools = computed(() => props.view === 'all' || props.view === 'imports');
-  const showBackupTools = computed(() => props.view === 'all' || props.view === 'backup');
   const isTarkovDevImportPreviewActive = computed(() => tarkovDevImportState.value === 'preview');
   const isEftLogsPreviewActive = computed(() => eftLogsImportState.value === 'preview');
   type ActiveDataFlow = 'backup' | 'eft-logs' | 'tarkov-dev';
@@ -1771,7 +1787,7 @@
   });
   const visibleDataFlows = computed<ActiveDataFlow[]>(() => {
     if (props.view === 'imports') return ['eft-logs', 'tarkov-dev'];
-    if (props.view === 'backup') return ['backup'];
+    if (props.view !== 'all') return [props.view];
     return ['backup', 'eft-logs', 'tarkov-dev'];
   });
   const isBlockedByOtherDataFlow = computed(
@@ -1792,6 +1808,29 @@
   );
   const isBackupOrEftLogsImportPreviewActive = computed(
     () => backupImportState.value === 'preview' || isEftLogsPreviewActive.value
+  );
+  const showProfileImport = computed(
+    () =>
+      visibleDataFlows.value.includes('tarkov-dev') &&
+      !isBlockedByOtherDataFlow.value &&
+      !isBackupOrEftLogsImportPreviewActive.value &&
+      !eftLogsIsParsing.value
+  );
+  const showLogImport = computed(
+    () =>
+      visibleDataFlows.value.includes('eft-logs') &&
+      !isBlockedByOtherDataFlow.value &&
+      !isTarkovDevImportPreviewActive.value
+  );
+  const canShowBackup = computed(
+    () => visibleDataFlows.value.includes('backup') && !isBlockedByOtherDataFlow.value
+  );
+  const showBackupTools = computed(
+    () =>
+      canShowBackup.value &&
+      !isTarkovDevImportPreviewActive.value &&
+      !isEftLogsPreviewActive.value &&
+      !eftLogsIsParsing.value
   );
   const isAnyImportPreviewActive = computed(
     () => isBackupOrEftLogsImportPreviewActive.value || isTarkovDevImportPreviewActive.value
