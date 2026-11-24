@@ -54,6 +54,7 @@ describe('DrawerItem', () => {
       routeState.path = path;
       const wrapper = mountSettingsDrawerItem();
       expect(wrapper.get('a').classes()).toContain('border-primary-500');
+      expect(wrapper.get('a').attributes('aria-current')).toBe('page');
       expect(wrapper.getComponent({ name: 'DrawerItemIcon' }).props('colorClass')).toBe(
         'text-white transition-opacity light:text-surface-50'
       );
@@ -63,6 +64,7 @@ describe('DrawerItem', () => {
     routeState.path = '/tasks';
     const wrapper = mountSettingsDrawerItem();
     expect(wrapper.get('a').classes()).not.toContain('border-primary-500');
+    expect(wrapper.get('a').attributes('aria-current')).toBeUndefined();
     expect(wrapper.getComponent({ name: 'DrawerItemIcon' }).props('colorClass')).toBe(
       'text-surface-300 opacity-75 transition-opacity group-hover:text-white group-hover:opacity-100 light:group-hover:text-surface-50'
     );

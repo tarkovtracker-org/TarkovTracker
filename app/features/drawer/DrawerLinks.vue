@@ -51,7 +51,7 @@
           </button>
         </div>
         <ul
-          v-if="isResourcesOpen"
+          v-show="isResourcesOpen"
           id="drawer-resources-sublinks"
           class="border-surface-700/60 mt-0.5 ml-6 flex flex-col gap-0.5 border-l pl-2"
         >

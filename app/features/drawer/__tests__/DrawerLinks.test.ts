@@ -14,14 +14,10 @@ vi.mock('vue-i18n', async (importOriginal) => ({
 }));
 const mountDrawerLinks = (isCollapsed = false) =>
   mount(DrawerLinks, {
+    attachTo: document.body,
     props: { isCollapsed },
     global: {
       stubs: {
-        DrawerItem: {
-          name: 'DrawerItem',
-          props: ['icon', 'iconSrc', 'localeKey', 'to', 'isCollapsed', 'badge'],
-          template: '<li :data-to="to" :data-locale-key="localeKey" />',
-        },
         DrawerItemIcon: {
           name: 'DrawerItemIcon',
           props: ['icon', 'colorClass', 'hasMargin'],
@@ -37,6 +33,7 @@ const mountDrawerLinks = (isCollapsed = false) =>
           props: ['name'],
           template: '<span :data-icon="name" />',
         },
+        UTooltip: { template: '<span><slot /></span>' },
       },
     },
   });
@@ -47,22 +44,26 @@ describe('DrawerLinks Resources navigation', () => {
   afterEach(() => {
     routeState.path = '/tasks';
   });
-  it('renders a direct DrawerItem link to /resources when collapsed', () => {
+  it('keeps the collapsed Resources group highlighted and marks only the hub as the current page', async () => {
     const wrapper = mountDrawerLinks(true);
-    const items = wrapper.findAllComponents({ name: 'DrawerItem' });
-    const resourcesItem = items.find((item) => item.props('to') === '/resources');
-    expect(resourcesItem).toBeDefined();
-    expect(resourcesItem?.props()).toMatchObject({
-      icon: 'i-mdi-compass',
-      localeKey: 'navigation_drawer.resources',
-      to: '/resources',
-      isCollapsed: true,
-    });
+    const resourcesLink = wrapper.get('a[href="/resources"]');
+    expect(resourcesLink.attributes('aria-label')).toBe('navigation_drawer.resources');
+    expect(resourcesLink.attributes('aria-current')).toBeUndefined();
     expect(wrapper.find('button[aria-label="navigation_drawer.resources_toggle"]').exists()).toBe(
       false
     );
     expect(wrapper.find('#drawer-resources-sublinks').exists()).toBe(false);
-    wrapper.unmount();
+    routeState.path = '/resources';
+    await nextTick();
+    expect(resourcesLink.attributes('aria-current')).toBe('page');
+    routeState.path = '/resources/seasonal-modifiers';
+    await nextTick();
+    expect(resourcesLink.classes()).toContain('border-primary-500');
+    expect(resourcesLink.attributes('aria-current')).toBeUndefined();
+    routeState.path = '/tasks';
+    await nextTick();
+    expect(resourcesLink.classes()).not.toContain('border-primary-500');
+    expect(resourcesLink.attributes('aria-current')).toBeUndefined();
   });
   it('renders a direct /resources link and collapsed sub-pages toggle when expanded on another route', () => {
     const wrapper = mountDrawerLinks(false);
@@ -73,15 +74,18 @@ describe('DrawerLinks Resources navigation', () => {
     expect(row?.classList.contains('border-primary-500')).toBe(false);
     const toggle = wrapper.get('button[aria-label="navigation_drawer.resources_toggle"]');
     expect(toggle.attributes('aria-expanded')).toBe('false');
-    expect(wrapper.find('#drawer-resources-sublinks').exists()).toBe(false);
-    wrapper.unmount();
+    const subList = wrapper.get('#drawer-resources-sublinks');
+    expect(toggle.attributes('aria-controls')).toBe(subList.attributes('id'));
+    expect(subList.isVisible()).toBe(false);
   });
   it('toggles important resource sub-pages without a redundant Resources overview item', async () => {
     const wrapper = mountDrawerLinks(false);
     const toggle = wrapper.get('button[aria-label="navigation_drawer.resources_toggle"]');
+    const subList = wrapper.get('#drawer-resources-sublinks');
+    expect(subList.isVisible()).toBe(false);
     await toggle.trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('true');
-    const subList = wrapper.get('#drawer-resources-sublinks');
+    expect(subList.isVisible()).toBe(true);
     const subLinks = subList.findAll('a');
     expect(subLinks).toHaveLength(1);
     expect(subLinks[0]?.attributes('href')).toBe('/resources/seasonal-modifiers');
@@ -90,8 +94,8 @@ describe('DrawerLinks Resources navigation', () => {
     expect(subList.find('a[href="/resources"]').exists()).toBe(false);
     await toggle.trigger('click');
     expect(toggle.attributes('aria-expanded')).toBe('false');
-    expect(wrapper.find('#drawer-resources-sublinks').exists()).toBe(false);
-    wrapper.unmount();
+    expect(wrapper.get('#drawer-resources-sublinks').element).toBe(subList.element);
+    expect(subList.isVisible()).toBe(false);
   });
   it('marks /resources active on the hub page while keeping sub-pages collapsed', () => {
     routeState.path = '/resources';
@@ -101,8 +105,7 @@ describe('DrawerLinks Resources navigation', () => {
     expect(resourcesLink.element.parentElement?.classList.contains('border-primary-500')).toBe(
       true
     );
-    expect(wrapper.find('#drawer-resources-sublinks').exists()).toBe(false);
-    wrapper.unmount();
+    expect(wrapper.get('#drawer-resources-sublinks').isVisible()).toBe(false);
   });
   it('auto-expands and marks Seasonal Modifiers active when on /resources/seasonal-modifiers', () => {
     routeState.path = '/resources/seasonal-modifiers';
@@ -119,11 +122,10 @@ describe('DrawerLinks Resources navigation', () => {
     );
     expect(modifierLink.attributes('aria-current')).toBe('page');
     expect(modifierLink.classes()).toContain('bg-surface-800/60');
-    wrapper.unmount();
   });
   it('auto-expands the sub-list when navigating to /resources/seasonal-modifiers after mount', async () => {
     const wrapper = mountDrawerLinks(false);
-    expect(wrapper.find('#drawer-resources-sublinks').exists()).toBe(false);
+    expect(wrapper.get('#drawer-resources-sublinks').isVisible()).toBe(false);
     routeState.path = '/resources/seasonal-modifiers';
     await nextTick();
     const toggle = wrapper.get('button[aria-label="navigation_drawer.resources_toggle"]');
@@ -133,6 +135,9 @@ describe('DrawerLinks Resources navigation', () => {
     );
     expect(modifierLink.attributes('aria-current')).toBe('page');
     expect(modifierLink.classes()).toContain('bg-surface-800/60');
-    wrapper.unmount();
+    routeState.path = '/resources';
+    await nextTick();
+    expect(wrapper.get('a[href="/resources"]').attributes('aria-current')).toBe('page');
+    expect(modifierLink.attributes('aria-current')).toBeUndefined();
   });
 });
