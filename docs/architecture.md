@@ -1,15 +1,8 @@
-# TarkovTracker Architecture Documentation
+# TarkovTracker Architecture
 
-<!-- AGENT QUICK REFERENCE
-Canonical env var map: §Environment Variables (~40 vars with descriptions).
-Naming: SUPABASE_* shared, NUXT_* private server, NUXT_PUBLIC_* browser-exposed.
-wrangler.toml is source of truth for Cloudflare Pages vars/bindings.
-Quoting: quote in TOML, unquoted in .env/.dev.vars unless dotenv requires it.
--->
-
-## Overview
-
-TarkovTracker uses prerendered public documents and a client-side application for tracking progress in Escape from Tarkov. Built with Nuxt 4, Vue 3, and Supabase, it provides real-time multi-device synchronization, team collaboration, and comprehensive task/hideout tracking.
+[AGENTS.md](../AGENTS.md) maps the repository. [Systems](systems/README.md) owns runtime behavior.
+[package.json](../package.json) owns installed versions, and [API ownership](api-ownership.md)
+defines the boundary with the separate public gateway.
 
 ## Public rendering and discovery
 
@@ -51,134 +44,6 @@ Discord's actual selected tags and layout. Previews are cached for about 30 minu
 defines the fetch requirements, supported layouts, limits, and cache behavior. Do not treat an
 HTML check or a local mockup as evidence of Discord's rendered card.
 
-Search Console indexing/canonical evidence and fresh Discord embeds require access to those
-services. Capture a 28-day query/page baseline before release; after release submit the registry's
-sitemap and inspect home, tasks, Kappa, and representative guides. Compare results at 4, 8, and
-12 weeks across tracker, quests/hideout/items, Kappa/Lightkeeper, and game-mode query groups.
-Ranking causes and improvements must be measured separately from these rendering fixes.
-
-## Technology Stack
-
-| Layer             | Technology       | Version  |
-| ----------------- | ---------------- | -------- |
-| Framework         | Nuxt             | ^4.5.1   |
-| UI Library        | Vue 3            | ^3.5.32  |
-| Component Library | @nuxt/ui         | ^4.10.0  |
-| Styling           | Tailwind CSS     | ^4.2.2   |
-| State Management  | Pinia            | ^4.0.2   |
-| Backend           | Supabase         | ^2.110.2 |
-| Deployment        | Cloudflare Pages | -        |
-| Maps              | Leaflet          | ^1.9.4   |
-| Graphs            | Vue Flow         | ^1.48.2  |
-| i18n              | Vue I18n         | ^11.4.10 |
-
-## Project Structure
-
-```text
-/
-├── app/                      # Application source (Nuxt srcDir)
-│   ├── assets/              # Static assets (CSS, images)
-│   ├── components/          # Global UI components
-│   ├── composables/         # Reusable composition functions
-│   ├── data/                # Static data (maps.json)
-│   ├── features/            # Feature modules (domain slices)
-│   │   ├── about/           # About page (team members, help links)
-│   │   ├── admin/           # Admin dashboard
-│   │   ├── credits/         # Contributor credits
-│   │   ├── dashboard/       # Main dashboard
-│   │   ├── drawer/          # Side-drawer and help UI
-│   │   ├── hideout/         # Hideout tracking
-│   │   ├── maps/            # Interactive maps
-│   │   ├── neededitems/     # Required items tracker
-│   │   ├── omnibar/         # Inline app-bar search and jump results
-│   │   ├── profile/         # Profile and shared progress views
-│   │   ├── resources/       # Resource guides
-│   │   ├── settings/        # User settings
-│   │   ├── storyline/       # Storyline progression
-│   │   ├── streamer-tools/  # Streamer overlay tooling
-│   │   ├── supporter/       # Supporter/tier management
-│   │   ├── tasks/           # Task/quest tracking
-│   │   └── team/            # Team collaboration
-│   ├── layouts/             # Page layouts
-│   ├── locales/             # i18n translations (JSON)
-│   ├── pages/               # File-based routing
-│   ├── plugins/             # Nuxt plugins
-│   ├── server/              # Nitro server routes
-│   │   ├── api/             # API endpoints
-│   │   ├── middleware/      # Server middleware
-│   │   └── utils/           # Server utilities
-│   ├── shell/               # App chrome (nav, footer)
-│   ├── stores/              # Pinia stores
-│   ├── types/               # TypeScript definitions
-│   └── utils/               # Utility functions
-├── docs/                     # Documentation
-├── supabase/                 # Supabase config and functions
-├── workers/                  # Cloudflare Workers
-│   └── api-gateway/         # External API gateway + Durable Object rate limiter
-├── nuxt.config.ts           # Nuxt configuration
-├── package.json             # Dependencies
-└── vitest.config.ts         # Test configuration
-```
-
-Rate limiting is multi-plane (Worker DO, Edge mutation counters, Pages shared limits, Auth
-platform limits). See [`rate-limiting.md`](./rate-limiting.md) for ownership, flows, and when to
-use which enforcer.
-
-## Architecture Diagram
-
-```mermaid
-graph TB
-    subgraph "Client"
-        UI[Vue 3 SPA]
-        Stores[Pinia Stores]
-        IDB[(IndexedDB Cache)]
-        LS[(localStorage)]
-    end
-
-    subgraph "State Management"
-        TarkovStore[useTarkovStore<br/>User Progress]
-        MetadataStore[useMetadataStore<br/>Game Data]
-        PreferencesStore[usePreferencesStore<br/>UI Settings]
-        ProgressStore[useProgressStore<br/>Computed Facade]
-    end
-
-    subgraph "Nuxt Server"
-        API[API Routes<br/>/api/tarkov/*]
-        TeamAPI[Team Routes<br/>/api/team/*]
-        MW[Middleware<br/>API Protection]
-    end
-
-    subgraph "External Services"
-        Supabase[(Supabase<br/>Auth, DB, Realtime)]
-        TarkovDev[json.tarkov.dev<br/>Static Data]
-        Overlay[GitHub Overlay<br/>Data Corrections]
-    end
-
-    subgraph "Deployment"
-        CF[Cloudflare Pages]
-        Gateway[API Gateway Worker]
-    end
-
-    UI --> Stores
-    Stores --> IDB
-    Stores --> LS
-
-    TarkovStore --> ProgressStore
-    MetadataStore --> ProgressStore
-    PreferencesStore --> ProgressStore
-
-    TarkovStore <--> Supabase
-    API --> TarkovDev
-    API --> Overlay
-    TeamAPI --> Supabase
-
-    MW --> API
-    MW --> TeamAPI
-
-    CF --> UI
-    Gateway --> CF
-```
-
 ## Settings navigation
 
 Settings applies hash scrolls immediately while the page is mounted. Both the page and Nuxt can
@@ -193,343 +58,50 @@ route scrolling, aliases, refresh and Back/Forward behavior stay in
 [browser smoke test](../scripts/preview/smoke/settings-navigation.smoke.mjs) covers the metadata
 transition and verifies geometry after scrolling settles.
 
-## State Management
+## State management
 
-### Three-Store Pattern + Facade
+| Store                 | Responsibility                                          |
+| --------------------- | ------------------------------------------------------- |
+| `useTarkovStore`      | Player progress, persistence and sync                   |
+| `useMetadataStore`    | Mode-scoped game data and localized views               |
+| `usePreferencesStore` | UI and account preferences                              |
+| `useProgressStore`    | Computed facade over progress, metadata and preferences |
 
-TarkovTracker uses a **three-store pattern** with Pinia plus a computed facade:
-
-1. **useTarkovStore** - User progress (tasks, hideout, level)
-2. **useMetadataStore** - Game data (tasks, items, maps)
-3. **usePreferencesStore** - UI settings
-
-**Facade:**
-
-- **useProgressStore** - Computed properties combining all three stores
-
-### Store Responsibilities
-
-#### useTarkovStore (User Progress)
-
-**Location:** `app/stores/useTarkov.ts` (store, mutations, sync lifecycle entry points), with
-`app/stores/tarkov/startupLoad.ts` (startup load and local/remote reconciliation),
-`app/stores/tarkov/syncSession.ts` (the single live sync controller),
-`app/stores/tarkov/progressMigration.ts` and `app/stores/tarkov/progressRepair.ts` (migration and
-repair), and `app/stores/tarkov/progressStorePersist.ts` (localStorage persistence).
-
-Manages isolated progress for persistent PvP, persistent PvE, and numbered Seasonal PvP.
-
-**Key Features:**
-
-- localStorage persistence with user ID validation
-- Supabase real-time sync with debouncing (5s)
-- Normalized Supabase rows keyed by `(user_id, game_mode, season_number)`
-- Multi-device conflict resolution
-- Data migration for legacy formats
-- Task repair mechanisms
-- Stores a single linked `tarkovUid` for tarkov.dev profiles
-- Treats import target mode as import-time UI state, not persisted account metadata
-
-#### Tarkov.dev Linking and Importing
-
-- A linked tarkov.dev account is represented by a single persisted `tarkovUid`.
-- The app does **not** persist a long-lived "linked mode" or "imported mode" field.
-- A Tarkov UID is linked to at most one account. An import reports success only after the cloud save
-  accepts it; a UID already linked elsewhere is reported and not linked, while the imported progress
-  is still saved.
-- Unlinking a tarkov.dev account clears only the saved `tarkovUid`; it does not roll back imported
-  progress, profile, skill, level, edition, or prestige fields.
-- Refetching a linked profile asks for a profile mode because PvP, PvE, and Seasonal profile JSON
-  use the same account id but different tarkov.dev mode routes.
-- Tarkov.dev imports default to the current mode when the pasted source does not identify a mode.
-  Mode-specific profile URLs fix the target to prevent cross-mode writes.
-- The import UI accepts a full `tarkov.dev/players/{regular|pve|pvp-season}/{uid}` profile URL,
-  fetches `players.tarkov.dev/{profile|pve|pvp-season}/{uid}.json` through the public
-  `/api/tarkov-dev/profile` proxy, and parses that JSON with the existing Tarkov.dev profile parser.
-- The import preview keeps parsed skill values collapsed by default, but exposes the exact
-  skill-id and level pairs that will be applied.
-- Tarkov.dev only refreshes that public JSON after the user opens their profile page on tarkov.dev,
-  so the UI asks users to open the profile before importing.
-- Tarkov.dev links use the currently viewed or selected mode only to choose the URL slug:
-  `regular` for PvP, `pve` for PvE, and `pvp-season` for Seasonal.
-- EFT-log imports are also locked for Seasonal until the active-season data source is verified.
-- Legacy embedded `tarkovDevProfile` payloads are sanitized out of stored progress data and should
-  not be reintroduced as long-lived state.
-
-#### useMetadataStore (Game Data)
-
-**Location:** `app/stores/useMetadata.ts`
-
-Manages static game data from the `json.tarkov.dev` API.
-
-**Key Features:**
-
-- Two-phase task loading (core → objectives → rewards)
-- IndexedDB caching with TTL
-- Graph building for task dependencies
-- Item hydration for objectives
-- Language-aware data fetching
-
-#### useProgressStore (Computed Facade)
-
-**Location:** `app/stores/useProgress.ts`
-
-Provides computed properties combining all stores.
-
-**Key Computed Properties:**
-
-- `tasksCompletions` - Per-team task completion status
-- `unlockedTasks` - Task availability considering prerequisites
-- `hideoutLevels` - Current hideout progression
-- `objectiveCompletions` - Task objective progress
-- `invalidTasks` - Data consistency validation
-
-## Data Synchronization
-
-### Supabase Sync Flow
-
-```mermaid
-sequenceDiagram
-    participant UI as Vue Component
-    participant Store as useTarkovStore
-    participant Local as localStorage
-    participant Sync as useSupabaseSync
-    participant RT as Realtime Channel
-    participant DB as Supabase
-
-    Note over UI,DB: Initial Load
-    UI->>Store: initializeTarkovSync()
-    Store->>Local: Load cached state
-    Store->>DB: Fetch user_progress account metadata
-    Store->>DB: Fetch user_game_mode_progress rows
-    DB-->>Store: Return account metadata + active mode rows
-    Store->>Store: Merge & resolve conflicts
-    Store->>Local: Persist state
-    Store->>RT: Subscribe to changes
-
-    Note over UI,DB: User Action
-    UI->>Store: Update task completion
-    Store->>Local: Persist immediately
-    Store->>Sync: Queue debounced sync
-    Sync->>DB: RPC upsert exact mode/season rows (after 5s debounce)
-
-    Note over UI,DB: Remote Update
-    RT-->>Store: Account or exact mode/season change event
-    Store->>Store: Detect self-origin
-    Store->>Store: Merge with local
-    Store->>UI: Trigger re-render
-```
-
-### Conflict Resolution Strategy
-
-1. **Sticky Complete Semantics**: Once a task is marked complete, it stays complete unless explicitly set to false
-2. **Timestamp-Based Merging**: Newer entries take precedence
-3. **Max Value Preservation**: For counts and levels, keep the higher value
-4. **Self-Origin Filtering**: Ignore echoed updates from own device (< 3s threshold)
-
-Persistent PvP and PvE use season number `0`. Seasonal PvP uses the active positive season number
-(`1` for the initial integration). The legacy `user_progress` row remains the account-metadata
-source; its frozen PvP/PvE columns are no longer written (#1028) and Seasonal progress exists only in
-`user_game_mode_progress`. See [`systems/progress-storage.md`](./systems/progress-storage.md#game-mode-and-seasonal-progress-storage)
-for the storage, RLS, team, sharing, prestige, backup, and compatibility invariants.
+See [storage](systems/progress-storage.md), [synchronization](systems/progress-sync.md),
+[game data](systems/game-data.md), [imports](systems/imports.md) and [teams](systems/teams.md).
 
 ## Authentication
 
-### OAuth Popup Flow (Login)
+Supabase provides OAuth and email authentication. The login popup polls every 500 ms, redirects
+after 3 seconds only if the popup was never observed open, and abandons after 90 seconds.
+A same-origin success message clears timers/listeners and navigates to a safe target. Client
+initialization, session reads and refreshes are single-flight per browser client. Protected requests
+reuse the current JWT. Team routes check membership.
 
-- Initial conditions:
-  - `loading.value[provider]` is set to `true` before popup open.
-  - `popupConfirmedOpen` starts as `false`.
-  - `pollTimer`, `fallbackTimer`, and `abandonedTimer` are created.
-- `pollTimer` runs every 500ms; if the popup closes, it clears `loading.value[provider]` and runs
-  `cleanup()`, otherwise it sets `popupConfirmedOpen`.
-- `fallbackTimer` runs at 3s; if `didCleanup` is false, loading is still active, the popup was never
-  confirmed open, and the popup is missing or closed, it runs `cleanup()` and then
-  `fallbackToRedirect(url, provider)`.
-- `abandonedTimer` runs at 90s; if `didCleanup` is still false, it clears `loading.value[provider]` and
-  runs `cleanup()` to abort the flow.
-- Success path: on `OAUTH_SUCCESS` message from the popup, it clears `loading.value[provider]`, runs
-  `cleanup()`, and navigates to the safe redirect.
-- `popupConfirmedOpen` tracks whether the popup has been detected as open at least once to avoid
-  triggering the redirect fallback unnecessarily.
-- `loading.value[provider]` acts as the gate for the fallback timer; if loading is cleared, fallback exits.
-- `cleanup()` clears timers, removes the message listener, and attempts to close the popup safely.
+## API architecture
 
-```mermaid
-sequenceDiagram
-    participant Login as login.vue
-    participant Popup as OAuth Popup
-    participant Callback as /auth/callback
+[Game-data contracts](systems/game-data.md) own endpoint scopes and cache behavior.
+The [browser verification proposal](tarkov-clearance-rollout.md) owns the Cloudflare gates.
+The client shares clearance probes and renewals, checks `cf-mitigated` before JSON parsing, and
+retries a challenged request once. One caller's abort does not cancel other waiters. IndexedDB
+hits are independent. Only challenged callers wait for manual retry. Dismissing the gate rejects
+them until verification is retried. A failed ordinary probe is retried on the next request.
+Verification follows `Retry-After`; after recovery, metadata and open shared profiles reload.
+Shared-profile request deadlines start after access is released. Server callers and direct public
+reads do not use the client gate.
 
-    Login->>Login: loading.value[provider] = true
-    Login->>Popup: window.open(url)
-    Login->>Login: start pollTimer + fallbackTimer + abandonedTimer
-    Popup->>Callback: OAuth provider redirects back
-    Callback-->>Popup: postMessage('OAUTH_SUCCESS')
-    Popup-->>Login: message event
-    Login->>Login: loading.value[provider] = false
-    Login->>Login: cleanup()
-    Login->>Login: navigateTo(redirect)
+### API protection
 
-    alt popup blocked or closed early
-        Login->>Login: fallbackTimer + !popupConfirmedOpen
-        Login->>Login: cleanup()
-        Login->>Login: fallbackToRedirect(url, provider)
-    end
-```
-
-### Supabase Authentication
-
-1. User authenticates via Supabase (OAuth/email)
-2. JWT stored in session
-3. Client initialization and session reads are single-flight per browser client.
-4. Protected requests reuse the current access token; concurrent refreshes share one
-   `refreshSession()` request per client.
-5. Protected routes validate token
-6. Team API validates membership
-
-## API Architecture
-
-### Tarkov Data API
-
-Network requests from metadata, shared profiles and log imports use
-[`tarkovApiFetch`](../app/utils/tarkovApiFetch.ts). When enabled it shares an initial access
-probe and one renewal per clearance generation. It inspects `cf-mitigated: challenge`
-before JSON parsing and retries each challenged data request at most once. Caller aborts
-do not cancel other waiters. Existing IndexedDB hits remain independent of verification.
-The root-mounted [`TarkovAccessGate`](../app/components/TarkovAccessGate.vue) can render while
-startup waits. Only a flow that met a challenge parks callers behind the gate's manual retry
-(a failed retry stays parked); dismissing the gate rejects them, and later requests fail fast
-until its non-modal verify action retries. The first release after any failed access check
-reloads metadata and open shared profiles. A rate-limited verification keeps retry disabled
-for the server's `Retry-After` delay. An ordinary probe
-failure rejects its callers without showing the gate, and the next request probes again.
-Gated GETs keep `$fetch`'s single transient retry. Shared-profile loads start their request budget after access is released.
-Cloudflare owns clearance; application
-verification does not authorize CDN hits. When enabled, the browser client checks clearance before requesting a catalog. Server-side callers and direct public reads do not use this client gate.
-
-Game data is prepared from `json.tarkov.dev` by the scheduled producer, then served
-through Nuxt snapshot readers. Internal modes map to upstream endpoints as
-`pvp` → `regular`, `pve` → `pve`, and `seasonal` → `pvp-season`.
-
-See the canonical [game-data architecture](./systems/game-data.md#tarkovdev-data-integration)
-and [endpoint contract](./api.md#neutral-catalog-responses).
-
-| Endpoint                       | Purpose                                             | HTTP cache policy |
-| ------------------------------ | --------------------------------------------------- | ----------------- |
-| `/api/tarkov/bootstrap`        | Player levels                                       | no-store          |
-| `/api/tarkov/tasks-core`       | Tasks, maps, traders                                | no-store          |
-| `/api/tarkov/tasks-objectives` | Task objectives                                     | no-store          |
-| `/api/tarkov/tasks-rewards`    | Task rewards                                        | no-store          |
-| `/api/tarkov/hideout`          | Hideout stations                                    | no-store          |
-| `/api/tarkov/items-lite`       | Minimal items                                       | no-store          |
-| `/api/tarkov/items`            | Full items                                          | no-store          |
-| `/api/tarkov/prestige`         | Prestige levels                                     | no-store          |
-| `/api/tarkov/editions`         | Editions, chapters, perks                           | no-store          |
-| `/api/tarkov/map-spawns`       | Map spawn points                                    | no-store          |
-| `/api/tarkov/strings`          | Referenced strings for every mode, per API language | no-store          |
-| `/api/tarkov/tasks-import`     | Whole English task snapshot per mode                | no-store          |
-| `/api/tarkov/overlay-status`   | Activated complete catalog manifest                 | no-store          |
-| `/api/tarkov/cache-meta`       | Browser purge marker                                | 5m edge           |
-
-The ten neutral datasets are prepared once per mode. Display strings load as one
-language bundle shared across modes. Editions use the same snapshot reader as the
-other neutral datasets. English imports retain their independent snapshot contract.
-
-### Team API
-
-| Endpoint            | Method | Purpose                    |
-| ------------------- | ------ | -------------------------- |
-| `/api/team/members` | GET    | Fetch team member profiles |
-
-### Caching Strategy
-
-The activated `TARKOV_DATA` manifest references 30 immutable mode catalogs and 13
-language bundles. Readers stream compressed objects and can reuse a per-colo Cache
-API copy after the active manifest confirms its key and timestamp. During KV
-failure, an eligible last-good copy is served as `STALE`; without one the reader
-returns 503. The browser stores neutral mode data and language strings separately
-in IndexedDB, then creates localized views for components. The existing purge
-marker invalidates both. See [browser caching](./systems/game-data.md#browser-cache-and-translation).
-
-```mermaid
-flowchart LR
-    Producer["Scheduled reviewed producer"] --> KV["Immutable KV objects and complete manifest"]
-    KV --> Reader["Snapshot reader"]
-    Reader --> Cache["Compressed per-colo Cache API copy"]
-    Cache --> Reader
-    Reader --> Browser["Neutral IndexedDB data and language tables"]
-    Browser --> View["Localized component view"]
-```
-
-## Security
-
-### API Protection
-
-```typescript
-// nuxt.config.ts
-runtimeConfig: {
-  apiProtection: {
-    allowedHosts: process.env.API_ALLOWED_HOSTS,
-    trustedIpRanges: process.env.API_TRUSTED_IP_RANGES,
-    requireAuth: process.env.API_REQUIRE_AUTH !== 'false',
-    publicRoutes:
-      '/api/tarkov/*,/api/tarkov-dev/profile,/api/changelog,/api/contributors,/api/logs/client,/api/security/tarkov-verify,/api/profile/*,/api/streamer/*,/api/twitch/*',
-    trustProxy: resolveTrustProxySetting({
-      API_TRUST_PROXY: process.env.API_TRUST_PROXY,
-      NITRO_PRESET: process.env.NITRO_PRESET,
-    }),
-  }
-}
-```
-
-## Performance Optimizations
-
-1. **IndexedDB Caching**: Reduce network requests
-2. **Idle Task Scheduling**: Defer non-critical fetches
-3. **Graph Building**: O(1) task dependency lookups
-4. **Memoization**: Cache computed values
-5. **Incremental List Loading**: Load long item/task lists progressively
-6. **Manual Chunks**: Separate vendor bundles
-
-## Testing
-
-**Framework:** Vitest + Vue Test Utils
-
-```bash
-# Run all tests
-pnpm run test
-
-# Watch mode
-pnpm run test:watch
-
-# Versioned API parity (fetches/builds the pinned external source)
-pnpm run verify:api-parity
-```
-
-**Test Organization:**
-
-- Unit tests: `app/**/__tests__/*.test.ts`
-- Mock strategy: Supabase client, network requests
-- DOM environment: happy-dom
+`nuxt.config.ts` defines public route exceptions and the proxy-trust default.
+`app/server/middleware/api-protection.ts` applies host, trusted-IP and authentication policy.
+See the [environment variables](#environment-variables) and [rate-limit owners](rate-limiting.md).
 
 ## Deployment
 
-### Cloudflare Pages
-
-```yaml
-# Cloudflare Pages project build configuration (dashboard / CI build settings).
-# Runtime app vars live in wrangler.toml [vars], not here.
-Build command: pnpm run build
-Build output: dist
-Root directory: /
-Node.js version: 24.x
-# Pages Functions handle only /api/*, /overlay/*, and bounded /profile/* paths.
-# Public pages and finite private shells are static; 404.html prevents SPA catch-all responses.
-# Optional build-tool pin (Pages build image). Detection also works from
-# pnpm-lock.yaml + packageManager without this env var.
-# PNPM_VERSION: 10.34.5
-```
+Cloudflare Pages builds from the repository root using `pnpm run build` on Node 24.x and publishes
+`dist`. Pages can derive pnpm from `packageManager`; an explicit `PNPM_VERSION` is `11.14.0`.
+See [public rendering](#public-rendering-and-discovery) for the static/dynamic split and the
+[runbook](runbook.md#deployment) for operational checks.
 
 ### Environment Variables
 
@@ -708,14 +280,3 @@ Edge-only tier roles for supporter sync (role sync skips the tier role when one 
 | `SUPABASE_ANON_KEY`         | Supabase anon key                                              | Yes        |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key                                      | Yes        |
 | `IP_HASH_SECRET`            | HMAC secret for pseudo-anonymizing IPs in abuse-gate log lines | Yes (prod) |
-
-## Code Conventions
-
-- **Indent:** 2 spaces
-- **Line width:** 100 characters
-- **Strings:** Single quotes
-- **Semicolons:** Always
-- **Imports:** Use `@/` alias
-- **Components:** PascalCase
-- **Colors:** Tailwind tokens only (no hex)
-- **Comments:** Only where necessary
