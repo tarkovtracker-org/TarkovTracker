@@ -205,13 +205,7 @@ function isSupportedSource(file: File): boolean {
     isEftImportLogFileName(file.webkitRelativePath || file.name)
   );
 }
-/** Read each known loose-file session together, then restore the original source order. */
-async function readLooseSessions(
-  files: File[],
-  onChunk: (bytes: number) => void,
-  signal: AbortSignal,
-  budget: EftLogImportBudget
-): Promise<EftParsedLogFile[]> {
+function groupLooseSessionIndexes(files: File[]): Map<string, number[]> {
   const sessions = new Map<string, number[]>();
   for (const [index, file] of files.entries()) {
     const key = eftLogSessionKey(file.webkitRelativePath || file.name);
@@ -219,8 +213,17 @@ async function readLooseSessions(
     indexes.push(index);
     sessions.set(key, indexes);
   }
+  return sessions;
+}
+/** Read each known loose-file session together, then restore the original source order. */
+async function readLooseSessions(
+  files: File[],
+  onChunk: (bytes: number) => void,
+  signal: AbortSignal,
+  budget: EftLogImportBudget
+): Promise<EftParsedLogFile[]> {
   const sources: EftParsedLogFile[] = [];
-  for (const indexes of sessions.values()) {
+  for (const indexes of groupLooseSessionIndexes(files).values()) {
     const session: EftParsedLogFile[] = [];
     for (const index of indexes) {
       signal.throwIfAborted();
