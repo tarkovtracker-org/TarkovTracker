@@ -27,6 +27,11 @@ function largeOutputFile(size: number): File {
   });
   return file;
 }
+const looseFile = (session: string, name: string, text: string): File => {
+  const file = new File([text], name);
+  Object.defineProperty(file, 'webkitRelativePath', { value: session + '/' + name });
+  return file;
+};
 describe('readEftLogSources', () => {
   it('reads an unzipped folder past all former byte limits and preserves its late mode evidence', async () => {
     const output = largeOutputFile(513 * 1024 * 1024);
@@ -58,6 +63,68 @@ describe('readEftLogSources', () => {
     // several times that under coverage on a shared one, so keep a bounded but generous cap
     // rather than the default 30s. The streaming assertions above are what guard behaviour.
   }, 120000);
+  it('releases redundant mode evidence across loose sessions under one shared limit', async () => {
+    const later = SESSION.replace('10-00-00', '11-00-00');
+    const repeatedMode = [0, 1, 2].map((ms) => mode.replace('.000|', '.00' + ms + '|')).join('');
+    const inputs = [
+      looseFile(SESSION, 'notifications.log', notification),
+      looseFile(later, 'output.log', repeatedMode),
+      looseFile(later, 'notifications.log', notification.replace('completed', 'next')),
+      looseFile(SESSION, 'output.log', repeatedMode),
+    ];
+    const { sources } = await readEftLogSources(inputs, {
+      signal: new AbortController().signal,
+      onProgress: () => {},
+      limits: { evidenceCount: 6 },
+    });
+    expect(sources.map((source) => source.name)).toEqual(
+      inputs.map((file) => file.webkitRelativePath)
+    );
+    expect(sources.flatMap((source) => source.timeline)).toHaveLength(2);
+    const preview = parseEftLogsForQuestImport(sources, [QUEST]);
+    expect(preview.events).toHaveLength(2);
+    expect(preview.matchedTaskIdsByMode.pve).toEqual([QUEST]);
+    await expect(
+      readEftLogSources([inputs[1]!], {
+        signal: new AbortController().signal,
+        onProgress: () => {},
+        limits: { evidenceCount: 2 },
+      })
+    ).rejects.toMatchObject({ limit: 'evidenceCount' });
+  });
+  it('preserves conflicts and intervening mode changes across loose session files', async () => {
+    const timedMode = (second: string, value: string) =>
+      mode.replace('01.000', second + '.000').replace('Pve', value);
+    const logs = [
+      [
+        'notifications.log',
+        ['00', '02', '03', '04', '05', '06']
+          .map((second) =>
+            notification.replace('02.000', second + '.000').replace('completed', second)
+          )
+          .join(''),
+      ],
+      ['output.log', ['01', '03', '05', '06'].map((s) => timedMode(s, 'Pve')).join('')],
+      ['output_001.log', ['03', '04'].map((s) => timedMode(s, 'Regular')).join('')],
+    ] as const;
+    const original = parseEftLogsForQuestImport(
+      logs.map(([name, text]) => ({ name: SESSION + '/' + name, text })),
+      [QUEST]
+    );
+    const { sources } = await read(
+      logs.map(([name, contents]) => looseFile(SESSION, name, contents))
+    );
+    const preview = parseEftLogsForQuestImport(sources, [QUEST]);
+    expect(preview.events.map((event) => event.mode)).toEqual([
+      'unknown',
+      'pve',
+      'unknown',
+      'pvp',
+      'pve',
+      'pve',
+    ]);
+    expect(preview).toEqual(original);
+  });
   it('imports a ZIP log expanded beyond 32 MiB with notifications from a raw file', async () => {
     const content = noise.repeat(Math.ceil((33 * 1024 * 1024) / noise.length)) + mode;
     const zip = new File(

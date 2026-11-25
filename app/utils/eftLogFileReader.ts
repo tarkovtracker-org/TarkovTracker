@@ -5,7 +5,9 @@ import {
   type EftLogImportLimits,
 } from '@/utils/eftLogImportBudget';
 import {
+  compactEftLogSessionModeEvidence,
   createEftLogFileParser,
+  eftLogSessionKey,
   isEftImportLogFileName,
   type EftParsedLogFile,
 } from '@/utils/eftLogQuestParser';
@@ -203,6 +205,33 @@ function isSupportedSource(file: File): boolean {
     isEftImportLogFileName(file.webkitRelativePath || file.name)
   );
 }
+/** Read each known loose-file session together, then restore the original source order. */
+async function readLooseSessions(
+  files: File[],
+  onChunk: (bytes: number) => void,
+  signal: AbortSignal,
+  budget: EftLogImportBudget
+): Promise<EftParsedLogFile[]> {
+  const sessions = new Map<string, number[]>();
+  for (const [index, file] of files.entries()) {
+    const key = eftLogSessionKey(file.webkitRelativePath || file.name);
+    const indexes = sessions.get(key) ?? [];
+    indexes.push(index);
+    sessions.set(key, indexes);
+  }
+  const sources: EftParsedLogFile[] = [];
+  for (const indexes of sessions.values()) {
+    const session: EftParsedLogFile[] = [];
+    for (const index of indexes) {
+      signal.throwIfAborted();
+      const source = await readRaw(files[index]!, onChunk, signal, budget);
+      sources[index] = source;
+      session.push(source);
+    }
+    compactEftLogSessionModeEvidence(session, budget);
+  }
+  return sources;
+}
 /** Processes sources sequentially, retaining parsed evidence instead of complete log text. */
 export async function readEftLogSources(files: File[], options: ReadOptions) {
   options.signal.throwIfAborted();
@@ -219,6 +248,12 @@ export async function readEftLogSources(files: File[], options: ReadOptions) {
     options.onProgress({ bytesRead, totalBytes });
   };
   onChunk(0);
+  // An archive can contribute more members to a session at any point in the selection.
+  if (!selected.some((file) => file.name.toLowerCase().endsWith('.zip'))) {
+    const looseSources = await readLooseSessions(selected, onChunk, options.signal, budget);
+    options.signal.throwIfAborted();
+    return { sources: looseSources, scanned: files.length };
+  }
   for (const file of selected) {
     options.signal.throwIfAborted();
     if (file.name.toLowerCase().endsWith('.zip')) {
