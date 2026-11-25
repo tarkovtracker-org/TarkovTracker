@@ -147,3 +147,20 @@ it('propagates network/tool errors without producing a fake absent-tag proof or 
   await expect(prepareRollback('owner/repo', '901')).rejects.toThrow('Network unavailable');
   expect(writeFileSync).not.toHaveBeenCalled();
 });
+it('uses a large stdout buffer and rethrows child-process errors with truncated output', async () => {
+  const normal = execFileSync.getMockImplementation();
+  execFileSync.mockImplementation((tool, args, options) => {
+    expect(options?.maxBuffer).toBeGreaterThan(1024 * 1024);
+    if (args.at(-1).includes('/compare/'))
+      throw Object.assign(new Error('stdout maxBuffer length exceeded'), {
+        code: 'ENOBUFS',
+        stdout: 'HTTP/2.0 200 OK\n\n{"truncated":',
+      });
+    return normal(tool, args, options);
+  });
+  rollbackPromotion.mockImplementation(async ({ github }) =>
+    github.rest.repos.compareCommits({ base: sha, head: sha })
+  );
+  await expect(prepareRollback('owner/repo', '901')).rejects.toMatchObject({ code: 'ENOBUFS' });
+  expect(writeFileSync).not.toHaveBeenCalled();
+});
