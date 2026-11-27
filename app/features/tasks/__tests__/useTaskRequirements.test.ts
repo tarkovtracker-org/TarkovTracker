@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTaskRequirements } from '@/features/tasks/composables/useTaskRequirements';
 import { buildTaskEvaluations } from '@/stores/taskAvailability';
+import { TASK_ID_REGISTRY } from '@/utils/constants';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { TaskAvailabilityTeamData, TaskBlocker } from '@/stores/taskAvailability';
 import type { Task } from '@/types/tarkov';
@@ -50,10 +51,11 @@ vi.mock('@/stores/useMetadata', () => ({
     storyChapters: [],
     getTaskById: (id: string) =>
       (
-        ({ 'unlock-quest': { id }, 'named-quest': { id, name: 'Named quest' } }) as Record<
-          string,
-          { id: string; name?: string }
-        >
+        ({
+          'unlock-quest': { id },
+          'named-quest': { id, name: 'Named quest' },
+          [TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT]: { id, name: 'Cut Down to the Root' },
+        }) as Record<string, { id: string; name?: string }>
       )[id],
   }),
 }));
@@ -109,6 +111,24 @@ describe('task requirement summary server gates', () => {
       ]);
     }
   );
+  it('keeps the accepted Jaeger quest linked in the requirements summary', () => {
+    const jaeger = TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT;
+    const target: Task = {
+      id: TASK_ID_REGISTRY.PRESERVE_A_VALUABLE_PIECE,
+      taskRequirements: [{ task: { id: jaeger }, status: ['active'] }],
+    };
+    state.data.confirmations = {
+      [target.id]: { requirements: otherRequirementsSignature(target)!, timestamp: 2 },
+    };
+    const { summary } = useTaskRequirements(() => target);
+    expect(summary.value).toEqual([
+      expect.objectContaining({
+        met: true,
+        label: 'page.tasks.requirements.task_accepted(task=Cut Down to the Root)',
+        to: `/tasks?task=${jaeger}`,
+      }),
+    ]);
+  });
   it('keeps normal availability blockers for a nonterminal task', () => {
     const requirements = useTaskRequirements(() => task);
     expect(requirements.summary.value.map((row) => row.met)).toEqual([false, false]);

@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSkillKeyAliases,
   collapseSkillOffsets,
-  formatSkillDisplayName,
+  formatSkillName,
   getCanonicalSkillKey,
+  getNextRequiredLevel,
   normalizeSkillToken,
   readSkillObjective,
   resolveSkillKey,
@@ -19,16 +20,6 @@ const skillObjective = (overrides: Partial<TaskObjective> = {}): TaskObjective =
     skill: { id: 'Vitality', name: 'Vitality', imageLink: 'https://example.com/vitality.webp' },
   },
   ...overrides,
-});
-describe('formatSkillDisplayName', () => {
-  it('splits camelCase skill names while preserving acronyms', () => {
-    expect(formatSkillDisplayName('StressResistance')).toBe('Stress Resistance');
-    expect(formatSkillDisplayName('HideoutManagement')).toBe('Hideout Management');
-    expect(formatSkillDisplayName('SMG')).toBe('SMG');
-    expect(formatSkillDisplayName('DMR')).toBe('DMR');
-    expect(formatSkillDisplayName('Endurance')).toBe('Endurance');
-    expect(formatSkillDisplayName('  ')).toBe('');
-  });
 });
 describe('normalizeSkillToken', () => {
   it('returns null for null', () => {
@@ -336,5 +327,35 @@ describe('collapseSkillOffsets', () => {
     expect(result.size).toBe(2);
     expect(result.get('Strength')?.offset).toBe(5);
     expect(result.get('Endurance')?.offset).toBe(3);
+  });
+});
+describe('formatSkillName', () => {
+  it('spaces camel-case skill identifiers', () => {
+    expect(formatSkillName('AimDrills')).toBe('Aim Drills');
+    expect(formatSkillName('HideoutManagement')).toBe('Hideout Management');
+  });
+  it('keeps acronyms together', () => {
+    expect(formatSkillName('DMR')).toBe('DMR');
+    expect(formatSkillName('SMG')).toBe('SMG');
+  });
+  it('leaves already formatted names unchanged', () => {
+    expect(formatSkillName('Stress Resistance')).toBe('Stress Resistance');
+  });
+  it('trims and splits uppercase prefixes and numeric skill names', () => {
+    expect(formatSkillName('  DMRHandling  ')).toBe('DMR Handling');
+    expect(formatSkillName('Level1Drills')).toBe('Level1 Drills');
+    expect(formatSkillName('  ')).toBe('');
+  });
+});
+describe('getNextRequiredLevel', () => {
+  it('returns the lowest requirement above the current level', () => {
+    expect(getNextRequiredLevel([5, 10, 20], 7)).toBe(10);
+    expect(getNextRequiredLevel([5, 10, 20], 0)).toBe(5);
+  });
+  it('treats a level equal to the requirement as met', () => {
+    expect(getNextRequiredLevel([5, 10], 10)).toBeNull();
+  });
+  it('returns null without requirements', () => {
+    expect(getNextRequiredLevel([], 3)).toBeNull();
   });
 });

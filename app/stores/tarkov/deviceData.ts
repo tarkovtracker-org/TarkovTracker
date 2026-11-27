@@ -19,7 +19,11 @@ import {
 } from '@/stores/tarkov/progressAuthority';
 import { removeSupersededProgressCopies } from '@/stores/tarkov/supersededProgress';
 import { logger } from '@/utils/logger';
-import { LEGACY_STORAGE_KEYS, STORAGE_KEYS } from '@/utils/storageKeys';
+import {
+  LEGACY_STORAGE_KEYS,
+  seasonTwoModifiersStorageKey,
+  STORAGE_KEYS,
+} from '@/utils/storageKeys';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 /**
  * Explicit removal of one account's data from this browser (see `CONTEXT.md`). It is
@@ -268,6 +272,7 @@ export const removeAccountDeviceData = async (userId: string): Promise<boolean> 
   // An earlier queued replacement can retain the owner's active bytes while removal waits.
   removed = removeAccountRecoveryCopy(userId) && removed;
   removed = removeSupersededProgressCopies(userId) && removed;
+  removed = safeRemoveItem(seasonTwoModifiersStorageKey(userId)) && removed;
   removed = (await removeOwnedStorageKeys(OWNER_SCOPED_KEYS, userId, isCurrent)) && removed;
   if (!isCurrent()) return false;
   // The active-slot lock and owner cleanup can allow another tab to create a backup.

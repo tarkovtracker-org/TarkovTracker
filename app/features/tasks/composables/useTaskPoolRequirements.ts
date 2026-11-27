@@ -42,7 +42,7 @@ export const useTaskPoolRequirements = (task: () => Task) => {
     isAvailabilityConfirmed(
       data.value.taskAvailability?.[task().id],
       data.value.taskCompletions?.[task().id],
-      otherRequirementsSignature(task())
+      otherRequirementsSignature(task(), data.value.taskCompletions)
     );
   const traderName = (requirement: VariableRequirement) =>
     metadata.traders?.find((trader) => trader.id === requirement.taskPool?.traderId)?.name;

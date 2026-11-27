@@ -235,7 +235,7 @@ function isSessionDirectory(directory: string, slashIndex: number): boolean {
   return slashIndex >= 0 && /(?:^|\/)log_/.test(directory);
 }
 /** Groups related files by session directory or the timestamp/build prefix of individual filenames. */
-function toSessionKey(fileName: string): string {
+export function eftLogSessionKey(fileName: string): string {
   const normalized = fileName.replaceAll('\\', '/').toLowerCase();
   const slashIndex = normalized.lastIndexOf('/');
   const directory = normalized.slice(0, slashIndex);
@@ -431,6 +431,23 @@ function combineModeSignals(timeline: BackendModeSignal[]): BackendModeSignal[] 
     } else combined.push({ ...signal });
   }
   return combined;
+}
+/** Releases redundant mode evidence after every file belonging to this session has been read. */
+export function compactEftLogSessionModeEvidence(
+  files: EftParsedLogFile[],
+  budget: EftLogImportBudget
+): void {
+  const owner = files.find((file) => file.timeline.length || file.legacy.length);
+  if (!owner) return;
+  const { timeline } = collectBackendModeSignals(files);
+  const transitions = timeline.filter((signal, index) => signal.mode !== timeline[index - 1]?.mode);
+  for (const file of files) {
+    budget.releaseEvidence(file.timeline.length + file.legacy.length);
+    file.timeline = [];
+    file.legacy = [];
+  }
+  budget.charge('evidenceCount', transitions.length);
+  owner.timeline = transitions;
 }
 /** Uses the latest preceding valid signal; future signals never identify an earlier event. */
 function resolveEventModeFromTimeline(
@@ -721,7 +738,7 @@ interface ImportCounts {
 }
 /** Groups related evidence while preserving the first known session version. */
 function addSessionFile(groups: Map<string, SessionLogs>, file: EftParsedLogFile): void {
-  const sessionKey = toSessionKey(file.name);
+  const sessionKey = eftLogSessionKey(file.name);
   const group = groups.get(sessionKey) ?? {
     files: [],
     version: extractSessionVersion(sessionKey) ?? file.version,

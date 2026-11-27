@@ -428,6 +428,27 @@ These show up in Supabase logs / query performance and are expected. Do not trea
      `WHERE pubname...` existence check). Already applied to production; do not delete (would
      desync migration history). Avoid this duplicate-add pattern in future migrations.
 
+## Progress sync database timing
+
+The `snapshot-progress-sync-timing` Supabase Cron job runs at minute 07 of each hour. It
+retains 30 days of cumulative Postgres call counts and execution time for the authenticated
+PostgREST `sync_user_game_mode_progress` statement. The private table stores timestamps,
+query IDs, and counters only. Query logging is independent of this job.
+
+Use the Supabase SQL editor with an operator role to inspect
+`private.progress_sync_timing_snapshots`. Check the job's run history under Integrations → Cron
+if an expected hour is missing. The first measurement requires a real sync call, and a full
+24-hour baseline needs two snapshots 24 hours apart.
+
+For each query ID, compare snapshots with matching `stats_since` and `stats_reset`
+(treat two null reset timestamps as equal) and nondecreasing counters. Use `captured_at` for
+the actual endpoints. Divide the change in `total_exec_time_ms` by the change in `calls`.
+If more than one query ID has valid endpoints, sum the elapsed-time deltas and call deltas
+before dividing. If the combined call delta is zero, report that the interval had no calls.
+Report gaps or changed query IDs as incomplete coverage. If deployment falls
+between sampling times, use windows wholly on each side of the cutover and report their
+actual boundaries. Gateway logs supply request-size cohorts separately.
+
 ## Database Migrations
 
 ### Immutable history and remote synchronization

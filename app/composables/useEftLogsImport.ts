@@ -33,6 +33,7 @@ import {
 } from '@/utils/eftLogQuestParser';
 import { EftLogRecordSizeError } from '@/utils/eftLogRecordReader';
 import { logger } from '@/utils/logger';
+import { importedAcceptanceSignature } from '@/utils/shiftingBalanceAcceptance';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
@@ -232,7 +233,8 @@ const applyStartedImports = (
     // its story objectives and confirms its gate signature (after the status write, so it counts).
     const task = tasksMap.get(taskId) ?? { id: taskId };
     recordImpliedStoryObjectives(store, task);
-    const signature = otherRequirementsSignature(task);
+    const signature =
+      otherRequirementsSignature(task, completions) ?? importedAcceptanceSignature(taskId);
     if (signature) store.confirmTaskAvailability(taskId, signature);
   }
 };

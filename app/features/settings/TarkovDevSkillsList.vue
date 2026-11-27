@@ -41,7 +41,7 @@
 </template>
 <script setup lang="ts">
   import { MAX_SKILL_LEVEL } from '@/utils/constants';
-  import { formatSkillDisplayName } from '@/utils/skillHelpers';
+  import { formatSkillName } from '@/utils/skillHelpers';
   const props = withDefaults(
     defineProps<{
       skills: ReadonlyArray<{ id: string; value: number }>;
@@ -58,7 +58,7 @@
   const formattedSkills = computed(() =>
     props.skills.map((skill) => ({
       id: skill.id,
-      label: formatSkillDisplayName(skill.id),
+      label: formatSkillName(skill.id),
       value: skill.value,
       badgeClass:
         skill.value >= MAX_SKILL_LEVEL

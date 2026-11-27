@@ -434,14 +434,12 @@ catalogs and modes, which can be expensive on a cold development server. Local
 live building is limited to development and does not establish production
 precompute readiness.
 
-Production and preview namespaces are separate. The preview namespace needs its
-own complete 46-object release and all three English imports from a reviewed
-producer before catalog-dependent UI verification. An English-only legacy seed
-cannot satisfy neutral readers. Use an approved broker writer or authorized
-operator workflow with the preview namespace selected explicitly. Keep production
-credentials out of preview builds and candidate code. Refresh the preview release
-before expiry and recheck its identity because all preview branches share that
-expendable namespace. See [Pull-request previews](./previews.md).
+Production and preview namespaces are separate. A complete scheduled precompute
+mirrors the published production release into preview after production succeeds.
+The trusted mirror checks all 46 immutable objects and three English imports,
+verifies the preview readbacks, and publishes the preview manifest last. The
+`previewOnly` dispatch on `main` can recover the preview namespace from a fresh
+production release. See [Pull-request previews](./previews.md).
 
 ### Files
 

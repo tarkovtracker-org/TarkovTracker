@@ -42,6 +42,8 @@ export const MAP_MARKER_COLORS = {
   COOP_EXTRACT: '#2b7b82',
   /** PMC spawns - --color-info-500 */
   PMC_SPAWN: '#2280c3',
+  /** Boss spawns - matches --color-error-500 */
+  BOSS_SPAWN: '#b23434',
   /** Transit locations - matches --color-error-400 */
   TRANSIT: '#cf5959',
   /** Default extract - --color-secondary-500 */
@@ -87,6 +89,7 @@ export const getMapColorOptions = (t: MapColorOptionTranslator): MapColorOption[
     { key: 'SHARED_EXTRACT', label: t('settings.interface.maps.colors.shared_extract') },
     { key: 'COOP_EXTRACT', label: t('settings.interface.maps.colors.coop_extract') },
     { key: 'PMC_SPAWN', label: t('common.pmc_spawn') },
+    { key: 'BOSS_SPAWN', label: t('maps.layers.boss_spawns') },
     { key: 'TRANSIT', label: t('maps.layers.transit') },
   ];
 };

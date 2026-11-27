@@ -181,3 +181,18 @@ test('precompute credentials require a main-only protected environment and exact
   assert.match(run, /OVERLAY_TOKEN: \$\{\{ secrets.OVERLAY_TOKEN \}\}/);
   assert.doesNotMatch(run, /secrets\.[A-Z_]+ \|\|/);
 });
+test('the scheduled writer refreshes preview KV after full releases on trusted main', () => {
+  const workflow = read('.github/workflows/precompute-tarkov-data.yml');
+  const job = jobBlock(workflow, 'precompute');
+  const refresh = workflowStep(job, 'Refresh the isolated preview catalog');
+  assert.match(refresh, /if: inputs\.previewOnly \|\| \(!inputs\.lang && !inputs\.gameMode\)/);
+  assert.match(refresh, /run: pnpm run precompute:preview/);
+  assert.match(refresh, /CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
+  assert.doesNotMatch(refresh, /OVERLAY_TOKEN|vars\.PREVIEW_TARKOV_DATA_KV_NAMESPACE_ID/);
+  const writer = read('scripts/precompute/refresh-preview.ts');
+  const binding = read('wrangler.toml').match(
+    /\[\[env\.preview\.kv_namespaces\]\]\r?\nbinding = "TARKOV_DATA"\r?\nid = "([0-9a-f]{32})"/
+  )?.[1];
+  assert.ok(binding);
+  assert.match(writer, new RegExp(`PREVIEW_NAMESPACE_ID = '${binding}'`));
+});

@@ -219,6 +219,8 @@ export const TRADERS_WITHOUT_REPUTATION = [
 ] as const;
 export const TASK_ID_REGISTRY = {
   GETTING_ACQUAINTED: '625d700cc48e6c62a440fab5',
+  CUT_DOWN_TO_THE_ROOT: '6a76466e752258ce02073d07',
+  PRESERVE_A_VALUABLE_PIECE: '6a885ad91006f9d30a0ed61b',
   A_HELPING_HAND: '6752f6d83038f7df520c83e8',
   EASY_MONEY_PART_1: '66058cb22cee99303f1ba067',
   EASY_MONEY_PART_1_PVP: '66058cb22cee99303f1ba067',
@@ -314,6 +316,52 @@ const SKILL_ORDER_ID = [
   'Crafting',
   'HideoutManagement',
 ] as const;
+type SkillOrderId = (typeof SKILL_ORDER_ID)[number];
+// In-game character screen skill groups, in display order. Unknown skills fall into 'other'.
+export const SKILL_CATEGORY_ORDER = ['physical', 'mental', 'combat', 'practical', 'other'] as const;
+export type SkillCategory = (typeof SKILL_CATEGORY_ORDER)[number];
+const SKILL_CATEGORY_BY_ID: Record<SkillOrderId, SkillCategory> = {
+  Endurance: 'physical',
+  Strength: 'physical',
+  Vitality: 'physical',
+  Health: 'physical',
+  StressResistance: 'physical',
+  Metabolism: 'physical',
+  Immunity: 'physical',
+  Perception: 'mental',
+  Intellect: 'mental',
+  Attention: 'mental',
+  Charisma: 'mental',
+  Pistol: 'combat',
+  Revolver: 'combat',
+  SMG: 'combat',
+  Assault: 'combat',
+  Shotgun: 'combat',
+  Sniper: 'combat',
+  LMG: 'combat',
+  HMG: 'combat',
+  Launcher: 'combat',
+  AttachedLauncher: 'combat',
+  Throwing: 'combat',
+  Melee: 'combat',
+  DMR: 'combat',
+  AimDrills: 'combat',
+  TroubleShooting: 'combat',
+  Surgery: 'practical',
+  CovertMovement: 'practical',
+  Search: 'practical',
+  MagDrills: 'practical',
+  LightVests: 'practical',
+  HeavyVests: 'practical',
+  WeaponTreatment: 'practical',
+  Crafting: 'practical',
+  HideoutManagement: 'practical',
+};
+export function getSkillCategory(skill: { id?: string; key?: string }): SkillCategory {
+  const skillId = skill.id ?? skill.key;
+  if (!skillId || !Object.hasOwn(SKILL_CATEGORY_BY_ID, skillId)) return 'other';
+  return SKILL_CATEGORY_BY_ID[skillId as SkillOrderId];
+}
 export const SKILL_SORT_MODES = ['priority', 'ingame'] as const;
 export type SkillSortMode = (typeof SKILL_SORT_MODES)[number];
 // Sort skills by in-game order

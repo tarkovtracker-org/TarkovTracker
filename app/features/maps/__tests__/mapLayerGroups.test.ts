@@ -15,6 +15,7 @@ const createInput = (available: Partial<MapLayerGroupsInput['available']> = {}) 
     extracts: { pmc: toggle(true), scav: toggle(false), shared: toggle(true), coop: toggle(true) },
     transit: toggle(true),
     spawns: toggle(false),
+    bosses: toggle(false),
     available: {
       pmc: true,
       scav: true,
@@ -23,6 +24,7 @@ const createInput = (available: Partial<MapLayerGroupsInput['available']> = {}) 
       coop: true,
       transit: true,
       spawns: true,
+      bosses: false,
       ...available,
     },
   }) satisfies MapLayerGroupsInput;

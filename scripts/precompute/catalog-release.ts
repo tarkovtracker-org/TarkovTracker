@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { setTimeout as delay } from 'node:timers/promises';
 import { gzipSync } from 'node:zlib';
 import { buildOverlayResponseHeaders } from '@/server/utils/overlayResponseHeaders';
 import { precomputedOverlayIdentity } from '@/server/utils/precomputedTarkov';
@@ -12,7 +11,7 @@ import {
 } from '@/utils/catalogDatasets';
 import { collectGameDataStrings } from '@/utils/gameDataStrings';
 import { normalizeTaskObjectives } from '@/utils/taskNormalization';
-import { KvReadNotFound } from './kv';
+import { readbackMatches } from './kv';
 import { PRECOMPUTED_TTL_SECONDS } from './precompute';
 import type { CatalogStore } from './kv';
 import type { ValidGameMode } from '@/server/utils/tarkov-cache-config';
@@ -27,18 +26,6 @@ function checkCatalog(dataset: CatalogDataset, payload: Payload, sha: string) {
   if (dataset === 'bootstrap' || dataset === 'map-spawns') return;
   if (precomputedOverlayIdentity(payload)?.sha256 !== sha)
     throw new Error(`Unexpected overlay in ${dataset}`);
-}
-async function readbackMatches(kv: CatalogStore, key: string, expected: Buffer) {
-  // A previously cached value or miss can outlive a successful KV write by 60 seconds.
-  for (const waitMs of [0, 5000, 15000, 45000]) {
-    if (waitMs) await delay(waitMs);
-    try {
-      if (expected.equals(Buffer.from(await kv.read(key)))) return true;
-    } catch (error) {
-      if (!(error instanceof KvReadNotFound)) throw error;
-    }
-  }
-  return false;
 }
 async function stage(kv: CatalogStore, scope: string, payload: Payload) {
   const body = JSON.stringify(payload);

@@ -187,6 +187,13 @@ gate uses the authoritative prestige task map.
 gates can be disabled; unknown data stays locked. Required status `complete|failed` accepts
 either terminal outcome. A story route permits **independent gates AND (quest prerequisites
 OR recorded progress in an explicitly wired chapter)**. Chapter order never grants access.
+For Preserve a Valuable Piece, eligibility alone does not prove Cut Down to the Root was
+accepted. An imported EFT start or explicit in-game availability confirmation is required;
+a reset invalidates the confirmation even when the reset device runs behind. A terminal Jaeger
+status closes the route. The five-second game delay is informational because the tracker does
+not have an authoritative acceptance clock.
+Other active prerequisites retain their existing planning behavior.
+
 Eligibility and caches use the selected mode. An isolated profile uses its own metadata and
 progress and ignores superseded requests. Required core/objective failures are fatal;
 edition, prestige and story failures can stay partial. Edition/story validation is independent.
@@ -277,6 +284,37 @@ Layer names map to our existing floor IDs (Labs `Second Level` becomes `Second_L
 Keep spatial bounds with the heights when refreshing this metadata: low outdoor Ground Zero
 locations are not necessarily in Garage, and the showroom has a local second-floor exception.
 Maps lacking reviewed floor metadata, including Terminal, show no inferred arrows.
+
+Icebreaker uses the hosted floor tiles credited to TarkovBOT.eu and the deck heights from
+[Tarkov.dev's Icebreaker map settings](https://github.com/the-hideout/tarkov-dev/blob/bc4ed844accb259a4ec07ed0077176fa91975908/src/data/maps.json#L1014).
+The published transform projects the helicopter extract outside the raster. The local transform was
+fitted to the zoom-2 tile artwork using Tarkov.dev's spawn, loot, and lock positions and checked
+against the helipad and 42 held-out boss positions at their published deck heights. All 42 project
+within 10 pixels of visible deck artwork at that zoom. Boss coordinates and configured chances
+come from the catalog. The chance is per spawn entry, including entries whose in-raid conditions
+are unspecified. The floor picker shows only the floors in the selected Main Decks or Engine Room
+group. Switching groups selects Infirmary or Engine Room, and the selected floor drives the artwork
+and pin elevation indicators. The groups follow [TarkovBOT's Icebreaker map](https://tarkovbot.eu/tools/interactive-maps/icebreaker).
+
+The catalog fills empty boss position lists only when the map ID, boss role, and raw zone name
+match a verified fallback. Tarkov.dev supplies the encounter rows, probabilities, and any
+available positions.
+
+On Icebreaker this covers Knight's Mash_t1 on Storage/Security and The Wedge's RoomsThird and
+RoomsThirdKitchen on Gym/Canteen. The positions come from the game-data import's
+unmodified bot spawn entries. All 12 project onto the visible artwork of their recorded decks.
+[Retail import provenance](https://github.com/danauraborealis/ManimalIcebreaker/blob/4effee7c5d0efa1943aa250c29ef031fe24a7c03/analysis/remap_retail_spawns.py#L36-L40)
+[Imported SpawnPointParams](https://github.com/danauraborealis/ManimalIcebreaker/blob/4effee7c5d0efa1943aa250c29ef031fe24a7c03/icebreaker-server/db/base.json#L1600-L3110)
+
+The other fallbacks cover Reshala at Dorms and New Gas on Customs, Sanitar at Pier and the
+Cultist Priest northeast of the Sunken Village on Shoreline, and the shared port spawn for
+Reshala, Glukhar, Killa, Sanitar, and Tagilla on Terminal. The 34 positions match retail bot
+spawn entries across game-mode captures. The pinned public archive corroborates their zone
+IDs and horizontal coordinates. Shoreline uses the elevations from the newer captures.
+[Retail location archive](https://github.com/carlsmei/tarkovdata/blob/08649f48a43fe8f4bea311b23a224a278a26492b/locations.json)
+
+The Lab (Dark), Infected Lab and Infected Factory reuse the backgrounds that Tarkov.dev declares
+for those variants. Each variant keeps its own boss rates, locations and extracts.
 
 `mapElevation.ts` classifies points and vertical volumes using half-open height intervals and
 scoped spatial exceptions before the base layer. A volume spanning several levels uses the

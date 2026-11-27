@@ -1,6 +1,6 @@
 <template>
   <div v-if="label" data-testid="task-time-gate" class="text-surface-400 text-xs">
-    <AppTooltip :text="t('page.tasks.questcard.time_gate_tooltip')">
+    <AppTooltip :text="t(tooltipKey)">
       <span class="inline-flex items-center gap-1">
         <UIcon name="i-mdi-timer-sand" aria-hidden="true" class="h-4 w-4 shrink-0" />
         {{ label }}
@@ -10,10 +10,14 @@
 </template>
 <script setup lang="ts">
   import { formatDelayDuration, resolveTaskTimeGate } from '@/features/tasks/task-time-gate';
+  import { strictAcceptancePredecessor } from '@/utils/shiftingBalanceAcceptance';
   import type { Task } from '@/types/tarkov';
   // The parent card already tracks this task's state; it passes it in instead of recomputing it.
   const props = defineProps<{
-    task: Pick<Task, 'availableDelaySecondsMax' | 'availableDelaySecondsMin'>;
+    task: Pick<
+      Task,
+      'id' | 'taskRequirements' | 'availableDelaySecondsMax' | 'availableDelaySecondsMin'
+    >;
     isComplete: boolean;
     isFailed: boolean;
   }>();
@@ -26,10 +30,20 @@
   const gate = computed(() =>
     props.isComplete || props.isFailed ? null : resolveTaskTimeGate(props.task)
   );
+  const afterAcceptance = computed(() => Boolean(strictAcceptancePredecessor(props.task)));
+  const tooltipKey = computed(() =>
+    afterAcceptance.value
+      ? 'page.tasks.questcard.time_gate_acceptance_tooltip'
+      : 'page.tasks.questcard.time_gate_tooltip'
+  );
   const label = computed(() => {
     if (!gate.value) return '';
     const min = duration(gate.value.min);
     const max = duration(gate.value.max);
+    if (afterAcceptance.value && min === max)
+      return t('page.tasks.questcard.time_gate_acceptance', { duration: max });
+    if (afterAcceptance.value)
+      return t('page.tasks.questcard.time_gate_acceptance_range', { min, max });
     if (min === max) return t('page.tasks.questcard.time_gate', { duration: max });
     return t('page.tasks.questcard.time_gate_range', { min, max });
   });

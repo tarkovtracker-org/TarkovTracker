@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, rename, rm, rmdir, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
+import { joinChunks } from '@/utils/stashScan/core/byteChunks';
 import type { ScanCatalog } from '@/utils/stashScan/types';
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 /** Hold from the first cache/shard write through manifest publication and pruning. */
@@ -40,15 +41,6 @@ export async function writeScanAsset(
     await rm(temporary, { force: true });
   }
 }
-function joinImageChunks(chunks: Uint8Array[], length: number): Uint8Array {
-  const result = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return result;
-}
 async function boundedImage(response: Response): Promise<Uint8Array> {
   if (!response.body) throw new Error('Missing grid image body');
   const reader = response.body.getReader();
@@ -65,7 +57,7 @@ async function readImageChunks(
   let length = 0;
   for (;;) {
     const next = await reader.read();
-    if (next.done) return joinImageChunks(chunks, length);
+    if (next.done) return joinChunks(chunks, length);
     length += next.value.length;
     if (length > MAX_IMAGE_BYTES) throw new Error('Oversized grid image');
     chunks.push(next.value);

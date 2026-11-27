@@ -417,7 +417,7 @@ four-character suffix. Switching accounts resets version and data selection to t
 
 ### EFT log import resource budgets
 
-`app/utils/eftLogImportBudget.ts` caps a selection at 1 GiB supported input, 1 GiB actual expanded bytes, 100,000 evidence items, 16 Mi UTF-16 evidence characters, 8,192 files and archive entries, and 1 Mi UTF-16 characters in aggregate names. Count ignored entries and duplicate events and mode signals before retention. Charge expanded bytes before decoding and copy retained strings to release decoded batches.
+`app/utils/eftLogImportBudget.ts` caps a selection at 1 GiB supported input, 1 GiB actual expanded bytes, 100,000 evidence items, 16 Mi UTF-16 evidence characters, 8,192 files and archive entries, and 1 Mi UTF-16 characters in aggregate names. Count ignored entries and duplicate events and mode signals before retention. For loose-file selections, finish each session before reading the next, then reclaim evidence slots by keeping only mode transitions after combining all of its log channels. Keep the original source order for review. Archive and mixed selections retain the existing shared evidence accounting because later archive entries can add context to any session. Charge expanded bytes before decoding and copy retained strings to release decoded batches.
 
 Filesystem reads and decoded batches are 256 KiB, with 1 KiB compressed inflation slices and an independent 8 Mi-character unfinished-record ceiling. Yield after expanded batches and check cancellation between slices. Ignore unsupported entries without inflating them. An exceeded budget aborts the whole selection without a partial preview or progress write. Retry with fewer sessions or only relevant files.
 

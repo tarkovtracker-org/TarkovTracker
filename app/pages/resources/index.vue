@@ -35,34 +35,28 @@
             v-for="filter in categoryFilters"
             :key="filter.id"
             size="md"
-            :color="activeCategory === filter.id ? 'primary' : 'neutral'"
-            :variant="activeCategory === filter.id ? 'solid' : 'soft'"
-            :aria-pressed="activeCategory === filter.id"
-            :class="[
-              'min-h-9 px-4',
-              activeCategory === filter.id
-                ? 'ring-primary-400/40 ring-1'
-                : 'text-surface-200 light:hover:text-surface-50 hover:text-white',
-            ]"
-            :label="filter.label"
-            @click="activeCategory = filter.id"
-          />
+            :color="filter.color"
+            :variant="filter.variant"
+            :aria-pressed="filter.isActive"
+            :class="filter.buttonClass"
+            class="max-w-full"
+            @click="setActiveCategory(filter.id)"
+          >
+            <span class="min-w-0 text-left wrap-anywhere whitespace-normal">
+              {{ filter.buttonLabel }}
+            </span>
+          </UButton>
         </div>
         <p v-if="isSearching" class="text-surface-400 text-sm" aria-live="polite">
-          {{
-            filteredResources.length === 1
-              ? t('page.resources.results_count_one', '1 resource found')
-              : t(
-                  'page.resources.results_count',
-                  { count: filteredResources.length },
-                  `${filteredResources.length} resources found`
-                )
-          }}
+          {{ resultsCountLabel }}
         </p>
       </div>
       <div v-if="visibleSections.length" class="space-y-8">
         <section v-for="section in visibleSections" :key="section.category" class="space-y-2.5">
-          <h2 class="text-primary-300/90 text-xs font-semibold tracking-[0.25em] uppercase">
+          <h2
+            v-if="showSectionHeaders"
+            class="text-primary-300/90 text-xs font-semibold tracking-[0.25em] uppercase"
+          >
             {{ section.label }}
             <span class="text-surface-500 ml-2 tracking-normal normal-case">
               · {{ section.resources.length }}
@@ -136,6 +130,7 @@
   import ResourceCard from '@/features/resources/ResourceCard.vue';
   import {
     CATEGORY_LABEL_FALLBACKS,
+    isResourceCategory,
     matchesResourceSearch,
     RESOURCE_CATEGORIES,
     RESOURCES,
@@ -144,23 +139,61 @@
   } from '@/features/resources/resourceData';
   type CategoryFilterId = 'all' | ResourceCategory;
   const { t } = useI18n({ useScope: 'global' });
+  const route = useRoute();
+  const router = useRouter();
   definePageMeta({ layout: 'default' });
   const searchInputId = useId();
   const searchQuery = ref('');
-  const activeCategory = ref<CategoryFilterId>('all');
+  const resolveCategoryFromQuery = (value: unknown): CategoryFilterId => {
+    const raw = Array.isArray(value) ? value[0] : value;
+    return isResourceCategory(raw) ? raw : 'all';
+  };
+  // The prerendered hub always contains all categories. Read the URL after hydration.
+  const canReadCategory = ref(false);
+  onMounted(() => {
+    canReadCategory.value = true;
+  });
+  const activeCategory = computed(() =>
+    canReadCategory.value ? resolveCategoryFromQuery(route.query.category) : 'all'
+  );
+  const setActiveCategory = (category: CategoryFilterId) => {
+    const query = { ...route.query };
+    if (category === 'all') {
+      delete query.category;
+    } else {
+      query.category = category;
+    }
+    void router.replace({ query, hash: route.hash });
+  };
   const isSearching = computed(() => searchQuery.value.trim().length > 0);
   const filterGroupLabel = computed(() =>
     t('page.resources.filter_label', 'Filter resources by category')
   );
+  const toFilterOption = (id: CategoryFilterId, label: string, count: number) => {
+    const isActive = activeCategory.value === id;
+    return {
+      id,
+      isActive,
+      color: (isActive ? 'primary' : 'neutral') as 'primary' | 'neutral',
+      variant: (isActive ? 'solid' : 'soft') as 'solid' | 'soft',
+      buttonClass: [
+        'min-h-9 px-4',
+        isActive
+          ? 'ring-primary-400/40 ring-1'
+          : 'text-surface-200 light:hover:text-surface-50 hover:text-white',
+      ],
+      buttonLabel: `${label} (${count})`,
+    };
+  };
   const categoryFilters = computed(() => [
-    {
-      id: 'all' as const,
-      label: t('common.all', 'All'),
-    },
-    ...RESOURCE_CATEGORIES.map((category) => ({
-      id: category,
-      label: t(`page.resources.categories.${category}`, CATEGORY_LABEL_FALLBACKS[category]),
-    })),
+    toFilterOption('all', t('common.all', 'All'), RESOURCES.length),
+    ...RESOURCE_CATEGORIES.map((category) =>
+      toFilterOption(
+        category,
+        t(`page.resources.categories.${category}`, CATEGORY_LABEL_FALLBACKS[category]),
+        RESOURCES.filter((resource) => resource.category === category).length
+      )
+    ),
   ]);
   const getResourceName = (resource: Resource) =>
     t(`page.resources.items.${resource.slug}.name`, resource.slug);
@@ -183,7 +216,17 @@
       )
     );
   });
+  const resultsCountLabel = computed(() =>
+    filteredResources.value.length === 1
+      ? t('page.resources.results_count_one', '1 resource found')
+      : t(
+          'page.resources.results_count',
+          { count: filteredResources.value.length },
+          `${filteredResources.value.length} resources found`
+        )
+  );
   const showCategoryBadges = computed(() => isSearching.value);
+  const showSectionHeaders = computed(() => activeCategory.value === 'all');
   const visibleSections = computed(() => {
     const categories =
       activeCategory.value === 'all' ? RESOURCE_CATEGORIES : [activeCategory.value];
@@ -203,6 +246,6 @@
   });
   const clearFilters = () => {
     searchQuery.value = '';
-    activeCategory.value = 'all';
+    setActiveCategory('all');
   };
 </script>
