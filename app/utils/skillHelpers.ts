@@ -5,6 +5,18 @@ export const normalizeSkillToken = (value: string | null | undefined): string | 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 };
+/**
+ * Turns a game skill identifier such as `AimDrills` into a display name (`Aim Drills`).
+ * Uppercase runs stay together, so acronyms like `DMR` and `SMG` are not spaced out.
+ */
+export const formatSkillName = (skillName: string): string =>
+  skillName.replace(/([a-z])([A-Z])/g, '$1 $2');
+/**
+ * Returns the lowest required level the current level does not meet yet, or null when every
+ * requirement is met. Expects `requiredLevels` sorted ascending.
+ */
+export const getNextRequiredLevel = (requiredLevels: number[], level: number): number | null =>
+  requiredLevels.find((requiredLevel) => level < requiredLevel) ?? null;
 export const getCanonicalSkillKey = (
   skillName: string | null | undefined,
   skillId?: string | null
