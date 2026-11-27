@@ -15,6 +15,16 @@ describe('maps static data', () => {
       1.5, 128, 1.4, 130.5,
     ]);
   });
+  it('assigns every Icebreaker floor to one group with a valid default', () => {
+    const { tile } = mapsData.icebreaker;
+    const [main, engine] = tile.floorGroups;
+    expect(main?.floors).toHaveLength(11);
+    expect(engine?.floors).toHaveLength(5);
+    expect(tile.floorGroups.flatMap((group) => group.floors).sort()).toEqual(
+      [...tile.floors].sort()
+    );
+    for (const group of tile.floorGroups) expect(group.floors).toContain(group.defaultFloor);
+  });
   it('keeps reserve floor controls aligned with the shared SVG', () => {
     expect(mapsData.reserve.svg).toMatchObject({
       floors: ['Bunkers', 'Ground_Level'],

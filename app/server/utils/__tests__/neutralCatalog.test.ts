@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import bossSpawnPositions from '@/data/bossSpawnPositions.json';
 import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 import { buildCatalogStrings, buildNeutralCatalog } from '@/server/utils/neutralCatalog';
 import { bindOverlayLocaleTargets, parseNeutralOverlay } from '@/server/utils/neutralOverlay';
@@ -101,6 +102,87 @@ describe('neutral catalogs', () => {
       ],
     });
   });
+  it.each(['regular', 'pve', 'pvp-season'] as const)(
+    'fills only matching Icebreaker boss zones in the %s catalog',
+    async (mode) => {
+      const icebreaker = bossSpawnPositions['69af492a4819ea4ba10a69c5'];
+      const knightZone = { name: 'BotZoneMash_t1', chance: 0.6, positions: [] };
+      const upstreamPosition = { x: 8, y: 23.77, z: 35 };
+      const knight = { mob: 'bossKnight', spawnChance: 0.7, spawnLocations: [knightZone] };
+      const wedge = {
+        mob: 'bossWedge',
+        spawnChance: 1,
+        spawnLocations: [
+          { name: 'BotZoneRoomsThird', chance: 0.3, positions: [] },
+          { name: 'BotZoneRoomsThirdKitchen', chance: 0.7, positions: [] },
+          { name: 'BotZoneRoomsThirdKitchen', positions: [upstreamPosition, { x: 'bad' }] },
+          knightZone,
+          { name: 'constructor', positions: [] },
+        ],
+      };
+      const options = upstream({
+        [`https://json.tarkov.dev/${mode}/tasks`]: {
+          data: { tasks: [{ id: 'task', name: 'Task' }] },
+        },
+        [`https://json.tarkov.dev/${mode}/traders`]: {
+          data: [{ id: 'trader', name: 'Trader' }],
+        },
+        [`https://json.tarkov.dev/${mode}/maps`]: {
+          data: {
+            maps: {
+              icebreaker: {
+                id: '69af492a4819ea4ba10a69c5',
+                name: 'Icebreaker',
+                bosses: [knight, wedge],
+              },
+              another: { id: 'another', name: 'Another map', bosses: [knight] },
+            },
+            mobs: { bossKnight: { name: 'Knight' }, bossWedge: { name: 'The Wedge' } },
+          },
+          translations: ['$.data.maps.*.bosses[*].spawnLocations[*].name'],
+        },
+      });
+      const catalog = await buildNeutralCatalog('tasks-core', mode, {
+        snapshot,
+        upstream: options,
+      });
+      expect(catalog.data).toMatchObject({
+        maps: [
+          {
+            id: '69af492a4819ea4ba10a69c5',
+            bossSpawns: [
+              {
+                name: 'Knight',
+                chance: 0.7,
+                locations: [
+                  {
+                    name: `@tt:${mode}:maps:BotZoneMash_t1`,
+                    chance: 0.6,
+                    positions: icebreaker.BotZoneMash_t1.positions,
+                  },
+                ],
+              },
+              {
+                name: 'The Wedge',
+                chance: 1,
+                locations: [
+                  { chance: 0.3, positions: icebreaker.BotZoneRoomsThird.positions },
+                  {
+                    chance: 0.7,
+                    positions: icebreaker.BotZoneRoomsThirdKitchen.positions,
+                  },
+                  { positions: [upstreamPosition] },
+                  { positions: [] },
+                  { positions: [] },
+                ],
+              },
+            ],
+          },
+          { id: 'another', bossSpawns: [{ locations: [{ positions: [] }] }] },
+        ],
+      });
+    }
+  );
   it('retains equipment lists and groups in the neutral objective snapshot', async () => {
     const payload = await buildNeutralCatalog('tasks-objectives', 'regular', {
       snapshot,

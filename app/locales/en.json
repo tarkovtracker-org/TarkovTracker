@@ -730,6 +730,11 @@
   },
   "maps": {
     "artwork_credit": "Map tiles by {name}",
+    "floor_groups": {
+      "label": "Deck group",
+      "main_decks": "Main Decks",
+      "engine_room": "Engine Room"
+    },
     "boss_spawns": {
       "raid_chance": "Configured spawn chance",
       "area_chance": "{name} · {chance} if spawned",

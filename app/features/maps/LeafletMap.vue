@@ -31,6 +31,7 @@
         <MapFloorControl
           v-if="hasMultipleFloors"
           :floors="floors"
+          :groups="floorGroups"
           :selected-floor="selectedFloor"
           @select="setFloor"
         />
@@ -819,6 +820,7 @@
     initialView: props.initialView ?? null,
     initialFloor: props.initialFloor,
   });
+  const floorGroups = computed(() => props.map.tile?.floorGroups);
   /** The floor named in copied coordinates, written as the floor panel shows it. */
   const coordinatesFloor = computed(() => selectedFloor.value.replace(/_/g, ' ') || null);
   /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */

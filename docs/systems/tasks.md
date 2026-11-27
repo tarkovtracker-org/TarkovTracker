@@ -298,7 +298,27 @@ fitted to the zoom-2 tile artwork using Tarkov.dev's spawn, loot, and lock posit
 against the helipad and 42 held-out boss positions at their published deck heights. All 42 project
 within 10 pixels of visible deck artwork at that zoom. Boss coordinates and configured chances
 come from the catalog. The chance is per spawn entry, including entries whose in-raid conditions
-are unspecified.
+are unspecified. The floor picker shows only the floors in the selected Main Decks or Engine Room
+group. Switching groups selects Infirmary or Engine Room, and the selected floor drives the artwork
+and pin elevation indicators. The groups follow [TarkovBOT's Icebreaker map](https://tarkovbot.eu/tools/interactive-maps/icebreaker).
+
+The catalog fills empty boss position lists only when the map ID, boss role, and raw zone name
+match a verified fallback. Tarkov.dev supplies the encounter rows, probabilities, and any
+available positions.
+
+On Icebreaker this covers Knight's Mash_t1 on Storage/Security and The Wedge's RoomsThird and
+RoomsThirdKitchen on Gym/Canteen. The positions come from the game-data import's
+unmodified bot spawn entries. All 12 project onto the visible artwork of their recorded decks.
+[Retail import provenance](https://github.com/danauraborealis/ManimalIcebreaker/blob/4effee7c5d0efa1943aa250c29ef031fe24a7c03/analysis/remap_retail_spawns.py#L36-L40)
+[Imported SpawnPointParams](https://github.com/danauraborealis/ManimalIcebreaker/blob/4effee7c5d0efa1943aa250c29ef031fe24a7c03/icebreaker-server/db/base.json#L1600-L3110)
+
+The other fallbacks cover Reshala at Dorms and New Gas on Customs, Sanitar at Pier and the
+Cultist Priest northeast of the Sunken Village on Shoreline, and the shared port spawn for
+Reshala, Glukhar, Killa, Sanitar, and Tagilla on Terminal. The 34 positions match retail bot
+spawn entries across game-mode captures. The pinned public archive corroborates their zone
+IDs and horizontal coordinates. Shoreline uses the elevations from the newer captures.
+[Retail location archive](https://github.com/carlsmei/tarkovdata/blob/08649f48a43fe8f4bea311b23a224a278a26492b/locations.json)
+
 The Lab (Dark), Infected Lab and Infected Factory reuse the backgrounds that Tarkov.dev declares
 for those variants. Each variant keeps its own boss rates, locations and extracts.
 
