@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { extractLanguageCode, useSafeLocale } from '@/composables/i18nHelpers';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import mapsData from '@/data/maps.json';
+import { resolveMergedBossSpawns } from '@/features/maps/utils/bossSpawnLocations';
 import {
   type FetchResponse,
   type FetchSuccess,
@@ -66,6 +67,7 @@ import {
   setCachedData,
 } from '@/utils/tarkovCache';
 import {
+  taskCoreCacheKey,
   TASK_OBJECTIVES_CACHE_VERSION,
   TASK_OBJECTIVES_PURGE_CHECK_TTL_MS,
 } from '@/utils/taskCatalogCache';
@@ -169,7 +171,6 @@ const ownsMetadataRequest = (
 const BOOTSTRAP_CACHE_VERSION = 'json-v2';
 /** Requests for language-independent data always use English to share one cache entry. */
 const ENGLISH_LANGUAGE_CODE = 'en';
-const TASKS_CORE_CACHE_VERSION = 'neutral-v1';
 const MAP_SPAWNS_CACHE_VERSION = 'neutral-v1';
 const ITEMS_CACHE_VERSION = 'neutral-v1';
 const TASK_REWARDS_CACHE_VERSION = 'neutral-v1';
@@ -824,10 +825,12 @@ export const useMetadataStore = defineStore('metadata', {
           // Check for unavailable before svg check (unavailable maps may not have svg)
           const unavailable = staticData?.unavailable;
           const extracts = resolveMergedMapExtracts(primaryMap.extracts, staticData?.extractsAdd);
+          const bossSpawns = resolveMergedBossSpawns(maps);
           if (staticData?.svg || staticData?.tile) {
             return {
               ...primaryMap,
               extracts,
+              bossSpawns,
               svg: staticData?.svg,
               tile: staticData?.tile,
               unavailable,
@@ -842,6 +845,7 @@ export const useMetadataStore = defineStore('metadata', {
           return {
             ...primaryMap,
             extracts,
+            bossSpawns,
             unavailable,
             mergedIds,
           };
@@ -1041,7 +1045,7 @@ export const useMetadataStore = defineStore('metadata', {
         const [tasksCore, hideout, prestige, editions] = await Promise.all([
           getCachedData<TarkovTasksCoreQueryResult>(
             'tasks-core' as CacheType,
-            `${TASKS_CORE_CACHE_VERSION}-${apiGameMode}`,
+            taskCoreCacheKey(apiGameMode),
             ENGLISH_LANGUAGE_CODE
           ),
           getCachedData<TarkovHideoutQueryResult>(
@@ -1595,7 +1599,7 @@ export const useMetadataStore = defineStore('metadata', {
       const requestKey = `${requestLanguage}-${requestGameMode}`;
       await this.fetchWithCache<TarkovTasksCoreQueryResult>({
         cacheType: 'tasks-core' as CacheType,
-        cacheKey: `${TASKS_CORE_CACHE_VERSION}-${requestGameMode}`,
+        cacheKey: taskCoreCacheKey(requestGameMode),
         cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/tasks-core',
         queryParams: { gameMode: requestGameMode },

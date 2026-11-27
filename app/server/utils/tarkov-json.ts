@@ -1,5 +1,6 @@
 import { $fetch } from 'ofetch';
 import { useRuntimeConfig } from '#imports';
+import { projectBossSpawns } from '@/server/utils/bossSpawnProjection';
 import { createLogger } from '@/server/utils/logger';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
 import { toTrustedGameLinkUrl } from '@/utils/externalUrl';
@@ -110,6 +111,7 @@ export type JsonTasksPayload = {
 };
 type JsonMapsPayload = {
   maps?: unknown;
+  mobs?: unknown;
 };
 type AdapterContext = {
   itemsById?: Map<string, JsonRecord>;
@@ -798,9 +800,10 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
     factionName: typeof raw.factionName === 'string' ? raw.factionName : undefined,
   }) as Task;
 }
-function adaptMap(raw: JsonRecord): TarkovMap {
+function adaptMap(raw: JsonRecord, mobs: unknown): TarkovMap {
   return compactObject({
     ...raw,
+    bossSpawns: projectBossSpawns(raw.bosses, mobs),
     id: stringId(raw) ?? '',
     name: typeof raw.name === 'string' ? raw.name : '',
   }) as TarkovMap;
@@ -1033,7 +1036,7 @@ export function adaptTasksCoreResponse(
   return {
     data: {
       tasks: toRecordArray(tasksPayload.tasks).map((task) => adaptTaskCore(task, context)),
-      maps: toRecordArray(mapsPayload.maps).map(adaptMap),
+      maps: toRecordArray(mapsPayload.maps).map((map) => adaptMap(map, mapsPayload.mobs)),
       traders: toRecordArray(tradersPayload).map(adaptTrader),
     },
   };

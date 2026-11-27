@@ -32,6 +32,75 @@ const upstream = (responses: Record<string, unknown>): TarkovJsonOptions => ({
   },
 });
 describe('neutral catalogs', () => {
+  it('publishes localized boss entries without adding ordinary NPC waves or fabricated positions', async () => {
+    const position = { x: 1, y: 2, z: 3 };
+    const options = upstream({
+      'https://json.tarkov.dev/pve/tasks': { data: { tasks: [{ id: 'task', name: 'Task' }] } },
+      'https://json.tarkov.dev/pve/traders': { data: [{ id: 'trader', name: 'Trader' }] },
+      'https://json.tarkov.dev/pve/maps': {
+        data: {
+          maps: {
+            map: {
+              id: 'map',
+              name: 'Map',
+              bosses: [
+                {
+                  mob: 'bossBully',
+                  spawnChance: 0.6,
+                  spawnLocations: [
+                    { name: 'stronghold', chance: 0.33, positions: [position, { x: '4' }] },
+                    { name: 'dorms', chance: 0.33, positions: [] },
+                  ],
+                },
+                { mob: 'bossPartisan', spawnChance: 0, spawnLocations: [] },
+                { mob: 'bossBully', spawnChance: 1.5 },
+                { mob: 'PmcBot', spawnChance: 1 },
+              ],
+            },
+          },
+          mobs: {
+            bossBully: { name: 'reshala' },
+            bossPartisan: { name: 'partisan' },
+            PmcBot: { name: 'raider' },
+          },
+        },
+        translations: ['$.data.maps.*.bosses[*].spawnLocations[*].name', '$.data.mobs.*.name'],
+      },
+      'https://json.tarkov.dev/pve/maps_en': {
+        data: {
+          reshala: 'Reshala',
+          partisan: 'Partisan',
+          stronghold: 'Stronghold',
+          dorms: 'Dorms',
+        },
+      },
+      'https://json.tarkov.dev/pve/maps_de': {
+        data: { stronghold: 'Festung', dorms: 'Wohnheim' },
+      },
+    });
+    const core = await buildNeutralCatalog('tasks-core', 'pve', { snapshot, upstream: options });
+    const strings = await buildCatalogStrings('de', collectGameDataStrings(core.data), {
+      snapshot,
+      upstream: options,
+    });
+    expect(localizeGameData(core, strings.data.strings).data).toMatchObject({
+      maps: [
+        {
+          bossSpawns: [
+            {
+              name: 'Reshala',
+              chance: 0.6,
+              locations: [
+                { name: 'Festung', chance: 0.33, positions: [position] },
+                { name: 'Wohnheim', chance: 0.33, positions: [] },
+              ],
+            },
+            { name: 'Partisan', chance: 0, locations: [] },
+          ],
+        },
+      ],
+    });
+  });
   it('retains equipment lists and groups in the neutral objective snapshot', async () => {
     const payload = await buildNeutralCatalog('tasks-objectives', 'regular', {
       snapshot,

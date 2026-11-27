@@ -54,6 +54,7 @@ export interface UseLeafletMapReturn {
   spawnLayer: ShallowRef<L.LayerGroup | null>;
   /** Transit location markers layer group */
   transitLayer: ShallowRef<L.LayerGroup | null>;
+  bossLayer: ShallowRef<L.LayerGroup | null>;
   /** Set the current floor */
   setFloor: (floor: string) => void;
   /** Zoom at which the whole map fits the container, or null before the map exists */
@@ -227,6 +228,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   const extractLayer = shallowRef<L.LayerGroup | null>(null);
   const spawnLayer = shallowRef<L.LayerGroup | null>(null);
   const transitLayer = shallowRef<L.LayerGroup | null>(null);
+  const bossLayer = shallowRef<L.LayerGroup | null>(null);
   const crsKey = ref('');
   const renderKey = ref('');
   let hasAppliedInitialView = false;
@@ -830,6 +832,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
       extractLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       spawnLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       transitLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
+      bossLayer.value = leaflet.value.layerGroup().addTo(mapInstance.value);
       // Setup idle detection
       if (enableIdleDetection && mapInstance.value) {
         mapInstance.value.on('movestart', resetIdleTimer);
@@ -913,6 +916,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
   /** Clear every marker group while retaining the map and its background. */
   function clearMarkers(): void {
     transitLayer.value?.clearLayers();
+    bossLayer.value?.clearLayers();
     if (objectiveLayer.value) {
       objectiveLayer.value.clearLayers();
     }
@@ -949,6 +953,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     extractLayer.value = null;
     spawnLayer.value = null;
     transitLayer.value = null;
+    bossLayer.value = null;
     fittedView = null;
     leaflet.value = null;
   }
@@ -1029,6 +1034,7 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     extractLayer,
     spawnLayer,
     transitLayer,
+    bossLayer,
     setFloor,
     refreshView,
     getFitZoom,

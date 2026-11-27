@@ -12,6 +12,7 @@ import {
 } from '@/utils/metadataLocalization';
 import { ensureTarkovAccess, getTarkovAccessState } from '@/utils/tarkovApiFetch';
 import { CACHE_CONFIG, getCachedData, setCachedData, type CacheType } from '@/utils/tarkovCache';
+import { taskCoreCacheKey } from '@/utils/taskCatalogCache';
 import { dedupeTaskObjectiveIds, normalizeTaskObjectives } from '@/utils/taskNormalization';
 import type {
   Task,
@@ -136,8 +137,11 @@ const cacheableProfileCatalog = (type: CacheType, value: unknown): boolean => {
   return validate(value as Record<string, unknown>);
 };
 type MetadataOwner = ReturnType<typeof useMetadataStore>;
-const profileCacheKey = (owner: MetadataOwner, type: CacheType, mode: string) =>
-  type === 'tasks-objectives' ? owner.getObjectiveCatalogCacheKey(mode) : `neutral-v1-${mode}`;
+const profileCacheKey = (owner: MetadataOwner, type: CacheType, mode: string) => {
+  if (type === 'tasks-objectives') return owner.getObjectiveCatalogCacheKey(mode);
+  if (type === 'tasks-core') return taskCoreCacheKey(mode);
+  return `neutral-v1-${mode}`;
+};
 const fetchProfileCatalog = async <T>(
   owner: MetadataOwner,
   context: { type: CacheType; mode: string; signal: AbortSignal },

@@ -45,7 +45,7 @@ the official provisional values change.
 | Endpoint                           | Scope            | Content                                                  |
 | ---------------------------------- | ---------------- | -------------------------------------------------------- |
 | `/api/tarkov/bootstrap`            | mode             | Player levels                                            |
-| `/api/tarkov/tasks-core`           | mode             | Tasks, maps, traders                                     |
+| `/api/tarkov/tasks-core`           | mode             | Tasks, maps (including boss spawns), traders             |
 | `/api/tarkov/tasks-objectives`     | mode             | Task objectives                                          |
 | `/api/tarkov/tasks-rewards`        | mode             | Task rewards                                             |
 | `/api/tarkov/hideout`              | mode             | Stations and crafts                                      |
