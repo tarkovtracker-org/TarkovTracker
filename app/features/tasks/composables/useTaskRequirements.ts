@@ -15,7 +15,11 @@ import {
   type RequirementCurrentStatus,
   type RequirementExpectedStatus,
 } from '@/features/tasks/task-requirement-helpers';
-import { hasStoryUnlockProgress, type TaskBlocker } from '@/stores/taskAvailability';
+import {
+  hasStoryUnlockProgress,
+  strictAcceptanceBlocker,
+  type TaskBlocker,
+} from '@/stores/taskAvailability';
 import { taskServerGateBlockers } from '@/stores/taskServerGates';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
@@ -65,6 +69,8 @@ const SUMMARY_FROM_TASK_DATA = new Set<TaskBlocker['type']>([
   'trader_level',
   'trader_reputation',
   'prerequisite',
+  'task_acceptance',
+  'task_acceptance_closed',
 ]);
 const groupStatusesByTask = (requirements: TaskRequirement[]): Map<string, StatusLists> => {
   const groups = new Map<string, StatusLists>();
@@ -332,6 +338,23 @@ export const useTaskRequirements = (task: () => Task) => {
     [...groupStatusesByTask(task().taskRequirements ?? [])]
       .filter(([id]) => id !== strictAcceptancePredecessor(task()))
       .map(([id, lists]) => taskRow(id, lists, unmetStatusLists(id, lists).length === 0));
+  const acceptanceSummary = (): TaskRequirementRow[] => {
+    const id = strictAcceptancePredecessor(task());
+    if (!id) return [];
+    const blocker = strictAcceptanceBlocker(task(), id, {
+      completions: completions.value,
+      confirmations: progressData.value.taskAvailability,
+    });
+    if (blocker) return otherRows(blocker);
+    return [
+      {
+        kind: 'task',
+        met: true,
+        label: t('page.tasks.requirements.task_accepted', { task: taskName(id) }),
+        to: `/tasks?task=${id}`,
+      },
+    ];
+  };
   const storySummary = (): TaskRequirementRow[] => {
     const chapters = task().storyUnlocks ?? [];
     if (!chapters.length) return [];
@@ -405,6 +428,7 @@ export const useTaskRequirements = (task: () => Task) => {
     ...levelSummary(),
     ...traderSummary(),
     ...taskSummary(),
+    ...acceptanceSummary(),
     ...storySummary(),
     ...metOtherSummary(),
     ...otherSummary(),

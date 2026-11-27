@@ -862,7 +862,7 @@
     return isAvailabilityConfirmed(
       progress.taskAvailability?.[props.task.id],
       progress.taskCompletions?.[props.task.id],
-      otherRequirementsSignature(props.task)
+      otherRequirementsSignature(props.task, progress.taskCompletions)
     );
   });
   const openTaskContextMenu = (event: MouseEvent) => {

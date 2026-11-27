@@ -1,5 +1,9 @@
 import { TASK_ID_REGISTRY } from '@/utils/constants';
-import { isAvailabilityConfirmed } from '@/utils/taskAvailabilityConfirmation';
+import {
+  hasUnconfirmableStatusClock,
+  isAvailabilityConfirmed,
+  taskStatusTimestamp,
+} from '@/utils/taskAvailabilityConfirmation';
 import { isTaskActive, isTaskComplete, isTaskFailed } from '@/utils/taskStatus';
 import type { TaskAvailabilityTeamData } from '@/stores/taskAvailability';
 import type { Task } from '@/types/tarkov';
@@ -23,8 +27,15 @@ const isActiveOnly = (statuses: unknown): boolean =>
   );
 export const importedAcceptanceSignature = (taskId: string): string | undefined =>
   taskId === CUT_DOWN_TO_THE_ROOT ? JSON.stringify(['eft-start', taskId]) : undefined;
-export const manualAcceptanceGate = (task: Task): string[] =>
-  strictAcceptancePredecessor(task) ? ['in-game-acceptance', CUT_DOWN_TO_THE_ROOT] : [];
+/** Bind the observation to the predecessor revision this device actually saw. */
+export const manualAcceptanceGate = (
+  task: Task,
+  completions?: TaskAvailabilityTeamData['completions']
+) => {
+  const predecessor = strictAcceptancePredecessor(task);
+  if (!predecessor) return undefined;
+  return ['in-game-acceptance', predecessor, taskStatusTimestamp(completions?.[predecessor])];
+};
 type AcceptanceData = Pick<TaskAvailabilityTeamData, 'completions' | 'confirmations'>;
 export const acceptanceBranchClosed = (taskId: string, data: AcceptanceData): boolean =>
   isTaskComplete(data.completions[taskId]) || isTaskFailed(data.completions[taskId]);
@@ -35,7 +46,7 @@ export const hasImportedAcceptance = (taskId: string, data: AcceptanceData): boo
     data.completions[taskId],
     importedAcceptanceSignature(taskId)
   );
-/** A newer reset or terminal state of either quest invalidates manual confirmation. */
+/** The signature retires on a predecessor change even when its clock lags behind. */
 export const hasManualAcceptance = (
   taskId: string,
   predecessor: string,
@@ -45,6 +56,6 @@ export const hasManualAcceptance = (
   const confirmation = data.confirmations?.[taskId];
   return (
     isAvailabilityConfirmed(confirmation, data.completions[taskId], signature) &&
-    isAvailabilityConfirmed(confirmation, data.completions[predecessor], signature)
+    !hasUnconfirmableStatusClock(data.completions[predecessor])
   );
 };

@@ -162,7 +162,7 @@ describe('useTaskActions', () => {
     actions.markTaskAvailable();
     expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledExactlyOnceWith(
       task.id,
-      JSON.stringify([['in-game-acceptance', jaeger]])
+      JSON.stringify([['in-game-acceptance', jaeger, 0]])
     );
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
     expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();

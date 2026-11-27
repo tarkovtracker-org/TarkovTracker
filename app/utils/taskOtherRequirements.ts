@@ -8,6 +8,7 @@ import type {
   TaskProgressionPool,
   RequirementComparison,
 } from '@/types/tarkov';
+import type { RawTaskCompletion } from '@/utils/taskStatus';
 const comparisons = new Set(['>=', '>', '<=', '<', '=', '==', '!=']);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -133,12 +134,15 @@ export const hasUnsupportedOtherRequirement = (task: Task): boolean =>
   normalizeOtherRequirements(task.otherRequirements).some(
     (requirement) => requirement.type === 'unknown'
   );
-export const otherRequirementsSignature = (task: Task): string | undefined => {
+export const otherRequirementsSignature = (
+  task: Task,
+  completions?: Readonly<Record<string, RawTaskCompletion>>
+): string | undefined => {
   const requirements = normalizeOtherRequirements(task.otherRequirements);
   if (requirements.some((requirement) => requirement.type === 'unknown')) return undefined;
   const confirmable: unknown[] = requirements.filter(isConfirmable).map(withoutProgressionMetadata);
-  const acceptance = manualAcceptanceGate(task);
-  if (acceptance.length) confirmable.push(acceptance);
+  const acceptance = manualAcceptanceGate(task, completions);
+  if (acceptance) confirmable.push(acceptance);
   return confirmable.length ? JSON.stringify(confirmable) : undefined;
 };
 /** Story objectives a task's overlay gates name, for Mark available to record. */

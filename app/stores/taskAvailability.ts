@@ -90,6 +90,17 @@ const result = (blockers: TaskBlocker[]): TaskAvailabilityResult => ({
   available: blockers.length === 0,
   blockers,
 });
+export const strictAcceptanceBlocker = (
+  task: Task,
+  taskId: string,
+  data: Pick<TaskAvailabilityTeamData, 'completions' | 'confirmations'>
+): TaskBlocker | undefined => {
+  if (acceptanceBranchClosed(taskId, data)) return { type: 'task_acceptance_closed', taskId };
+  if (hasImportedAcceptance(taskId, data)) return undefined;
+  const signature = otherRequirementsSignature(task, data.completions);
+  if (hasManualAcceptance(task.id, taskId, data, signature)) return undefined;
+  return { type: 'task_acceptance', taskId };
+};
 const KNOWN_STATUSES = new Set(['complete', 'completed', 'failed', 'active', 'accept', 'accepted']);
 const requirementStatuses = (requirement: TaskRequirement): unknown[] => {
   if (Array.isArray(requirement.status)) return requirement.status;
@@ -222,21 +233,16 @@ const createTeamEvaluator = (
     if (isTaskActive(completion) || isTaskComplete(completion)) return result([]);
     return evaluate(taskId, true);
   };
-  const acceptanceResult = (task: Task, taskId: string): TaskAvailabilityResult => {
-    if (acceptanceBranchClosed(taskId, data))
-      return result([{ type: 'task_acceptance_closed', taskId }]);
-    if (hasImportedAcceptance(taskId, data)) return result([]);
-    if (hasManualAcceptance(task.id, taskId, data, otherRequirementsSignature(task)))
-      return result([]);
-    return result([{ type: 'task_acceptance', taskId }]);
-  };
   const requiredTaskResult = (task: Task, requirement: TaskRequirement): TaskAvailabilityResult => {
     const taskId = requirement.task.id;
     const completion = data.completions[taskId];
     const statuses = normalizeStatuses(requirement);
     if (!tasksById.has(taskId)) return missingTaskResult(taskId);
     if (terminalStatusMet(statuses, completion)) return result([]);
-    if (taskId === strictAcceptancePredecessor(task)) return acceptanceResult(task, taskId);
+    if (taskId === strictAcceptancePredecessor(task)) {
+      const blocker = strictAcceptanceBlocker(task, taskId, data);
+      return result(blocker ? [blocker] : []);
+    }
     return acceptsActive(statuses)
       ? activeRequirementResult(taskId, completion)
       : result([{ type: 'prerequisite' }]);

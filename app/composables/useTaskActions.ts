@@ -249,7 +249,8 @@ export function useTaskActions(
     currentEvaluation(taskId)?.blockers.flatMap((blocker) =>
       blocker.type === 'prerequisite' ? (blocker.requirements ?? []) : []
     );
-  const taskCompletion = (id: string) => tarkovStore.getCurrentProgressData().taskCompletions?.[id];
+  const taskCompletions = () => tarkovStore.getCurrentProgressData().taskCompletions;
+  const taskCompletion = (id: string) => taskCompletions()?.[id];
   /** Any completed objective in a story-unlock chapter opens the route, including gates Mark available records. */
   const recordsStoryUnlock = (currentTask: Task, chapterId: string) =>
     storyObjectiveRequirements(currentTask).some((gate) => gate.storyChapter.id === chapterId);
@@ -270,8 +271,7 @@ export function useTaskActions(
     );
   const acceptanceClockAllowsConfirmation = (currentTask: Task): boolean => {
     const predecessor = strictAcceptancePredecessor(currentTask);
-    const timestamp = predecessor ? taskCompletion(predecessor)?.timestamp : undefined;
-    return timestamp === undefined || timestamp <= Date.now();
+    return !predecessor || !hasUnconfirmableStatusClock(taskCompletion(predecessor));
   };
   /**
    * Mark available must either make the task available or change nothing: an unsupported server
@@ -284,7 +284,7 @@ export function useTaskActions(
     const gatesConfirmable =
       !hasUnsupportedOtherRequirement(currentTask) &&
       !(
-        otherRequirementsSignature(currentTask) &&
+        otherRequirementsSignature(currentTask, taskCompletions()) &&
         hasUnconfirmableStatusClock(taskCompletion(currentTask.id))
       );
     return (
@@ -303,7 +303,6 @@ export function useTaskActions(
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     if (!canMarkTaskAvailable(currentTask)) return;
-    const requirements = otherRequirementsSignature(currentTask);
     applyTaskAvailabilityRequirements({
       getCompletion: taskCompletion,
       skipTaskRequirements: storyRouteSatisfied(currentTask),
@@ -314,6 +313,7 @@ export function useTaskActions(
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     ensureTraderRequirements(currentTask);
     recordImpliedStoryObjectives(tarkovStore, currentTask);
+    const requirements = otherRequirementsSignature(currentTask, taskCompletions());
     if (requirements) tarkovStore.confirmTaskAvailability(currentTask.id, requirements);
     emitAction({
       taskId: currentTask.id,

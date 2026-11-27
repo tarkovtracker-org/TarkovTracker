@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { actions, defaultState } from '@/stores/progressState';
+import { mergeProgressData } from '@/stores/tarkov/progressMerge';
 import {
   buildTaskEvaluations,
   type TaskAvailabilityTeamData,
@@ -50,7 +52,10 @@ describe('Shifting Balance acceptance', () => {
   };
   const incomplete = { complete: false, failed: false, timestamp: 100 };
   const imported = { requirements: importedAcceptanceSignature(jaeger.id)!, timestamp: 100 };
-  const confirmed = { requirements: otherRequirementsSignature(lightkeeper)!, timestamp: 100 };
+  const confirmed = {
+    requirements: otherRequirementsSignature(lightkeeper, { [jaeger.id]: incomplete })!,
+    timestamp: 100,
+  };
   it('does not interpret eligible or reset as accepted, without changing other quests', () => {
     const existing = { ...lightkeeper, id: 'existing-quest' };
     expect(evaluate(existing, data(), [jaeger]).available).toBe(true);
@@ -73,6 +78,53 @@ describe('Shifting Balance acceptance', () => {
       expect(run(101).available).toBe(false);
     }
   );
+  it.each([
+    ['confirmation first', 200],
+    ['reset first', 200],
+    ['confirmation first', 100],
+    ['reset first', 100],
+  ])('invalidates an unseen confirmation after sync (%s, reset clock %i)', (order, resetClock) => {
+    const baseline = structuredClone(defaultState);
+    baseline.pvp.taskCompletions[jaeger.id] = { ...incomplete };
+    const fast = structuredClone(baseline);
+    const slow = structuredClone(baseline);
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(10_000);
+      actions.confirmTaskAvailability.call(
+        fast,
+        lightkeeper.id,
+        otherRequirementsSignature(lightkeeper, fast.pvp.taskCompletions)!
+      );
+      vi.setSystemTime(resetClock);
+      actions.setTaskUncompleted.call(slow, jaeger.id);
+      const available = (progress: typeof fast.pvp) =>
+        evaluate(
+          lightkeeper,
+          data({ completions: progress.taskCompletions, confirmations: progress.taskAvailability }),
+          [jaeger]
+        ).available;
+      expect(available(fast.pvp)).toBe(true);
+      expect(available(slow.pvp)).toBe(false);
+      const ordered = order === 'confirmation first' ? [fast.pvp, slow.pvp] : [slow.pvp, fast.pvp];
+      const firstSync = mergeProgressData(baseline.pvp, ordered[0]);
+      expect(available(firstSync)).toBe(order === 'confirmation first');
+      const merged = mergeProgressData(firstSync, ordered[1]);
+      expect(merged.taskCompletions[jaeger.id]?.timestamp).toBe(Math.max(101, resetClock));
+      expect(merged.taskAvailability?.[lightkeeper.id]?.timestamp).toBe(10_000);
+      expect(available(merged)).toBe(false);
+      slow.pvp = merged;
+      actions.confirmTaskAvailability.call(
+        slow,
+        lightkeeper.id,
+        otherRequirementsSignature(lightkeeper, slow.pvp.taskCompletions)!
+      );
+      expect(available(mergeProgressData(fast.pvp, slow.pvp))).toBe(true);
+      expect(available(mergeProgressData(slow.pvp, fast.pvp))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it.each([{ complete: true }, { failed: true }])(
     'cannot bypass a closed branch: %j',
     (completion) => {

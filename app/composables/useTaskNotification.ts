@@ -167,7 +167,8 @@ export function useTaskNotification(): TaskNotificationReturn {
     return provesStartGates(
       task,
       data?.taskCompletions?.[task.id],
-      data?.taskAvailability?.[task.id]
+      data?.taskAvailability?.[task.id],
+      data?.taskCompletions
     );
   };
   /** Register a reversible action in the global undo store for actions we can revert. */

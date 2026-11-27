@@ -1466,6 +1466,7 @@
         "unknown": "Unknown requirement",
         "cycle": "Prerequisite loop",
         "task": "{action} {task}",
+        "task_accepted": "Accepted {task}",
         "you": "you: {value}",
         "story_alternative": "Or progress a story chapter: {chapters}",
         "met": "Met",

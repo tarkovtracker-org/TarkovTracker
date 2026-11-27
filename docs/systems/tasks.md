@@ -189,8 +189,9 @@ either terminal outcome. A story route permits **independent gates AND (quest pr
 OR recorded progress in an explicitly wired chapter)**. Chapter order never grants access.
 For Preserve a Valuable Piece, eligibility alone does not prove Cut Down to the Root was
 accepted. An imported EFT start or explicit in-game availability confirmation is required;
-a reset is not acceptance, and a terminal Jaeger status cannot be bypassed. The five-second
-game delay is informational because the tracker does not have an authoritative acceptance clock.
+a reset invalidates the confirmation even when the reset device runs behind. A terminal Jaeger
+status closes the route. The five-second game delay is informational because the tracker does
+not have an authoritative acceptance clock.
 Other active prerequisites retain their existing planning behavior.
 
 Eligibility and caches use the selected mode. An isolated profile uses its own metadata and
