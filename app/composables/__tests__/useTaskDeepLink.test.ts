@@ -333,6 +333,33 @@ describe('useTaskDeepLink', () => {
     expect(taskDeepLink.pinnedTaskId.value).toBe('teammate-active');
     taskDeepLink.cleanup();
   });
+  it('focuses a task active for a teammate when the team aggregate was filtered to locked', async () => {
+    metadataTasks.value = [{ id: 'teammate-active', name: 'Active for teammate' }];
+    preferenceState.taskUserView = 'all';
+    preferenceState.taskSecondaryView = 'locked';
+    applyRouteQuery({ task: 'teammate-active' });
+    const taskElement = document.createElement('div');
+    taskElement.id = 'task-teammate-active';
+    document.body.appendChild(taskElement);
+    const { matchesAllUsersView } = await import('@/utils/allUsersTaskStatus');
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const teammates = [
+      { teamId: 'self', isUnlocked: false, isActive: false, isCompleted: false, isFailed: false },
+      { teamId: 'teammate', isUnlocked: true, isActive: true, isCompleted: false, isFailed: false },
+    ];
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: computed(() => {
+        const status = preferenceState.taskSecondaryView as 'all' | 'active' | 'locked';
+        return status === 'all' || matchesAllUsersView(status, teammates, false)
+          ? metadataTasks.value
+          : [];
+      }),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(taskDeepLink.pinnedTaskId.value).toBe('teammate-active');
+    taskDeepLink.cleanup();
+  });
   it('keeps a legacy unlocked task in the available view when it has no active state', async () => {
     metadataTasks.value = [{ id: 'task-legacy-available', name: 'Legacy Task', requiredKeys: [] }];
     unlockedTasks.value = { 'task-legacy-available': { self: true } };

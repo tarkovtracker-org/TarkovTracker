@@ -50,10 +50,11 @@ export function useTaskDeepLink({
   const lightkeeperTraderId = computed(() => metadataStore.getTraderByName('lightkeeper')?.id);
   const linkedTaskStatus = (taskId: string) => {
     const userView = preferencesStore.getTaskUserView;
-    const teamId = userView === 'all' ? 'self' : userView;
-    const status = progressStore.getTaskStatus(teamId, taskId);
+    // Teammates may have different statuses, so the aggregate view must include every status.
+    if (userView === 'all') return 'all';
+    const status = progressStore.getTaskStatus(userView, taskId);
     if (status !== 'incomplete') return status;
-    return unlockedTasks.value[taskId]?.[teamId] ? 'available' : 'locked';
+    return unlockedTasks.value[taskId]?.[userView] ? 'available' : 'locked';
   };
   const highlightTask = (taskElement: HTMLElement) => {
     taskElement.classList.add(
