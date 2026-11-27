@@ -799,7 +799,7 @@ describe('useLeafletMap', () => {
       );
       wrapper.unmount();
     });
-    it('rebuilds the tile layer with the new floor path when switching floors', async () => {
+    it('preserves valid tiles after a tile error and can switch floors', async () => {
       const leafletModule = await import('leaflet');
       const tileLayerSpy = vi.spyOn(leafletModule.default, 'tileLayer');
       const mapData = {
@@ -822,7 +822,16 @@ describe('useLeafletMap', () => {
         },
       } as unknown as TarkovMap;
       const { result, wrapper } = await mountUseLeafletMap(mapData);
+      const tileError = mockTileLayer.on.mock.calls.findLast(
+        ([event]) => event === 'tileerror'
+      )?.[1];
+      expect(tileError).toBeTypeOf('function');
+      mockMapInstance.hasLayer.mockReturnValueOnce(true);
+      mockMapInstance.removeLayer.mockClear();
+      tileError?.({ type: 'tileerror' });
+      expect(mockMapInstance.removeLayer).not.toHaveBeenCalledWith(mockTileLayer);
       tileLayerSpy.mockClear();
+      mockTileLayer.off.mockClear();
       result.setFloor('Second_Level');
       await nextTick();
       await vi.advanceTimersByTimeAsync(1000);
@@ -832,6 +841,7 @@ describe('useLeafletMap', () => {
         'https://tiles.example.com/lab/2nd/{z}/{x}/{y}.png',
         expect.any(Object)
       );
+      expect(mockMapInstance.removeLayer).toHaveBeenCalledBefore(mockTileLayer.off);
       wrapper.unmount();
     });
   });

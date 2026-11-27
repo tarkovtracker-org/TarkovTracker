@@ -451,8 +451,9 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
     const leafletMap = mapInstance.value;
     if (!leafletMap) return;
     if (tileLayer.value) {
-      tileLayer.value.off();
       leafletMap.removeLayer(tileLayer.value);
+      // Leaflet unregisters its map listeners on the layer's remove event.
+      tileLayer.value.off();
       tileLayer.value = null;
     }
     try {
@@ -486,14 +487,8 @@ export function useLeafletMap(options: UseLeafletMapOptions): UseLeafletMapRetur
             attachTileErrorHandler(nextIndex);
             return;
           }
-          logger.error(`Tile layer failed for ${failedUrl}. No fallback URLs available.`, event);
+          // Sparse tile sets omit tiles outside the artwork. Keep the valid tiles and floor switching.
           layer.off('tileerror', handleTileError);
-          if (leafletMap.hasLayer(layer)) {
-            leafletMap.removeLayer(layer);
-          }
-          if (tileLayer.value === layer) {
-            tileLayer.value = null;
-          }
         };
         layer.on('tileerror', handleTileError);
       };

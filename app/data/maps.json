@@ -45,7 +45,60 @@
     }
   },
   "icebreaker": {
-    "unavailable": true
+    "tile": {
+      "tilePath": "https://assets.tarkov.dev/maps/icebreaker/06_infirmary/{z}/{x}/{y}.png",
+      "floorTilePaths": {
+        "Control Room": "https://assets.tarkov.dev/maps/icebreaker/00_control_room/{z}/{x}/{y}.png",
+        "Engine Room": "https://assets.tarkov.dev/maps/icebreaker/01_engine_room/{z}/{x}/{y}.png",
+        "Engine Room (upper)": "https://assets.tarkov.dev/maps/icebreaker/02_engine_room_upper/{z}/{x}/{y}.png",
+        "Fuel Pumps (lower)": "https://assets.tarkov.dev/maps/icebreaker/03_fuel_pumps_lower/{z}/{x}/{y}.png",
+        "Fuel Pumps": "https://assets.tarkov.dev/maps/icebreaker/04_fuel_pumps/{z}/{x}/{y}.png",
+        "Storage/Security": "https://assets.tarkov.dev/maps/icebreaker/05_storage_ecurity/{z}/{x}/{y}.png",
+        "Infirmary": "https://assets.tarkov.dev/maps/icebreaker/06_infirmary/{z}/{x}/{y}.png",
+        "Helipad": "https://assets.tarkov.dev/maps/icebreaker/07_helipad/{z}/{x}/{y}.png",
+        "Gym/Canteen": "https://assets.tarkov.dev/maps/icebreaker/08_gym-canteen/{z}/{x}/{y}.png",
+        "Accommodation (lower)": "https://assets.tarkov.dev/maps/icebreaker/09_accommodation_lower/{z}/{x}/{y}.png",
+        "Accommodation (mid)": "https://assets.tarkov.dev/maps/icebreaker/10_accommodation_mid/{z}/{x}/{y}.png",
+        "Accommodation (upper)": "https://assets.tarkov.dev/maps/icebreaker/11_accommodation_upper/{z}/{x}/{y}.png",
+        "Officers' Deck": "https://assets.tarkov.dev/maps/icebreaker/12_officers_deck/{z}/{x}/{y}.png",
+        "Stairs (blocked)": "https://assets.tarkov.dev/maps/icebreaker/13_stairs_blocked/{z}/{x}/{y}.png",
+        "Bridge": "https://assets.tarkov.dev/maps/icebreaker/14_bridge/{z}/{x}/{y}.png",
+        "Bridge Roof": "https://assets.tarkov.dev/maps/icebreaker/15_bridge_roof/{z}/{x}/{y}.png"
+      },
+      "floors": [
+        "Control Room",
+        "Engine Room",
+        "Engine Room (upper)",
+        "Fuel Pumps (lower)",
+        "Fuel Pumps",
+        "Storage/Security",
+        "Infirmary",
+        "Helipad",
+        "Gym/Canteen",
+        "Accommodation (lower)",
+        "Accommodation (mid)",
+        "Accommodation (upper)",
+        "Officers' Deck",
+        "Stairs (blocked)",
+        "Bridge",
+        "Bridge Roof"
+      ],
+      "defaultFloor": "Infirmary",
+      "coordinateRotation": 180,
+      "transform": [1.5, 128, 1.4, 130.5],
+      "bounds": [
+        [-22, -93],
+        [22, 90]
+      ],
+      "minZoom": 1,
+      "maxZoom": 5,
+      "tileSize": 256,
+      "elevationKey": "icebreaker",
+      "attribution": {
+        "name": "TarkovBOT.eu",
+        "url": "https://tarkovbot.eu/"
+      }
+    }
   },
   "interchange": {
     "svg": {
@@ -80,7 +133,8 @@
       ],
       "minZoom": 2,
       "maxZoom": 6,
-      "tileSize": 175
+      "tileSize": 175,
+      "elevationKey": "lab"
     }
   },
   "labyrinth": {

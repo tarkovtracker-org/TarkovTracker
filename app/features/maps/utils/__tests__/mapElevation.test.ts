@@ -132,8 +132,18 @@ describe('floor-relative elevation', () => {
     const labs = { id: 'lab', name: 'The Lab', tile: maps.lab.tile } as unknown as TarkovMap;
     expect(getMapFloorDelta(labs, 'Technical', at(-150, 5, -300))).toBe(2);
     expect(getMapFloorDelta(labs, 'Second_Level', at(-150, -2, -300))).toBe(-2);
-    const unrelated = { ...labs, tile: { ...labs.tile!, defaultFloor: 'Unmapped' } };
+    const unrelated = { ...labs, tile: { ...labs.tile!, elevationKey: undefined } };
     expect(getMapFloorDelta(unrelated, 'Technical', at(-150, 5, -300))).toBe(0);
+  });
+  it('classifies Icebreaker spawn positions using the published deck heights', () => {
+    const icebreaker = {
+      id: 'icebreaker',
+      name: 'Icebreaker',
+      tile: maps.icebreaker.tile,
+    } as unknown as TarkovMap;
+    expect(getMapFloorDelta(icebreaker, 'Infirmary', at(0, 16.15, -60))).toBe(-1);
+    expect(getMapFloorDelta(icebreaker, 'Storage/Security', at(0, 16.15, -60))).toBe(0);
+    expect(getMapFloorDelta(icebreaker, 'Infirmary', at(0, 26.47, 0))).toBe(3);
   });
   it('does not invent arrows for Reserve floors absent from its artwork', () => {
     const reserve = { id: 'reserve', name: 'Reserve', svg: maps.reserve.svg } as TarkovMap;

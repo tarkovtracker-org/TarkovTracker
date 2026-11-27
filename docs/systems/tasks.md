@@ -285,6 +285,17 @@ Keep spatial bounds with the heights when refreshing this metadata: low outdoor 
 locations are not necessarily in Garage, and the showroom has a local second-floor exception.
 Maps lacking reviewed floor metadata, including Terminal, show no inferred arrows.
 
+Icebreaker uses the hosted floor tiles credited to TarkovBOT.eu and the deck heights from
+[Tarkov.dev's Icebreaker map settings](https://github.com/the-hideout/tarkov-dev/blob/bc4ed844accb259a4ec07ed0077176fa91975908/src/data/maps.json#L1014).
+The published transform projects the helicopter extract outside the raster. The local transform was
+fitted to the zoom-2 tile artwork using Tarkov.dev's spawn, loot, and lock positions and checked
+against the helipad and 42 held-out boss positions at their published deck heights. All 42 project
+within 10 pixels of visible deck artwork at that zoom. Boss coordinates and configured chances
+come from the catalog. The chance is per spawn entry, including entries whose in-raid conditions
+are unspecified.
+The Lab (Dark), Infected Lab and Infected Factory reuse the backgrounds that Tarkov.dev declares
+for those variants. Each variant keeps its own boss rates, locations and extracts.
+
 `mapElevation.ts` classifies points and vertical volumes using half-open height intervals and
 scoped spatial exceptions before the base layer. A volume spanning several levels uses the
 nearest supported level toward the selected floor; a selected floor within that span needs no

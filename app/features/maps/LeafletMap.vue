@@ -28,42 +28,12 @@
       <div
         class="pointer-events-none absolute inset-2 z-1000 flex flex-wrap content-start items-start justify-between gap-2 @max-[30rem]:static @max-[30rem]:mb-2"
       >
-        <AppTooltip
+        <MapFloorControl
           v-if="hasMultipleFloors"
-          :text="t('maps.tooltips.switch_floor')"
-          :content="{ side: 'right' }"
-        >
-          <div
-            class="bg-surface-850/95 pointer-events-auto flex shrink-0 flex-col gap-1 rounded-lg border border-white/8 p-1.5 shadow-lg @max-[30rem]:w-full @max-[30rem]:flex-row @max-[30rem]:items-center"
-          >
-            <span class="text-surface-400 px-1 text-[10px] font-medium tracking-wide uppercase">
-              {{ t('maps.floors') }}
-            </span>
-            <div
-              class="flex flex-col-reverse gap-0.5 @max-[30rem]:min-w-0 @max-[30rem]:flex-row @max-[30rem]:flex-wrap"
-            >
-              <button
-                v-for="floor in floors"
-                :key="floor"
-                type="button"
-                :aria-pressed="floor === selectedFloor"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-full items-center rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 @max-[30rem]:w-auto"
-                :class="
-                  floor === selectedFloor
-                    ? 'bg-primary-500/15 text-surface-50'
-                    : 'text-surface-300/65 hover:text-surface-100 hover:bg-white/5'
-                "
-                @click="setFloor(floor)"
-              >
-                <span
-                  v-if="floor === selectedFloor"
-                  class="bg-primary-400 absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full"
-                />
-                {{ floor.replace(/_/g, ' ') }}
-              </button>
-            </div>
-          </div>
-        </AppTooltip>
+          :floors="floors"
+          :selected-floor="selectedFloor"
+          @select="setFloor"
+        />
         <div
           class="pointer-events-none order-first ml-auto flex max-h-full min-h-0 max-w-full flex-col items-end gap-2 pb-40 @max-[30rem]:w-full @max-[30rem]:pb-0 @min-[30rem]:order-last"
         >
@@ -500,6 +470,15 @@
           >
             {{ extractSource.label }} · {{ t('maps.extract_requirements.raid_notice') }}
           </p>
+          <a
+            v-if="props.map.tile?.attribution && isWebUrl(props.map.tile.attribution.url)"
+            :href="props.map.tile.attribution.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-surface-300 pointer-events-auto rounded bg-black/70 px-1.5 py-0.5 text-[10px] leading-snug underline-offset-2 hover:underline"
+          >
+            {{ t('maps.artwork_credit', { name: props.map.tile.attribution.name }) }}
+          </a>
         </div>
         <div
           v-if="showKeyboardCursor"
@@ -628,6 +607,7 @@
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import MapBossSpawnDetails from '@/features/maps/MapBossSpawnDetails.vue';
   import MapCursorCoordinates from '@/features/maps/MapCursorCoordinates.vue';
+  import MapFloorControl from '@/features/maps/MapFloorControl.vue';
   import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
   import MapMarkerColorControls from '@/features/maps/MapMarkerColorControls.vue';
   import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
@@ -686,6 +666,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { isEditableTarget } from '@/utils/editableTarget';
+  import { isWebUrl } from '@/utils/externalUrl';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
