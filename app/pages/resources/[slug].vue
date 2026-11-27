@@ -28,12 +28,39 @@
         :meta-line="metaLine"
         :compatibility-text="compatibilityText"
       />
-      <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_13rem]">
-        <ResourceGuideArticle
-          :resource="resource"
-          :guide-title="guideTitle"
-          :overview="overviewText"
-        />
+      <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-8">
+        <div class="min-w-0 space-y-10">
+          <ResourceGuideArticle
+            :resource="resource"
+            :guide-title="guideTitle"
+            :overview="overviewText"
+          />
+          <nav
+            class="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6"
+            :aria-label="t('page.resources.back_to_hub', 'Back to Resources')"
+          >
+            <UButton
+              to="/resources"
+              color="neutral"
+              variant="soft"
+              icon="i-mdi-arrow-left"
+              :label="t('page.resources.back_to_hub', 'Back to Resources')"
+            />
+            <UButton
+              :to="{ path: '/resources', query: { category: resource.category } }"
+              color="neutral"
+              variant="ghost"
+              trailing-icon="i-mdi-arrow-right"
+              class="max-w-full"
+            >
+              <span class="min-w-0 text-left wrap-anywhere whitespace-normal">
+                {{
+                  t('page.resources.browse_category', { category: categoryLabel }, categoryLabel)
+                }}
+              </span>
+            </UButton>
+          </nav>
+        </div>
         <ResourceGuideToc :items="tocItems" :active-id="activeSectionId" @select="onTocClick" />
       </div>
     </div>
@@ -42,7 +69,9 @@
 <script setup lang="ts">
   import {
     CATEGORY_LABEL_FALLBACKS,
+    getGuideTocEntries,
     getResourceBySlug,
+    resolveActiveSectionId,
     RESOURCE_META_ITEMS,
   } from '@/features/resources/resourceData';
   import ResourceGuideArticle from '@/features/resources/ResourceGuideArticle.vue';
@@ -85,11 +114,7 @@
     const category = resource.value?.category;
     if (!category) return '';
     return RESOURCE_META_ITEMS[category]
-      .map((item) =>
-        item.useCategoryLabel
-          ? categoryLabel.value
-          : t(item.labelKey ?? '', item.labelFallback ?? '')
-      )
+      .map((item) => t(item.labelKey, item.labelFallback))
       .join(' · ');
   });
   const compatibilityText = computed(() =>
@@ -97,65 +122,45 @@
       ? t(`page.resources.guides.${slug.value}.compatibility`, '')
       : ''
   );
-  const tocItems = computed<ResourceGuideTocItem[]>(() => {
-    const guide = resource.value?.guide;
-    const candidates: Array<ResourceGuideTocItem & { enabled: boolean }> = [
-      { id: 'overview', label: t('common.overview', 'Overview'), enabled: true },
-      {
-        id: 'video',
-        label: t('page.resources.guide_sections.video_walkthrough', 'Video Walkthrough'),
-        enabled: Boolean(resource.value?.videoId),
-      },
-      {
-        id: 'setup',
-        label: t('common.getting_started', 'Getting Started'),
-        enabled: Boolean(guide?.steps),
-      },
-      {
-        id: 'troubleshooting',
-        label: t('page.resources.guide_sections.troubleshooting', 'Troubleshooting'),
-        enabled: Boolean(guide?.troubleshooting),
-      },
-      {
-        id: 'tips',
-        label: t('page.resources.guide_sections.tips', 'Tips & Tricks'),
-        enabled: Boolean(guide?.tips),
-      },
-      {
-        id: 'faq',
-        label: t('page.resources.guide_sections.faq', 'Common Questions'),
-        enabled: Boolean(guide?.faq),
-      },
-    ];
-    return candidates.filter((item) => item.enabled).map(({ id, label }) => ({ id, label }));
-  });
+  const tocItems = computed<ResourceGuideTocItem[]>(() =>
+    getGuideTocEntries(resource.value).map((entry) => ({
+      id: entry.id,
+      label: t(entry.labelKey, entry.labelFallback),
+    }))
+  );
   const activeSectionId = ref('overview');
   const SCROLL_OFFSET = 72;
+  const isModifiedClick = ({ metaKey, ctrlKey, shiftKey, altKey }: MouseEvent) =>
+    [metaKey, ctrlKey, shiftKey, altKey].some(Boolean);
   const onTocClick = (id: string, event: MouseEvent) => {
-    event.preventDefault();
-    activeSectionId.value = id;
+    if (isModifiedClick(event)) return;
     const target = document.getElementById(id);
     if (!target) return;
-    const top = target.getBoundingClientRect().top + window.scrollY - SCROLL_OFFSET;
-    window.scrollTo({ top, behavior: 'smooth' });
-    history.replaceState(null, '', `#${id}`);
+    event.preventDefault();
+    activeSectionId.value = id;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+    });
+    history.replaceState(history.state, '', `#${id}`);
   };
-  const getSectionPosition = (item: ResourceGuideTocItem) => {
+  const readSectionPosition = (item: ResourceGuideTocItem) => {
     const element = document.getElementById(item.id);
     return element ? { id: item.id, top: element.getBoundingClientRect().top } : null;
   };
   const updateActiveSection = () => {
-    const sections = tocItems.value.map(getSectionPosition).filter((entry) => entry !== null);
-    const current = sections.findLast((section) => section.top <= SCROLL_OFFSET + 8);
-    activeSectionId.value = current?.id ?? sections[0]?.id ?? 'overview';
+    const sections = tocItems.value.map(readSectionPosition).filter((entry) => entry !== null);
+    activeSectionId.value = resolveActiveSectionId(sections, SCROLL_OFFSET + 8);
   };
   onMounted(() => {
     updateActiveSection();
-    window.addEventListener('scroll', updateActiveSection, { passive: true });
+    window.addEventListener('scroll', updateActiveSection, { capture: true, passive: true });
     window.addEventListener('resize', updateActiveSection);
   });
   onBeforeUnmount(() => {
-    window.removeEventListener('scroll', updateActiveSection);
+    window.removeEventListener('scroll', updateActiveSection, true);
     window.removeEventListener('resize', updateActiveSection);
   });
   watch(tocItems, () => nextTick(updateActiveSection));

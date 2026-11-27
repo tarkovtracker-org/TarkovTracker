@@ -18,7 +18,7 @@
         v-else
         class="bg-primary-500/15 text-primary-300 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
       >
-        <UIcon name="i-mdi-bookmark" class="h-5 w-5" />
+        <UIcon :name="fallbackIcon" class="h-5 w-5" />
       </div>
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-start justify-between gap-2">
@@ -44,32 +44,20 @@
     </div>
     <div class="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-5">
       <UButton
-        v-if="primaryAction"
-        :to="primaryAction.kind === 'internal' ? primaryAction.href : undefined"
-        :href="primaryAction.kind === 'external' ? primaryAction.href : undefined"
-        :target="primaryAction.external ? '_blank' : undefined"
-        :rel="primaryAction.external ? 'noopener noreferrer' : undefined"
+        v-if="primaryButton"
+        v-bind="primaryButton"
         size="sm"
         color="primary"
         variant="solid"
         class="min-h-9"
-        :icon="primaryAction.icon"
-        :trailing-icon="primaryAction.external ? 'i-mdi-open-in-new' : undefined"
-        :label="t(primaryAction.labelKey, primaryAction.labelFallback)"
       />
       <UButton
-        v-if="highlightedSecondary"
-        :to="highlightedSecondary.kind === 'internal' ? highlightedSecondary.href : undefined"
-        :href="highlightedSecondary.kind === 'external' ? highlightedSecondary.href : undefined"
-        :target="highlightedSecondary.external ? '_blank' : undefined"
-        :rel="highlightedSecondary.external ? 'noopener noreferrer' : undefined"
+        v-if="secondaryButton"
+        v-bind="secondaryButton"
         size="sm"
         color="neutral"
         variant="link"
         class="text-surface-200 hover:text-primary-300 min-h-9 px-1"
-        :icon="highlightedSecondary.icon"
-        :trailing-icon="highlightedSecondary.external ? 'i-mdi-open-in-new' : undefined"
-        :label="t(highlightedSecondary.labelKey, highlightedSecondary.labelFallback)"
       />
       <UDropdownMenu
         v-if="moreMenuItems.length"
@@ -96,6 +84,7 @@
     getPrimaryAction,
     splitSecondaryActions,
     type Resource,
+    type ResourceAction,
   } from '@/features/resources/resourceData';
   import type { DropdownMenuItem } from '@nuxt/ui';
   const { t } = useI18n({ useScope: 'global' });
@@ -108,6 +97,7 @@
       showCategoryBadge: false,
     }
   );
+  const fallbackIcon = computed(() => props.resource.icon ?? 'i-mdi-bookmark');
   const name = computed(() =>
     t(`page.resources.items.${props.resource.slug}.name`, props.resource.slug)
   );
@@ -120,9 +110,21 @@
       CATEGORY_BADGE_FALLBACKS[props.resource.category]
     )
   );
-  const primaryAction = computed(() => getPrimaryAction(props.resource));
+  const toButtonBindings = (action: ResourceAction | null) => {
+    if (!action) return null;
+    return {
+      to: action.kind === 'internal' ? action.href : undefined,
+      href: action.kind === 'external' ? action.href : undefined,
+      target: action.external ? ('_blank' as const) : undefined,
+      rel: action.external ? 'noopener noreferrer' : undefined,
+      icon: action.icon,
+      trailingIcon: action.external ? 'i-mdi-open-in-new' : undefined,
+      label: t(action.labelKey, action.labelFallback),
+    };
+  };
+  const primaryButton = computed(() => toButtonBindings(getPrimaryAction(props.resource)));
   const secondarySplit = computed(() => splitSecondaryActions(props.resource));
-  const highlightedSecondary = computed(() => secondarySplit.value.highlighted);
+  const secondaryButton = computed(() => toButtonBindings(secondarySplit.value.highlighted));
   const moreMenuItems = computed<DropdownMenuItem[][]>(() => {
     const items = secondarySplit.value.more.map((action) => ({
       icon: action.icon,
