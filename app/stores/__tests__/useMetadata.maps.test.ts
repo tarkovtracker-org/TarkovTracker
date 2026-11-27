@@ -11,6 +11,38 @@ describe('useMetadataStore mapsWithSvg extracts additions', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
   });
+  it('reuses artwork for variants without merging their boss rates or extracting from the base map', async () => {
+    const store = useMetadataStore();
+    await store.loadStaticMapData();
+    const infected = { name: 'Infected Tagilla', chance: 0.75, locations: [] };
+    store.maps = [
+      {
+        id: 'factory',
+        name: 'Factory',
+        normalizedName: 'factory',
+        extracts: [{ id: 'base-extract', name: 'Gate' }],
+        bossSpawns: [{ name: 'Tagilla', chance: 0.3, locations: [] }],
+      },
+      {
+        id: 'infected',
+        name: 'Infected Factory',
+        normalizedName: 'infected-factory',
+        bossSpawns: [infected],
+      },
+      { id: 'dark', name: 'The Lab (Dark)', normalizedName: 'the-lab-dark' },
+      { id: 'dark-name-only', name: 'The Lab (Dark)' },
+      { id: 'infected-lab', name: 'Infected Lab', normalizedName: 'infected-lab' },
+    ];
+    const byId = new Map(store.mapsWithSvg.map((map) => [map.id, map]));
+    expect(byId.get('infected')?.svg).toEqual(byId.get('factory')?.svg);
+    expect(byId.get('infected')).toMatchObject({ mergedIds: ['infected'] });
+    expect(byId.get('infected')?.bossSpawns).toEqual([infected]);
+    expect(byId.get('infected')?.extracts).toBeUndefined();
+    for (const id of ['dark', 'dark-name-only', 'infected-lab']) {
+      expect(byId.get(id)?.tile).toMatchObject({ elevationKey: 'lab' });
+      expect(byId.get(id)).toMatchObject({ mergedIds: [id] });
+    }
+  });
   it('merges extractsAdd from static map data into mapsWithSvg', async () => {
     const store = useMetadataStore();
     await store.loadStaticMapData();

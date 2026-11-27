@@ -410,6 +410,15 @@ interface MetadataState {
   currentGameMode: string;
   lastCachePurgeCheckAt: number;
 }
+/** Upstream shares the artwork for these variants, while each variant retains its own raid data. */
+const MAP_ARTWORK_ALIASES: Record<string, string> = {
+  infectedfactory: 'factory',
+  infectedlab: 'lab',
+  thelabdark: 'lab',
+  'thelab(dark)': 'lab',
+};
+const getMapArtwork = (data: StaticMapData | null, key: string) =>
+  data?.[key] ?? data?.[MAP_ARTWORK_ALIASES[key] ?? ''];
 const deriveStaticMapKey = (mapName: string, normalizedName?: string): string => {
   if (normalizedName) {
     return MAP_NORMALIZED_NAME_MAPPING[normalizedName] ?? normalizedName.replace(/-/g, '');
@@ -821,18 +830,19 @@ export const useMetadataStore = defineStore('metadata', {
           const primaryMap = maps.find((map) => map.normalizedName === 'ground-zero') ?? maps[0];
           if (!primaryMap) return null;
           const staticData = state.staticMapData?.[mapKey];
+          const artwork = getMapArtwork(state.staticMapData, mapKey);
           const mergedIds = maps.map((map) => map.id);
           // Check for unavailable before svg check (unavailable maps may not have svg)
           const unavailable = staticData?.unavailable;
           const extracts = resolveMergedMapExtracts(primaryMap.extracts, staticData?.extractsAdd);
           const bossSpawns = resolveMergedBossSpawns(maps);
-          if (staticData?.svg || staticData?.tile) {
+          if (artwork?.svg || artwork?.tile) {
             return {
               ...primaryMap,
               extracts,
               bossSpawns,
-              svg: staticData?.svg,
-              tile: staticData?.tile,
+              svg: artwork.svg,
+              tile: artwork.tile,
               unavailable,
               mergedIds,
             };

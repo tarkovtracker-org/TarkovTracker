@@ -419,6 +419,8 @@ export interface MapTileConfig {
   floors?: string[];
   defaultFloor?: string;
   floorTilePaths?: Record<string, string>;
+  elevationKey?: string;
+  attribution?: { name: string; url: string };
 }
 export interface MapBossSpawnLocation {
   name: string;
