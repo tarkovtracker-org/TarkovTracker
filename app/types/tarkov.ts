@@ -407,6 +407,11 @@ export interface MapSvgConfig {
   minZoom?: number;
   maxZoom?: number;
 }
+export interface MapFloorGroup {
+  labelKey: string;
+  floors: string[];
+  defaultFloor: string;
+}
 export interface MapTileConfig {
   tilePath: string;
   tileFallbacks?: string[];
@@ -419,6 +424,7 @@ export interface MapTileConfig {
   floors?: string[];
   defaultFloor?: string;
   floorTilePaths?: Record<string, string>;
+  floorGroups?: MapFloorGroup[];
   elevationKey?: string;
   attribution?: { name: string; url: string };
 }

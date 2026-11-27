@@ -292,7 +292,10 @@ fitted to the zoom-2 tile artwork using Tarkov.dev's spawn, loot, and lock posit
 against the helipad and 42 held-out boss positions at their published deck heights. All 42 project
 within 10 pixels of visible deck artwork at that zoom. Boss coordinates and configured chances
 come from the catalog. The chance is per spawn entry, including entries whose in-raid conditions
-are unspecified.
+are unspecified. The floor picker shows only the floors in the selected Main Decks or Engine Room
+group. Switching groups selects Infirmary or Engine Room, and the selected floor drives the artwork
+and pin elevation indicators. The groups follow [TarkovBOT's Icebreaker map](https://tarkovbot.eu/tools/interactive-maps/icebreaker).
+
 The Lab (Dark), Infected Lab and Infected Factory reuse the backgrounds that Tarkov.dev declares
 for those variants. Each variant keeps its own boss rates, locations and extracts.
 

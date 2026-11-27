@@ -83,6 +83,36 @@
         "Bridge",
         "Bridge Roof"
       ],
+      "floorGroups": [
+        {
+          "labelKey": "maps.floor_groups.main_decks",
+          "defaultFloor": "Infirmary",
+          "floors": [
+            "Storage/Security",
+            "Infirmary",
+            "Helipad",
+            "Gym/Canteen",
+            "Accommodation (lower)",
+            "Accommodation (mid)",
+            "Accommodation (upper)",
+            "Officers' Deck",
+            "Stairs (blocked)",
+            "Bridge",
+            "Bridge Roof"
+          ]
+        },
+        {
+          "labelKey": "maps.floor_groups.engine_room",
+          "defaultFloor": "Engine Room",
+          "floors": [
+            "Control Room",
+            "Engine Room",
+            "Engine Room (upper)",
+            "Fuel Pumps (lower)",
+            "Fuel Pumps"
+          ]
+        }
+      ],
       "defaultFloor": "Infirmary",
       "coordinateRotation": 180,
       "transform": [1.5, 128, 1.4, 130.5],
