@@ -5,6 +5,8 @@ import {
   type TaskEvaluationOptions,
 } from '@/stores/taskAvailability';
 import { TASK_ID_REGISTRY, type GameMode } from '@/utils/constants';
+import { importedAcceptanceSignature } from '@/utils/shiftingBalanceAcceptance';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import { normalizeTraderRequirements } from '@/utils/taskRequirements';
 import type { Task, RequirementComparison, StoryChapter } from '@/types/tarkov';
 const data = (overrides: Partial<TaskAvailabilityTeamData> = {}): TaskAvailabilityTeamData => ({
@@ -39,6 +41,53 @@ const evaluate = (
     requireTraderLevels: true,
     ...options,
   })[task.id]!.self!;
+describe('Shifting Balance acceptance', () => {
+  const { CUT_DOWN_TO_THE_ROOT, PRESERVE_A_VALUABLE_PIECE } = TASK_ID_REGISTRY;
+  const jaeger: Task = { id: CUT_DOWN_TO_THE_ROOT };
+  const lightkeeper: Task = {
+    id: PRESERVE_A_VALUABLE_PIECE,
+    taskRequirements: [{ task: { id: jaeger.id }, status: ['active'] }],
+  };
+  const incomplete = { complete: false, failed: false, timestamp: 100 };
+  const imported = { requirements: importedAcceptanceSignature(jaeger.id)!, timestamp: 100 };
+  const confirmed = { requirements: otherRequirementsSignature(lightkeeper)!, timestamp: 100 };
+  it('does not interpret eligible or reset as accepted, without changing other quests', () => {
+    const existing = { ...lightkeeper, id: 'existing-quest' };
+    expect(evaluate(existing, data(), [jaeger]).available).toBe(true);
+    for (const completions of [{}, { [jaeger.id]: incomplete }]) {
+      const result = evaluate(lightkeeper, data({ completions }), [jaeger]);
+      expect(result.blockers).toEqual([{ type: 'task_acceptance', taskId: jaeger.id }]);
+    }
+  });
+  it.each([jaeger.id, lightkeeper.id])(
+    'accepts current confirmation at %s, not stale confirmation',
+    (id) => {
+      const confirmations = { [id]: id === jaeger.id ? imported : confirmed };
+      const run = (timestamp: number) =>
+        evaluate(
+          lightkeeper,
+          data({ confirmations, completions: { [jaeger.id]: { ...incomplete, timestamp } } }),
+          [jaeger]
+        );
+      expect(run(100).available).toBe(true);
+      expect(run(101).available).toBe(false);
+    }
+  );
+  it.each([{ complete: true }, { failed: true }])(
+    'cannot bypass a closed branch: %j',
+    (completion) => {
+      const result = evaluate(
+        lightkeeper,
+        data({
+          completions: { [jaeger.id]: completion },
+          confirmations: { [jaeger.id]: imported, [lightkeeper.id]: confirmed },
+        }),
+        [jaeger]
+      );
+      expect(result.blockers).toEqual([{ type: 'task_acceptance_closed', taskId: jaeger.id }]);
+    }
+  );
+});
 describe('canonical task availability', () => {
   it('preserves cycle and missing-reference diagnostics through active prerequisites', () => {
     const a: Task = { id: 'a', taskRequirements: [{ task: { id: 'b' }, status: ['active'] }] };

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
+import { TASK_ID_REGISTRY } from '@/utils/constants';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { Task } from '@/types/tarkov';
 const { trackEventMock, trackTaskActionMock } = vi.hoisted(() => ({
@@ -140,6 +141,33 @@ const setup = async (
   };
 };
 describe('useTaskActions', () => {
+  it('confirms the Lightkeeper quest without creating Jaeger progress', async () => {
+    const jaeger = TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT;
+    const task: Task = {
+      id: TASK_ID_REGISTRY.PRESERVE_A_VALUABLE_PIECE,
+      taskRequirements: [{ task: { id: jaeger }, status: ['active'] }],
+    };
+    const { actions, tarkovStore } = await setup(
+      task,
+      [{ id: jaeger }, task],
+      {},
+      {},
+      {
+        [task.id]: {
+          self: { available: false, blockers: [{ type: 'task_acceptance', taskId: jaeger }] },
+        },
+      }
+    );
+    expect(actions.canMarkTaskAvailable()).toBe(true);
+    actions.markTaskAvailable();
+    expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledExactlyOnceWith(
+      task.id,
+      JSON.stringify([['in-game-acceptance', jaeger]])
+    );
+    expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskFailed).not.toHaveBeenCalled();
+  });
   it('confirms only the selected server-gated task without inventing counter contributors', async () => {
     const task: Task = {
       id: 'gated',

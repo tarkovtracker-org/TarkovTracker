@@ -1,6 +1,13 @@
 import { taskServerGateBlockers } from '@/stores/taskServerGates';
 import { resolveTraderUnlockTaskIds, type GameMode } from '@/utils/constants';
+import {
+  acceptanceBranchClosed,
+  hasImportedAcceptance,
+  hasManualAcceptance,
+  strictAcceptancePredecessor,
+} from '@/utils/shiftingBalanceAcceptance';
 import { isStorylineTraderUnlocked, storylineTraderUnlocks } from '@/utils/storylineTraderUnlocks';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import {
   compareRequirement,
   getTaskTraderRequirements,
@@ -45,6 +52,8 @@ export type TaskBlocker = {
     | 'trader_reputation'
     | 'prerequisite'
     | 'failed_branch'
+    | 'task_acceptance'
+    | 'task_acceptance_closed'
     | 'faction'
     | 'trader_unlock'
     | 'prestige'
@@ -187,6 +196,8 @@ const traderUnlocked = (ids: string[], data: TaskAvailabilityTeamData) =>
   !ids.length || ids.some((id) => isTaskComplete(data.completions[id]));
 const disabledBlockers = (task: Task): TaskBlocker[] =>
   task.disabled ? [{ type: 'disabled', taskId: task.id }] : [];
+const isDirectPrerequisiteBlocker = (blocker: TaskBlocker) =>
+  ['cycle', 'unknown', 'task_acceptance', 'task_acceptance_closed'].includes(blocker.type);
 const missingTaskResult = (taskId: string) =>
   result([{ type: 'unknown', taskId, reason: 'task_reference' }]);
 const createTeamEvaluator = (
@@ -211,12 +222,21 @@ const createTeamEvaluator = (
     if (isTaskActive(completion) || isTaskComplete(completion)) return result([]);
     return evaluate(taskId, true);
   };
-  const requiredTaskResult = (requirement: TaskRequirement): TaskAvailabilityResult => {
+  const acceptanceResult = (task: Task, taskId: string): TaskAvailabilityResult => {
+    if (acceptanceBranchClosed(taskId, data))
+      return result([{ type: 'task_acceptance_closed', taskId }]);
+    if (hasImportedAcceptance(taskId, data)) return result([]);
+    if (hasManualAcceptance(task.id, taskId, data, otherRequirementsSignature(task)))
+      return result([]);
+    return result([{ type: 'task_acceptance', taskId }]);
+  };
+  const requiredTaskResult = (task: Task, requirement: TaskRequirement): TaskAvailabilityResult => {
     const taskId = requirement.task.id;
     const completion = data.completions[taskId];
     const statuses = normalizeStatuses(requirement);
     if (!tasksById.has(taskId)) return missingTaskResult(taskId);
     if (terminalStatusMet(statuses, completion)) return result([]);
+    if (taskId === strictAcceptancePredecessor(task)) return acceptanceResult(task, taskId);
     return acceptsActive(statuses)
       ? activeRequirementResult(taskId, completion)
       : result([{ type: 'prerequisite' }]);
@@ -252,23 +272,24 @@ const createTeamEvaluator = (
     // A wired story route can satisfy the quest group, never trader/faction/prestige gates.
     if (chapterIds.some((id) => hasStoryUnlockProgress(id, data))) return [];
     if (!interpretableRequirements(task)) return [{ type: 'unknown', reason: 'task_requirement' }];
-    return unmetPrerequisiteBlockers(task.taskRequirements ?? [], chapterIds);
+    return unmetPrerequisiteBlockers(task, task.taskRequirements ?? [], chapterIds);
   };
   const unmetPrerequisiteBlockers = (
+    task: Task,
     requirements: TaskRequirement[],
     chapterIds: string[]
   ): TaskBlocker[] => {
     const evaluated = requirements.map((requirement) => ({
       requirement,
-      result: requiredTaskResult(requirement),
+      result: requiredTaskResult(task, requirement),
     }));
     const unmet = evaluated.filter((entry) => !entry.result.available);
     if (!unmet.length) return [];
     const diagnostics = unmet
       .flatMap((entry) => entry.result.blockers)
-      .filter((blocker) => ['cycle', 'unknown'].includes(blocker.type));
+      .filter(isDirectPrerequisiteBlocker);
     const ordinary = unmet.filter((entry) =>
-      entry.result.blockers.every((blocker) => !['cycle', 'unknown'].includes(blocker.type))
+      entry.result.blockers.every((blocker) => !isDirectPrerequisiteBlocker(blocker))
     );
     if (!ordinary.length) return diagnostics;
     return [

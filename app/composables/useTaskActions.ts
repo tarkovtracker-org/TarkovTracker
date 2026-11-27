@@ -4,6 +4,7 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { strictAcceptancePredecessor } from '@/utils/shiftingBalanceAcceptance';
 import { effectiveStoryProgress, storyCatalogForMode } from '@/utils/storylineCompletion';
 import { hasUnconfirmableStatusClock } from '@/utils/taskAvailabilityConfirmation';
 import {
@@ -83,6 +84,7 @@ const RESOLVABLE_BLOCKERS: ReadonlySet<TaskBlocker['type']> = new Set([
   'trader_level',
   'trader_reputation',
   'prerequisite',
+  'task_acceptance',
   'global_variable_unknown',
   // A derived trader-tier count is a best-effort estimate that a confirmation overrides.
   'task_counter',
@@ -266,6 +268,11 @@ export function useTaskActions(
           ),
         })
     );
+  const acceptanceClockAllowsConfirmation = (currentTask: Task): boolean => {
+    const predecessor = strictAcceptancePredecessor(currentTask);
+    const timestamp = predecessor ? taskCompletion(predecessor)?.timestamp : undefined;
+    return timestamp === undefined || timestamp <= Date.now();
+  };
   /**
    * Mark available must either make the task available or change nothing: an unsupported server
    * gate or an unmet ambiguous/malformed prerequisite would leave it locked after raising levels,
@@ -282,6 +289,7 @@ export function useTaskActions(
       );
     return (
       gatesConfirmable &&
+      acceptanceClockAllowsConfirmation(currentTask) &&
       !hasUnresolvableBlocker(currentTask.id) &&
       canApplyTaskAvailabilityRequirements(
         currentTask,

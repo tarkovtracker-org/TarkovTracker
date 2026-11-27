@@ -1,3 +1,4 @@
+import { manualAcceptanceGate } from '@/utils/shiftingBalanceAcceptance';
 import { copyCounterGroup, isCounterGroups, isCounterTaskIds } from '@/utils/taskCounters';
 import { compareRequirement } from '@/utils/taskRequirements';
 import type {
@@ -135,10 +136,10 @@ export const hasUnsupportedOtherRequirement = (task: Task): boolean =>
 export const otherRequirementsSignature = (task: Task): string | undefined => {
   const requirements = normalizeOtherRequirements(task.otherRequirements);
   if (requirements.some((requirement) => requirement.type === 'unknown')) return undefined;
-  const confirmable = requirements.filter(isConfirmable);
-  return confirmable.length
-    ? JSON.stringify(confirmable.map(withoutProgressionMetadata))
-    : undefined;
+  const confirmable: unknown[] = requirements.filter(isConfirmable).map(withoutProgressionMetadata);
+  const acceptance = manualAcceptanceGate(task);
+  if (acceptance.length) confirmable.push(acceptance);
+  return confirmable.length ? JSON.stringify(confirmable) : undefined;
 };
 /** Story objectives a task's overlay gates name, for Mark available to record. */
 export const storyObjectiveRequirements = (task: Task) =>
