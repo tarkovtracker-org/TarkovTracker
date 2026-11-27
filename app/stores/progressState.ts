@@ -14,14 +14,19 @@
  *
  * @module stores/userProgressState
  */
-import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
+import {
+  ACTIVE_SEASON_NUMBER,
+  GAME_MODES,
+  TASK_ID_REGISTRY,
+  type GameMode,
+} from '@/utils/constants';
 import {
   reconcileSeasonalProgressSeason,
   sanitizeManualActivityEpoch,
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
-import { nextClock } from '@/utils/taskAvailabilityConfirmation';
+import { nextClock, taskStatusTimestamp } from '@/utils/taskAvailabilityConfirmation';
 import {
   isTaskActive as isTaskCompletionActive,
   isTaskComplete as isTaskCompletionComplete,
@@ -285,13 +290,18 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
 /** Status changes must follow the earlier task/Undo clock and retire live confirmations. */
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
   const data = getCurrentData(state);
-  const previousTimestamp = data.taskCompletions[taskId]?.timestamp ?? 0;
+  const previousTimestamp = taskStatusTimestamp(data.taskCompletions[taskId]);
   const confirmationTimestamp = data.taskAvailability?.[taskId]?.timestamp ?? 0;
   const timestamp = Math.max(
     completion.timestamp ?? 0,
     nextClock(previousTimestamp, confirmationTimestamp)
   );
-  updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
+  // A corrupt Jaeger clock must continue to invalidate in-game confirmations.
+  const statusTimestamp =
+    taskId === TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT
+      ? Math.max(previousTimestamp, timestamp)
+      : timestamp;
+  updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp: statusTimestamp });
 };
 // Simplified actions
 export const actions = {
@@ -542,3 +552,16 @@ export const actions = {
   },
 } as const;
 export type UserActions = typeof actions;
+export const patchProgressState = (
+  store: { $patch: (mutate: (state: UserState) => void) => void },
+  nextState: UserState
+) => {
+  store.$patch((state) => {
+    state.currentGameMode = nextState.currentGameMode;
+    state.gameEdition = nextState.gameEdition;
+    state.tarkovUid = nextState.tarkovUid;
+    state.pvp = nextState.pvp;
+    state.pve = nextState.pve;
+    state.seasonal = nextState.seasonal;
+  });
+};

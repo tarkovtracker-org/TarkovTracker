@@ -604,6 +604,20 @@ describe('useEftLogsImport', () => {
       tarkovStore.confirmTaskAvailability.mock.invocationCallOrder[0]!
     );
   });
+  it('records separate acceptance evidence when an EFT log starts the Jaeger branch', async () => {
+    const taskId = TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT;
+    metadataStore.tasks = [{ id: taskId }];
+    const composable = await loadComposable();
+    await composable.parseFile(new File([startedLog(taskId)], 'notifications.log'));
+    await composable.confirmImport('pvp');
+    expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledWith(
+      taskId,
+      JSON.stringify(['eft-start', taskId])
+    );
+    expect(tarkovStore.setTaskActive.mock.invocationCallOrder[0]!).toBeLessThan(
+      tarkovStore.confirmTaskAvailability.mock.invocationCallOrder[0]!
+    );
+  });
   it('records the story objective an imported start implies', async () => {
     metadataStore.tasks = [
       {

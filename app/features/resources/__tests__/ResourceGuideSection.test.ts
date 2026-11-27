@@ -10,6 +10,7 @@ describe('ResourceGuideSection', () => {
       global: { stubs: { UIcon: true } },
     });
     expect(wrapper.get('section').attributes('id')).toBe('overview');
+    expect(wrapper.get('section').attributes('tabindex')).toBe('-1');
     expect(wrapper.get('h2').text()).toBe('Overview');
     expect(wrapper.getComponent({ name: 'UIcon' }).props('name')).toBe('i-mdi-information-outline');
     expect(wrapper.get('p').text()).toBe('Guide content');

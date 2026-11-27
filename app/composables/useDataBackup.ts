@@ -54,6 +54,7 @@ import {
   type RecoveryArchiveResult,
   type SupersededArchiveCopy,
 } from '@/utils/backup/parsing';
+import { getStorageKeys, isSupabaseAuthStorageKey } from '@/utils/clientStorage';
 import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
 import { buildDebugTaskSummary, type DebugTaskSummary } from '@/utils/debugTaskSummary';
 import { logger } from '@/utils/logger';
@@ -303,22 +304,6 @@ async function sanitizeTarkovStateForDebug(state: unknown): Promise<UserState> {
   clonedState.pve = sanitizeProgressForDebug(clonedState.pve);
   clonedState.seasonal = sanitizeProgressForDebug(clonedState.seasonal);
   return clonedState;
-}
-function getStorageKeys(storage: Storage | null): string[] {
-  if (!storage) {
-    return [];
-  }
-  const keys: string[] = [];
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index);
-    if (key) {
-      keys.push(key);
-    }
-  }
-  return keys;
-}
-function isSupabaseAuthStorageKey(key: string): boolean {
-  return key.endsWith('-auth-token') || key.endsWith('-code-verifier');
 }
 type ProgressBackupIdentity = { prefix: string; owner: string; createdAt: number | null };
 function getProgressBackupIdentity(key: string): ProgressBackupIdentity | null {

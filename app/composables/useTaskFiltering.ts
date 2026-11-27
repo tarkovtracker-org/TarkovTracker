@@ -266,7 +266,10 @@ export function useTaskFiltering() {
   const allUsersTaskBuilders: Record<TaskSecondaryView, AllUsersTaskBuilder> = {
     all: (task, statuses) => ({
       ...task,
-      neededBy: getUsersWithStatus(statuses, isAvailableTeamTask),
+      neededBy: getUsersWithStatus(
+        statuses,
+        (status) => isAvailableTeamTask(status) || isActiveTeamTask(status)
+      ),
     }),
     available: (task, statuses) => {
       if (!matchesAllUsersView('available', statuses, isInvalidForStatuses(task, statuses))) {

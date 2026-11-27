@@ -4,10 +4,15 @@ import { describe, expect, it } from 'vitest';
 import {
   CATEGORY_LABEL_FALLBACKS,
   getGuidePrimaryAction,
+  getGuideQuickActions,
   getGuideSecondaryLinks,
+  getGuideStepsHeading,
+  getGuideTocEntries,
   getPrimaryAction,
   getSecondaryActions,
+  isResourceCategory,
   matchesResourceSearch,
+  resolveActiveSectionId,
   RESOURCE_CATEGORIES,
   RESOURCES,
   splitSecondaryActions,
@@ -21,6 +26,7 @@ const en = JSON.parse(readFileSync(join(process.cwd(), 'app/locales/en.json'), '
       categories: Record<string, string>;
       category_badges: Record<string, string>;
       actions: Record<string, string>;
+      guide_sections: Record<string, string>;
     };
   };
 };
@@ -28,15 +34,15 @@ const resourcesLocale = en.page.resources;
 const nonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 const expectedGuideKeys = (
-  steps: number,
+  steps: readonly number[],
   tips: number,
-  faq: number,
+  faq: readonly number[],
   troubleshooting = 0,
   compatibility = false
 ): string[] => {
   const keys = ['overview'];
   if (compatibility) keys.push('compatibility');
-  for (let n = 1; n <= steps; n++) {
+  for (const n of steps) {
     keys.push(`step_${n}_title`, `step_${n}_desc`);
   }
   for (let n = 1; n <= troubleshooting; n++) {
@@ -45,7 +51,7 @@ const expectedGuideKeys = (
   for (let n = 1; n <= tips; n++) {
     keys.push(`tip_${n}`);
   }
-  for (let n = 1; n <= faq; n++) {
+  for (const n of faq) {
     keys.push(`faq_${n}_q`, `faq_${n}_a`);
   }
   return keys;
@@ -56,6 +62,13 @@ describe('resourceData locale parity', () => {
   });
   it('does not include a self-referential TarkovTracker featured card', () => {
     expect(RESOURCES.some((resource) => resource.slug === 'tarkovtracker')).toBe(false);
+  });
+  it('validates resource categories safely', () => {
+    for (const category of RESOURCE_CATEGORIES) {
+      expect(isResourceCategory(category)).toBe(true);
+    }
+    expect(isResourceCategory('unknown')).toBe(false);
+    expect(isResourceCategory(undefined)).toBe(false);
   });
   it('covers every category with at least one resource', () => {
     for (const category of RESOURCE_CATEGORIES) {
@@ -80,10 +93,11 @@ describe('resourceData locale parity', () => {
     }
   );
   it.each(RESOURCES.map((resource) => [resource.slug, resource] as const))(
-    'defines a primary action and secondary links for %s',
+    'defines a non-empty primary action and secondary links for %s',
     (_slug, resource) => {
       const primary = getPrimaryAction(resource);
       expect(primary).not.toBeNull();
+      expect(nonEmptyString(primary?.labelFallback)).toBe(true);
       expect(resource.keywords.length).toBeGreaterThan(0);
       const secondary = getSecondaryActions(resource);
       if (primary?.external) {
@@ -99,6 +113,16 @@ describe('resourceData locale parity', () => {
     const guideConfig = resource.guide;
     if (!guideConfig) {
       throw new Error(`${slug} hasGuide without guide config`);
+    }
+    if (guideConfig.stepsHeadingKey) {
+      const sectionKey = guideConfig.stepsHeadingKey.split('.').pop() ?? '';
+      expect(nonEmptyString(resourcesLocale.guide_sections[sectionKey])).toBe(true);
+      expect(nonEmptyString(guideConfig.stepsHeadingFallback)).toBe(true);
+    }
+    for (const action of getGuideQuickActions(resource)) {
+      const actionKey = action.labelKey.split('.').pop() ?? '';
+      expect(nonEmptyString(resourcesLocale.actions[actionKey])).toBe(true);
+      expect(nonEmptyString(action.labelFallback)).toBe(true);
     }
     const guideLocale = resourcesLocale.guides[slug];
     if (!guideLocale) {
@@ -122,9 +146,7 @@ describe('resourceData locale parity', () => {
       if (key === 'overview' || key === 'compatibility') continue;
       const stepMatch = key.match(/^step_(\d+)_(?:title|desc)$/);
       if (stepMatch) {
-        expect(Number(stepMatch[1]), `orphan ${slug}.${key}`).toBeLessThanOrEqual(
-          guideConfig.steps
-        );
+        expect(guideConfig.steps, `orphan ${slug}.${key}`).toContain(Number(stepMatch[1]));
         continue;
       }
       const troubleshootingMatch = key.match(/^troubleshooting_(\d+)_(?:title|desc)$/);
@@ -141,11 +163,66 @@ describe('resourceData locale parity', () => {
       }
       const faqMatch = key.match(/^faq_(\d+)_[qa]$/);
       if (faqMatch) {
-        expect(Number(faqMatch[1]), `orphan ${slug}.${key}`).toBeLessThanOrEqual(guideConfig.faq);
+        expect(guideConfig.faq, `orphan ${slug}.${key}`).toContain(Number(faqMatch[1]));
         continue;
       }
       expect.fail(`unrecognized guide locale key ${slug}.${key}`);
     }
+  });
+  it('keeps translated guide entries bound to their original topics after reordering', () => {
+    const ratScanner = RESOURCES.find((resource) => resource.slug === 'ratscanner');
+    const migration = RESOURCES.find((resource) => resource.slug === 'tarkovtracker_org_vs_io');
+    expect(ratScanner?.guide?.steps).toEqual([1, 2, 3, 5, 4]);
+    expect(ratScanner?.guide?.faq).toEqual([1, 2, 4]);
+    expect(migration?.guide?.faq).toEqual([3, 5, 4]);
+    expect(resourcesLocale.guides.ratscanner?.step_4_title).toBe('Scan an item');
+    expect(resourcesLocale.guides.ratscanner?.step_5_title).toContain('Connect TarkovTracker.org');
+  });
+  it('returns custom or default steps headings for guides', () => {
+    const orgGuide = RESOURCES.find((entry) => entry.slug === 'tarkovtracker_org_vs_io');
+    const monitorGuide = RESOURCES.find((entry) => entry.slug === 'tarkovmonitor');
+    expect(getGuideStepsHeading(orgGuide)).toEqual({
+      key: 'page.resources.guide_sections.migration_steps',
+      fallback: 'Move Your Progress to TarkovTracker.org',
+    });
+    expect(getGuideStepsHeading(monitorGuide)).toEqual({
+      key: 'common.getting_started',
+      fallback: 'Getting Started',
+    });
+    expect(getGuideStepsHeading(undefined)).toEqual({
+      key: 'common.getting_started',
+      fallback: 'Getting Started',
+    });
+  });
+  it('builds ordered guide TOC entries and resolves active scroll sections', () => {
+    const monitor = RESOURCES.find((entry) => entry.slug === 'tarkovmonitor');
+    expect(getGuideTocEntries(monitor).map((entry) => entry.id)).toEqual([
+      'overview',
+      'setup',
+      'video',
+      'troubleshooting',
+      'tips',
+      'faq',
+    ]);
+    expect(getGuideTocEntries(undefined)).toEqual([]);
+    expect(
+      resolveActiveSectionId(
+        [
+          { id: 'overview', top: -100 },
+          { id: 'setup', top: 40 },
+          { id: 'faq', top: 300 },
+        ],
+        80
+      )
+    ).toBe('setup');
+    expect(resolveActiveSectionId([{ id: 'setup', top: 200 }], 80)).toBe('setup');
+    expect(resolveActiveSectionId([], 80)).toBe('overview');
+  });
+  it('assigns distinct fallback icons to resources without a logo', () => {
+    const seasonal = RESOURCES.find((entry) => entry.slug === 'seasonal_modifiers');
+    const cultist = RESOURCES.find((entry) => entry.slug === 'cultistcircle');
+    expect(seasonal?.icon).toBe('i-mdi-tune-variant');
+    expect(cultist?.icon).toBe('i-mdi-circle-double');
   });
   it('does not declare guide configs for resources without hasGuide', () => {
     for (const resource of RESOURCES.filter((entry) => !entry.hasGuide)) {

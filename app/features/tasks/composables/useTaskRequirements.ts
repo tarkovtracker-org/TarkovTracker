@@ -15,11 +15,16 @@ import {
   type RequirementCurrentStatus,
   type RequirementExpectedStatus,
 } from '@/features/tasks/task-requirement-helpers';
-import { hasStoryUnlockProgress, type TaskBlocker } from '@/stores/taskAvailability';
+import {
+  hasStoryUnlockProgress,
+  strictAcceptanceBlocker,
+  type TaskBlocker,
+} from '@/stores/taskAvailability';
 import { taskServerGateBlockers } from '@/stores/taskServerGates';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useProgressStore } from '@/stores/useProgress';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { strictAcceptancePredecessor } from '@/utils/shiftingBalanceAcceptance';
 import { effectiveStoryProgress, storyCatalogForMode } from '@/utils/storylineCompletion';
 import { normalizeOtherRequirements } from '@/utils/taskOtherRequirements';
 import { compareRequirement, getTaskTraderRequirements } from '@/utils/taskRequirements';
@@ -52,7 +57,11 @@ type StatusLists = Array<string[] | undefined>;
 type KnownOtherRequirement = Exclude<TaskOtherRequirement, { type: 'unknown' }>;
 const TERMINAL_BLOCKERS = new Set<TaskBlocker['type']>(['complete', 'failed']);
 // Gates the tracker cannot observe; the user confirms them with Mark available.
-const CONFIRMATION_BLOCKERS = new Set<TaskBlocker['type']>(['dialogue', 'global_variable_unknown']);
+const CONFIRMATION_BLOCKERS = new Set<TaskBlocker['type']>([
+  'dialogue',
+  'global_variable_unknown',
+  'task_acceptance',
+]);
 const SUMMARY_FROM_TASK_DATA = new Set<TaskBlocker['type']>([
   'complete',
   'failed',
@@ -60,6 +69,8 @@ const SUMMARY_FROM_TASK_DATA = new Set<TaskBlocker['type']>([
   'trader_level',
   'trader_reputation',
   'prerequisite',
+  'task_acceptance',
+  'task_acceptance_closed',
 ]);
 const groupStatusesByTask = (requirements: TaskRequirement[]): Map<string, StatusLists> => {
   const groups = new Map<string, StatusLists>();
@@ -114,7 +125,9 @@ export const useTaskRequirements = (task: () => Task) => {
   const blockerLink = (blocker: TaskBlocker) => {
     const chapterId = blocker.chapterIds?.[0];
     if (chapterId && blocker.objective) return storyObjectiveLink(chapterId, blocker.objective.id);
-    return blocker.type === 'trader_unlock' ? linkedTask(blocker.taskId) : undefined;
+    return ['trader_unlock', 'task_acceptance', 'task_acceptance_closed'].includes(blocker.type)
+      ? linkedTask(blocker.taskId)
+      : undefined;
   };
   // detail keeps the full blocker sentence on demand when the short label drops information.
   type ShortLabel = { label: string; progress?: string; detail?: boolean };
@@ -322,9 +335,26 @@ export const useTaskRequirements = (task: () => Task) => {
     )
   );
   const taskSummary = (): TaskRequirementRow[] =>
-    [...groupStatusesByTask(task().taskRequirements ?? [])].map(([id, lists]) =>
-      taskRow(id, lists, unmetStatusLists(id, lists).length === 0)
-    );
+    [...groupStatusesByTask(task().taskRequirements ?? [])]
+      .filter(([id]) => id !== strictAcceptancePredecessor(task()))
+      .map(([id, lists]) => taskRow(id, lists, unmetStatusLists(id, lists).length === 0));
+  const acceptanceSummary = (): TaskRequirementRow[] => {
+    const id = strictAcceptancePredecessor(task());
+    if (!id) return [];
+    const blocker = strictAcceptanceBlocker(task(), id, {
+      completions: completions.value,
+      confirmations: progressData.value.taskAvailability,
+    });
+    if (blocker) return otherRows(blocker);
+    return [
+      {
+        kind: 'task',
+        met: true,
+        label: t('page.tasks.requirements.task_accepted', { task: taskName(id) }),
+        to: `/tasks?task=${id}`,
+      },
+    ];
+  };
   const storySummary = (): TaskRequirementRow[] => {
     const chapters = task().storyUnlocks ?? [];
     if (!chapters.length) return [];
@@ -398,6 +428,7 @@ export const useTaskRequirements = (task: () => Task) => {
     ...levelSummary(),
     ...traderSummary(),
     ...taskSummary(),
+    ...acceptanceSummary(),
     ...storySummary(),
     ...metOtherSummary(),
     ...otherSummary(),

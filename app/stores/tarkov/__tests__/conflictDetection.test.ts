@@ -29,6 +29,12 @@ describe('detectDataConflicts task active state', () => {
     expect(result.conflictCount).toBe(1);
     expect(result.hasConflict).toBe(true);
   });
+  it.each([false, true])('ignores stale acceptance on terminal rows (failed: %s)', (failed) => {
+    const terminal = { complete: true, failed };
+    expect(
+      detectDataConflicts(withTask({ ...terminal, active: true }), withTask(terminal)).conflictCount
+    ).toBe(0);
+  });
   it('still reports terminal-flag disagreement', () => {
     const result = detectDataConflicts(
       withTask(EXPLICIT_ACTIVE),

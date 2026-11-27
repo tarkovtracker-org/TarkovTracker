@@ -1,3 +1,4 @@
+import type { AuthenticatedMutation } from './authenticated-mutation.ts';
 /**
  * Discord role sync utility for Supabase Edge Functions.
  * Adds/removes Discord roles via the Bot API.
@@ -295,3 +296,9 @@ export async function removeSupporterRole(discordUserId: string): Promise<void> 
     throw new Error(`Unable to remove supporter role for Discord user ${discordUserId}`);
   }
 }
+export const readDiscordAccountLink = (auth: AuthenticatedMutation) =>
+  auth.supabase
+    .from('discord_account_links')
+    .select('discord_user_id')
+    .eq('user_id', auth.user.id)
+    .maybeSingle<{ discord_user_id: string }>();

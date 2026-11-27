@@ -525,10 +525,76 @@ describe('useTaskNotification', () => {
     context.notification.undoLastAction();
     return context;
   };
+  it.each([true, false, undefined])(
+    'restores an alternative with prior acceptance %s after completion',
+    async (active) => {
+      const state = structuredClone(defaultState);
+      progressActions.setTaskActive.call(state, undoTask.id);
+      state.pvp.taskCompletions[alternativeTask.id] = {
+        complete: false,
+        failed: false,
+        timestamp: 10,
+        ...(active === undefined ? {} : { active }),
+      };
+      const { notification, tarkovStore, stop } = await setup([undoTask, alternativeTask], {
+        progressData: state.pvp,
+        isTaskActive: progressGetters.isTaskActive(state),
+        isTaskComplete: progressGetters.isTaskComplete(state),
+      });
+      tarkovStore.setTaskActive.mockImplementation((id: string) =>
+        progressActions.setTaskActive.call(state, id)
+      );
+      tarkovStore.setTaskUncompleted.mockImplementation((id: string) =>
+        progressActions.setTaskUncompleted.call(state, id)
+      );
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, id)
+      );
+      notification.onTaskAction({ taskId: undoTask.id, action: 'complete', taskName: 'Main Task' });
+      progressActions.setTaskComplete.call(state, undoTask.id);
+      progressActions.setTaskFailed.call(state, alternativeTask.id);
+      expect(state.pvp.taskCompletions[alternativeTask.id]?.active).toBe(false);
+      notification.undoLastAction();
+      expect(state.pvp.taskCompletions[undoTask.id]?.active).toBe(true);
+      expect(state.pvp.taskCompletions[alternativeTask.id]?.active).toBe(active);
+      stop();
+    }
+  );
+  it('does not partially undo completion when an alternative clock cannot advance', async () => {
+    const state = structuredClone(defaultState);
+    progressActions.setTaskActive.call(state, undoTask.id);
+    const { notification, tarkovStore, stop } = await setup([undoTask, alternativeTask], {
+      progressData: state.pvp,
+    });
+    notification.onTaskAction({ taskId: undoTask.id, action: 'complete', taskName: 'Main Task' });
+    state.pvp.taskCompletions[alternativeTask.id] = {
+      active: false,
+      complete: true,
+      failed: true,
+      timestamp: MAX_CONFIRMATION_TIMESTAMP,
+    };
+    tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+      progressActions.setTaskAcceptanceUnknown.call(state, id)
+    );
+    await notification.undoLastAction();
+    expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskObjectiveUncomplete).not.toHaveBeenCalled();
+    stop();
+  });
+  it('leaves a completed alternative untouched when undoing completion', async () => {
+    const { tarkovStore, stop } = await undo(
+      { action: 'complete', taskName: 'Main Task' },
+      { isTaskComplete: (id) => id === alternativeTask.id }
+    );
+    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalledWith(alternativeTask.id);
+    expect(tarkovStore.setTaskAcceptanceUnknown).not.toHaveBeenCalledWith(alternativeTask.id);
+    expect(tarkovStore.setTaskObjectiveUncomplete).not.toHaveBeenCalledWith('obj-alt');
+    stop();
+  });
   it('undoing complete uncompletes the task, its objectives and its alternatives', async () => {
     const { tarkovStore, stop } = await undo({ action: 'complete', taskName: 'Main Task' });
     expect(tarkovStore.setTaskAcceptanceUnknown).toHaveBeenCalledWith('task-main');
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('task-alt');
+    expect(tarkovStore.setTaskAcceptanceUnknown).toHaveBeenCalledWith('task-alt');
     expect(tarkovStore.setTaskObjectiveUncomplete).toHaveBeenCalledWith('obj-main');
     expect(tarkovStore.setTaskObjectiveUncomplete).toHaveBeenCalledWith('obj-alt');
     stop();

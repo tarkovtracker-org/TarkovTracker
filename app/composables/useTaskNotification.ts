@@ -1,6 +1,7 @@
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
+import { hasUnconfirmableStatusClock } from '@/utils/taskAvailabilityConfirmation';
 import { provesStartGates, releaseRecordedStoryObjectives } from '@/utils/taskProgress';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { Task, TaskObjective } from '@/types/tarkov';
@@ -82,29 +83,15 @@ export function useTaskNotification(): TaskNotificationReturn {
       }
     });
   };
-  type AlternativeTaskAction = 'setTaskComplete' | 'setTaskUncompleted' | 'setTaskFailed';
-  type ObjectiveAction = 'setTaskObjectiveComplete' | 'setTaskObjectiveUncomplete';
-  const updateAlternativeObjectives = (
-    objectives: TaskObjective[],
-    taskAction: AlternativeTaskAction,
-    objectiveAction?: ObjectiveAction
-  ) => {
-    if (taskAction === 'setTaskFailed') clearTaskObjectives(objectives);
-    else if (objectiveAction) handleTaskObjectives(objectives, objectiveAction);
-  };
-  const handleAlternatives = (
-    alternatives: string[] | undefined,
-    taskAction: AlternativeTaskAction,
-    objectiveAction?: ObjectiveAction
-  ) => {
+  const alternativeObjectives = (taskId: string) =>
+    tasks.value.find((task) => task.id === taskId)?.objectives ?? [];
+  const failAlternatives = (alternatives: string[] | undefined) => {
     if (!Array.isArray(alternatives)) return;
-    alternatives.forEach((a: string) => {
-      // Failing alternatives must never overwrite one the player already completed.
-      if (taskAction === 'setTaskFailed' && tarkovStore.isTaskComplete(a)) return;
-      tarkovStore[taskAction](a);
-      const objectives = tasks.value.find((task) => task.id === a)?.objectives;
-      if (objectives) updateAlternativeObjectives(objectives, taskAction, objectiveAction);
-    });
+    for (const taskId of alternatives) {
+      if (tarkovStore.isTaskComplete(taskId)) continue;
+      tarkovStore.setTaskFailed(taskId);
+      clearTaskObjectives(alternativeObjectives(taskId));
+    }
   };
   const needsLevel = (currentLevel: unknown, minLevel: number) =>
     typeof currentLevel !== 'number' || !Number.isFinite(currentLevel) || currentLevel < minLevel;
@@ -117,16 +104,39 @@ export function useTaskNotification(): TaskNotificationReturn {
     event: TaskActionPayload;
     task: Task | undefined;
     previousAcceptance: boolean | undefined;
+    alternativeAcceptances: ReadonlyMap<string, boolean | undefined>;
     releaseStoryObjectives: () => void;
   };
-  const restoreTaskAcceptance = ({ event, previousAcceptance }: UndoContext) => {
-    if (previousAcceptance === undefined) tarkovStore.setTaskAcceptanceUnknown(event.taskId);
-    else if (previousAcceptance) tarkovStore.setTaskActive(event.taskId);
-    else tarkovStore.setTaskUncompleted(event.taskId);
+  const restoreTaskAcceptance = (taskId: string, active: boolean | undefined) => {
+    if (active === undefined) tarkovStore.setTaskAcceptanceUnknown(taskId);
+    else if (active) tarkovStore.setTaskActive(taskId);
+    else tarkovStore.setTaskUncompleted(taskId);
   };
+  const restoreSelectedAcceptance = ({ event, previousAcceptance }: UndoContext) =>
+    restoreTaskAcceptance(event.taskId, previousAcceptance);
   const previousAcceptance = (taskId: string): boolean | undefined => {
     const active = tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId]?.active;
     return typeof active === 'boolean' ? active : undefined;
+  };
+  const captureAlternativeAcceptances = (alternatives: string[] | undefined) =>
+    new Map(
+      (Array.isArray(alternatives) ? alternatives : [])
+        .filter((id) => !tarkovStore.isTaskComplete(id))
+        .map((id) => [id, previousAcceptance(id)] as const)
+    );
+  const checkAcceptanceRestores = (context: UndoContext) => {
+    const completions = tarkovStore.getCurrentProgressData()?.taskCompletions;
+    const restores = [
+      [context.event.taskId, context.previousAcceptance] as const,
+      ...context.alternativeAcceptances,
+    ];
+    if (
+      restores.some(
+        ([id, active]) => active === undefined && hasUnconfirmableStatusClock(completions?.[id])
+      )
+    ) {
+      throw new Error('Task acceptance clock cannot advance');
+    }
   };
   const showUndoStatus = ({ event }: UndoContext, statusKey: string) => {
     updateTaskStatus(statusKey, event.taskName);
@@ -138,19 +148,19 @@ export function useTaskNotification(): TaskNotificationReturn {
   const undoHandlers: Partial<Record<TaskActionPayload['action'], (context: UndoContext) => void>> =
     {
       active: (context) => {
-        restoreTaskAcceptance(context);
+        restoreSelectedAcceptance(context);
         context.releaseStoryObjectives();
         showUndoStatus(context, 'page.tasks.questcard.undo_active');
       },
       complete: (context) => {
-        restoreTaskAcceptance(context);
+        checkAcceptanceRestores(context);
+        restoreSelectedAcceptance(context);
         context.releaseStoryObjectives();
         uncompleteObjectives(context.task);
-        handleAlternatives(
-          context.task?.alternatives,
-          'setTaskUncompleted',
-          'setTaskObjectiveUncomplete'
-        );
+        for (const [taskId, active] of context.alternativeAcceptances) {
+          restoreTaskAcceptance(taskId, active);
+          handleTaskObjectives(alternativeObjectives(taskId), 'setTaskObjectiveUncomplete');
+        }
         showUndoStatus(context, 'page.tasks.questcard.undo_complete');
       },
       uncomplete: (context) => {
@@ -158,7 +168,7 @@ export function useTaskNotification(): TaskNotificationReturn {
         if (context.task?.objectives) {
           handleTaskObjectives(context.task.objectives, 'setTaskObjectiveComplete');
         }
-        handleAlternatives(context.task?.alternatives, 'setTaskFailed');
+        failAlternatives(context.task?.alternatives);
         raiseToMinLevel(context.task?.minPlayerLevel);
         showUndoStatus(context, 'page.tasks.questcard.undo_uncomplete');
       },
@@ -172,7 +182,7 @@ export function useTaskNotification(): TaskNotificationReturn {
         showUndoStatus(context, 'page.tasks.questcard.undo_reset_failed');
       },
       fail: (context) => {
-        restoreTaskAcceptance(context);
+        restoreSelectedAcceptance(context);
         context.releaseStoryObjectives();
         uncompleteObjectives(context.task);
         showUndoStatus(context, 'page.tasks.questcard.undo_failed');
@@ -183,17 +193,22 @@ export function useTaskNotification(): TaskNotificationReturn {
     return provesStartGates(
       task,
       data?.taskCompletions?.[task.id],
-      data?.taskAvailability?.[task.id]
+      data?.taskAvailability?.[task.id],
+      data?.taskCompletions
     );
   };
   /** Register a reversible action in the global undo store for actions we can revert. */
   const registerUndo = (event: TaskActionPayload, description: string) => {
     const handler = undoHandlers[event.action];
     if (!handler) return;
+    const task = tasks.value.find(({ id }) => id === event.taskId);
     const context: UndoContext = {
       event,
+      task,
       previousAcceptance: previousAcceptance(event.taskId),
-      task: tasks.value.find((task) => task.id === event.taskId),
+      alternativeAcceptances: captureAlternativeAcceptances(
+        event.action === 'complete' ? task?.alternatives : undefined
+      ),
       releaseStoryObjectives: () =>
         releaseRecordedStoryObjectives({
           store: tarkovStore,

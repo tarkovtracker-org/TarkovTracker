@@ -2,7 +2,15 @@
  * Layers panel rows whose visibility is remembered across refreshes and page changes. Task rows
  * (Regular, Pinned, Team) already persist through their own preferences.
  */
-const SAVED_MAP_LAYER_KEYS = ['pmc', 'scav', 'shared', 'coop', 'transit', 'spawns'] as const;
+const SAVED_MAP_LAYER_KEYS = [
+  'pmc',
+  'scav',
+  'shared',
+  'coop',
+  'transit',
+  'spawns',
+  'bosses',
+] as const;
 export type SavedMapLayerKey = (typeof SAVED_MAP_LAYER_KEYS)[number];
 /** Only rows the user changed are stored; a missing row follows its default. */
 export type SavedMapLayerVisibility = Partial<Record<SavedMapLayerKey, boolean>>;

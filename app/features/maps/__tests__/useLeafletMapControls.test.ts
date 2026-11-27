@@ -32,6 +32,7 @@ const createPreferencesStore = () => {
         PMC_EXTRACT: '#f97316',
         PMC_SPAWN: '#ef4444',
         TRANSIT: '#cf5959',
+        BOSS_SPAWN: '#b23434',
         SCAV_EXTRACT: '#3b82f6',
         SELECTED: '#f59e0b',
         SELF_OBJECTIVE: '#10b981',
@@ -48,7 +49,6 @@ const createPreferencesStore = () => {
     get mapPanSpeed() {
       return state.mapPanSpeed;
     },
-    setMapMarkerColor: () => {},
     setMapPanSpeed: (value: number) => {
       state.mapPanSpeed = value;
     },
@@ -75,7 +75,6 @@ describe('useLeafletMapControls', () => {
     const controls = useLeafletMapControls({
       map: ref({ id: '5714dbc024597771384a510d', name: 'Interchange', extracts: [extract] }),
       preferencesStore: createPreferencesStore(),
-      t: (key) => key,
     });
     // The translated name does not match the co-op pattern, so only the loaded rules classify it.
     expect(getExtractGlyphKind(extract)).toBe('shared');
@@ -114,7 +113,6 @@ describe('useLeafletMapControls', () => {
         transits: [transit, { ...transit, id: 'bad', position: foreign.position }],
       } as TarkovMap),
       preferencesStore: createPreferencesStore(),
-      t: (key) => key,
     });
     expect(controls.mapExtracts.value).toEqual([native]);
     expect(controls.hasScavExtracts.value).toBe(false);
@@ -128,7 +126,6 @@ describe('useLeafletMapControls', () => {
       map,
       preferencesStore: createPreferencesStore(),
       showExtracts: false,
-      t: (key: string) => key,
     });
     expect(controls.mapTransits.value).toEqual([]);
     expect(controls.hasTransits.value).toBe(false);
@@ -172,7 +169,6 @@ describe('useLeafletMapControls', () => {
         spawns: [{ categories: ['player'], position: { x: 1, y: 0, z: 1 }, sides: ['pmc'] }],
       } as TarkovMap),
       preferencesStore: createPreferencesStore(),
-      t: (key: string) => key,
     });
     expect(controls.hasPmcSpawns.value).toBe(true);
     expect(controls.hasCoopExtracts.value).toBe(true);

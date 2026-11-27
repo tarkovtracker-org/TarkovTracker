@@ -1,9 +1,7 @@
-import { getCompletionFlags } from '@/utils/taskStatus';
+import { getCompletionFlags, isTaskActive } from '@/utils/taskStatus';
 import type { UserProgressData } from '@/stores/progressState';
 type TaskCompletion = UserProgressData['taskCompletions'][string];
 type ObjectiveProgress = UserProgressData['taskObjectives'][string];
-// Unknown acceptance agrees with explicit false; only true is authoritative acceptance.
-const recordedAcceptance = (completion: TaskCompletion | undefined) => completion?.active === true;
 const taskEntriesConflict = (
   local: TaskCompletion | undefined,
   remote: TaskCompletion | undefined
@@ -13,7 +11,7 @@ const taskEntriesConflict = (
   return (
     localFlags.complete !== remoteFlags.complete ||
     localFlags.failed !== remoteFlags.failed ||
-    recordedAcceptance(local) !== recordedAcceptance(remote)
+    isTaskActive(local) !== isTaskActive(remote)
   );
 };
 const objectiveCount = (entry: ObjectiveProgress | undefined) => entry?.count ?? 0;

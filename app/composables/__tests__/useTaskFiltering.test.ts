@@ -391,6 +391,15 @@ describe('useTaskFiltering', () => {
         )
         .map(({ id, neededBy }) => [id, neededBy])
     ).toContainEqual(['task-map', ['Teammate']]);
+    expect(
+      taskFiltering
+        .calculateFilteredTasksForOptions(
+          tasks,
+          { ...allUserStatusOptions, secondaryView: 'all' },
+          false
+        )
+        .map(({ id, neededBy }) => [id, neededBy])
+    ).toContainEqual(['task-map', ['Self', 'Teammate']]);
     const failedOptions = { ...allUserStatusOptions, secondaryView: 'failed' as const };
     expect(
       taskFiltering

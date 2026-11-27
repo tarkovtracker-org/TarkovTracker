@@ -1,11 +1,8 @@
-import { TASK_OBJECTIVES_PURGE_CHECK_TTL_MS } from '@/utils/taskCatalogCache';
+import { readErrorBodySnippet } from '@/server/utils/fetchWithTimeout';
 import type { H3Event } from 'h3';
 import { normalizeSupabaseUrl } from '~/server/utils/adminSupabase';
 import { createLogger } from '~/server/utils/logger';
 const logger = createLogger('TarkovCacheMeta');
-let purgeTime = 0;
-let nextPurgeCheckAt = 0;
-let purgeCheck: Promise<number> | undefined;
 function buildAuditQuery(event: H3Event) {
   const config = useRuntimeConfig(event);
   const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
@@ -63,15 +60,7 @@ export async function readTarkovCacheMeta(event: H3Event) {
 }
 async function readAuditResponse(response: Response, url: URL) {
   if (!response.ok) {
-    let bodySnippet: string;
-    try {
-      bodySnippet = await response.text();
-      if (bodySnippet.length > 200) {
-        bodySnippet = bodySnippet.slice(0, 200) + '...';
-      }
-    } catch {
-      bodySnippet = '[unable to read response body]';
-    }
+    const bodySnippet = await readErrorBodySnippet(response);
     logger.error('Non-OK response from Supabase.', {
       url: url.toString(),
       status: response.status,
@@ -106,18 +95,4 @@ async function readAuditResponse(response: Response, url: URL) {
     return details !== null && typeof details === 'object' && details.success === true;
   });
   return { data: { lastPurgeAt: lastSuccessful?.created_at ?? null } };
-}
-export function getTarkovCachePurgeTime(event: H3Event): Promise<number> {
-  if (Date.now() < nextPurgeCheckAt) return Promise.resolve(purgeTime);
-  purgeCheck ??= readTarkovCacheMeta(event)
-    .then(({ data }) => {
-      const timestamp = Date.parse(data.lastPurgeAt ?? '');
-      if (Number.isFinite(timestamp)) purgeTime = Math.max(purgeTime, timestamp);
-      return purgeTime;
-    })
-    .finally(() => {
-      nextPurgeCheckAt = Date.now() + TASK_OBJECTIVES_PURGE_CHECK_TTL_MS;
-      purgeCheck = undefined;
-    });
-  return purgeCheck;
 }

@@ -119,319 +119,142 @@ is not confused with the eye.
 
 ### Server-side start requirements
 
-`app/utils/taskOtherRequirements.ts` preserves and validates the API's `otherRequirements` at
-adaptation and overlay boundaries. `app/stores/taskServerGates.ts` evaluates global-variable
-comparisons literally, separately from prerequisite edges, and keeps missing or invalid effective
-account values unknown (including `== 0`). Overlay `storyObjective` gates are met by the player's effective storyline objective
-(a recorded mark or producer-declared tutorial baseline; see [storyline policy](./overlay-and-precompute.md))
-(not by an in-game confirmation). A task that is available, started, completed or failed has passed its
-start gates, so Mark available, Mark complete, Mark failed, the prerequisites Mark available
-completes, and imported EFT starts, completions and failures all record that objective
-(`recordImpliedStoryObjectives`). A task's recorded state proves its gates (`provesStartGates`) when
-it is completed, manually failed, or confirmed available; automatic branch failures do not count
-because they do not prove the task was started. The completed-task repair (`repairCompletedProgress`)
-backfills ordinary tracked objectives for every gated task whose state proves it, on each progress and task-catalog
-load, stamped past any unmark, so the two cannot disagree; it never unmarks. Repair and
-the metadata projection never backfill a tutorial baseline or fabricate its completion time. Undoing Mark complete or
-Mark failed releases only the objectives that action newly recorded, unless another task's state
-still proves them; a manual uncomplete leaves them recorded. Completing or uncompleting an objective stamps a clock after the entry's
-existing one, so a newer device clock cannot override the latest change. `applyOverlay` turns a story gate whose chapter or objective is absent from
-the mode's story catalog into an unknown gate, and a recorded objective in one of the task's own
-story-unlock chapters opens the story route, so Mark available backfills no prerequisites.
-Trader conversations also require confirmation;
-unsupported or malformed requirements remain blocked as `{ type: 'unknown', upstreamType }`, keeping the
-upstream discriminator. Only published start requirements are
-consumed, not finish/fail conditions. Unknown server gates remain in the locked list, with an
-explanation shared by task cards and recommendations.
+`app/utils/taskOtherRequirements.ts` preserves published start gates. `app/stores/taskServerGates.ts`
+evaluates global-variable comparisons literally, separately from quest edges. Missing or malformed
+values stay unknown, including for `== 0`. Unknown gates stay locked and share explanations
+across cards and recommendations. Finish/fail conditions do not become start gates.
 
-The [overlay registry](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLES.md)
-is a best-effort mapping from a global variable to the tasks whose completions derive it
-([mechanics research](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLE_MECHANICS.md)).
-`app/server/utils/overlayCounters.ts` validates it against the overlay schema and, for the request's
-mode, applies only `verified`/`complete` entries whose revision is in
-`SUPPORTED_COUNTER_REVISIONS`. It attaches each entry's derivation to the matching gate as
-`counter` when every contributor is in the same task payload: `{ type: 'distinctTaskCompletions',
-taskIds }` counts each completed task, and `{ type: 'taskGroupCompletions', groups }` counts each
-group the game credits as one. A list group counts once all its tasks are completed (same-threshold
-Gunsmith pairs; whether half a group already counts is unverified, so the tracker takes the
-conservative reading and Mark available covers an earlier in-game unlock). An `{ anyOf }` group (two
-or more tasks) counts once any member is completed (faction variants such as the BEAR-only AKM and
-USEC-only M4A1 Gunsmith parts, where a player can only ever complete one). No task may appear in two
-groups. An unknown derivation
-type makes the registry malformed, so the tracker must support a type before the overlay publishes
-it. This runs last in `applyOverlay`, so task
-corrections cannot supply a derivation.
-`unresolved`/`partial` entries, unsupported revisions and other modes attach no counter.
+Story gates use recorded objectives or the producer's tutorial baseline. Missing mode-scoped
+chapters/objectives become unknown. Mark available, accept, complete, fail, implied prerequisite
+completion and EFT imports record the relevant story objective. An explicitly accepted, completed,
+manually failed or confirmed-available task proves its supported gates. Automatic branch failure does not. Repair
+backfills ordinary objectives after the latest unmark without fabricating baseline timestamps.
+Undo releases only the objectives that action introduced unless another task still proves
+them. Manual uncomplete keeps them. All mark/unmark writes advance the objective clock.
 
-Registry entries may also carry `pool: { traderId, loyaltyLevel }`. For a supported revision and
-matching mode, the server attaches `taskPool` with that identity, verification, coverage and candidate
-derivation when every contributor exists. This display metadata never creates a counter or an
-additional trader-loyalty gate. Entries without pool metadata retain their existing counter behavior.
-Both `counter` and `taskPool` are excluded from in-game confirmation signatures.
+`app/server/utils/overlayCounters.ts` applies the
+[global-variable registry](https://github.com/tarkovtracker-org/tarkov-data-overlay/blob/main/docs/GLOBAL_VARIABLES.md)
+last. A counter requires verified, complete, supported-revision mode data and every contributor
+in the task payload. Distinct tasks count individually. Groups count once for all members, or
+once for any member of an explicit `anyOf` group. A task cannot belong to multiple groups.
+Unresolved, partial, wrong-mode and unsupported entries create no counter. Unknown registry
+shapes fail validation. An explicit valid account value wins; an invalid value stays unknown.
+A recognized derived count with no completions is a known shortfall.
 
-Cards and dashboard blockers share an instruction such as "Complete at least 3 LL2 tasks for
-Mechanic". Cards show actual tracked progress and an expandable contributor list, with available
-incomplete tasks first. Each contributor retains its own availability; the current task is identified
-without being suggested as work to unlock itself. Faction alternatives appear together and earn one
-credit per group. Confirmed in-game availability remains distinct from tracked completions.
-Unresolved pools without an effective account value show "Progress unverified". A known account
-value is displayed as in-game progress. Candidate tasks remain explicitly labeled, and counting
-these candidates cannot clear the gate. Unmapped variables retain generic in-game progression wording.
-Pool descriptions are additive to the existing `json-v3` task-core payload. Keep its cache keys:
-payloads that retain the gate without pool metadata show a generic pool instruction until refreshed.
-Payloads that previously discarded the gate cannot render it until a refreshed catalog restores it. Publish consumer
-support before adding optional pool fields to the overlay, since older consumers reject unknown
-registry entry fields; then refresh precompute and the existing browser/edge caches to expose names.
+Optional pool metadata explains trader/loyalty candidates without inventing a counter or
+loyalty gate. Pool labels and contributor lists distinguish tracked progress, in-game values
+and unverified candidates. Available unfinished contributors rank first; the task itself is
+never suggested as its own unlock. Counter/pool metadata is excluded from the confirmation
+signature. Deploy compatible consumers before publishing new optional registry fields.
 
-For a gate carrying `counter`, the evaluator counts that player's completed contributors or
-groups (`task_counter` blocker with current/required on a shortfall). An account without those
-completions reads a known shortfall, not unknown. An explicit effective account value takes
-precedence, and an invalid one stays unknown instead of falling back. Gates without a derivation keep
-the unknown behaviour below. The tracker never assumes other missing values are zero, creates
-synthetic prerequisite edges, or shares a value between accounts/modes.
+### Availability confirmations
 
-**Mark available** confirms the selected task's supported server-side start gates from the player's
-in-game observation. Confirmations live in each mode's `taskAvailability` map
-(`{ [taskId]: { requirements, timestamp } }`, `app/utils/taskAvailabilityConfirmation.ts`), never in
-`taskCompletions`: confirming or clearing cannot create an "active" task record or rewrite a status
-another device set. `requirements` is the exact normalized gate signature (the `counter` derivation is
-excluded from it), and a clear is an empty string kept as a tombstone. Sync merges the map per task by
-the confirmation's own timestamp. A confirmation counts only while its signature matches and it is
-not older than the task's status timestamp, so a later reset, completion, failure or progress repair
-on any device retires it without rewriting the map. An explicitly accepted (`active`) task counts as
-having met its supported server gates without a confirmation, because the game only allows accepting
-a task once they are met; accepting also records the story objectives the task implies. The row sanitizer preserves the key (migration
-`20260928140000_preserve_task_availability_confirmations.sql`); a missing key means no confirmations.
-Every merge selects per-task timestamp winners before applying the
-[map bounds](../../supabase/migrations/20261001190000_bound_task_availability_confirmations.sql),
-so same-epoch writes cannot grow it past the sync payload limit or restore an older duplicate
-when a newer winner is evicted.
-Startup and reconnect merges compare against historical candidates before byte eviction; only the
-bounded result is applied. Owned local snapshots carry field-valid candidates limited to 1,000
-entries per mode through same-epoch composition. Their count bound is compositional: entries below
-a source's first 1,000 cannot enter the union's first 1,000 when per-task timestamps only advance.
-Snapshot candidates never enter applied state, serialization, or acknowledgement baselines.
-Before replacing oversized owned active data, the retention guard preserves its unchanged bytes
-in the existing owner-scoped recovery slot. Recovery saving may retain one unchanged historical
-payload; it never synthesizes or accumulates new overflow. Saving identical validated owner bytes
-is idempotent, including legacy progress fields that composition would otherwise normalize.
-Divergent sources that cannot be
-represented by one original leave both existing copies untouched and block destructive writes.
-The matching owner may still reconcile those copies. A confirmed startup merge/upload releases
-the historical barrier, and the existing acknowledgement flow retires the recovery copy.
-The sync RPC unions confirmations, so omitting an evicted newer winner alone could restore an older
-server value. Same-epoch startup reconciliation first uploads an eviction pass using the existing
-empty-requirement clear tombstones, then the final bounded state. Each pass stays field-, count-,
-byte-, and RPC-payload-bounded; no raw candidates are sent. Eviction clears use the largest known
-local/remote confirmation clock, so they cannot replace a concurrent newer confirmation. A failed
-or superseded pass leaves original recovery evidence pending. The server may retain bounded clear
-tombstones in addition to the client's selected confirmations; they never count as availability.
-Quota or storage failures preserve the originals and surface the existing failed-save warning.
-Standalone backup imports still sanitize and bound each imported map. Task-ID tie ordering follows
-PostgreSQL's C collation, including supplementary Unicode code points; NUL and lone surrogates are
-rejected before they can prevent JSONB persistence.
-It does not set a counter, acknowledge another task's dialogue, or complete candidate contributor
-tasks. Because a derived count is an estimate, a confirmation overrides a derived shortfall. It cannot
-bypass an explicit known unmet account value, malformed requirements, or independent
-level/faction/trader/prestige/quest gates, and changed requirements invalidate it. The lock-reset button in
-the card's Requirements header clears just the in-game confirmation. Mark available either makes the task available or changes
-nothing: it is withheld for unsupported or malformed server gates and for unmet ambiguous-status or
-malformed prerequisites. A confirmation-only mode counts as progress for sync and startup adoption. Status changes are stamped after the task's confirmation clock, so a
-device whose clock runs ahead cannot keep a confirmation alive past a later reset. Clocks are
-capped at 3000-01-01 (`MAX_CONFIRMATION_TIMESTAMP`, same bound in the migration); a confirmation at
-the cap never counts. Mark available is offered only while every current blocker is one it can
-clear (player level, trader level/reputation, unambiguous prerequisites, unknown-value or
-conversation server gates) and never before the player's own evaluation exists (for example while
-the player's own progress is hidden). An imported EFT
-log start confirms the task's current gate signature, since the game only starts a task whose gates
-are met. Shared profiles evaluate with the owner's confirmations. Incomplete/reset records are not
-confirmation evidence. Explicit prerequisite backfill
-continues for unambiguous completed/failed requirements; active-or-complete and other ambiguous
-status choices no longer fabricate completion histories or flatten alternative ancestors.
+`app/utils/taskAvailabilityConfirmation.ts` stores per-mode `taskAvailability[taskId]` with the
+normalized gate signature and timestamp. A clear uses an empty-signature tombstone.
+Confirmation never changes a task status and is invalid if older than the current status or
+if the signature changed. Status changes advance beyond confirmation clocks. Clocks cap at
+3000-01-01; a confirmation at the cap never counts. Confirmation-only progress is syncable.
 
-This is additive to `tasks-core-json-v3`: old cached payloads that discarded `otherRequirements`
-cannot be repaired in the evaluator. Before claiming the fix is live, verify a successful full
-precompute refresh using this revision and refreshed edge/browser task payloads containing the new
-field. No production precompute or cache purge is performed by opening the PR. Unknown gates that
-are not published upstream cannot be reconstructed from the public task catalog.
+Mark available is shown only for the player's own evaluation and when its supported changes
+can clear every blocker. It can confirm unknown/conversation gates, override a derived
+shortfall, and backfill unambiguous level/trader/quest requirements. It cannot clear explicit
+unmet values, malformed gates, faction/prestige gates, unknown task data or independent story
+trader gates. Ambiguous prerequisite statuses never manufacture outcomes. An already open
+story route does not backfill quests. EFT starts confirm the current gate signature. Shared
+profiles use their owner's confirmations. Clearing affects only that confirmation.
 
-Hideout cards evaluate the declared trader comparison against current loyalty (legacy default `>=`). Completed-module enforcement retains a build if the current stored loyalty satisfies the comparison (including legacy values above the normal range), or if any valid loyalty level at or below it satisfies that comparison, so advancing past an upper-bound or equality requirement cannot erase built modules or their parts. Lower-bound loyalty downgrades still revoke dependent builds. Disabled trader gating bypasses both checks. Optional profile chapter and prestige normalization run inside their optional request boundaries: malformed catalogs show a partial failure without discarding successful task catalogs. Overlay promotion requires a nonempty editions catalog as well as complete provenance, and forced edition refreshes forward `cacheBust=1` to bypass the worker overlay cache.
+Select same-epoch winners by task timestamp before count/byte eviction. Historical snapshot
+candidates are field-valid and capped at 1,000 per mode. They never enter applied state,
+serialization or acknowledgement. Preserve one original oversized owned payload in its recovery
+slot, idempotently. If divergent sources cannot fit that rule, keep both originals and block
+destructive writes until owned reconciliation. Send bounded eviction tombstones before the
+final bounded map, using the highest known local/remote clocks so newer concurrent records win.
+Failed or superseded reconciliation leaves recovery pending. Reject NUL and lone surrogates;
+task-ID ties follow PostgreSQL C/code-point order. Standalone imports sanitize and bound maps.
 
-Isolated profile catalogs normalize and qualify duplicate objective IDs and build the same task predecessor graph as active metadata, without mutating active progress. EFT completion imports apply trader implications only when the trader-gating preference captured at confirmation is enabled; task completion and player-level implications remain authoritative. Shared profiles project legacy objective keys through the duplicate-ID mapping without modifying stored progress; explicit task-qualified values take precedence.
+### Trader, story and prestige gates
 
-`app/utils/taskRequirements.ts` normalizes the discriminated trader collection at the server
-boundary. `tarkov-json.ts` builds `normalizedTraderRequirements` after reference adaptation;
-`overlay.ts` rebuilds it when an overlay replaces trader requirements. Legacy split lists remain
-compatibility projections. Missing types, malformed references/values and unsupported comparisons
-become diagnostic unknown requirements, not reputation guesses. A missing comparison on a known
-legacy requirement defaults to `>=`. Declared `>=`, `>`, `<=`, `<`, `=`, `==` and `!=` are evaluated
-literally. Neither trader identity nor the sign of a value selects its meaning.
+`app/utils/taskRequirements.ts` normalizes trader loyalty and reputation comparisons. Apply
+declared operators literally and default a missing legacy operator to `>=`. Preserve upstream
+type and record unknown diagnostics for malformed explicit task, trader or prestige gates.
+Only absent optional inputs omit a gate. Overlay and localized patches retain original IDs
+and diagnostics. An objectives-only merge cannot replace core gates. A malformed prestige
+diagnostic blocks independently of inference. The overlay's supported id-less New Beginning
+gate uses the authoritative prestige task map.
 
-Declared prerequisite collections and prestige references follow the same rule. `null` and
-`undefined` mean the optional gate is absent; every other value is a gate the source declared, so it
-either survives normalization or is recorded in `Task.requirementDiagnostics` as `task_requirement`
-or `prestige_reference`. `tarkov-json.ts` models `requiredPrestige` as an id reference only, so it
-drops anything else and records the diagnostic; `overlay.ts` reports exactly the gates its own
-normalization dropped; `taskAvailability.ts` turns each diagnostic into an unknown blocker. Supported
-source shapes are unaffected: a bare prerequisite task id, a bare prestige id string, and a prestige
-object reference all still resolve, an absent or empty collection still leaves the task available,
-and the overlay keeps the id-less `{ name, prestigeLevel }` gate of an injected New Beginning task
-verbatim (its level comes from `buildPrestigeTaskMap`'s task id/wikiLink inference, not from the
-reference). A satisfied story route continues to unlock a task whose quest group is uninterpretable,
-because that route is an alternative to the group rather than a bypass of an independent gate. The
-evaluator additionally treats a non-list `taskRequirements` as the same diagnostic rather than as an
-empty list, so an older payload cannot make availability read a broken collection as no collection.
-That guard covers the evaluator only: other task consumers still assume a list, and a pre-fix payload
-that dropped a gate without recording a diagnostic stays unlocked until the refresh below replaces it.
+`app/stores/taskAvailability.ts` memoizes per-task/user evaluations with cycle protection.
+`useProgress.taskEvaluations` drives locked cards, sorting and recommendations. Known trader
+gates can be disabled; unknown data stays locked. Required status `complete|failed` accepts
+either terminal outcome. A story route permits **independent gates AND (quest prerequisites
+OR recorded progress in an explicitly wired chapter)**. Chapter order never grants access.
+For Preserve a Valuable Piece, eligibility alone does not prove Cut Down to the Root was
+accepted. An imported EFT start or explicit in-game availability confirmation is required;
+a reset invalidates the confirmation even when the reset device runs behind. A terminal Jaeger
+status closes the route. The five-second game delay is informational because the tracker does
+not have an authoritative acceptance clock.
+Other active prerequisites allow the planning fallback for legacy rows with unknown acceptance.
+Explicitly inactive rows cannot use that fallback.
 
-A `prestige_reference` diagnostic blocks independently of `prestigeTaskMap`, including entries
-inferred from a New Beginning task id or wikiLink: inference cannot repair a malformed declared gate.
-Without a diagnostic, the map continues to govern supported prestige references and inferred tasks.
-The overlay's supported id-less prestige shape is retained without a diagnostic. Two adjacent paths keep
-the diagnostic intact rather than losing it: task patches are normalized using their original id,
-and retain pre-merge diagnostics rather than accepting a patch-supplied diagnostic array,
-including locale patches after they merge,
-because locale corrections are applied last, and `useProfileTaskMetadata.mergeProfileTasks` takes only
-objective data from the objectives catalog, so a stray gate field an overlay patch merged into that
-response cannot replace the core catalog's gates.
+Eligibility and caches use the selected mode. An isolated profile uses its own metadata and
+progress and ignores superseded requests. Required core/objective failures are fatal;
+edition, prestige and story failures can stay partial. Edition/story validation is independent.
+Profile objective normalization keeps task-qualified IDs authoritative without writes.
 
-`app/stores/taskAvailability.ts` evaluates each task/user with memoization and cycle protection.
-The result carries availability and blockers for levels, loyalty, reputation, quest statuses,
-failed branches, faction, trader unlocks, prestige and unsupported data. `useProgress.taskEvaluations`
-is the source for explanations and sorting; `unlockedTasks` is its boolean projection. The task
-card builds its requirement views with `useTaskRequirements`. A collapsed locked card shows
-blockers as chips (three, then an inline "+N more"). An expanded card shows the Requirements
-list with blockers first and each level, trader, quest, and server-side requirement
-marked met or unmet. The list starts open while any requirement is unmet and collapsed once all
-are met; its header toggles it like Objectives. Trader rows with the same requirement, status,
-and current value merge into one row (`Loyalty 3+: Therapist, Skier`). Server-side and trader
-unlock rows use short labels (`Trader conversation`, `Unlock Mechanic`). When the label drops
-detail, such as a story unlock objective, the full `useTaskBlockerText` sentence opens from an
-info button on hover, focus, or tap. Gates the tracker cannot observe keep a visible Mark available
-hint. Quest links skips only prerequisite links that the open Requirements list shows. Cards carry no separate level or trader
-requirement badges. Comparisons use the plain-language formatter in `requirement-format.ts`
-(`15+`, `exactly 1`); the dashboard's `useTaskBlockerText` sentences use the same formatter. Shared/non-current profile
-views call the same evaluator with their own mode progress. Profile task/objective, prestige and
-story catalogs load for the selected mode without mutating the active metadata store; obsolete
-mode/language requests are aborted on scope change or unmount and late responses are ignored.
-Requests time out after 60 seconds to accommodate the server retry budget. Edition and story
-catalogs share one request but validate independently; story, edition or prestige failures retain
-successful task and objective data with an error indicator. Profiles prefer the selected mode's
-editions, falling back to the active catalog while unavailable. Missing core/objective catalogs
-remain fatal.
-Explicit objective `unlocks` with `type: 'trader'` supply trader gates shared by dashboard cards
-and every pending task owned by that trader, including tasks without their own story requirements.
-Once the selected mode's task and reward catalogs load, the dashboard shows an unlinked warning
-for a configured unlock only if neither its task ID nor any task's trader rewards match. It shows
-a neutral status while the necessary catalog data is unavailable.
-Only a unique objective placement is authoritative; an omitted trader ID resolves only through a
-unique same-name chapter trader reference. Chapter summaries and objective wording never imply a
-gate. Exact objective completion (including the producer-declared tutorial baseline) opens the
-trader; chapter completion, standing, other completed tasks, task availability confirmations and
-disabled loyalty gating do not bypass an explicit gate. Catalogs must match each user's mode;
-shared profiles use their isolated viewed-mode catalog. Dashboard task-derived story gates remain
-a compatibility fallback when no clear objective placement exists. Story trader blockers name the
-objective and cannot be cleared through Mark available; complete the storyline objective first.
-Task-gated traders open when any configured unlock task (`TRADER_UNLOCK_TASKS`) or any task whose
-`finishRewards.traderUnlock` names the trader is complete (for example, Mechanic's Introduction
-opens Jaeger). The dashboard and the evaluator read the same reward-derived list, so a trader
-locked on the dashboard also locks its tasks. A configured unlock ID stays a gate even when its
-task is absent from the catalog; recorded completion can still satisfy it. Ref uses only the
-current mode's configured ID, and an unlock task never gates itself. Missing unlock metadata
-keeps the dashboard locked without a broken task link; task blockers explain the missing data
-instead of showing a raw ID.
-Players can recover a missing configured unlock task from explicit completion notifications through
-the [bounded EFT log-import path](./imports.md#eft-log-import), even before its metadata returns.
+Explicit story-objective trader unlocks apply to all tasks for that trader. Resolve only a
+unique objective placement and a unique same-name chapter trader when no ID is supplied.
+Exact objective completion or the tutorial baseline opens it. Chapter summaries, standing,
+task completion and disabling loyalty do not. When no clear story placement exists, the dashboard and evaluator share configured and
+reward-derived unlock tasks. Any completed unlock task opens that trader. It never gates itself. A configured but missing task stays a gate
+that recorded progress or [EFT import](imports.md#eft-log-import) may satisfy. Ref uses only
+the current mode's ID. Missing catalog data explains a blocker without exposing a raw ID.
 
-Time gates are information only. `tarkov-json.ts` carries upstream `availableDelaySecondsMin/Max`
-onto the task core only when positive and finite (upstream reports no delay as `0`). The card header
-shows the stated delay ("Unlocks 10h after prerequisites are complete", or a min–max range) on
-unfinished tasks through `TaskTimeGateNote.vue` and `task-time-gate.ts`. It explains why the game
-can still withhold a task the tracker shows as available. The evaluator, sorting and Mark available
-ignore it, and there is no countdown: tracker completion times cannot reconstruct when the
-prerequisite was finished in game (#922). The fields are additive to `tasks-core-json-v3`, so cache
-keys stay unchanged and they appear once the scheduled precompute and browser caches refresh.
+Completion/availability and EFT completion share trader lower-bound implications. Never
+reduce loyalty/reputation or infer upper-bound, inequality or strict reputation increments.
+Strict integer loyalty advances one level. A built hideout module stays built when current
+or a lower valid loyalty satisfies an equality/upper-bound gate. Lower-bound downgrades can
+revoke a build. Disabled trader gating bypasses both checks. EFT trader implications honor
+the preference captured at confirmation. Quest completion and level implications still apply.
+EFT cannot infer the quest branch from a completion with a story alternative. Tarkov.dev
+profile import has no quest-completion backfill.
 
-Dashboard Up next follow-up counts use canonical prerequisite availability intersected with the
-current profile's edition, prestige and faction eligibility. Ineligible children contribute no
-“Opens” count or ranking bonus. Dashboard display preferences (task categories and required keys)
-do not remove an otherwise eligible follow-up from that count.
+### Presentation and ordering
 
-Up next also shows one continuation for an incomplete auto-started or already-progressed Storyline
-chapter from the current mode's catalog. “Next tracked step” follows the existing timeline, skips
-automatic tutorial completion and optional steps, and does not claim in-game availability. Unresolved
-route choices link to the chapter without selecting a branch; missing/exhausted objective data asks
-the player to review the chapter rather than inferring completion. Benefits retain source qualifiers;
-“Opens” counts only eligible pending tasks whose every remaining gate is that exact story objective.
-The unfiltered, non-searching personal Available list reuses this guidance when empty. Known story
-objective blockers deep-link to that objective; unknown references retain the task requirements link.
-Search, content filters, teammate views and other task statuses keep their existing empty states.
+Accept records the task as Active and moves it out of Available. Completion, failure and a
+neutral reset clear acceptance. Undo restores prior acceptance, including unknown acceptance and
+alternatives affected by completion. The team All view includes active and available teammates
+under Needed by.
 
-Completed and failed tasks are terminal.
-The explicit Accept workflow stores `active: true`; a neutral write stores `active: false`.
-Legacy rows without an `active` key retain the unlockable prerequisite fallback. Task cards use
-the same fallback when explaining prerequisite status, without labeling unknown tasks Active.
+Cards show a short collapsed blocker list and shared requirement explanations. Expanded rows
+put blockers first and group equivalent trader gates. Show story routes as independent
+alternatives. Time-gate notes display finite positive upstream min/max delay for unfinished
+tasks, with no countdown or effect on sorting, availability, or Mark available.
 
-Shared story chapters followed by matching mode corrections produce `Task.storyUnlocks` from
-`questUnlocks`. Availability requires all independent gates AND (all quest requirements OR any
-wired chapter with recorded completion/objective progress). Chapter ordering is never an unlock
-condition. Client chapters merge the same mode patches (including partial objectives), and
-edition/chapter caches and in-flight requests are mode-scoped. The Requirements row lists a
-story route as its own "Or progress a story chapter" line, met from the same effective story
-progress the evaluator reads; the quest prerequisites keep their own state. `complete|failed` accepts either terminal outcome. A story route cannot bypass trader,
-faction or prestige gates. Required prestige uses the existing authoritative prestige task map;
-unresolved references remain blocked until metadata is available.
+`app/utils/taskSorter.ts` progression sorts available, single numeric gate by distance,
+quest-chain gate, multiple gates, completed, terminal-blocked and unknown. All-users views use
+the best visible rank. Trader sorting uses trader/loyalty/readiness then stable name/ID.
+Pinned partitions, map/status groups and Kappa chains stay intact. Partial-rank chains take
+their best rank and unranked groups go last. Impact remains the default. Legacy `level`
+means player-level sort and invalid settings fall back to `none`.
 
-Sorting lives in `app/utils/taskSorter.ts`. Progression sorts available tasks first, then a single
-numeric gate by relative distance, a quest-chain gate, multiple gates, completed tasks, terminal
-blocked tasks, and unknown data. All-users views use the best visible user's rank. Trader sort
-uses trader order, that trader's required loyalty, readiness, and stable name/ID ties. Pinned
-partitions and map/status grouping remain intact. Item distribution retains Kappa priority and
-uses progression within it; Kappa chain groups use progression while keeping parts adjacent.
-The row sorter accepts a partial progression index: chains inherit their best known rank, and
-wholly unranked groups sort last. Catalog changes recompute the overview reactively; removed
-tasks are not retained as stale rows.
-The existing impact default remains. Saved `level` values retain player-level sorting, now labelled
-Player level; `progression` is additive and invalid saved/query values retain the `none` fallback.
-Genuine level badges, graph levels and XP/level projections remain player-level values.
-
-Completion/availability actions and EFT completion imports share `taskProgress.ts` implications:
-raise known loyalty/reputation lower bounds without reducing earned values. Integer strict loyalty
-bounds advance to the next level; strict reputation bounds remain unchanged because no exact
-standing increment is known. Upper bounds and `!=` do not infer a new minimum. Existing terminal
-prerequisite outcomes are preserved. EFT completion logs do not identify which OR route was used,
-so tasks with wired story alternatives do not imply completion or failure of legacy prerequisites.
-Explicit prerequisite events still apply. Missing recorded story progress is not proof of the quest
-route. Imports load and mutate only their selected destination mode;
-Seasonal log eligibility and restoration guards are unchanged. Tarkov.dev profile import does
-not import quest completions and therefore has no trader/task backfill path.
+Up next counts only eligible follow-ups across edition, prestige and faction regardless of
+dashboard display settings. It can suggest one incomplete started or auto-started Storyline
+chapter, skip optional/tutorial progress, and leave unresolved route choices to the player.
+Missing objective data asks the player to review the chapter. “Opens” counts eligible pending
+tasks whose only remaining gate is the exact objective. The unfiltered personal Available
+empty state reuses this guidance. Known story blockers deep-link to their objective.
 
 ### Invariants
 
-- Undoing completion or failure restores whether the task was accepted before that action.
-
-- Canonical requirements, blockers, status comparisons and story alternatives are shared by UI and
-  recommendations; no new dependency on the removed upstream task `alternatives` is introduced.
-- Known trader gates may be disabled by preference; unknown data never silently unlocks a task.
-- A declared gate that cannot be interpreted never reads as an absent gate. An absent optional gate
-  leaves the task available; a malformed explicit prerequisite collection or prestige reference keeps
-  it blocked behind an unknown blocker.
-- `requirementDiagnostics` is additive to the `tasks-core-json-v3` contract, so recording it does not
-  bump the precompute or browser cache versions and adds no new rollout requirement. A payload
-  without the field behaves exactly as it did before; the evaluator
-  independently blocks a non-list `taskRequirements` from any payload vintage. Successful precompute
-  refreshes run every 12 hours, after which edge and browser caches must also refresh. This is not
-  a strict 12-hour recovery bound: failed runs can leave older KV entries serving for their seven-day
-  TTL. Verify a successful precompute from the deployed fix before claiming production diagnostics
-  are active; already-discarded gates cannot be recovered by the evaluator alone.
-- PvP, PvE and Seasonal evaluate only their own progress and mode-specific task metadata.
-- Task-core stays on `json-v3` for optional pool descriptions; player progress and IndexedDB schema
-  8 are unchanged. Deploy the compatible consumer with the current overlay first. After publishing
-  pool metadata, run trusted-main precompute without language/mode filters and verify all 48
-  refreshed entries and their overlay provenance before purging corrected edge/browser metadata.
-  This avoids exposing empty versioned KV keys during Pages' automatic deployment. Incompatible
-  contract changes still require the separate compatible-producer/preseed/consumer rollout in
-  [overlay release verification](./overlay-and-precompute.md#release-verification).
+- PvP/PvE/Seasonal never borrow other modes' metadata or progress. No new runtime dependency
+  on the removed upstream `alternatives` field.
+- Requirement diagnostics, server gates, pool labels and delay fields remain additive to
+  `tasks-core-json-v3`. Older payloads that dropped source gates require successful precompute
+  and edge/browser refresh. Twelve-hour scheduling is not a recovery deadline. Failed writes
+  can leave old KV entries up to their seven-day TTL.
+- Deploy the compatible consumer first. After publishing pool data use unfiltered trusted-main
+  precompute and verify all 48 entries and provenance before cache invalidation.
+  See [overlay release verification](overlay-and-precompute.md#release-verification) for
+  incompatible producer/preseed/consumer ordering.
 
 ## Map transit layer
 
@@ -467,6 +290,17 @@ Layer names map to our existing floor IDs (Labs `Second Level` becomes `Second_L
 Keep spatial bounds with the heights when refreshing this metadata: low outdoor Ground Zero
 locations are not necessarily in Garage, and the showroom has a local second-floor exception.
 Maps lacking reviewed floor metadata, including Terminal, show no inferred arrows.
+
+Icebreaker uses the hosted floor tiles credited to TarkovBOT.eu and the deck heights from
+[Tarkov.dev's Icebreaker map settings](https://github.com/the-hideout/tarkov-dev/blob/bc4ed844accb259a4ec07ed0077176fa91975908/src/data/maps.json#L1014).
+The published transform projects the helicopter extract outside the raster. The local transform was
+fitted to the zoom-2 tile artwork using Tarkov.dev's spawn, loot, and lock positions and checked
+against the helipad and 42 held-out boss positions at their published deck heights. All 42 project
+within 10 pixels of visible deck artwork at that zoom. Boss coordinates and configured chances
+come from the catalog. The chance is per spawn entry, including entries whose in-raid conditions
+are unspecified.
+The Lab (Dark), Infected Lab and Infected Factory reuse the backgrounds that Tarkov.dev declares
+for those variants. Each variant keeps its own boss rates, locations and extracts.
 
 `mapElevation.ts` classifies points and vertical volumes using half-open height intervals and
 scoped spatial exceptions before the base layer. A volume spanning several levels uses the
@@ -508,7 +342,7 @@ the capture tooling.
 is null until the overlay publishes valid sections, and the route returns 503 without an overlay.
 `useExtractRuleData` requests the route once per page load and holds no rule data until a
 payload passes the shared `app/utils/extractRuleData.ts` checks; the app ships no bundled copy
-([#1407](https://github.com/tarkovtracker-org/TarkovTracker/issues/1407)). Without rule data
+. Without rule data
 (still loading, a null `data`, a malformed payload, or an unavailable overlay, including local
 runs without `OVERLAY_TOKEN`) every extract shows the unknown-requirements cue plus any tarkov.dev
 transfer cost, never the "No requirements listed" line, and the map omits the source line. Co-op
@@ -546,163 +380,70 @@ not invented when data is missing. Refresh both sections in the overlay; the app
 
 ## Map markers, legend, and sizing
 
-Extract and transit markers are pins: a 30 px shaded teardrop with a white border, a dark outer
-ring, a drop shadow and a small ground shadow, so they stand out on light and dark map areas. The
-teardrop's tip is the exact map position, and the pin grows slightly on hover or when opened. A
-white glyph inside uses the familiar running-through-a-door exit symbol for shared and
-unknown-faction extracts, including Armored Train. PMC-only (shield), Scav-only (skull), co-op
-(handshake), and transit (transfer) retain distinct glyphs so access restrictions remain readable
-without relying on color. Shared and unknown-faction extracts keep their separate colors and
-their existing layer classification; sharing a glyph does not imply a known faction.
-`app/features/maps/utils/markerGlyphs.ts` owns the classification, path data, and pin markup; head
-colors come from the customizable marker palette. A pin's name appears beside it on hover, when
-it is tapped or clicked (until another pin or the map is clicked), for every pin once the view is
-zoomed in at least one level past the whole-map fit, or always when **Always show names** is on
-(`map_always_show_names`). The accessible label includes the name, floor direction, and requirement
-badges. Extract pins enter the keyboard tab order so Enter opens their details; transit pins stay
-out of it. The map surface keeps its own keyboard controls.
+`app/features/maps/utils/markerGlyphs.ts` draws 30 px pins anchored at their tips. PMC, Scav,
+co-op and transit use distinct glyphs. Shared and unknown extracts share the exit glyph but
+keep their classification and colors. Names show on hover, tap, zoom or Always show names.
+Enter opens extract details. Transit pins stay out of the tab order. Accessible labels include
+name, floor direction and requirements.
 
-Objective markers are 26 px raised chips: a white border, a top highlight, an inner bottom shade, a
-dark outline and a drop shadow keep them readable on light and dark map areas, whatever their fill
-(the outline doubles with `prefers-contrast: more`). A zone also gets one at its centre. The glyph
-on each chip names the action the objective's upstream `type` asks for: visit or locate (eye),
-plant, stash or install (tray with a down arrow), find or pick up (magnifier), mark with an MS2000
-Marker (beacon), eliminate (pistol), use an item such as a signal flare (pointing hand), extract
-(the extract pins' exit glyph), and a flag for any other type.
-`app/features/maps/utils/objectiveGlyphs.ts` owns the type mapping, path data, and chip markup. The
-glyph is white or near-black, whichever has the higher WCAG contrast against the fill
-(`colorContrast.ts`), so a light fill never hides it. Chips are non-interactive Leaflet markers in
-their own pane above the overlay pane and below the extract pins. Under each chip sits an invisible
-dot of the same size that takes hover, click and the stacked-objective hit test; the dot (or its
-zone) raises the chip on hover and recolors it while its popup is pinned. A chip fades when the
-objective is on another floor and returns to full strength on hover. Its floor badge sits 2 px to
-the left of the chip. A zone's outline and fill are drawn only while the zone is at least 2 chips
-(52 px) wide or tall on screen, rechecked after every zoom; smaller zones show just their chip, so
-no outline peeks out around it. Hovering the zone or its chip shows the outline at any size
-(`app/features/maps/utils/objectiveZoneOutline.ts`).
+`app/features/maps/utils/objectiveGlyphs.ts` draws high-contrast 26 px chips by upstream type.
+The transparent same-size dot or zone owns hover, click and stacked hit-testing. Keep the chip
+above its zone and below extract pins. Distant-floor chips fade and regain contrast on hover.
+Zone outlines appear at two chip widths/heights or on hover at any size.
 
-**Map Colors > Objective colors** (in the map toolbar and **Settings > Maps**) chooses what the fill
-shows (#920): the task **Category** (Regular, Pinned, Team colors; the default), the **Quest**, or
-the **Objective type**. Quest and type colors come from a color-blind-safe palette: Okabe-Ito (7
-colors, the default), Tol bright (6) or Tol muted (9). A test keeps every pair of palette colors
-apart under simulated protanopia, deuteranopia and tritanopia. In Quest mode `assignTaskColors`
-assigns automatic colors over `mapTaskIds` (before hiding): they repeat only once a map has more
-quests than the palette has colors, and hiding or "show only" never changes them. Completing,
-unlocking or filtering quests changes `mapTaskIds` and may move automatic colors. A picked quest
-color never changes and never moves another quest's color, though it may match one. Type mode
-colors the seven action types in
-legend order and keeps the generic flag pale grey; the Layers panel's Objective icons key shows
-those colors. Outside Category mode the Regular, Pinned and Team rows still filter markers but show
-a neutral swatch. `app/features/maps/utils/objectiveColors.ts` owns the modes, palettes and
-assignment.
+`app/features/maps/utils/objectiveColors.ts` owns category, quest and objective-type colors,
+color-blind-safe palettes and overrides. Stable automatic colors use pre-hide `mapTaskIds`.
+Hiding, show-only and manual overrides cannot recolor other quests. Changing the eligible
+set may reassign colors. Category rows still filter in other color modes. Glyphs always identify
+types and the quest legend labels each color.
 
-Hovering or clicking an objective opens its popup (`LeafletObjectiveTooltip.vue`, helpers in
-`app/features/maps/utils/objectivePopup.ts`). The header shows the trader's portrait and name
-(#1394), the full task name (a wiki link when one is trusted), the minimum player level when above
-1, and a tarkov.dev link. A details panel names the action with its chip and shows the objective
-description, the item involved (the MS2000 Marker for a mark, the quest item for a quest pickup or
-stash, otherwise the first accepted item plus how many alternatives exist, or, when no item is
-accepted, the weapon or gear an elimination must use) with its icon, item quantity when applicable
-and a FIR badge. The panel lists each required key group (`A / B` when any one works) and shows a
-progress bar when the objective counts more than one. Weapon and clothing labels omit the
-elimination count.
-The footer has a labeled **Mark complete** / **Completed** toggle, a **Task list** button that
-scrolls to and highlights the objective, and the show-only and hide quest buttons. Compact tooltip
-density keeps the layout and makes the footer buttons icon-only.
-Read-only popups omit the toggle and progress. The stacked list shows each entry's trader
-portrait with the action chip on it.
+`app/features/maps/utils/objectivePopup.ts` builds trader, task, trusted links, level, action,
+item/gear, quantity, FIR and key-group details. Multi-count objectives show progress. Read-only
+popups omit toggles/progress. Editable popups mark/unmark, jump to the task list and hide or
+show only that quest. Compact density uses icon-only footer controls.
 
-The toolbar's **Layers** button opens one in-map panel that is both the legend and the visibility
-controls (`MapLayersPanel.vue` and `MapLayerRow.vue`, rows built by
-`app/features/maps/utils/mapLayerGroups.ts`). Rows are grouped as Tasks (Regular, Pinned, Team),
-Extracts (PMC, Scav, Shared / unknown, Co-op), and Locations (Transit, PMC Spawns). Each row depicts
-the markers it controls, including combined rows; hidden rows stay listed, dimmed with an
-eye-off icon. Task rows are always listed; extract and location rows appear only when the selected
-map has that marker type. The collapsed button shows how many rows are hidden, and the panel offers
-**Show all layers** while any are hidden. The Shared row shows one exit glyph in the shared color.
-Only when the selected map has drawable extracts without a known faction does its label become
-Shared / unknown, with a hint that faction data was not supplied. It still shows one glyph and
-controls either-faction exits and unclassified exits without assigning a faction to the latter.
-Shared and co-op extracts have their own toggles and start visible when either faction's extracts
-start visible; extracts without a known faction follow the
-Shared row, which is listed whenever such extracts exist. Extracts start visible or hidden from
-**Settings > Maps > Show Extracts by Default** (`showMapExtracts`, synced as `show_map_extracts`).
-Turning an extract, transit or spawn row on or off (or using **Show all layers**) is remembered
-across refreshes, page changes and the full-screen map in `mapLayerVisibility`, which is local
-only, like `mapHiddenTaskIds`; `app/features/maps/utils/mapLayerVisibility.ts` owns the row keys.
-A remembered row wins over the default. Changing **Show Extracts by Default** clears remembered
-extract rows so the new default applies; if the preference arrives from account sync while a map
-is open, it applies only to rows without a remembered choice. The
-panel opens by default when the map is at least 480 px wide, remembers an explicit open or close
-in `map_layers_panel_open`, and is capped at 45% of the viewport height (scrolling inside) in
-containers narrower than 30rem. Below the rows, collapsible **Objective icons** and **Extract
-icons** keys list every objective glyph and extract requirement badge.
+`app/features/maps/utils/mapLayerGroups.ts` owns the Layers panel. Task rows are always
+listed; extract/location rows depend on drawable markers. Hidden rows remain listed.
+Shared/unknown and co-op start visible when either faction's extracts starts visible.
+The shared row shows “unknown” only when the map contains unclassified markers. Local
+`mapLayerVisibility` overrides defaults across refresh, navigation and fullscreen. Changing
+the extract default clears remembered extract rows locally. Synced changes update unremembered
+rows only. Panel open state is local. In narrow containers controls stack above the map and
+the panel scrolls within its height cap.
 
-The inline map's height follows the window (75%, clamped to 320 px and 85% of the window) until
-the user drags or keys the resize handle (arrow keys step, Home/End jump to the limits). That
-choice persists in `tasks_map_height_choice`; double-clicking the handle or pressing Enter on it
-returns to the automatic height. On first load, a value in the old `tasks_map_height` key moves
-to the new key unless it equals the old default `520`, which the old code wrote on first visit
-and therefore means "never resized"; the old key is then removed. An untouched view refits the
-map bounds whenever its container resizes; a panned or zoomed view is kept.
-Leaflet's native window-resize handler is disabled so the ResizeObserver can decide whether to
-refit before invalidating size and changing the center.
-In containers narrower than 30rem, the toolbar and floor picker stack above the map instead of
-covering it.
+Inline height follows 75% of the window, bounded by 320 px and 85%, until an explicit
+drag/keyboard resize. Enter/double-click reset it. Migrate legacy `tasks_map_height` unless
+it equals the old untouched default of 520. Keep panned or zoomed views on resize. Otherwise
+refit via ResizeObserver with Leaflet native resize disabled.
 
 ## Map objective visibility and required items
 
-**Summary.** The Tasks map derives objective visibility once for map markers and the required-item
-summary. Objectives are categorized as pinned, self, or team, while the summary separately groups
-items and keys from pinned tasks and active tasks so pinned requirements remain distinguishable.
+`app/composables/useMapObjectiveMarks.ts` derives marks and shared objective visibility from the
+same selected-map tasks. Pin by task ID before self/team classification. Locked/All may show
+unowned locked objectives as self markers, never failed tasks. Pinned, self and team preferences
+control markers separately. The summary uses `selfNeedsObjective` and includes only required
+equipment/alternative key groups that the player still needs. Aggregate pinned and active
+separately, following their own toggles. Team visibility never changes the summary.
+Bring-mode includes canonical `objective.item` for bring objectives without `items`.
 
-### Flow
+Apply local hidden task IDs after filters and categories. Hidden tasks leave visible marks and
+summaries and move into a collapsed list, without being dropped from the filtered task set.
+A direct-linked task stays in focus. Jumping to an objective unhides its task. Show only hides
+other current `mapTaskIds`, show all unhides current map tasks, and new unlocks are shown.
+The hidden list, layer choices and quest colors stay user-local.
 
-1. `useMapObjectiveMarks` derives each objective's active users, completion state, and category.
-   Pinning is resolved from the enclosing task ID; pinned objectives take precedence over self and
-   team membership. The composable returns both map marks and an objective-visibility map, each
-   entry carrying the category plus `selfNeedsObjective` — whether the local player still needs
-   that objective themselves. Under the Locked and All status filters, `tasks.vue` passes
-   `shouldShowLockedObjectives`, so objectives of locked (not failed) tasks with no other owner
-   draw as self markers; a teammate who needs the objective still owns it.
-2. `LeafletMap` applies the pinned, self, and team map preferences to marker colors and visibility.
-3. `MapRequiredItemsSummary` splits the selected task set using the persisted pinned task IDs, then
-   aggregates bring-mode equipment and alternative key groups independently for each group. It
-   filters objectives to the selected map and the shared objective-visibility state.
-4. The summary's pinned group follows the pinned-objective preference. Its active group follows the
-   self-objective preference. Objectives the player does not still need themselves are dropped, so
-   the Team chip never changes required-item summaries.
-5. Quests the user hid from the map (#918) are applied last. `useMapObjectiveMarks` returns
-   `mapTaskIds` (tasks that draw at least one marker in an enabled pinned/self/team category on the
-   selected map, before hiding) and `hiddenTaskIds`; objectives of hidden tasks are removed from
-   both the marks and the objective-visibility map, so the required-items summary follows too.
-   `MapTaskVisibilityPanel` (inline and fullscreen), the task-card toggles, and the marker popup
-   (via `LeafletMap`'s `taskVisibilityActions`) edit the single `mapHiddenTaskIds` list. In map view
-   `tasks.vue` moves hidden map quests out of the main list into the collapsed
-   `MapHiddenTasksSection`, so the list matches the map.
-6. In Quest color mode, `useMapObjectiveMarks` returns `mapTaskColors` and sets each mark's `color`;
-   every mark also carries its `taskId`. `MapTaskVisibilityPanel` then shows a quest legend (shown
-   quests only) and a color picker per quest under **Choose quests**; a picked color replaces the
-   automatic one until it is reset. Hovering or focusing a legend entry, or hovering one of the
-   quest's markers, highlights that quest: its chips grow, its zone outlines show and every other
-   chip fades. Clicking a legend entry keeps the highlight (for touch screens) until it is clicked
-   again, the quest is hidden or leaves the map, or quest coloring is turned off; a lock does not
-   return by itself when the quest comes back. The legend and the map report their hovers
-   separately (a marker hover wins over a legend hover or focus, which wins over the lock), so
-   leaving one never clears the other. The map releases a hover it reported when it redraws its
-   markers or unmounts, `tasks.vue` drops the marker hover when the fullscreen map opens or
-   closes over it, and the legend forgets an entry that leaves it, since none of these fires
-   mouseout. `useMapTaskHighlight` in `tasks.vue` shares that state between the panel and the inline
-   and fullscreen maps; `LeafletMap` toggles chip classes for it without redrawing markers.
-7. **Trader reputation** beside **Choose quests** filters the map, its quest list, and the
-   required-item summary by completion rewards. **Any gain** stays available even if the catalog
-   has no positive rewards. The numbered minimums come from the current mode's rewards in
-   [map task visibility](../../app/features/maps/utils/mapTaskVisibility.ts). The selection carries
-   across maps and fullscreen and clears when leaving Tasks → Maps. A numbered minimum also
-   clears if the loaded catalog no longer offers it. Quests opened from a direct link stay in focus.
-   The reputation no-match alert offers a reset even when the map is collapsed.
-   Manually hidden quests retain their hidden status. The list of hidden quests shows entries
-   that meet the active reputation filter.
+Quest highlights prioritize marker hover, then legend hover/focus, then an explicit legend lock.
+Hover channels clear independently on redraw, fullscreen switch or disposal. Hiding or losing
+a quest, or changing color mode, drops its lock without automatic restoration. Share state
+across inline/fullscreen and update chip classes without rebuilding markers.
+
+Trader reputation filters the same tasks, marks and item summary by mode-scoped completion
+rewards. Any gain is always offered. Clear an unavailable numbered minimum or the filter
+when leaving Tasks → Maps. Preserve hidden state and direct-link focus. The empty state can
+reset the filter even with the map closed.
+
+Hit-test visible points and zones in container pixels. Count a zone/center as one. For
+overlap, list points then zones smallest first. Choosing one pins its full popup.
 
 ### Files
 
@@ -722,136 +463,26 @@ items and keys from pinned tasks and active tasks so pinned requirements remain 
   `app/features/maps/MapQuestLegend.vue` and `app/features/maps/composables/useMapTaskHighlight.ts` — objective color modes, quest colors and quest highlight.
 - `app/features/tasks/MapHiddenTasksSection.vue` — collapsed list section for hidden map quests.
 
-### Invariants
-
-- Pinning is determined by `task.id`, never by an objective ID; a pinned task's objectives are
-  categorized as `pinned` before self or team membership is considered.
-- Map marker visibility is controlled independently by the pinned, self, and team preferences.
-- Required-item summaries use the selected map and shared objective visibility, exclude completed
-  objectives, and preserve equipment counts and alternative key groups after deduplication.
-- A summary lists only what the local player still needs, and enforces that through
-  `selfNeedsObjective` rather than through `category`. That covers objectives the player ticked
-  off, tasks they completed or failed, and tasks they have not unlocked — even when a teammate
-  still needs the objective. Gating on `category` alone would be wrong, because a pinned task
-  reports `category: 'pinned'` and would otherwise mask a teammate-only requirement.
-- Pinned and active task requirements are aggregated into separate groups whenever both contain
-  visible content; the pinned group uses the pinned marker accent.
-- The pinned summary group follows `mapShowPinnedObjectives`; the active summary group follows
-  `mapShowSelfObjectives`. `mapShowTeamObjectives` does not hide or alter the required-item
-  summary, preserving the product rule that the Team chip controls map markers only.
-- Bring-mode aggregation additionally includes the canonical `objective.item` field for bring-type
-  objectives, covering upstream objectives that expose no `items` array. Task-card rendering uses
-  `all` mode and is unaffected by that field, and neither mode reintroduces the removed task
-  `alternatives` runtime dependency.
-- A group given a title renders its section headings one level down (`h4`) and uses the short
-  `required_items` / `required_keys` labels; an untitled standalone group keeps the `h3` level and
-  the longer `*_summary` labels.
-- Hiding a quest is a separate state from filter-driven visibility (task filters, trader-standing
-  gating from #730): it only acts on tasks that already passed every filter. In map view a hidden
-  map quest leaves the main task list for the collapsed hidden section, but it is never dropped from
-  the filtered set; the task opened from a link stays in its own section.
-- There is one state, a hidden list keyed by task ID. "Show only" hides every other quest in the
-  current map's `mapTaskIds` and un-hides the chosen one; quests unlocked later are shown by
-  default. "Show all" un-hides the current map's quests only.
-- `mapHiddenTaskIds` persists in user-scoped local preferences storage and is not part of the
-  Supabase `user_preferences` sync payload (no column exists). The same holds for
-  `mapObjectiveColorMode`, `mapObjectivePalette` and the per-quest `mapTaskColors`.
-- Color is never the only cue: the glyph names the objective type in every color mode, and the quest
-  legend names each quest beside its color.
-- Jumping to an objective of a hidden quest un-hides that quest first so its popup can open.
-- Hovering or clicking an objective marker hit-tests every visible zone and point in container
-  pixels. When more than one distinct objective is under the pointer, the popup is a compact stacked
-  list (points first, then zones smallest to largest); choosing an entry pins that objective's full
-  tooltip. A zone and its own center marker count as one objective, so a single objective still gets
-  the full tooltip directly (#919).
-
 ## Task list and Needed Items
-
-Sell-item objectives keep separate trader descriptions and progress counters. Their full accepted-item
-pool uses `ObjectiveItemDisplay` and the shared "Any of N" popover instead of the capped equipment
-strip. The popover renders at most 50 items per page; larger pools can be searched by name or short
-name and paged through without changing progress. Single-item sales still show the item directly.
-Cycling pauses for completed objectives and completed or failed parent tasks, while browsing stays
-available.
-
-Shoot objectives with multiple weapons in a flat alternatives list use the same display and
-popover. The equipment strip groups single-mod alternatives and wearable choices that share a
-known equipment kind. Gear with mixed or unknown kinds stays inline. Outfit choices can be shown
-per slot when the source lists every valid combination of the items in those slots. Each
-alternative key group has its own popover. Consolidated find-and-handover rows show a shared
-accepted-item list when every objective in the row accepts the same set.
-
-Weapon-build task objectives show their base weapon and explicit `containsAll` parts beneath the
-objective statement. `TaskWeaponBuildItems.vue` consumes the same `neededItemTaskObjectives`
-records and `useNeededItemProgress` helper as Needed Items: the base keeps the objective ID,
-and each explicit part keeps `${objective.id}:${part.id}` plus `sourceObjectiveId`. Collection
-updates counts only; it never completes the build or validates its required stats. Single-item
-rows use checkboxes, and completed or failed parent tasks disable collection controls. Category
-option browsing remains outside this explicit-part view.
 
 ### Task list loading
 
-`app/composables/useInfiniteScroll.ts` loads another batch only when the sentinel is connected
-to the document and has a layout box. Nuxt Suspense can mount a warm-cache task list in a
-detached tree; its zero bounding rectangle must not trigger auto-fill. Hidden or detached
-sentinels consume no auto-load budget. The existing intersection observer checks again when
-the list becomes visible; configured scroll fallback and explicit checks use the same guard.
+`app/composables/useInfiniteScroll.ts` loads eight-card batches only for connected, laid-out
+sentinels. Hidden/detached elements use no budget. Keep preload margin and auto-load caps.
 
-The tasks page requests objectives, rewards, item-lite hydration, and edition eligibility through the
-readiness composable `useTaskDetailReadiness`, which invokes the existing cached/deduplicated
-metadata store actions. Keep its loading state
-until these requests, background edition revalidation, objective mode-count metadata, and the
-first visible-task refresh settle. This prevents objective
-skeleton/reward reflow and an initial list filtered without edition eligibility. This eager
-request is scoped to the tasks page; other routes retain the store's idle scheduling. Edition
-responses, errors, and cleanup apply only to the current promise; superseded cache reads and
-network requests cannot overwrite current eligibility, cache payloads, or loading state.
-When the objective catalog fails to load, cards awaiting objectives show a retry action. It
-uses the cached, deduplicated loader for the current mode and language, including its overlay
-provenance check. Already loaded objectives stay visible.
-Normalize edition and chapter network payloads before applying either, preserving existing
-data if normalization fails. Empty cached editions do not replace loaded eligibility.
+The tasks page waits on core, edition revalidation, objectives, rewards, items-lite, objective
+mode counts and the first visible-task refresh. Other pages keep idle detail scheduling.
+Metadata registers every in-flight core phase synchronously through success or failure.
+Core replacements advance `tasksCoreRevision` even on a cache hit; incremental details do
+not. Edition readiness reuses settled success/failure and joins in-flight work. Explicit
+retry refreshes it. New requests supersede queued idle callbacks. Apply normalized replies
+and errors only to the current mode/language/version.
 
-Task readiness uses `ensureEditionsData` to join or reuse the current mode/language edition request,
-including a request settled during bootstrap/core loading. Settled failures are also reused to avoid
-repeated readiness requests; they retain the error, and explicit fetch/refresh calls retry. Scope
-changes invalidate that settlement and clear the visible catalog. Explicit `fetchEditionsData` calls keep
-their cache revalidation behavior. Queued reward work, like editions, is consumed by a later eager
-request; other routes retain their idle load when no caller takes ownership.
-
-Initialization marks `tasksCoreRefreshing` before updating locale/mode and reading caches.
-`fetchAllData` registers its phase synchronously before bootstrap; initialization then releases
-its setup phase. A per-store set retains every active phase until core settlement, including
-failures, so either completion order keeps readiness pending while another core refresh can run.
-Task readiness stays false during this phase, so locale changes cannot reveal old core data
-while bootstrap is pending. Optional requests remain outside this phase and keep their timeout.
-
-Deferred edition callbacks capture a request version. A later edition request, including a
-deduplicated join, consumes that queued load; the callback skips its redundant revalidation.
-Routes without an eager request retain idle edition loading.
-
-Core-task replacements advance `tasksCoreRevision`, including cache hits that never raise
-`loading`; detail/item merges do not advance it. Readiness watches this revision so cached
-locale replacements and empty-to-populated core recovery start a new wait. After objectives
-and rewards/items settle, await objective mode-count metadata; retry once only when the store
-returns `stale` for a response discarded during task replacement. Handled failures are not retried. The existing gate timer still bounds this wait.
-
-Optional detail requests use a three-second gate timer after core readiness; on expiry,
-resume filtering/rendering while late requests continue. Failed requests also release
-the gate. Mode/locale changes, core reloads, and scope disposal invalidate earlier waits and clear
-their timers. An empty task dataset does not wait for optional requests.
-
-Reset filter readiness when metadata or task-detail readiness resets. Metadata readiness
-alone must not expose the empty state during the debounced filter refresh; a completed refresh
-with no matching tasks still shows the normal empty state. Subsequent filter changes retain
-the existing debounce and task actions still request an immediate refresh. Deep-link effects
-use this combined loading state so queries wait for mounted cards and retry after readiness
-clears even when the filtered task IDs have not changed.
-
-Keep the tasks page's eight-card batches, preload margin, and auto-load caps. Do not defer
-critical metadata or change task filters, progress state, or card expansion to mask mounting
-cost. The #808/#444 performance validation is historical and archived in git history; keep the
-behavioral invariants above (eight-card batches, preload margin, and auto-load caps) unchanged.
+Once core settles, a three-second gate bounds optional details and mode-count readiness.
+Retry the count only when task replacement makes its response stale. Empty data skips the
+gate. Errors or timer expiry unblock rendering. Scope changes invalidate old waits. Keep
+old loaded objectives visible after retryable failures. A warm cache or empty-to-populated
+recovery still refreshes filters before empty states and deep-link effects settle.
 
 ### Task card layout and legacy density preferences
 
@@ -937,8 +568,7 @@ canonical under the grouped-view rule that nameless items are not grouped. A poo
 contributes to at most one group, so search-time re-keying never double-counts. When the matched
 item already has direct needs (needs whose own primary item is that item), re-keyed pooled
 objectives are dropped from the combined view instead of joining that group, so the searched
-item's displayed total stays aligned with its visible direct needs (#882: a LEDX search otherwise
-added every "sell N of any item" pool). Progress writes stay bound to the objective ID regardless
+item's displayed total stays aligned with its visible direct needs. Progress writes stay bound to the objective ID regardless
 of which item identity is displayed.
 
 Result membership and underlying grouped data use `filteredItems`, including the ownership filter.

@@ -311,6 +311,7 @@ const finalRanks = new Map<string, number>([
   ['complete', 4],
   ['failed', 5],
   ['failed_branch', 5],
+  ['task_acceptance_closed', 5],
   ['faction', 5],
   ['disabled', 5],
   ['unknown', 6],
@@ -334,7 +335,9 @@ const blockerDistance = (blocker: TaskAvailabilityResult['blockers'][number]) =>
 const singleBlockerRank = (
   blocker: TaskAvailabilityResult['blockers'][number]
 ): [number, number] => {
-  if (['prerequisite', 'trader_unlock', 'story_objective'].includes(blocker.type))
+  if (
+    ['prerequisite', 'task_acceptance', 'trader_unlock', 'story_objective'].includes(blocker.type)
+  )
     return [2, blocker.requirements?.length ?? 1];
   return [1, blockerDistance(blocker)];
 };

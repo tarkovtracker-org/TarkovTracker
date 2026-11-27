@@ -7,7 +7,10 @@
       {{ t('page.resources.title', 'Resources & Guides') }}
     </NuxtLink>
     <UIcon name="i-mdi-chevron-right" class="h-4 w-4 shrink-0 opacity-60" />
-    <NuxtLink to="/resources" class="hover:text-primary-300 transition-colors">
+    <NuxtLink
+      :to="{ path: '/resources', query: { category: resource.category } }"
+      class="hover:text-primary-300 transition-colors"
+    >
       {{ categoryLabel }}
     </NuxtLink>
     <UIcon name="i-mdi-chevron-right" class="h-4 w-4 shrink-0 opacity-60" />

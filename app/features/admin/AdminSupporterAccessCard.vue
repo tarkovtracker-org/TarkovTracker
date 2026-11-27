@@ -6,7 +6,7 @@
     ADMIN_ERROR_LOCALE_KEYS,
     getAdminErrorCode,
   } from '@/utils/adminErrors';
-  import { refreshSupabaseSession } from '@/utils/supabaseAuth';
+  import { getOrRefreshSupabaseAccessToken } from '@/utils/supabaseAuth';
   const { $supabase } = useNuxtApp();
   const { t } = useI18n({ useScope: 'global' });
   const toast = useToast();
@@ -36,14 +36,7 @@
     if (!canSave.value) return;
     isSaving.value = true;
     try {
-      const sessionResp = await $supabase.client.auth.getSession();
-      let token = sessionResp.data.session?.access_token ?? null;
-      if (!token) {
-        // A failed refresh means no usable token. Fall through to the
-        // authentication-required message instead of the generic failure.
-        const refreshed = await refreshSupabaseSession($supabase.client).catch(() => null);
-        token = refreshed?.access_token ?? null;
-      }
+      const token = await getOrRefreshSupabaseAccessToken($supabase.client);
       if (!token) {
         toast.add({
           title: t('common.update_failed', 'Update failed'),

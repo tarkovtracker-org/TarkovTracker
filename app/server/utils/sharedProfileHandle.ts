@@ -1,4 +1,4 @@
-import { createError } from 'h3';
+import { createError, getRouterParam, type H3Event } from 'h3';
 import { isGameMode, type GameMode } from '@/utils/constants';
 type RestFetch = (path: string) => Promise<Response>;
 const readLookupRows = async <T>(restFetch: RestFetch, path: string): Promise<T[]> => {
@@ -34,3 +34,16 @@ export const resolveDefaultSharedMode = async (
   if (available.includes('pve')) return 'pve';
   return 'seasonal'; // The main profile lookup checks the current season and visibility.
 };
+const PROFILE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function requireStreamerProfileParams(event: H3Event) {
+  const userId = (getRouterParam(event, 'userId') || '').trim();
+  const mode = getRouterParam(event, 'mode');
+  if (!isGameMode(mode)) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid profile mode' });
+  }
+  if (!PROFILE_ID_PATTERN.test(userId)) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid profile id' });
+  }
+  return { userId, mode };
+}

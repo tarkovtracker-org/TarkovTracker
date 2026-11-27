@@ -7,11 +7,14 @@ interface ResourceLink {
   url: string;
 }
 export interface ResourceGuideConfig {
-  steps: number;
+  steps: readonly number[];
   tips: number;
-  faq: number;
+  faq: readonly number[];
   troubleshooting?: number;
   compatibility?: boolean;
+  stepsHeadingKey?: string;
+  stepsHeadingFallback?: string;
+  quickActions?: ResourceAction[];
   shareImage?: {
     src: string;
     width: number;
@@ -22,6 +25,7 @@ export interface ResourceGuideConfig {
 interface ResourceBase {
   slug: string;
   logo: string | null;
+  icon?: string;
   category: ResourceCategory;
   videoId?: string;
   links: ResourceLink[];
@@ -46,9 +50,8 @@ export interface ResourceAction {
   external: boolean;
 }
 export interface ResourceMetaItem {
-  labelKey?: string;
-  labelFallback?: string;
-  useCategoryLabel?: boolean;
+  labelKey: string;
+  labelFallback: string;
 }
 export const RESOURCE_CATEGORIES: ResourceCategory[] = [
   'tarkovtracker_guides',
@@ -56,6 +59,8 @@ export const RESOURCE_CATEGORIES: ResourceCategory[] = [
   'data_and_apis',
   'calculators_and_reference',
 ];
+export const isResourceCategory = (value: unknown): value is ResourceCategory =>
+  typeof value === 'string' && RESOURCE_CATEGORIES.includes(value as ResourceCategory);
 export const CATEGORY_LABEL_FALLBACKS: Record<ResourceCategory, string> = {
   tarkovtracker_guides: 'TarkovTracker.org Guides',
   companion_apps: 'Companion Apps',
@@ -70,7 +75,6 @@ export const CATEGORY_BADGE_FALLBACKS: Record<ResourceCategory, string> = {
 };
 export const RESOURCE_META_ITEMS: Record<ResourceCategory, ResourceMetaItem[]> = {
   tarkovtracker_guides: [
-    { labelKey: 'page.resources.meta.official_guide', labelFallback: 'Official guide' },
     {
       labelKey: 'page.resources.meta.maintained_by_team',
       labelFallback: 'Maintained by the TarkovTracker.org team',
@@ -78,22 +82,47 @@ export const RESOURCE_META_ITEMS: Record<ResourceCategory, ResourceMetaItem[]> =
   ],
   companion_apps: [
     { labelKey: 'page.resources.meta.windows', labelFallback: 'Windows' },
-    { labelKey: 'page.resources.meta.companion_app', labelFallback: 'Companion App' },
     { labelKey: 'page.resources.meta.setup_time', labelFallback: '5-minute setup' },
   ],
   data_and_apis: [
-    { useCategoryLabel: true },
     { labelKey: 'page.resources.meta.community_data', labelFallback: 'Community maintained' },
+    { labelKey: 'page.resources.meta.free_json_api', labelFallback: 'Free JSON API' },
   ],
   calculators_and_reference: [
-    { useCategoryLabel: true },
     { labelKey: 'page.resources.meta.web_tool', labelFallback: 'Web tool' },
+    { labelKey: 'page.resources.meta.no_account', labelFallback: 'No account required' },
   ],
 };
+const internalAction = (
+  href: string,
+  labelKey: string,
+  labelFallback: string,
+  icon: string
+): ResourceAction => ({
+  kind: 'internal',
+  href,
+  labelKey,
+  labelFallback,
+  icon,
+  external: false,
+});
+const openImportsAction = internalAction(
+  '/settings#imports',
+  'page.resources.actions.open_imports',
+  'Open Imports',
+  'i-mdi-database-import-outline'
+);
+const createApiTokenAction = internalAction(
+  '/settings#api',
+  'page.resources.actions.create_api_token',
+  'Create API token',
+  'i-mdi-key-variant'
+);
 export const RESOURCES: Resource[] = [
   {
     slug: 'seasonal_modifiers',
     logo: null,
+    icon: 'i-mdi-tune-variant',
     category: 'calculators_and_reference',
     hasGuide: false,
     primaryAction: 'planner',
@@ -105,7 +134,14 @@ export const RESOURCES: Resource[] = [
     logo: '/img/logos/tarkovtrackerlogo-mini.webp',
     category: 'tarkovtracker_guides',
     hasGuide: true,
-    guide: { steps: 5, tips: 0, faq: 4 },
+    guide: {
+      steps: [1, 2, 3, 4, 5],
+      tips: 0,
+      faq: [3, 5, 4],
+      stepsHeadingKey: 'page.resources.guide_sections.migration_steps',
+      stepsHeadingFallback: 'Move Your Progress to TarkovTracker.org',
+      quickActions: [openImportsAction, createApiTokenAction],
+    },
     primaryAction: 'guide',
     keywords: ['io', 'org', 'difference', 'domain', 'migration', 'official', 'faq'],
     links: [],
@@ -116,7 +152,14 @@ export const RESOURCES: Resource[] = [
     logo: '/img/logos/tarkovmonitorlogo.avif',
     category: 'companion_apps',
     hasGuide: true,
-    guide: { steps: 4, tips: 2, faq: 3, troubleshooting: 3, compatibility: true },
+    guide: {
+      steps: [1, 2, 3, 4],
+      tips: 2,
+      faq: [1, 2, 3],
+      troubleshooting: 3,
+      compatibility: true,
+      quickActions: [createApiTokenAction],
+    },
     primaryAction: 'guide',
     keywords: ['desktop', 'raid', 'sync', 'companion', 'progress', 'logs', 'quest'],
     links: [
@@ -131,7 +174,14 @@ export const RESOURCES: Resource[] = [
     category: 'companion_apps',
     hasGuide: true,
     videoId: 'EIyZYFCLgNo',
-    guide: { steps: 4, tips: 2, faq: 4, troubleshooting: 4, compatibility: true },
+    guide: {
+      steps: [1, 2, 3, 5, 4],
+      tips: 2,
+      faq: [1, 2, 4],
+      troubleshooting: 4,
+      compatibility: true,
+      quickActions: [createApiTokenAction],
+    },
     primaryAction: 'guide',
     keywords: ['scanner', 'desktop', 'market', 'barter', 'tooltip', 'price', 'quest'],
     links: [
@@ -145,7 +195,13 @@ export const RESOURCES: Resource[] = [
     logo: '/img/logos/tarkovdevlogo.webp',
     category: 'data_and_apis',
     hasGuide: true,
-    guide: { steps: 3, tips: 2, faq: 2 },
+    guide: {
+      steps: [1, 2, 3],
+      tips: 1,
+      faq: [1, 2],
+      stepsHeadingKey: 'page.resources.guide_sections.ways_to_use',
+      stepsHeadingFallback: 'Ways to Use Tarkov.dev',
+    },
     primaryAction: 'api',
     keywords: ['api', 'json', 'data', 'developer', 'items', 'quests', 'market', 'traders'],
     links: [
@@ -158,9 +214,10 @@ export const RESOURCES: Resource[] = [
   {
     slug: 'cultistcircle',
     logo: null,
+    icon: 'i-mdi-circle-double',
     category: 'calculators_and_reference',
     hasGuide: true,
-    guide: { steps: 2, tips: 2, faq: 2 },
+    guide: { steps: [1, 2], tips: 2, faq: [1, 2] },
     primaryAction: 'website',
     keywords: ['calculator', 'cultist', 'circle', 'recipe', 'rewards', 'sacrifice'],
     links: [{ type: 'website', url: 'https://cultistcircle.com' }],
@@ -276,14 +333,12 @@ const guideAction = (resource: Resource, useSetupLabel = true): ResourceAction =
 };
 export const getPrimaryAction = (resource: Resource): ResourceAction | null => {
   if (resource.primaryAction === 'planner') {
-    return {
-      kind: 'internal',
-      href: '/resources/seasonal-modifiers',
-      labelKey: 'page.resources.actions.open_planner',
-      labelFallback: '',
-      icon: 'i-mdi-calculator-variant-outline',
-      external: false,
-    };
+    return internalAction(
+      '/resources/seasonal-modifiers',
+      'page.resources.actions.open_planner',
+      'Open planner',
+      'i-mdi-calculator-variant-outline'
+    );
   }
   if (resource.primaryAction === 'guide' && resource.hasGuide) {
     return guideAction(resource);
@@ -321,6 +376,77 @@ export const getGuidePrimaryAction = (resource: Resource): ResourceAction | null
     }
   }
   return defaultAction(resource);
+};
+export const getGuideQuickActions = (resource: Resource): ResourceAction[] =>
+  resource.hasGuide ? (resource.guide.quickActions ?? []) : [];
+export const getGuideStepsHeading = (
+  resource: Resource | undefined
+): { key: string; fallback: string } => {
+  if (resource?.hasGuide && resource.guide.stepsHeadingKey) {
+    return {
+      key: resource.guide.stepsHeadingKey,
+      fallback: resource.guide.stepsHeadingFallback ?? '',
+    };
+  }
+  return {
+    key: 'common.getting_started',
+    fallback: 'Getting Started',
+  };
+};
+export interface GuideTocEntry {
+  id: string;
+  labelKey: string;
+  labelFallback: string;
+}
+export const getGuideTocEntries = (resource: Resource | undefined): GuideTocEntry[] => {
+  if (!resource?.hasGuide) return [];
+  const { guide, videoId } = resource;
+  const stepsHeading = getGuideStepsHeading(resource);
+  const optionalSections: Array<GuideTocEntry & { enabled: boolean }> = [
+    {
+      id: 'setup',
+      labelKey: stepsHeading.key,
+      labelFallback: stepsHeading.fallback,
+      enabled: guide.steps.length > 0,
+    },
+    {
+      id: 'video',
+      labelKey: 'page.resources.guide_sections.video_walkthrough',
+      labelFallback: 'Video Walkthrough',
+      enabled: Boolean(videoId),
+    },
+    {
+      id: 'troubleshooting',
+      labelKey: 'page.resources.guide_sections.troubleshooting',
+      labelFallback: 'Troubleshooting',
+      enabled: Boolean(guide.troubleshooting),
+    },
+    {
+      id: 'tips',
+      labelKey: 'page.resources.guide_sections.tips',
+      labelFallback: 'Tips & Tricks',
+      enabled: guide.tips > 0,
+    },
+    {
+      id: 'faq',
+      labelKey: 'page.resources.guide_sections.faq',
+      labelFallback: 'Common Questions',
+      enabled: guide.faq.length > 0,
+    },
+  ];
+  return [
+    { id: 'overview', labelKey: 'common.overview', labelFallback: 'Overview' },
+    ...optionalSections
+      .filter((entry) => entry.enabled)
+      .map(({ id, labelKey, labelFallback }) => ({ id, labelKey, labelFallback })),
+  ];
+};
+export const resolveActiveSectionId = (
+  sections: ReadonlyArray<{ id: string; top: number }>,
+  threshold: number
+): string => {
+  const current = sections.findLast((section) => section.top <= threshold);
+  return current?.id ?? sections[0]?.id ?? 'overview';
 };
 export const getGuideSecondaryLinks = (resource: Resource): ResourceAction[] => {
   const primary = getGuidePrimaryAction(resource);

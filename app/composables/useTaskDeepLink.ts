@@ -4,7 +4,6 @@ import { useRouteSearchQuery } from '@/composables/useRouteSearchQuery';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useProgressStore } from '@/stores/useProgress';
-import { TASK_STATE } from '@/utils/constants';
 import { getQueryString } from '@/utils/routeHelpers';
 import { isTaskListPath, TASK_ROUTE_PATHS } from '@/utils/taskRouteView';
 import type { Task } from '@/types/tarkov';
@@ -25,9 +24,6 @@ export interface UseTaskDeepLinkReturn {
   highlightObjective: (objectiveId: string) => Promise<void>;
   cleanup: () => void;
 }
-type TaskStatus = 'active' | 'available' | 'locked' | 'completed' | 'failed';
-const selfTaskFlag = (flags: Record<string, Record<string, boolean>> | undefined, taskId: string) =>
-  flags?.[taskId]?.self ?? false;
 export function useTaskDeepLink({
   filteredTasks,
   leafletMapRef,
@@ -40,7 +36,7 @@ export function useTaskDeepLink({
   const progressStore = useProgressStore();
   const { trackFocusedTaskVisible } = useDashboardFocusAnalytics();
   const { tasks } = storeToRefs(metadataStore);
-  const { tasksCompletions, tasksState, unlockedTasks, tasksFailed } = storeToRefs(progressStore);
+  const { unlockedTasks } = storeToRefs(progressStore);
   const pinnedTaskId = ref<string | null>(null);
   const highlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   const objectiveHighlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
@@ -52,14 +48,12 @@ export function useTaskDeepLink({
     pinnedTaskId.value = null;
   };
   const lightkeeperTraderId = computed(() => metadataStore.getTraderByName('lightkeeper')?.id);
-  const getTaskStatus = (taskId: string): TaskStatus => {
-    const rules: Array<{ status: TaskStatus; matches: () => boolean }> = [
-      { status: 'failed', matches: () => selfTaskFlag(tasksFailed.value, taskId) },
-      { status: 'completed', matches: () => selfTaskFlag(tasksCompletions.value, taskId) },
-      { status: 'active', matches: () => tasksState.value[taskId] === TASK_STATE.ACTIVE },
-      { status: 'available', matches: () => selfTaskFlag(unlockedTasks.value, taskId) },
-    ];
-    return rules.find(({ matches }) => matches())?.status ?? 'locked';
+  const linkedTaskStatus = (taskId: string) => {
+    const userView = preferencesStore.getTaskUserView;
+    const teamId = userView === 'all' ? 'self' : userView;
+    const status = progressStore.getTaskStatus(teamId, taskId);
+    if (status !== 'incomplete') return status;
+    return unlockedTasks.value[taskId]?.[teamId] ? 'available' : 'locked';
   };
   const highlightTask = (taskElement: HTMLElement) => {
     taskElement.classList.add(
@@ -238,7 +232,7 @@ export function useTaskDeepLink({
       }
       const currentSecondaryView = preferencesStore.getTaskSecondaryView;
       if (currentSecondaryView !== 'all') {
-        const status = getTaskStatus(taskId);
+        const status = linkedTaskStatus(taskId);
         if (currentSecondaryView !== status) {
           preferencesStore.setTaskSecondaryView(status);
         }

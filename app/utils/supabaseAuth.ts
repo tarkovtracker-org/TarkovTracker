@@ -48,3 +48,13 @@ export const refreshSupabaseSession = async (client: {
     clearPendingRefresh(clientKey, refresh);
   }
 };
+const getAccessToken = (session: Session | null): string | null => session?.access_token ?? null;
+export const getOrRefreshSupabaseAccessToken = async (
+  client: Pick<SupabaseClient, 'auth'>
+): Promise<string | null> => {
+  const { data } = await client.auth.getSession();
+  const token = getAccessToken(data.session);
+  if (token) return token;
+  const refreshed = await refreshSupabaseSession(client).catch(() => null);
+  return getAccessToken(refreshed);
+};
