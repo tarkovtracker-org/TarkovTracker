@@ -83,30 +83,7 @@
             </UButton>
           </div>
           <MapObjectiveColorControls class="border-surface-700 border-b pb-3" />
-          <div class="grid gap-2 sm:grid-cols-2">
-            <label
-              v-for="option in mapColorOptions"
-              :key="option.key"
-              class="bg-surface-900/40 border-surface-700 flex items-center justify-between gap-3 rounded-md border px-2.5 py-2"
-            >
-              <span class="flex items-center gap-2">
-                <span
-                  class="h-3.5 w-3.5 rounded-full border border-white/30"
-                  :style="{ backgroundColor: mapMarkerColors[option.key] }"
-                />
-                <span class="text-surface-200 text-xs font-medium">
-                  {{ option.label }}
-                </span>
-              </span>
-              <input
-                :aria-label="option.label"
-                :value="mapMarkerColors[option.key]"
-                type="color"
-                class="bg-surface-900 border-surface-700 h-8 w-11 shrink-0 cursor-pointer rounded border p-1"
-                @input="onMapColorInput(option.key, $event)"
-              />
-            </label>
-          </div>
+          <MapMarkerColorControls />
         </div>
       </div>
     </template>
@@ -114,10 +91,9 @@
 </template>
 <script setup lang="ts">
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import MapMarkerColorControls from '@/features/maps/MapMarkerColorControls.vue';
   import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
-  import { getMapColorOptions, type MapMarkerColorKey } from '@/utils/theme-colors';
-  const { t } = useI18n({ useScope: 'global' });
   const preferencesStore = usePreferencesStore();
   const mapZoomSliderId = 'settings-map-zoom-speed-slider';
   const mapPanSliderId = 'settings-map-pan-speed-slider';
@@ -138,11 +114,4 @@
     get: () => preferencesStore.getMapZoneOpacity,
     set: (val) => preferencesStore.setMapZoneOpacity(val),
   });
-  const mapMarkerColors = computed(() => preferencesStore.getMapMarkerColors);
-  const mapColorOptions = computed(() => getMapColorOptions(t));
-  const onMapColorInput = (key: MapMarkerColorKey, event: Event) => {
-    const input = event.target as HTMLInputElement | null;
-    if (!input) return;
-    preferencesStore.setMapMarkerColor(key, input.value);
-  };
 </script>

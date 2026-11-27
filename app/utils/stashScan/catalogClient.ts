@@ -1,4 +1,5 @@
 import { decodeScanJsonObject, scanJsonObject } from '@/utils/stashScan/catalogJson';
+import { joinChunks } from '@/utils/stashScan/core/byteChunks';
 import { FEATURE_VERSION } from '@/utils/stashScan/core/features';
 import { createIconIndex, type IconIndex } from '@/utils/stashScan/core/matcher';
 import { decodeScanShard } from '@/utils/stashScan/indexCodec';
@@ -23,15 +24,6 @@ async function readBounded(stream: ReadableStream<Uint8Array>, limit: number): P
     await reader.cancel();
   }
   return joinChunks(chunks, length);
-}
-function joinChunks(chunks: Uint8Array[], length: number): Uint8Array {
-  const result = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return result;
 }
 async function readAsset(path: string, limit: number, cache: RequestCache): Promise<Uint8Array> {
   const response = await fetch(`/stash-scan/${path}`, {

@@ -142,30 +142,7 @@
                         </UButton>
                       </div>
                       <MapObjectiveColorControls class="border-surface-700 border-b pb-3" />
-                      <div class="grid grid-cols-2 gap-2">
-                        <label
-                          v-for="option in mapColorOptions"
-                          :key="option.key"
-                          class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
-                        >
-                          <span class="flex min-w-0 items-center gap-2">
-                            <span
-                              class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
-                              :style="{ backgroundColor: mapColors[option.key] }"
-                            />
-                            <span class="text-surface-200 text-[11px] font-medium">
-                              {{ option.label }}
-                            </span>
-                          </span>
-                          <input
-                            :aria-label="option.label"
-                            :value="mapColors[option.key]"
-                            type="color"
-                            class="bg-surface-900 border-surface-700 h-7 w-9 shrink-0 cursor-pointer rounded border p-1"
-                            @input="onMapColorInput(option.key, $event)"
-                          />
-                        </label>
-                      </div>
+                      <MapMarkerColorControls compact />
                     </div>
                   </template>
                 </UPopover>
@@ -650,6 +627,7 @@
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
   import MapCursorCoordinates from '@/features/maps/MapCursorCoordinates.vue';
   import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
+  import MapMarkerColorControls from '@/features/maps/MapMarkerColorControls.vue';
   import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
   import {
     appendExtractRequirementTags,
@@ -882,14 +860,12 @@
     hasSharedExtracts,
     hasUnknownFactionExtracts,
     mapColors,
-    mapColorOptions,
     mapExtracts,
     mapPanSpeed,
     mapPmcSpawns,
     mapTooltipDensity,
     mapZoneOpacity,
     mapZoomSpeed,
-    onMapColorInput,
     panSpeedLabel,
     showPmcExtracts,
     showPmcSpawns,
@@ -906,7 +882,6 @@
     showPmcSpawns: props.showPmcSpawns,
     showScavExtracts: props.showScavExtracts,
     gameMode: currentGameMode,
-    t,
   });
   const mapColorsOpen = ref(false);
   const mapSettingsOpen = ref(false);
