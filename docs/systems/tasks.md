@@ -187,6 +187,13 @@ gate uses the authoritative prestige task map.
 gates can be disabled; unknown data stays locked. Required status `complete|failed` accepts
 either terminal outcome. A story route permits **independent gates AND (quest prerequisites
 OR recorded progress in an explicitly wired chapter)**. Chapter order never grants access.
+For Preserve a Valuable Piece, eligibility alone does not prove Cut Down to the Root was
+accepted. An imported EFT start or explicit in-game availability confirmation is required;
+a reset invalidates the confirmation even when the reset device runs behind. A terminal Jaeger
+status closes the route. The five-second game delay is informational because the tracker does
+not have an authoritative acceptance clock.
+Other active prerequisites retain their existing planning behavior.
+
 Eligibility and caches use the selected mode. An isolated profile uses its own metadata and
 progress and ignores superseded requests. Required core/objective failures are fatal;
 edition, prestige and story failures can stay partial. Edition/story validation is independent.

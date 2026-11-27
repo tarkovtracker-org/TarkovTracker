@@ -17,7 +17,7 @@ import {
   isTaskActive,
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
-import type { TaskAvailabilityConfirmation } from '@/types/progress';
+import type { TaskAvailabilityConfirmation, UserProgressData } from '@/types/progress';
 import type { Task, TaskObjective, TaskRequirement } from '@/types/tarkov';
 type TaskObjectiveProgressStore = {
   getObjectiveCount: (objectiveId: string) => number;
@@ -200,11 +200,12 @@ const isManuallyFailed = (completion: RawTaskCompletion): boolean =>
 export const provesStartGates = (
   task: Task,
   completion: RawTaskCompletion,
-  confirmation: TaskAvailabilityConfirmation | undefined
+  confirmation: TaskAvailabilityConfirmation | undefined,
+  completions: UserProgressData['taskCompletions'] | undefined
 ): boolean =>
   isTaskComplete(completion) ||
   isManuallyFailed(completion) ||
-  isAvailabilityConfirmed(confirmation, completion, otherRequirementsSignature(task));
+  isAvailabilityConfirmed(confirmation, completion, otherRequirementsSignature(task, completions));
 const storyObjectiveKey = ({ chapterId, objectiveId }: StoryObjectiveRef) =>
   `${chapterId}\u0000${objectiveId}`;
 /**

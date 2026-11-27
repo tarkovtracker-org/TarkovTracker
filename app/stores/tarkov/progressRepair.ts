@@ -275,7 +275,8 @@ const repairModeStoryGates =
       const proven = provesStartGates(
         task,
         modeData.taskCompletions?.[task.id],
-        modeData.taskAvailability?.[task.id]
+        modeData.taskAvailability?.[task.id],
+        modeData.taskCompletions
       );
       if (proven) repaired += markTaskStoryGates(modeData, task, chapters);
     }

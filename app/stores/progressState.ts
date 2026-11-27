@@ -14,14 +14,19 @@
  *
  * @module stores/userProgressState
  */
-import { ACTIVE_SEASON_NUMBER, GAME_MODES, type GameMode } from '@/utils/constants';
+import {
+  ACTIVE_SEASON_NUMBER,
+  GAME_MODES,
+  TASK_ID_REGISTRY,
+  type GameMode,
+} from '@/utils/constants';
 import {
   reconcileSeasonalProgressSeason,
   sanitizeManualActivityEpoch,
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
-import { nextClock } from '@/utils/taskAvailabilityConfirmation';
+import { nextClock, taskStatusTimestamp } from '@/utils/taskAvailabilityConfirmation';
 import {
   isTaskComplete as isTaskCompletionComplete,
   isTaskFailed as isTaskCompletionFailed,
@@ -284,10 +289,15 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
  */
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
   const confirmationTs = getCurrentData(state).taskAvailability?.[taskId]?.timestamp;
-  const timestamp =
+  let timestamp =
     confirmationTs === undefined
       ? completion.timestamp
       : Math.max(completion.timestamp ?? 0, nextClock(confirmationTs));
+  // A reset on the same millisecond or a slower device must still change Jaeger's revision.
+  if (taskId === TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT) {
+    const previous = taskStatusTimestamp(getCurrentData(state).taskCompletions?.[taskId]);
+    timestamp = Math.max(timestamp ?? 0, previous, nextClock(previous));
+  }
   updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
 };
 // Simplified actions
