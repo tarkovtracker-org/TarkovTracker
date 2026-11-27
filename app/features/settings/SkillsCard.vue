@@ -389,7 +389,9 @@
       releaseEditingPin(skillKey);
       return;
     }
-    afterPointerRelease(() => releaseEditingPin(skillKey));
+    afterPointerRelease(() => {
+      if (document.activeElement?.id !== getSkillInputId(skillKey)) releaseEditingPin(skillKey);
+    });
   };
   const onPaste = (e: ClipboardEvent, skillName: string) => {
     e.preventDefault();
@@ -408,8 +410,8 @@
   // The reset button unmounts once the offset is cleared, so move focus to the row's input
   // instead of letting it fall back to the document body.
   const resetOffset = (skillName: string) => {
+    document.getElementById(getSkillInputId(skillName))?.focus();
     skillCalculation.resetSkillOffset(skillName);
-    void focusElementById(getSkillInputId(skillName));
   };
   const resetAllCount = ref(0);
   const openResetAllDialog = () => {

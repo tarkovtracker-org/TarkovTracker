@@ -478,18 +478,40 @@ describe('SkillsCard', () => {
     window.dispatchEvent(new Event('pointerup'));
     await vi.waitFor(() => expect(wrapper.find('#settings-skill-Strength').exists()).toBe(false));
   });
-  it('moves focus to the level input after resetting a row', async () => {
-    const wrapper = createWrapper();
-    document.body.appendChild(wrapper.element);
-    try {
-      await wrapper.find('#settings-skill-Strength button').trigger('click');
-      await nextTick();
-      expect(document.activeElement?.id).toBe('skill-input-Strength');
-    } finally {
-      wrapper.unmount();
-      wrapper.element.remove();
+  it.each(['keyboard', 'pointer'])(
+    'retains input focus after a %s reset under Adjusted',
+    async (method) => {
+      const offsets = ref<Record<string, number>>({ Strength: 3, Endurance: 2 });
+      const wrapper = createWrapper({
+        allGameSkills: computed(() => [makeSkill('Strength'), makeSkill('Endurance')]),
+        getSkillOffset: (key: string) => offsets.value[key] ?? 0,
+        resetSkillOffset: (key: string) => {
+          offsets.value[key] = 0;
+        },
+      });
+      document.body.appendChild(wrapper.element);
+      try {
+        await findButton(wrapper, 'settings.skills.filter.adjusted')!.trigger('click');
+        const reset = wrapper.get<HTMLButtonElement>('#settings-skill-Strength button');
+        if (method === 'pointer') {
+          wrapper.get<HTMLInputElement>('#skill-input-Strength').element.focus();
+          await reset.trigger('pointerdown');
+        }
+        reset.element.focus();
+        if (method === 'pointer') await reset.trigger('pointerup');
+        await reset.trigger('click');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await nextTick();
+        expect(document.activeElement?.id).toBe('skill-input-Strength');
+        wrapper.get<HTMLInputElement>('#skill-input-Endurance').element.focus();
+        await nextTick();
+        expect(wrapper.find('#settings-skill-Strength').exists()).toBe(false);
+      } finally {
+        wrapper.unmount();
+        wrapper.element.remove();
+      }
     }
-  });
+  );
   it('hides the reset-all action when nothing is adjusted', () => {
     const wrapper = createWrapper({ getSkillOffset: () => 0 });
     expect(findButton(wrapper, 'settings.skills.reset_all')).toBeUndefined();
