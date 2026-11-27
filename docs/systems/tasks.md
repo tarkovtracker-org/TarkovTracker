@@ -296,6 +296,14 @@ are unspecified. The floor picker shows only the floors in the selected Main Dec
 group. Switching groups selects Infirmary or Engine Room, and the selected floor drives the artwork
 and pin elevation indicators. The groups follow [TarkovBOT's Icebreaker map](https://tarkovbot.eu/tools/interactive-maps/icebreaker).
 
+Icebreaker fills empty spawn positions for Knight's Mash_t1 on Storage/Security and The Wedge's
+RoomsThird and RoomsThirdKitchen on Gym/Canteen. The fallback uses only the matching Icebreaker
+map ID, boss role, and raw zone name. It preserves any valid Tarkov.dev position and keeps the
+catalog's encounter rows and probabilities. The positions come from the game-data import's
+unmodified bot spawn entries. All 12 project onto the visible artwork of their recorded decks.
+[Retail import provenance](https://github.com/danauraborealis/ManimalIcebreaker/blob/4effee7c5d0efa1943aa250c29ef031fe24a7c03/analysis/remap_retail_spawns.py#L36-L40)
+[Imported SpawnPointParams](https://github.com/danauraborealis/ManimalIcebreaker/blob/4effee7c5d0efa1943aa250c29ef031fe24a7c03/icebreaker-server/db/base.json#L1600-L3110)
+
 The Lab (Dark), Infected Lab and Infected Factory reuse the backgrounds that Tarkov.dev declares
 for those variants. Each variant keeps its own boss rates, locations and extracts.
 
