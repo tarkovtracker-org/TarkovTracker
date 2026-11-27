@@ -727,8 +727,9 @@
     }
   },
   "maps": {
+    "artwork_credit": "Map tiles by {name}",
     "boss_spawns": {
-      "raid_chance": "Raid spawn chance",
+      "raid_chance": "Configured spawn chance",
       "area_chance": "{name} · {chance} if spawned",
       "no_location": "Spawn area unavailable",
       "no_pin": "No map pin"
