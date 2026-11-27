@@ -67,6 +67,7 @@ import {
   setCachedData,
 } from '@/utils/tarkovCache';
 import {
+  taskCoreCacheKey,
   TASK_OBJECTIVES_CACHE_VERSION,
   TASK_OBJECTIVES_PURGE_CHECK_TTL_MS,
 } from '@/utils/taskCatalogCache';
@@ -170,7 +171,6 @@ const ownsMetadataRequest = (
 const BOOTSTRAP_CACHE_VERSION = 'json-v2';
 /** Requests for language-independent data always use English to share one cache entry. */
 const ENGLISH_LANGUAGE_CODE = 'en';
-const TASKS_CORE_CACHE_VERSION = 'neutral-v2';
 const MAP_SPAWNS_CACHE_VERSION = 'neutral-v1';
 const ITEMS_CACHE_VERSION = 'neutral-v1';
 const TASK_REWARDS_CACHE_VERSION = 'neutral-v1';
@@ -1045,7 +1045,7 @@ export const useMetadataStore = defineStore('metadata', {
         const [tasksCore, hideout, prestige, editions] = await Promise.all([
           getCachedData<TarkovTasksCoreQueryResult>(
             'tasks-core' as CacheType,
-            `${TASKS_CORE_CACHE_VERSION}-${apiGameMode}`,
+            taskCoreCacheKey(apiGameMode),
             ENGLISH_LANGUAGE_CODE
           ),
           getCachedData<TarkovHideoutQueryResult>(
@@ -1599,7 +1599,7 @@ export const useMetadataStore = defineStore('metadata', {
       const requestKey = `${requestLanguage}-${requestGameMode}`;
       await this.fetchWithCache<TarkovTasksCoreQueryResult>({
         cacheType: 'tasks-core' as CacheType,
-        cacheKey: `${TASKS_CORE_CACHE_VERSION}-${requestGameMode}`,
+        cacheKey: taskCoreCacheKey(requestGameMode),
         cacheLanguage: ENGLISH_LANGUAGE_CODE,
         endpoint: '/api/tarkov/tasks-core',
         queryParams: { gameMode: requestGameMode },
