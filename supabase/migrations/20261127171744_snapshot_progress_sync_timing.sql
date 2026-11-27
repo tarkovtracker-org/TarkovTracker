@@ -2,6 +2,20 @@ SET LOCAL lock_timeout = '5s';
 
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements SCHEMA extensions;
 
+-- A PostgreSQL upgrade can leave the existing extension at an older version.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_attribute
+    WHERE attrelid = to_regclass('extensions.pg_stat_statements')
+      AND attname = 'stats_since' AND attnum > 0 AND NOT attisdropped
+  ) THEN
+    RAISE EXCEPTION 'Progress sync timing requires extensions.pg_stat_statements.stats_since'
+      USING HINT = 'Upgrade pg_stat_statements to version 1.11 or later before retrying this migration.';
+  END IF;
+END;
+$$;
+
 CREATE TABLE private.progress_sync_timing_snapshots (
   captured_hour timestamptz NOT NULL,
   query_id bigint NOT NULL,
