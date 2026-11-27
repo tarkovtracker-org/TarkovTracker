@@ -32,6 +32,7 @@ const createPreferencesStore = () => {
         PMC_EXTRACT: '#f97316',
         PMC_SPAWN: '#ef4444',
         TRANSIT: '#cf5959',
+        BOSS_SPAWN: '#b23434',
         SCAV_EXTRACT: '#3b82f6',
         SELECTED: '#f59e0b',
         SELF_OBJECTIVE: '#10b981',

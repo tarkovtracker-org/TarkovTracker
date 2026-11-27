@@ -59,6 +59,7 @@ const { mapState, mockMapInstance, resetMapMarkerColorsSpy } = vi.hoisted(() => 
       extractLayer: null as unknown,
       spawnLayer: null as unknown,
       transitLayer: null as unknown,
+      bossLayer: null as unknown,
     },
   };
 });
@@ -93,6 +94,7 @@ vi.mock('@/composables/useLeafletMap', () => ({
       extractLayer: shallowRef(mapState.extractLayer),
       spawnLayer: shallowRef(mapState.spawnLayer),
       transitLayer: shallowRef(mapState.transitLayer),
+      bossLayer: shallowRef(mapState.bossLayer),
       setFloor: (floor: string) => {
         setFloorSpy(floor);
         selectedFloor.value = floor;
@@ -117,6 +119,7 @@ vi.mock('@/stores/usePreferences', () => ({
       COOP_EXTRACT: '#777777',
       DEFAULT_EXTRACT: '#888888',
       TRANSIT: '#cf5959',
+      BOSS_SPAWN: '#b23434',
     },
     getMapTooltipDensity: 'comfortable',
     getMapObjectiveColorMode: 'category',
@@ -201,6 +204,7 @@ describe('LeafletMap controls', () => {
     mapState.extractLayer = null;
     mapState.spawnLayer = null;
     mapState.transitLayer = null;
+    mapState.bossLayer = null;
     mapState.fitZoom = null;
     localStorage.clear();
     savedLayers.value = {};
@@ -231,6 +235,47 @@ describe('LeafletMap controls', () => {
     await wrapper.get('[data-testid="map-layers-toggle"]').trigger('click');
     return (key: string) => wrapper.find(`[data-testid="map-layers-panel"] [data-layer="${key}"]`);
   };
+  it('shows and remembers the boss layer even when its raid chance has no pinned area', async () => {
+    const map = {
+      ...mapData,
+      bossSpawns: [{ name: 'Partisan', chance: 0.25, locations: [] }],
+    };
+    const first = await mountMap({ map });
+    const firstRow = await openLayersPanel(first);
+    const selector = '[data-testid="map-boss-spawn-details"]';
+    expect(firstRow('bosses').attributes('aria-pressed')).toBe('false');
+    expect(first.find(selector).exists()).toBe(false);
+    await firstRow('bosses').trigger('click');
+    expect(first.get(selector).text()).toContain('25%');
+    expect(first.get(selector).text()).toContain('Partisan');
+    expect(savedLayers.value).toEqual({ bosses: true });
+    first.unmount();
+    const second = await mountMap({ map });
+    expect(second.get('[data-layer="bosses"]').attributes('aria-pressed')).toBe('true');
+    await second.get('[data-layer="bosses"]').trigger('click');
+    expect(second.find(selector).exists()).toBe(false);
+    second.unmount();
+  });
+  it('refits an open boss popup when the map viewport shrinks', async () => {
+    const popup = { options: {}, isOpen: () => true, update: vi.fn() };
+    const layer = () => ({ clearLayers: vi.fn(), addLayer: vi.fn() });
+    mapState.objectiveLayer = layer();
+    mapState.extractLayer = layer();
+    mapState.spawnLayer = layer();
+    mapState.bossLayer = {
+      ...layer(),
+      eachLayer: (visit: (entry: unknown) => void) => visit({ getPopup: () => popup }),
+    };
+    const wrapper = await mountMap();
+    const resize = mockMapInstance.on.mock.calls.filter(([event]) => event === 'resize').at(-1)![1];
+    popup.update.mockClear();
+    mockMapInstance.size = { x: 220, y: 240 };
+    resize();
+    await nextTick();
+    expect(popup.options).toMatchObject({ maxWidth: 160, minWidth: 160, maxHeight: 140 });
+    expect(popup.update).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
   it('starts extracts from the saved default and follows it when it changes', async () => {
     const wrapper = await mountMap({
       map: {

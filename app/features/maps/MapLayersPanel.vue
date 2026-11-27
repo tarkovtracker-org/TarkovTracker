@@ -18,12 +18,15 @@
         >
           {{ group.label }}
         </p>
-        <MapLayerRow
-          v-for="item in group.items"
-          :key="item.key"
-          :item="item"
-          @toggle="emit('toggle', $event)"
-        />
+        <template v-for="item in group.items" :key="item.key">
+          <MapLayerRow :item="item" @toggle="emit('toggle', $event)" />
+          <div
+            v-if="item.key === 'bosses' && item.visible.value && bossSpawns?.length"
+            class="bg-surface-900/60 mx-2 mt-1 rounded-md border border-white/8 p-2 text-[11px] leading-snug"
+          >
+            <MapBossSpawnDetails :bosses="bossSpawns" expandable />
+          </div>
+        </template>
       </div>
       <div class="mt-1.5 border-t border-white/8 pt-1.5">
         <button
@@ -138,6 +141,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import MapBossSpawnDetails from '@/features/maps/MapBossSpawnDetails.vue';
   import MapLayerRow from '@/features/maps/MapLayerRow.vue';
   import { getGlyphInk } from '@/features/maps/utils/colorContrast';
   import {
@@ -156,10 +160,12 @@
     MAP_OBJECTIVE_GLYPH_PATHS,
     type MapObjectiveGlyphKind,
   } from '@/features/maps/utils/objectiveGlyphs';
+  import type { MapBossSpawn } from '@/types/tarkov';
   /** Combined legend and visibility list; each row shows a marker type and toggles it. */
   const props = defineProps<{
     id: string;
     groups: MapLayerGroup[];
+    bossSpawns?: MapBossSpawn[];
     /** Objective-type chip colors while chips are colored by type; null keeps neutral chips. */
     objectiveKindColors?: Record<MapObjectiveGlyphKind, string> | null;
   }>();

@@ -82,6 +82,7 @@ export function useLeafletMapControls({
   const hasTransits = computed(() => mapTransits.value.length > 0);
   const saved = preferencesStore.getMapLayerVisibility ?? {};
   const showTransits = ref(saved.transit ?? true);
+  const showBossSpawns = ref(saved.bosses ?? false);
   const mapPmcSpawns = computed<MapSpawn[]>(() => {
     if (!map.value?.spawns) return [];
     return map.value.spawns.filter((spawn) => {
@@ -107,6 +108,7 @@ export function useLeafletMapControls({
     coop: showCoopExtracts,
     transit: showTransits,
     spawns: showPmcSpawns,
+    bosses: showBossSpawns,
   };
   // Another map on the page (the full-screen one) can save a row; follow it so both agree.
   watch(
@@ -169,6 +171,7 @@ export function useLeafletMapControls({
     hasTransits,
     mapTransits,
     showTransits,
+    showBossSpawns,
     hasCoopExtracts,
     hasPmcExtracts,
     hasPmcSpawns,

@@ -457,6 +457,7 @@
             :id="layersPanelId"
             v-model:always-show-names="alwaysShowNames"
             :groups="layerGroups"
+            :boss-spawns="props.map.bossSpawns"
             :objective-kind-colors="objectiveKindColors"
             @toggle="toggleLayer"
             @show-all="showAllLayers"
@@ -605,7 +606,7 @@
 <script setup lang="ts">
   import 'leaflet/dist/leaflet.css';
   import { useElementSize, useStorage } from '@vueuse/core';
-  import { createApp } from 'vue';
+  import { createApp, render } from 'vue';
   import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
     mapObjectiveCategory,
@@ -625,10 +626,12 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
+  import MapBossSpawnDetails from '@/features/maps/MapBossSpawnDetails.vue';
   import MapCursorCoordinates from '@/features/maps/MapCursorCoordinates.vue';
   import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
   import MapMarkerColorControls from '@/features/maps/MapMarkerColorControls.vue';
   import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
+  import { getBossPins, type BossPin } from '@/features/maps/utils/bossSpawnLocations';
   import {
     appendExtractRequirementTags,
     createExtractDetails,
@@ -824,6 +827,7 @@
     extractLayer,
     spawnLayer,
     transitLayer,
+    bossLayer,
     setFloor,
     refreshView,
     getFitZoom,
@@ -853,6 +857,7 @@
     hasTransits,
     mapTransits,
     showTransits,
+    showBossSpawns,
     hasCoopExtracts,
     hasPmcExtracts,
     hasPmcSpawns,
@@ -917,6 +922,13 @@
     }
   });
   const layersPanelId = `map-layers-${useId()}`;
+  const hasRenderConfig = computed(
+    () => isValidMapSvgConfig(props.map.svg) || isValidMapTileConfig(props.map.tile)
+  );
+  const bossPins = computed(() =>
+    showBossSpawns.value && hasRenderConfig.value ? getBossPins(props.map) : []
+  );
+  const appContext = getCurrentInstance()!.appContext;
   const layerGroups = computed(() =>
     buildMapLayerGroups({
       t,
@@ -935,6 +947,7 @@
       },
       transit: showTransits,
       spawns: showPmcSpawns,
+      bosses: showBossSpawns,
       available: {
         pmc: props.showExtractToggle && hasPmcExtracts.value,
         scav: props.showExtractToggle && hasScavExtracts.value,
@@ -944,6 +957,7 @@
         coop: props.showExtractToggle && hasCoopExtracts.value,
         transit: hasTransits.value,
         spawns: props.showSpawnToggle && hasPmcSpawns.value,
+        bosses: Boolean(props.map.bossSpawns?.length),
       },
     })
   );
@@ -956,15 +970,16 @@
   );
   const extractRuleData = useExtractRuleData();
   /** Which extract glyph categories are drawn; markers and the source line share this rule. */
-  const extractVisibility = computed<Record<MapMarkerGlyphKind, boolean>>(() => ({
-    pmc: showPmcExtracts.value,
-    scav: showScavExtracts.value,
-    shared: showSharedExtracts.value,
-    coop: showCoopExtracts.value,
-    // Extracts without a known faction follow the Shared row, the closest legend entry.
-    extract: showSharedExtracts.value,
-    transit: false,
-  }));
+  const extractVisibility = computed<Record<ReturnType<typeof getExtractGlyphKind>, boolean>>(
+    () => ({
+      pmc: showPmcExtracts.value,
+      scav: showScavExtracts.value,
+      shared: showSharedExtracts.value,
+      coop: showCoopExtracts.value,
+      // Extracts without a known faction follow the Shared row, the closest legend entry.
+      extract: showSharedExtracts.value,
+    })
+  );
   const anyExtractsVisible = computed(() =>
     mapExtracts.value.some(
       (extract) =>
@@ -1035,11 +1050,16 @@
   const updateCurrentMapZoom = () => {
     currentMapZoom.value = mapInstance.value?.getZoom() ?? 0;
     fitZoom.value = getFitZoom();
-    extractLayer.value?.eachLayer?.((layer) => {
-      const popup = (layer as L.Marker).getPopup?.();
-      if (popup) fitExtractPopup(popup);
-    });
+    refitLocationPopups(extractLayer.value);
+    // Resize can refit the whole map after the Leaflet resize event and override popup auto-pan.
+    void nextTick(() => refitLocationPopups(bossLayer.value));
   };
+  function refitLocationPopups(group: L.LayerGroup | null): void {
+    group?.eachLayer?.((layer) => {
+      const popup = (layer as L.Marker).getPopup?.();
+      if (popup) fitLocationPopup(popup);
+    });
+  }
   // Names appear for every pin once the user zooms in past the whole-map view, where there is room
   // for them; hover and tap show a single name at any zoom.
   const NAMES_ZOOM_DELTA = 1;
@@ -2164,8 +2184,8 @@
     });
     if (mapInstance.value?.hasLayer(popup)) popup.update();
   }
-  /** Keep requirement details inside the current map, including after viewport changes. */
-  function fitExtractPopup(popup: L.Popup): void {
+  /** Keep location details inside the current map, including after viewport changes. */
+  function fitLocationPopup(popup: L.Popup): void {
     const size = mapInstance.value?.getSize();
     if (!size) return;
     const maxWidth = Math.max(80, Math.min(280, size.x - 60));
@@ -2189,9 +2209,6 @@
     const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
     const pin = createMapPinElement(kind, color, label);
     const offFloor = appendElevation(pin, elevation);
-    // The co-op pin glyph is already the handshake, so its requirement strip skips it.
-    if (requirements) appendExtractRequirementTags(pin, requirements, [kind]);
-    if (offFloor) dimOffFloorPin(pin);
     const icon = leafletApi.divIcon({
       className: `${className} ${MAP_PIN_ICON_CLASS}`,
       html: pin,
@@ -2204,26 +2221,61 @@
       // Extracts expose their requirement details to keyboard users as well as pointer users.
       // Transit pins keep the map surface keyboard controls.
       interactive: true,
-      keyboard: Boolean(requirements),
+      keyboard: Boolean(requirements) || kind === 'boss',
       zIndexOffset: 1000,
     });
-    if (requirements) {
-      marker.bindPopup(createExtractDetails(label, requirements), {
-        className:
-          'map-extract-popup [&_.leaflet-popup-content-wrapper]:border [&_.leaflet-popup-content-wrapper]:border-white/10',
-        // Open above the pin head (36 px, scaled up while open) so the pin and its name stay visible.
-        offset: [0, -28],
-      });
-      marker.on('popupopen', (event: L.PopupEvent) => fitExtractPopup(event.popup));
-    }
-    marker.on('click', () => togglePinName(pin));
+    attachExtractDetails(marker, pin, kind, label, requirements);
+    if (offFloor) dimOffFloorPin(pin);
+    if (kind !== 'boss') marker.on('click', () => togglePinName(pin));
     return marker;
   }
-  const visibleTransits = computed(() => {
-    const hasRenderConfig =
-      isValidMapSvgConfig(props.map.svg) || isValidMapTileConfig(props.map.tile);
-    return showTransits.value && hasRenderConfig ? mapTransits.value : [];
-  });
+  function attachExtractDetails(
+    marker: L.Marker,
+    pin: HTMLElement,
+    kind: MapMarkerGlyphKind,
+    label: string,
+    requirements?: ExtractRequirements
+  ): void {
+    if (!requirements) return;
+    // The co-op pin glyph is already the handshake, so its requirement strip skips it.
+    appendExtractRequirementTags(pin, requirements, [kind]);
+    marker.bindPopup(createExtractDetails(label, requirements), {
+      className: `map-extract-popup ${LOCATION_POPUP_CLASS}`,
+      // Open above the pin head so the pin and its name stay visible.
+      offset: [0, -28],
+    });
+    marker.on('popupopen', (event: L.PopupEvent) => fitLocationPopup(event.popup));
+  }
+  const LOCATION_POPUP_CLASS =
+    '[&_.leaflet-popup-content-wrapper]:border [&_.leaflet-popup-content-wrapper]:border-white/10';
+  const visibleTransits = computed(() =>
+    showTransits.value && hasRenderConfig.value ? mapTransits.value : []
+  );
+  function createBossMarker(leafletApi: NonNullable<typeof leaflet.value>, pin: BossPin): L.Marker {
+    const label = [...new Set(pin.encounters.map(({ boss }) => boss.name))].join(' · ');
+    const marker = createPinMarker(leafletApi, 'boss', label, pin.position, 'boss-spawn-marker');
+    const container = document.createElement('div');
+    const bosses = pin.encounters.map(({ boss, location }) => ({ ...boss, locations: [location] }));
+    marker.bindPopup(container, {
+      className: LOCATION_POPUP_CLASS,
+      offset: [0, -28],
+    });
+    marker.on('popupopen', (event: L.PopupEvent) => {
+      const content = h(MapBossSpawnDetails, { bosses });
+      content.appContext = appContext;
+      render(content, container);
+      fitLocationPopup(event.popup);
+    });
+    marker.on('popupclose', () => render(null, container));
+    return marker;
+  }
+  function createBossMarkers(): void {
+    const layer = bossLayer.value;
+    const leafletApi = leaflet.value;
+    if (!layer || !leafletApi) return;
+    layer.clearLayers();
+    bossPins.value.forEach((pin) => layer.addLayer(createBossMarker(leafletApi, pin)));
+  }
   /** Rebuild source-map transit labels, clearing stale markers when none are visible. */
   function createTransitMarkers(): void {
     const layer = transitLayer.value;
@@ -2393,6 +2445,7 @@
   );
   watch(showPmcSpawns, () => createPmcSpawnMarkers());
   watch([leaflet, transitLayer, visibleTransits], () => createTransitMarkers());
+  watch([leaflet, bossLayer, bossPins, selectedFloor, mapColors], createBossMarkers);
   watch(
     () => props.showPmcSpawns,
     (value) => {

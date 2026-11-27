@@ -727,6 +727,12 @@
     }
   },
   "maps": {
+    "boss_spawns": {
+      "raid_chance": "Raid spawn chance",
+      "area_chance": "{name} · {chance} if spawned",
+      "no_location": "Spawn area unavailable",
+      "no_pin": "No map pin"
+    },
     "extract_requirements": {
       "raid_notice": "Not live raid status",
       "source": "Requirements: EFT {version} data and public references",
@@ -813,6 +819,7 @@
       "hidden_count": "{count} hidden",
       "names_hint": "Otherwise names show when zoomed in, on hover, or on tap",
       "pmc_spawns": "PMC Spawns",
+      "boss_spawns": "Boss Spawns",
       "shared": "Shared",
       "shared_hint": "Either faction",
       "shared_or_unknown": "Shared / unknown",

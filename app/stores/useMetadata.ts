@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { extractLanguageCode, useSafeLocale } from '@/composables/i18nHelpers';
 import { useGraphBuilder } from '@/composables/useGraphBuilder';
 import mapsData from '@/data/maps.json';
+import { resolveMergedBossSpawns } from '@/features/maps/utils/bossSpawnLocations';
 import {
   type FetchResponse,
   type FetchSuccess,
@@ -169,7 +170,7 @@ const ownsMetadataRequest = (
 const BOOTSTRAP_CACHE_VERSION = 'json-v2';
 /** Requests for language-independent data always use English to share one cache entry. */
 const ENGLISH_LANGUAGE_CODE = 'en';
-const TASKS_CORE_CACHE_VERSION = 'neutral-v1';
+const TASKS_CORE_CACHE_VERSION = 'neutral-v2';
 const MAP_SPAWNS_CACHE_VERSION = 'neutral-v1';
 const ITEMS_CACHE_VERSION = 'neutral-v1';
 const TASK_REWARDS_CACHE_VERSION = 'neutral-v1';
@@ -824,10 +825,12 @@ export const useMetadataStore = defineStore('metadata', {
           // Check for unavailable before svg check (unavailable maps may not have svg)
           const unavailable = staticData?.unavailable;
           const extracts = resolveMergedMapExtracts(primaryMap.extracts, staticData?.extractsAdd);
+          const bossSpawns = resolveMergedBossSpawns(maps);
           if (staticData?.svg || staticData?.tile) {
             return {
               ...primaryMap,
               extracts,
+              bossSpawns,
               svg: staticData?.svg,
               tile: staticData?.tile,
               unavailable,
@@ -842,6 +845,7 @@ export const useMetadataStore = defineStore('metadata', {
           return {
             ...primaryMap,
             extracts,
+            bossSpawns,
             unavailable,
             mergedIds,
           };
