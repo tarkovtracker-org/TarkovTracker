@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import icebreakerPositions from '@/data/icebreakerBossSpawnPositions.json';
+import bossSpawnPositions from '@/data/bossSpawnPositions.json';
 import { testOverlayEditions } from '@/server/utils/__tests__/overlayFixtures';
 import { buildCatalogStrings, buildNeutralCatalog } from '@/server/utils/neutralCatalog';
 import { bindOverlayLocaleTargets, parseNeutralOverlay } from '@/server/utils/neutralOverlay';
@@ -105,6 +105,7 @@ describe('neutral catalogs', () => {
   it.each(['regular', 'pve', 'pvp-season'] as const)(
     'fills only matching Icebreaker boss zones in the %s catalog',
     async (mode) => {
+      const icebreaker = bossSpawnPositions['69af492a4819ea4ba10a69c5'];
       const knightZone = { name: 'BotZoneMash_t1', chance: 0.6, positions: [] };
       const upstreamPosition = { x: 8, y: 23.77, z: 35 };
       const knight = { mob: 'bossKnight', spawnChance: 0.7, spawnLocations: [knightZone] };
@@ -157,7 +158,7 @@ describe('neutral catalogs', () => {
                   {
                     name: `@tt:${mode}:maps:BotZoneMash_t1`,
                     chance: 0.6,
-                    positions: icebreakerPositions.bossKnight.BotZoneMash_t1,
+                    positions: icebreaker.BotZoneMash_t1.positions,
                   },
                 ],
               },
@@ -165,10 +166,10 @@ describe('neutral catalogs', () => {
                 name: 'The Wedge',
                 chance: 1,
                 locations: [
-                  { chance: 0.3, positions: icebreakerPositions.bossWedge.BotZoneRoomsThird },
+                  { chance: 0.3, positions: icebreaker.BotZoneRoomsThird.positions },
                   {
                     chance: 0.7,
-                    positions: icebreakerPositions.bossWedge.BotZoneRoomsThirdKitchen,
+                    positions: icebreaker.BotZoneRoomsThirdKitchen.positions,
                   },
                   { positions: [upstreamPosition] },
                   { positions: [] },
