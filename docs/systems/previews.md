@@ -239,21 +239,19 @@ still needs current revision evidence.
   controlled branch alias so host trust covers the unique deployment URL, and the app's offline
   Supabase fallback activates on `pages.dev`. Public game data still flows through `/api/tarkov/*`.
 - Preview `TARKOV_DATA` binds a dedicated namespace shared by all preview branches,
-  separate from production. Neutral readers need the complete release of 30 mode
-  catalogs and 13 language bundles, plus the three whole English import snapshots.
-  Seed it explicitly from a reviewed, merged producer with a pinned
-  `EXPECTED_OVERLAY_SHA` and both language/mode filters empty. The production
-  precompute workflow refreshes only production. An approved broker writer or
-  authorized operator can run the existing producer against the preview namespace
-  without exposing credentials to candidate code. A historical English-only core
-  seed cannot satisfy the neutral reader. Validate the complete manifest, immutable
-  object readbacks, and all three import results before testing catalog-dependent
-  UI. Refresh before expiry and at least every six days while an import preview
-  remains active. Unavailable or expired English imports always return 503.
-  Neutral catalog readers can return a last-good per-colo copy marked `STALE`
-  when KV is unavailable, or 503 when no copy exists. Only a current release
-  passes verification. Ordinary preview smoke tests do not certify the complete
-  catalog or import release. Every approved preview runtime has read/write/delete
+  separate from production. After each complete production precompute, the trusted
+  12-hour schedule copies the published release into preview. It checks the
+  complete set of 46 immutable objects and all three English imports, reads back
+  every preview write, and activates the manifest last. The workflow can also be
+  dispatched on `main` with `previewOnly` and empty language/mode filters to
+  refresh this namespace from the current production release. Writer credentials
+  stay in the main-only precompute environment.
+  Browser smoke setup checks that regular hideout data returns a current
+  `PRECOMPUTE` release no older than six days. A failure identifies the catalog
+  dependency before running the browser suite. Unavailable or expired English
+  imports return 503. Neutral catalog readers can return a last-good per-colo copy
+  marked `STALE` when KV is unavailable, or 503 when no copy exists.
+  Every approved preview runtime has read/write/delete
   access to this shared expendable store. Only merged public game catalogs belong
   there. Revalidate the seeded identity before testing because another preview can
   change the shared release. The trusted deployment job reads `wrangler.toml` from

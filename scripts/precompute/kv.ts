@@ -6,6 +6,7 @@
  * Per-key requests keep catalog writes and readback verification independently
  * retryable within the release publication pipeline.
  */
+import { setTimeout as delay } from 'node:timers/promises';
 const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4';
 const KV_TIMEOUT_MS = 30_000;
 const KV_ATTEMPTS = 3;
@@ -49,6 +50,18 @@ export function createKvRestWriter(config: KvRestConfig): CatalogStore {
   };
 }
 export class KvReadNotFound extends Error {}
+export async function readbackMatches(kv: CatalogStore, key: string, expected: Buffer) {
+  // A previously cached value or miss can outlive a successful KV write by 60 seconds.
+  for (const waitMs of [0, 5000, 15000, 45000]) {
+    if (waitMs) await delay(waitMs);
+    try {
+      if (expected.equals(Buffer.from(await kv.read(key)))) return true;
+    } catch (error) {
+      if (!(error instanceof KvReadNotFound)) throw error;
+    }
+  }
+  return false;
+}
 type KvFailure = { error: Error; retryable: boolean };
 type Attempt<T> = { value: T } | KvFailure;
 function transportFailure(operation: 'read' | 'write', key: string, cause: unknown): KvFailure {

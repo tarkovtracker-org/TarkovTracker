@@ -103,6 +103,7 @@
     "metrics": "node scripts/ci/metrics.mjs",
     "postinstall": "node scripts/setup/prepare-nuxt.mjs",
     "verify:overlay": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/check-overlay.ts",
+    "precompute:preview": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/refresh-preview.ts",
     "precompute:tarkov": "tsx --tsconfig scripts/precompute/tsconfig.json scripts/precompute/run.ts",
     "prod-db:test": "vitest run scripts/ops/prod-db.test.mjs",
     "prepare": "husky || true",
