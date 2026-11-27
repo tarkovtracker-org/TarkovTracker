@@ -1,5 +1,20 @@
 BEGIN;
-SELECT plan(22);
+SELECT plan(23);
+
+-- More than one batch of maximum-width entries must survive until aliases have been resolved.
+WITH fixtures AS (
+  SELECT jsonb_object_agg(repeat('𝄞', 62) || lpad(n::text, 2, '0'),
+    jsonb_build_object('requirements', repeat('𝄞', 4096), 'timestamp', n + 0.75))
+    AS valid_entries
+  FROM generate_series(1, 17) AS n
+)
+SELECT ok(
+  private.prepare_task_identity_progress(jsonb_build_object('level', 42, 'taskAvailability',
+    valid_entries || '{"invalid":{"requirements":"gate","timestamp":"not a number"}}'::jsonb
+  )) = jsonb_build_object('level', 42, 'taskAvailability', valid_entries),
+  'validation preserves raw clocks and valid multibyte entries above the aggregate byte budget'
+)
+FROM fixtures;
 
 SELECT is(
   public.sanitize_user_progress_mode_data(

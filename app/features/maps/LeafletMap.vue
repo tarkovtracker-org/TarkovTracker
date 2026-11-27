@@ -28,42 +28,13 @@
       <div
         class="pointer-events-none absolute inset-2 z-1000 flex flex-wrap content-start items-start justify-between gap-2 @max-[30rem]:static @max-[30rem]:mb-2"
       >
-        <AppTooltip
+        <MapFloorControl
           v-if="hasMultipleFloors"
-          :text="t('maps.tooltips.switch_floor')"
-          :content="{ side: 'right' }"
-        >
-          <div
-            class="bg-surface-850/95 pointer-events-auto flex shrink-0 flex-col gap-1 rounded-lg border border-white/8 p-1.5 shadow-lg @max-[30rem]:w-full @max-[30rem]:flex-row @max-[30rem]:items-center"
-          >
-            <span class="text-surface-400 px-1 text-[10px] font-medium tracking-wide uppercase">
-              {{ t('maps.floors') }}
-            </span>
-            <div
-              class="flex flex-col-reverse gap-0.5 @max-[30rem]:min-w-0 @max-[30rem]:flex-row @max-[30rem]:flex-wrap"
-            >
-              <button
-                v-for="floor in floors"
-                :key="floor"
-                type="button"
-                :aria-pressed="floor === selectedFloor"
-                class="focus-visible:ring-primary-500 focus-visible:ring-offset-surface-850 relative flex h-8 w-full items-center rounded-md px-2.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 @max-[30rem]:w-auto"
-                :class="
-                  floor === selectedFloor
-                    ? 'bg-primary-500/15 text-surface-50'
-                    : 'text-surface-300/65 hover:text-surface-100 hover:bg-white/5'
-                "
-                @click="setFloor(floor)"
-              >
-                <span
-                  v-if="floor === selectedFloor"
-                  class="bg-primary-400 absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-full"
-                />
-                {{ floor.replace(/_/g, ' ') }}
-              </button>
-            </div>
-          </div>
-        </AppTooltip>
+          :floors="floors"
+          :groups="floorGroups"
+          :selected-floor="selectedFloor"
+          @select="setFloor"
+        />
         <div
           class="pointer-events-none order-first ml-auto flex max-h-full min-h-0 max-w-full flex-col items-end gap-2 pb-40 @max-[30rem]:w-full @max-[30rem]:pb-0 @min-[30rem]:order-last"
         >
@@ -142,30 +113,7 @@
                         </UButton>
                       </div>
                       <MapObjectiveColorControls class="border-surface-700 border-b pb-3" />
-                      <div class="grid grid-cols-2 gap-2">
-                        <label
-                          v-for="option in mapColorOptions"
-                          :key="option.key"
-                          class="bg-surface-800/70 border-surface-700 flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
-                        >
-                          <span class="flex min-w-0 items-center gap-2">
-                            <span
-                              class="h-3.5 w-3.5 shrink-0 rounded-full border border-white/30"
-                              :style="{ backgroundColor: mapColors[option.key] }"
-                            />
-                            <span class="text-surface-200 text-[11px] font-medium">
-                              {{ option.label }}
-                            </span>
-                          </span>
-                          <input
-                            :aria-label="option.label"
-                            :value="mapColors[option.key]"
-                            type="color"
-                            class="bg-surface-900 border-surface-700 h-7 w-9 shrink-0 cursor-pointer rounded border p-1"
-                            @input="onMapColorInput(option.key, $event)"
-                          />
-                        </label>
-                      </div>
+                      <MapMarkerColorControls compact />
                     </div>
                   </template>
                 </UPopover>
@@ -480,6 +428,7 @@
             :id="layersPanelId"
             v-model:always-show-names="alwaysShowNames"
             :groups="layerGroups"
+            :boss-spawns="props.map.bossSpawns"
             :objective-kind-colors="objectiveKindColors"
             @toggle="toggleLayer"
             @show-all="showAllLayers"
@@ -522,6 +471,15 @@
           >
             {{ extractSource.label }} · {{ t('maps.extract_requirements.raid_notice') }}
           </p>
+          <a
+            v-if="props.map.tile?.attribution && isWebUrl(props.map.tile.attribution.url)"
+            :href="props.map.tile.attribution.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-surface-300 pointer-events-auto rounded bg-black/70 px-1.5 py-0.5 text-[10px] leading-snug underline-offset-2 hover:underline"
+          >
+            {{ t('maps.artwork_credit', { name: props.map.tile.attribution.name }) }}
+          </a>
         </div>
         <div
           v-if="showKeyboardCursor"
@@ -628,7 +586,7 @@
 <script setup lang="ts">
   import 'leaflet/dist/leaflet.css';
   import { useElementSize, useStorage } from '@vueuse/core';
-  import { createApp } from 'vue';
+  import { createApp, render } from 'vue';
   import { type MapViewState, useLeafletMap, withoutZoomSnap } from '@/composables/useLeafletMap';
   import {
     mapObjectiveCategory,
@@ -648,9 +606,13 @@
   } from '@/features/maps/composables/useLeafletMapControls';
   import LeafletObjectiveStack from '@/features/maps/LeafletObjectiveStack.vue';
   import LeafletObjectiveTooltip from '@/features/maps/LeafletObjectiveTooltip.vue';
+  import MapBossSpawnDetails from '@/features/maps/MapBossSpawnDetails.vue';
   import MapCursorCoordinates from '@/features/maps/MapCursorCoordinates.vue';
+  import MapFloorControl from '@/features/maps/MapFloorControl.vue';
   import MapLayersPanel from '@/features/maps/MapLayersPanel.vue';
+  import MapMarkerColorControls from '@/features/maps/MapMarkerColorControls.vue';
   import MapObjectiveColorControls from '@/features/maps/MapObjectiveColorControls.vue';
+  import { getBossPins, type BossPin } from '@/features/maps/utils/bossSpawnLocations';
   import {
     appendExtractRequirementTags,
     createExtractDetails,
@@ -705,6 +667,7 @@
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { isEditableTarget } from '@/utils/editableTarget';
+  import { isWebUrl } from '@/utils/externalUrl';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
   import { logger } from '@/utils/logger';
   import { clusterSpawns } from '@/utils/mapClustering';
@@ -846,6 +809,7 @@
     extractLayer,
     spawnLayer,
     transitLayer,
+    bossLayer,
     setFloor,
     refreshView,
     getFitZoom,
@@ -856,6 +820,7 @@
     initialView: props.initialView ?? null,
     initialFloor: props.initialFloor,
   });
+  const floorGroups = computed(() => props.map.tile?.floorGroups);
   /** The floor named in copied coordinates, written as the floor panel shows it. */
   const coordinatesFloor = computed(() => selectedFloor.value.replace(/_/g, ' ') || null);
   /** Objective chips are raised 26 px coins; the invisible dot under each one takes input. */
@@ -875,6 +840,7 @@
     hasTransits,
     mapTransits,
     showTransits,
+    showBossSpawns,
     hasCoopExtracts,
     hasPmcExtracts,
     hasPmcSpawns,
@@ -882,14 +848,12 @@
     hasSharedExtracts,
     hasUnknownFactionExtracts,
     mapColors,
-    mapColorOptions,
     mapExtracts,
     mapPanSpeed,
     mapPmcSpawns,
     mapTooltipDensity,
     mapZoneOpacity,
     mapZoomSpeed,
-    onMapColorInput,
     panSpeedLabel,
     showPmcExtracts,
     showPmcSpawns,
@@ -906,7 +870,6 @@
     showPmcSpawns: props.showPmcSpawns,
     showScavExtracts: props.showScavExtracts,
     gameMode: currentGameMode,
-    t,
   });
   const mapColorsOpen = ref(false);
   const mapSettingsOpen = ref(false);
@@ -942,6 +905,13 @@
     }
   });
   const layersPanelId = `map-layers-${useId()}`;
+  const hasRenderConfig = computed(
+    () => isValidMapSvgConfig(props.map.svg) || isValidMapTileConfig(props.map.tile)
+  );
+  const bossPins = computed(() =>
+    showBossSpawns.value && hasRenderConfig.value ? getBossPins(props.map) : []
+  );
+  const appContext = getCurrentInstance()!.appContext;
   const layerGroups = computed(() =>
     buildMapLayerGroups({
       t,
@@ -960,6 +930,7 @@
       },
       transit: showTransits,
       spawns: showPmcSpawns,
+      bosses: showBossSpawns,
       available: {
         pmc: props.showExtractToggle && hasPmcExtracts.value,
         scav: props.showExtractToggle && hasScavExtracts.value,
@@ -969,6 +940,7 @@
         coop: props.showExtractToggle && hasCoopExtracts.value,
         transit: hasTransits.value,
         spawns: props.showSpawnToggle && hasPmcSpawns.value,
+        bosses: Boolean(props.map.bossSpawns?.length),
       },
     })
   );
@@ -981,15 +953,16 @@
   );
   const extractRuleData = useExtractRuleData();
   /** Which extract glyph categories are drawn; markers and the source line share this rule. */
-  const extractVisibility = computed<Record<MapMarkerGlyphKind, boolean>>(() => ({
-    pmc: showPmcExtracts.value,
-    scav: showScavExtracts.value,
-    shared: showSharedExtracts.value,
-    coop: showCoopExtracts.value,
-    // Extracts without a known faction follow the Shared row, the closest legend entry.
-    extract: showSharedExtracts.value,
-    transit: false,
-  }));
+  const extractVisibility = computed<Record<ReturnType<typeof getExtractGlyphKind>, boolean>>(
+    () => ({
+      pmc: showPmcExtracts.value,
+      scav: showScavExtracts.value,
+      shared: showSharedExtracts.value,
+      coop: showCoopExtracts.value,
+      // Extracts without a known faction follow the Shared row, the closest legend entry.
+      extract: showSharedExtracts.value,
+    })
+  );
   const anyExtractsVisible = computed(() =>
     mapExtracts.value.some(
       (extract) =>
@@ -1060,11 +1033,16 @@
   const updateCurrentMapZoom = () => {
     currentMapZoom.value = mapInstance.value?.getZoom() ?? 0;
     fitZoom.value = getFitZoom();
-    extractLayer.value?.eachLayer?.((layer) => {
-      const popup = (layer as L.Marker).getPopup?.();
-      if (popup) fitExtractPopup(popup);
-    });
+    refitLocationPopups(extractLayer.value);
+    // Resize can refit the whole map after the Leaflet resize event and override popup auto-pan.
+    void nextTick(() => refitLocationPopups(bossLayer.value));
   };
+  function refitLocationPopups(group: L.LayerGroup | null): void {
+    group?.eachLayer?.((layer) => {
+      const popup = (layer as L.Marker).getPopup?.();
+      if (popup) fitLocationPopup(popup);
+    });
+  }
   // Names appear for every pin once the user zooms in past the whole-map view, where there is room
   // for them; hover and tap show a single name at any zoom.
   const NAMES_ZOOM_DELTA = 1;
@@ -2189,8 +2167,8 @@
     });
     if (mapInstance.value?.hasLayer(popup)) popup.update();
   }
-  /** Keep requirement details inside the current map, including after viewport changes. */
-  function fitExtractPopup(popup: L.Popup): void {
+  /** Keep location details inside the current map, including after viewport changes. */
+  function fitLocationPopup(popup: L.Popup): void {
     const size = mapInstance.value?.getSize();
     if (!size) return;
     const maxWidth = Math.max(80, Math.min(280, size.x - 60));
@@ -2214,9 +2192,6 @@
     const color = mapColors.value[MAP_MARKER_GLYPH_COLOR_KEYS[kind]];
     const pin = createMapPinElement(kind, color, label);
     const offFloor = appendElevation(pin, elevation);
-    // The co-op pin glyph is already the handshake, so its requirement strip skips it.
-    if (requirements) appendExtractRequirementTags(pin, requirements, [kind]);
-    if (offFloor) dimOffFloorPin(pin);
     const icon = leafletApi.divIcon({
       className: `${className} ${MAP_PIN_ICON_CLASS}`,
       html: pin,
@@ -2229,26 +2204,61 @@
       // Extracts expose their requirement details to keyboard users as well as pointer users.
       // Transit pins keep the map surface keyboard controls.
       interactive: true,
-      keyboard: Boolean(requirements),
+      keyboard: Boolean(requirements) || kind === 'boss',
       zIndexOffset: 1000,
     });
-    if (requirements) {
-      marker.bindPopup(createExtractDetails(label, requirements), {
-        className:
-          'map-extract-popup [&_.leaflet-popup-content-wrapper]:border [&_.leaflet-popup-content-wrapper]:border-white/10',
-        // Open above the pin head (36 px, scaled up while open) so the pin and its name stay visible.
-        offset: [0, -28],
-      });
-      marker.on('popupopen', (event: L.PopupEvent) => fitExtractPopup(event.popup));
-    }
-    marker.on('click', () => togglePinName(pin));
+    attachExtractDetails(marker, pin, kind, label, requirements);
+    if (offFloor) dimOffFloorPin(pin);
+    if (kind !== 'boss') marker.on('click', () => togglePinName(pin));
     return marker;
   }
-  const visibleTransits = computed(() => {
-    const hasRenderConfig =
-      isValidMapSvgConfig(props.map.svg) || isValidMapTileConfig(props.map.tile);
-    return showTransits.value && hasRenderConfig ? mapTransits.value : [];
-  });
+  function attachExtractDetails(
+    marker: L.Marker,
+    pin: HTMLElement,
+    kind: MapMarkerGlyphKind,
+    label: string,
+    requirements?: ExtractRequirements
+  ): void {
+    if (!requirements) return;
+    // The co-op pin glyph is already the handshake, so its requirement strip skips it.
+    appendExtractRequirementTags(pin, requirements, [kind]);
+    marker.bindPopup(createExtractDetails(label, requirements), {
+      className: `map-extract-popup ${LOCATION_POPUP_CLASS}`,
+      // Open above the pin head so the pin and its name stay visible.
+      offset: [0, -28],
+    });
+    marker.on('popupopen', (event: L.PopupEvent) => fitLocationPopup(event.popup));
+  }
+  const LOCATION_POPUP_CLASS =
+    '[&_.leaflet-popup-content-wrapper]:border [&_.leaflet-popup-content-wrapper]:border-white/10';
+  const visibleTransits = computed(() =>
+    showTransits.value && hasRenderConfig.value ? mapTransits.value : []
+  );
+  function createBossMarker(leafletApi: NonNullable<typeof leaflet.value>, pin: BossPin): L.Marker {
+    const label = [...new Set(pin.encounters.map(({ boss }) => boss.name))].join(' · ');
+    const marker = createPinMarker(leafletApi, 'boss', label, pin.position, 'boss-spawn-marker');
+    const container = document.createElement('div');
+    const bosses = pin.encounters.map(({ boss, location }) => ({ ...boss, locations: [location] }));
+    marker.bindPopup(container, {
+      className: LOCATION_POPUP_CLASS,
+      offset: [0, -28],
+    });
+    marker.on('popupopen', (event: L.PopupEvent) => {
+      const content = h(MapBossSpawnDetails, { bosses });
+      content.appContext = appContext;
+      render(content, container);
+      fitLocationPopup(event.popup);
+    });
+    marker.on('popupclose', () => render(null, container));
+    return marker;
+  }
+  function createBossMarkers(): void {
+    const layer = bossLayer.value;
+    const leafletApi = leaflet.value;
+    if (!layer || !leafletApi) return;
+    layer.clearLayers();
+    bossPins.value.forEach((pin) => layer.addLayer(createBossMarker(leafletApi, pin)));
+  }
   /** Rebuild source-map transit labels, clearing stale markers when none are visible. */
   function createTransitMarkers(): void {
     const layer = transitLayer.value;
@@ -2418,6 +2428,7 @@
   );
   watch(showPmcSpawns, () => createPmcSpawnMarkers());
   watch([leaflet, transitLayer, visibleTransits], () => createTransitMarkers());
+  watch([leaflet, bossLayer, bossPins, selectedFloor, mapColors], createBossMarkers);
   watch(
     () => props.showPmcSpawns,
     (value) => {

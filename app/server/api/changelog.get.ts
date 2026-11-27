@@ -1,5 +1,6 @@
 import { defineEventHandler, getQuery, setResponseHeaders } from 'h3';
 import { LRUCache } from 'lru-cache';
+import { readErrorBodySnippet } from '@/server/utils/fetchWithTimeout';
 import { createLogger } from '@/server/utils/logger';
 import { getSharedCache, resolveSharedCacheOrigin } from '@/server/utils/sharedEdgeStore';
 import {
@@ -359,15 +360,7 @@ const fetchGithub = async <T>(
     return null;
   }
   if (!response.ok) {
-    let bodySnippet: string;
-    try {
-      bodySnippet = await response.text();
-      if (bodySnippet.length > 200) {
-        bodySnippet = bodySnippet.slice(0, 200) + '...';
-      }
-    } catch {
-      bodySnippet = '[unable to read response body]';
-    }
+    const bodySnippet = await readErrorBodySnippet(response);
     logger.warn('[Changelog] Non-OK response from GitHub.', {
       url,
       status: response.status,

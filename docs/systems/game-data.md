@@ -23,6 +23,11 @@ catalog from the overlay repository for the Seasonal Modifiers planner. The
 artifact mirrors Tarkov.dev's `season` and `season_en` envelopes and carries
 Battlestate's provisional source link. The browser loads it from a noindex
 client-rendered document. Point suggestions only balance the published preview values.
+Guest Season 2 modifier plans are saved in the current browser. Signed-in
+plans follow the account across browsers. When the account has never saved a
+plan, the planner can copy a previous browser plan. An explicitly cleared
+account plan stays empty. The planner shows saved modifiers that are present in
+the current catalog and offers a retry if it cannot save a change.
 Empty exclusions leave compatibility unknown. The fetch uses the existing server-only,
 read-only overlay credential and rejects redirects. The isolate shares a pending read
 and retains the validated immutable catalog for reuse.
@@ -40,7 +45,7 @@ the official provisional values change.
 | Endpoint                           | Scope            | Content                                                  |
 | ---------------------------------- | ---------------- | -------------------------------------------------------- |
 | `/api/tarkov/bootstrap`            | mode             | Player levels                                            |
-| `/api/tarkov/tasks-core`           | mode             | Tasks, maps, traders                                     |
+| `/api/tarkov/tasks-core`           | mode             | Tasks, maps (including boss spawns), traders             |
 | `/api/tarkov/tasks-objectives`     | mode             | Task objectives                                          |
 | `/api/tarkov/tasks-rewards`        | mode             | Task rewards                                             |
 | `/api/tarkov/hideout`              | mode             | Stations and crafts                                      |
@@ -148,7 +153,7 @@ Game data passes through four layers; each consumer should state which one it re
   Task `alternatives` is one: upstream removed the field, and
   `app/composables/useGraphBuilder.ts` derives it from completion-triggered `failConditions`
   (`app/composables/__tests__/useGraphBuilder.test.ts`). The API gateway reads tasks without this
-  derivation; see [the data decision record](../decision-tarkov-data.md) for the open target.
+  derivation. See the [roadmap](../roadmap.md#data-and-progress) for the remaining cutover.
 
 The `/api/tarkov/*` routes serve the app's game catalogs. The public progress API
 on `api.tarkovtracker.org` has a separately owned contract defined by
@@ -170,8 +175,8 @@ server-rendered consumers during the migration.
 - Requested-language values take precedence over English fallback. Missing values
   cannot enter an activated strings bundle.
 - Items-lite omits declared translations only for fields removed by its projection.
-  Retained names and properties keep their declared references. See the historical
-  [items-lite CPU measurements](../evidence/items-lite-cpu-2026-11-14.md).
+  Retained names and properties keep their declared references. Earlier projection reduces cold
+  CPU while preserving localized response bytes, URL validation, fallback and full-catalog behavior.
 - Upstream and localized overlay links pass `toTrustedGameLinkUrl` before rendering.
   Client link helpers check the same HTTPS host allowlist and use ID-derived
   tarkov.dev links when necessary.

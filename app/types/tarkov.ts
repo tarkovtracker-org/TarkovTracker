@@ -407,6 +407,11 @@ export interface MapSvgConfig {
   minZoom?: number;
   maxZoom?: number;
 }
+export interface MapFloorGroup {
+  labelKey: string;
+  floors: string[];
+  defaultFloor: string;
+}
 export interface MapTileConfig {
   tilePath: string;
   tileFallbacks?: string[];
@@ -419,12 +424,29 @@ export interface MapTileConfig {
   floors?: string[];
   defaultFloor?: string;
   floorTilePaths?: Record<string, string>;
+  floorGroups?: MapFloorGroup[];
+  elevationKey?: string;
+  attribution?: { name: string; url: string };
+}
+export interface MapBossSpawnLocation {
+  name: string;
+  /** Location probability given this spawn entry. */
+  chance?: number;
+  positions: MapPosition[];
+}
+export interface MapBossSpawn {
+  name: string;
+  /** Probability for this spawn entry, expressed as a fraction. */
+  chance: number;
+  locations: MapBossSpawnLocation[];
+  mapName?: string;
 }
 export interface TarkovMap {
   id: string;
   name: string;
   normalizedName?: string;
   spawns?: MapSpawn[];
+  bossSpawns?: MapBossSpawn[];
   /** Extraction points available on this map */
   extracts?: MapExtract[];
   transits?: MapTransit[];

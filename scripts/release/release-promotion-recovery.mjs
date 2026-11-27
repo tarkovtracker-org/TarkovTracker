@@ -3,7 +3,9 @@ import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { mainValidationProblem } from './release-gate.mjs';
 import { rollbackPromotion } from './release-promotion.mjs';
-const execute = (tool, args) => execFileSync(tool, args, { encoding: 'utf8' }).trim();
+const MAX_BUFFER = 32 * 1024 * 1024;
+const execute = (tool, args) =>
+  execFileSync(tool, args, { encoding: 'utf8', maxBuffer: MAX_BUFFER }).trim();
 function decodeResponse(output) {
   const match = /^HTTP\/\S+\s+(\d+)/.exec(output);
   if (!match) throw new Error('GitHub response has no HTTP status.');
@@ -17,13 +19,17 @@ function decodeResponse(output) {
       .join('\n\n')
   );
 }
+function httpErrorOutput(error) {
+  if (error.code) throw error;
+  if (!error.stdout?.length) throw error;
+  return String(error.stdout);
+}
 function readRequest(endpoint) {
   let output;
   try {
     output = execute('gh', ['api', '--include', endpoint]);
   } catch (error) {
-    if (!error.stdout?.length) throw error;
-    output = String(error.stdout);
+    output = httpErrorOutput(error);
   }
   return decodeResponse(output);
 }

@@ -3,7 +3,8 @@ import { createMapIconSvg } from '@/features/maps/utils/mapIcons';
 import type { MapExtract } from '@/types/tarkov';
 import type { MapMarkerColorKey } from '@/utils/theme-colors';
 /** Marker categories that render an icon chip on the map and in the legend. */
-export type MapMarkerGlyphKind = 'pmc' | 'scav' | 'shared' | 'coop' | 'transit' | 'extract';
+export type MapMarkerGlyphKind =
+  'pmc' | 'scav' | 'shared' | 'coop' | 'transit' | 'extract' | 'boss';
 /** Running through a doorway: the familiar extraction cue, without a faction restriction. */
 const EXIT_GLYPH_PATH =
   'M13.34 8.17c-.93 0-1.69-.77-1.69-1.7a1.69 1.69 0 0 1 1.69-1.69c.94 0 1.7.76 1.7 1.69s-.76 1.7-1.7 1.7M10.3 19.93l-5.93-1.18l.34-1.7l4.15.85l1.35-6.86l-1.52.6v2.86H7v-3.96l4.4-1.87l.67-.08c.6 0 1.1.34 1.43.85l.86 1.35c.68 1.21 2.03 2.03 3.64 2.03v1.68c-1.86 0-3.56-.83-4.66-2.1l-.5 2.54l1.77 1.69V23h-1.69v-5.1l-1.78-1.69zM21 23h-2V3H6v13.11l-2-.42V1h17zM6 23H4v-3.22l2 .42z';
@@ -19,6 +20,7 @@ export const MAP_MARKER_GLYPH_PATHS: Record<MapMarkerGlyphKind, string> = {
   transit:
     'M16.5 15.5H22V17h-5.5v1.75l-2.5-2.5l2.5-2.5zm3 4.25V18l2.5 2.5l-2.5 2.5v-1.75H14v-1.5zM9.5 5.5a2 2 0 0 1-2-2a2 2 0 0 1 2-2a2 2 0 0 1 2 2a2 2 0 0 1-2 2M5.75 8.9L4 9.65V13H2V8.3l5.25-2.15Q7.625 6 8 6c.7 0 1.35.35 1.7.95l.95 1.6C11.55 10 13.15 11 15 11v2c-2.2 0-4.15-1-5.45-2.6l-.6 3L11 15.45V23H9v-6l-2.15-2l-1.75 8H3z',
   extract: EXIT_GLYPH_PATH,
+  boss: 'M15.8 18.5l6 1.6l-.4 1.9l-9.4-2.5L2.6 22l-.5-1.9l6-1.6L2 16.9l.5-1.9l9.4 2.5l9.4-2.5l.5 1.9zM18 8c0 1.8-.8 3.3-2 4.4V15h-2v-2h-1v2h-2v-2h-1v2H8v-2.6C6.8 11.3 6 9.8 6 8a6 6 0 0 1 6-6a6 6 0 0 1 6 6m-7-.5c0-.8-.7-1.5-1.5-1.5S8 6.7 8 7.5S8.7 9 9.5 9S11 8.3 11 7.5m2 3.5l-1-2l-1 2zm3-3.5c0-.8-.7-1.5-1.5-1.5S13 6.7 13 7.5S13.7 9 14.5 9S16 8.3 16 7.5',
 };
 /** The user-customizable color that fills each glyph chip. */
 export const MAP_MARKER_GLYPH_COLOR_KEYS: Record<MapMarkerGlyphKind, MapMarkerColorKey> = {
@@ -28,9 +30,13 @@ export const MAP_MARKER_GLYPH_COLOR_KEYS: Record<MapMarkerGlyphKind, MapMarkerCo
   coop: 'COOP_EXTRACT',
   transit: 'TRANSIT',
   extract: 'DEFAULT_EXTRACT',
+  boss: 'BOSS_SPAWN',
 };
 /** Classify an extract by who can use it in mode; unknown factions keep the generic exit glyph. */
-export function getExtractGlyphKind(extract: MapExtract, mode = 'pvp'): MapMarkerGlyphKind {
+export function getExtractGlyphKind(
+  extract: MapExtract,
+  mode = 'pvp'
+): Exclude<MapMarkerGlyphKind, 'transit' | 'boss'> {
   if (extract.faction === 'shared') return isCoopExtract(extract, mode) ? 'coop' : 'shared';
   return extract.faction === 'pmc' || extract.faction === 'scav' ? extract.faction : 'extract';
 }

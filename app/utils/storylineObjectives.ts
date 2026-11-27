@@ -244,3 +244,41 @@ export const normalizeStoryChapter = (chapter: StoryChapter): StoryChapter => {
     objectives: normalizeStoryObjectives(chapter.objectives),
   };
 };
+type StoryProgressMutations = {
+  setStoryChapterComplete: (chapterId: string) => void;
+  setStoryChapterUncomplete: (chapterId: string) => void;
+  setStoryObjectiveComplete: (chapterId: string, objectiveId: string) => void;
+  setStoryObjectiveUncomplete: (chapterId: string, objectiveId: string) => void;
+};
+type StoryProgressChapter = Pick<
+  ToggleStoryChapterWithLinearObjectivesOptions,
+  'objectives' | 'mutuallyExclusiveQuestPairs'
+>;
+export const createStoryProgressToggles = (
+  store: StoryProgressMutations,
+  isComplete: (chapterId: string, objectiveId: string) => boolean
+) => ({
+  toggleChapter(chapterId: string, chapter: StoryProgressChapter | undefined, complete: boolean) {
+    toggleStoryChapterWithLinearObjectives({
+      chapterId,
+      isChapterComplete: complete,
+      objectives: chapter?.objectives,
+      mutuallyExclusiveQuestPairs: chapter?.mutuallyExclusiveQuestPairs,
+      isObjectiveComplete: (id) => isComplete(chapterId, id),
+      setChapterComplete: (id) => store.setStoryChapterComplete(id),
+      setChapterUncomplete: (id) => store.setStoryChapterUncomplete(id),
+      setObjectiveComplete: (id, objectiveId) => store.setStoryObjectiveComplete(id, objectiveId),
+      setObjectiveUncomplete: (id, objectiveId) =>
+        store.setStoryObjectiveUncomplete(id, objectiveId),
+    });
+  },
+  toggleObjective(chapterId: string, objectiveId: string, objective: StoryObjective | undefined) {
+    if (isAutomaticStoryObjective(objective)) return;
+    if (isComplete(chapterId, objectiveId)) {
+      store.setStoryObjectiveUncomplete(chapterId, objectiveId);
+      return;
+    }
+    if (objective?.mutuallyExclusiveWith?.some((id) => isComplete(chapterId, id))) return;
+    store.setStoryObjectiveComplete(chapterId, objectiveId);
+  },
+});

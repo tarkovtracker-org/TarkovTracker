@@ -301,6 +301,21 @@ export type Database = {
         }
         Relationships: []
       }
+      season_two_modifier_plans: {
+        Row: {
+          modifier_ids: string[]
+          user_id: string
+        }
+        Insert: {
+          modifier_ids: string[]
+          user_id: string
+        }
+        Update: {
+          modifier_ids?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
       stripe_events: {
         Row: {
           event_id: string

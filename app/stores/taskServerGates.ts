@@ -19,7 +19,7 @@ const confirmedRequirements = (task: Task, data: TaskServerGateData): boolean =>
   isAvailabilityConfirmed(
     data.confirmations?.[task.id],
     data.completions[task.id],
-    otherRequirementsSignature(task)
+    otherRequirementsSignature(task, data.completions)
   );
 type VariableRequirement = Extract<TaskOtherRequirement, { type: 'globalVariable' }>;
 const accountBlockers = (

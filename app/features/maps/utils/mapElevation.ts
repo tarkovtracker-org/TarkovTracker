@@ -25,7 +25,7 @@ const inHeight = (height: number, range: number[]): boolean =>
   height >= range[0]! && height < range[1]!;
 function configKey(map: TarkovMap): string {
   if (typeof map.svg === 'object') return map.svg.file.replace(/\.svg$/, '').toLowerCase();
-  return map.tile?.defaultFloor === 'First_Level' ? 'lab' : '';
+  return map.tile?.elevationKey ?? '';
 }
 function getConfig(map: TarkovMap): FloorConfig | undefined {
   const render = typeof map.svg === 'object' ? map.svg : map.tile;

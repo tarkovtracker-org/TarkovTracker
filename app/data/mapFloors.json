@@ -235,7 +235,7 @@
             ]
           },
           {
-            "height": [8.0, 11.1],
+            "height": [8, 11.1],
             "bounds": [
               [
                 [279, -79],
@@ -711,6 +711,150 @@
                 [-268, -163]
               ]
             ]
+          }
+        ]
+      }
+    ]
+  },
+  "icebreaker": {
+    "order": [
+      "Control Room",
+      "Engine Room",
+      "Engine Room (upper)",
+      "Fuel Pumps (lower)",
+      "Fuel Pumps",
+      "Storage/Security",
+      "Infirmary",
+      "Helipad",
+      "Gym/Canteen",
+      "Accommodation (lower)",
+      "Accommodation (mid)",
+      "Accommodation (upper)",
+      "Officers' Deck",
+      "Stairs (blocked)",
+      "Bridge",
+      "Bridge Roof"
+    ],
+    "base": "Infirmary",
+    "height": [18.92, 19.56],
+    "layers": [
+      {
+        "floor": "Control Room",
+        "extents": [
+          {
+            "height": [-10000, 3.5]
+          }
+        ]
+      },
+      {
+        "floor": "Engine Room",
+        "extents": [
+          {
+            "height": [3.6, 5.6]
+          }
+        ]
+      },
+      {
+        "floor": "Engine Room (upper)",
+        "extents": [
+          {
+            "height": [5.7, 8.7]
+          }
+        ]
+      },
+      {
+        "floor": "Fuel Pumps (lower)",
+        "extents": [
+          {
+            "height": [8.8, 11.8]
+          }
+        ]
+      },
+      {
+        "floor": "Fuel Pumps",
+        "extents": [
+          {
+            "height": [11.9, 14.9]
+          }
+        ]
+      },
+      {
+        "floor": "Storage/Security",
+        "extents": [
+          {
+            "height": [15, 18.93]
+          }
+        ]
+      },
+      {
+        "floor": "Helipad",
+        "extents": [
+          {
+            "height": [19.57, 22.1]
+          }
+        ]
+      },
+      {
+        "floor": "Gym/Canteen",
+        "extents": [
+          {
+            "height": [22.2, 25.2]
+          }
+        ]
+      },
+      {
+        "floor": "Accommodation (lower)",
+        "extents": [
+          {
+            "height": [25.3, 28.2]
+          }
+        ]
+      },
+      {
+        "floor": "Accommodation (mid)",
+        "extents": [
+          {
+            "height": [28.3, 31.3]
+          }
+        ]
+      },
+      {
+        "floor": "Accommodation (upper)",
+        "extents": [
+          {
+            "height": [31.4, 34.4]
+          }
+        ]
+      },
+      {
+        "floor": "Officers' Deck",
+        "extents": [
+          {
+            "height": [34.5, 37.5]
+          }
+        ]
+      },
+      {
+        "floor": "Stairs (blocked)",
+        "extents": [
+          {
+            "height": [37.6, 40.6]
+          }
+        ]
+      },
+      {
+        "floor": "Bridge",
+        "extents": [
+          {
+            "height": [40.7, 43.7]
+          }
+        ]
+      },
+      {
+        "floor": "Bridge Roof",
+        "extents": [
+          {
+            "height": [43.8, 10000]
           }
         ]
       }

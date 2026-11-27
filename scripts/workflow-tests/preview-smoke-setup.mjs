@@ -35,6 +35,11 @@ function runPlaywright(config, env) {
 }
 function readinessBarrier() {
   const state = { ready: false, probes: 0, pending: [] };
+  const reachWorkerBarrier = (response) => {
+    state.pending.push(response);
+    if (state.pending.length === 2)
+      state.pending.forEach((pending) => pending.end('both workers reached the barrier'));
+  };
   const serve = (request, response) => {
     if (request.url === '/') {
       state.ready = true;
@@ -48,9 +53,16 @@ function readinessBarrier() {
       response.end('smoke started before readiness');
       return;
     }
-    state.pending.push(response);
-    if (state.pending.length === 2)
-      state.pending.forEach((pending) => pending.end('both workers reached the barrier'));
+    if (request.url === '/api/tarkov/hideout?gameMode=regular') {
+      response.writeHead(200, {
+        'content-type': 'application/json',
+        'x-cache-status': 'PRECOMPUTE',
+        'x-catalog-release': String(Date.now()),
+      });
+      response.end('{}');
+      return;
+    }
+    reachWorkerBarrier(response);
   };
   return { state, serve };
 }

@@ -27,6 +27,7 @@ export interface MapLayerGroupsInput {
   extracts: { pmc: Toggle; scav: Toggle; shared: Toggle; coop: Toggle };
   transit: Toggle;
   spawns: Toggle;
+  bosses: Toggle;
   /** Whether the selected map has each marker type (task rows are always listed). */
   available: {
     pmc: boolean;
@@ -36,6 +37,7 @@ export interface MapLayerGroupsInput {
     coop: boolean;
     transit: boolean;
     spawns: boolean;
+    bosses: boolean;
   };
 }
 type Candidate = MapLayerItem & { available: boolean };
@@ -123,6 +125,7 @@ function locationItems({
   colors,
   transit,
   spawns,
+  bosses,
   available,
 }: MapLayerGroupsInput): Candidate[] {
   return [
@@ -141,6 +144,14 @@ function locationItems({
       swatch: 'spawn',
       visible: spawns,
       available: available.spawns,
+    },
+    {
+      key: 'bosses',
+      label: t('maps.layers.boss_spawns'),
+      color: colors.BOSS_SPAWN,
+      swatch: 'boss',
+      visible: bosses,
+      available: available.bosses,
     },
   ];
 }

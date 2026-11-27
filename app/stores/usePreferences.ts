@@ -18,7 +18,6 @@ import {
   type MapObjectivePaletteKey,
 } from '@/features/maps/utils/objectiveColors';
 import {
-  normalizeNeededItemsCardStyle,
   normalizeNeededItemsFilterType,
   normalizeNeededItemsFirFilter,
   normalizeNeededItemsSortBy,
@@ -547,9 +546,6 @@ export const usePreferencesStore = defineStore('preferences', {
     getNeededItemsHideOwned: (state) => {
       return state.neededItemsHideOwned ?? false;
     },
-    getNeededItemsCardStyle: (state) => {
-      return normalizeNeededItemsCardStyle(state.neededItemsCardStyle);
-    },
     getHideGlobalTasks: (state) => {
       return state.hideGlobalTasks ?? false;
     },
@@ -836,9 +832,6 @@ export const usePreferencesStore = defineStore('preferences', {
     },
     setNeededItemsHideOwned(hide: boolean) {
       this.neededItemsHideOwned = hide;
-    },
-    setNeededItemsCardStyle(style: 'compact' | 'expanded') {
-      this.neededItemsCardStyle = normalizeNeededItemsCardStyle(style);
     },
     setHideGlobalTasks(hide: boolean) {
       this.hideGlobalTasks = hide;

@@ -41,6 +41,9 @@ export function createEftLogImportBudget(overrides: Partial<EftLogImportLimits> 
   };
   return {
     charge,
+    releaseEvidence(count: number): void {
+      used.evidenceCount -= count;
+    },
     retain(chars: number): void {
       charge('evidenceCount', 1);
       charge('evidenceChars', chars);

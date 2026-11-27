@@ -1,14 +1,6 @@
-import {
-  createError,
-  defineEventHandler,
-  getQuery,
-  getRouterParam,
-  setHeader,
-  setResponseHeader,
-} from 'h3';
-import { isGameMode, type GameMode } from '@/utils/constants';
+import { defineEventHandler, getQuery, setHeader, setResponseHeader } from 'h3';
+import { requireStreamerProfileParams } from '@/server/utils/sharedProfileHandle';
 import { buildOverlayContentSecurityPolicy } from '@/utils/csp';
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type OverlayMetric = 'items' | 'summary' | 'tasks';
 type OverlayAccent = 'custom' | 'info' | 'kappa' | 'success' | 'warning';
 type OverlayAlign =
@@ -27,9 +19,6 @@ type OverlayLayout = 'card' | 'minimal' | 'text';
 type OverlayResolution = '1080p' | '1440p' | 'custom';
 type OverlaySize = 'lg' | 'md' | 'sm';
 type OverlayFont = 'inter' | 'oswald' | 'outfit' | 'poppins' | 'rajdhani' | 'roboto-mono';
-const normalizeMode = (value: string | undefined): GameMode | null => {
-  return isGameMode(value) ? value : null;
-};
 const readScalarQueryValue = (value: unknown): string => {
   if (Array.isArray(value)) {
     return String(value[0] ?? '').trim();
@@ -268,14 +257,7 @@ const FONT_CONFIG: Record<OverlayFont, { family: string; href: string }> = {
   },
 };
 export default defineEventHandler((event) => {
-  const userId = (getRouterParam(event, 'userId') || '').trim();
-  const mode = normalizeMode(getRouterParam(event, 'mode'));
-  if (!mode) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid profile mode' });
-  }
-  if (!UUID_REGEX.test(userId)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid profile id' });
-  }
+  const { userId, mode } = requireStreamerProfileParams(event);
   const query = getQuery(event);
   const metric = normalizeMetric(query.metric);
   const accent = normalizeAccent(query.accent);

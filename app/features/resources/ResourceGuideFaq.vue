@@ -5,7 +5,7 @@
     icon="i-mdi-help-circle-outline"
   >
     <div class="divide-y divide-white/5 rounded-xl border border-white/10">
-      <details v-for="n in resource.guide?.faq ?? 0" :id="`faq-${n}`" :key="n" class="group px-4">
+      <details v-for="n in resource.guide?.faq" :id="`faq-${n}`" :key="n" class="group px-4">
         <summary
           class="text-surface-100 hover:text-primary-200 focus-visible:ring-primary-400/40 flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-3 text-base font-medium transition-colors marker:content-none focus-visible:ring-2 focus-visible:outline-none [&::-webkit-details-marker]:hidden"
         >

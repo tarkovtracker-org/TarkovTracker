@@ -96,3 +96,7 @@ export function isTaskCounted(completion: RawTaskCompletion, isInvalid: boolean)
   }
   return !isInvalid;
 }
+export const hasCompletionStatus = (statuses: string[] | undefined): boolean => {
+  const normalized = (statuses ?? []).map((status) => status.toLowerCase());
+  return normalized.includes('complete') || normalized.includes('completed');
+};

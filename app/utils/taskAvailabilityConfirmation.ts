@@ -133,13 +133,13 @@ export const mergeTaskAvailability = (
  * Status clocks are not capped, so any finite value counts as-is: an out-of-range status clock is
  * newer than every valid confirmation and retires it rather than reading as absent.
  */
-const statusTimestamp = (completion: RawTaskCompletion): number => {
+export const taskStatusTimestamp = (completion: RawTaskCompletion): number => {
   const value = isRecord(completion) ? completion.timestamp : undefined;
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 };
 /** A status clock a confirmation can never follow (corrupt data beyond the ceiling). */
 export const hasUnconfirmableStatusClock = (completion: RawTaskCompletion): boolean =>
-  statusTimestamp(completion) >= MAX_CONFIRMATION_TIMESTAMP;
+  taskStatusTimestamp(completion) >= MAX_CONFIRMATION_TIMESTAMP;
 /**
  * A confirmation counts only for the exact requirement signature and only while it is not older
  * than the task's last status change, so a reset, completion, failure or repair on any device
@@ -152,5 +152,5 @@ export const isAvailabilityConfirmed = (
 ): boolean => {
   if (!signature || confirmation?.requirements !== signature) return false;
   if (confirmation.timestamp >= MAX_CONFIRMATION_TIMESTAMP) return false;
-  return confirmation.timestamp >= statusTimestamp(completion);
+  return confirmation.timestamp >= taskStatusTimestamp(completion);
 };

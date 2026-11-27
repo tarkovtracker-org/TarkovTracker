@@ -177,7 +177,9 @@ Fetches minimal player level data for early UI rendering.
 
 ### GET /api/tarkov/tasks-core
 
-Fetches core task data (tasks, maps, traders) without objectives or rewards.
+Fetches core task data (tasks, maps, traders) without objectives or rewards. The optional
+`maps[].bossSpawns` projection includes encounter probabilities and conditional location
+probabilities as fractions. Location positions can be empty.
 
 **Query Parameters:**
 
@@ -662,7 +664,7 @@ problems keep their specific `4xx` messages in the same envelope.
 IndexedDB schema 9 stores neutral catalogs in mode scopes and strings in language
 scopes. `generateCacheKey` produces keys such as the following.
 
-- `tarkov-tasks-core-neutral-v1-regular-en`
+- `tarkov-tasks-core-neutral-v2-regular-en`
 - `tarkov-hideout-neutral-v1-pve-en`
 - `tarkov-items-lite-neutral-v1-pvp-season-en`
 - `tarkov-strings-strings-v1-de`

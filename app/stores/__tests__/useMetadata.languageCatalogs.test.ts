@@ -116,7 +116,7 @@ describe('language-neutral metadata catalogs', () => {
     });
     expect(cache.setCachedData).toHaveBeenCalledWith(
       'tasks-core',
-      'neutral-v1-regular',
+      'neutral-v2-regular',
       'en',
       catalogs['tasks-core'],
       expect.any(Number),
