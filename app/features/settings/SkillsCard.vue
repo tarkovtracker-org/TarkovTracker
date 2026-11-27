@@ -74,6 +74,7 @@
             </div>
             <UButton
               v-if="adjustedSkills.length > 0"
+              :id="RESET_ALL_BUTTON_ID"
               icon="i-mdi-restore"
               size="xs"
               variant="ghost"
@@ -196,6 +197,7 @@
   const skillFilter = ref<SkillFilter>('all');
   const showResetAllDialog = ref(false);
   const SEARCH_INPUT_ID = 'skills-search-input';
+  const RESET_ALL_BUTTON_ID = 'skills-reset-all-button';
   // The row being edited stays visible even if the edit stops matching the active filter,
   // so clearing an input under 'Adjusted' does not unmount it mid-edit.
   const editingSkillKey = ref<string | null>(null);
@@ -423,7 +425,7 @@
     showResetAllDialog.value = false;
   };
   const onResetAllDialogAfterLeave = () => {
-    if (adjustedSkills.value.length === 0) void focusElementById(SEARCH_INPUT_ID);
+    void focusElementById(adjustedSkills.value.length > 0 ? RESET_ALL_BUTTON_ID : SEARCH_INPUT_ID);
   };
   // Leave the Adjusted filter once nothing is adjusted, but never while a row is being edited.
   watch([() => adjustedSkills.value.length, editingSkillKey], ([adjustedCount, editingKey]) => {

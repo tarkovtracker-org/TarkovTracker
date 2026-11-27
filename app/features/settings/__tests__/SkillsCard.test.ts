@@ -46,6 +46,7 @@ const _UBadge = { template: '<span class="badge"><slot /></span>' };
 const _UModal = {
   template: '<div v-if="open" class="modal"><slot name="content" /></div>',
   props: ['open'],
+  emits: ['after:leave'],
 };
 type UseSkillCalculationMock = ReturnType<typeof useSkillCalculation>;
 type GameSkill = UseSkillCalculationMock['allGameSkills']['value'][number];
@@ -393,6 +394,25 @@ describe('SkillsCard', () => {
     expect(resetSkillOffset).toHaveBeenCalledWith('Strength');
     expect(resetSkillOffset).toHaveBeenCalledWith('Endurance');
     expect(wrapper.find('.modal').exists()).toBe(false);
+  });
+  it('returns focus to Reset all adjustments after cancelling', async () => {
+    const resetSkillOffset = vi.fn();
+    const wrapper = createWrapper({ resetSkillOffset });
+    document.body.appendChild(wrapper.element);
+    try {
+      const resetAll = findButton(wrapper, 'settings.skills.reset_all')!;
+      await resetAll.trigger('click');
+      const cancel = findButton(wrapper, 'common.cancel')!;
+      cancel.element.focus();
+      await cancel.trigger('click');
+      wrapper.getComponent(_UModal).vm.$emit('after:leave');
+      await nextTick();
+      expect(document.activeElement).toBe(resetAll.element);
+      expect(resetSkillOffset).not.toHaveBeenCalled();
+    } finally {
+      wrapper.unmount();
+      wrapper.element.remove();
+    }
   });
   it('keeps the edited row visible under the Adjusted filter until blur', async () => {
     const offsets = ref<Record<string, number>>({ Strength: 3, Endurance: 2 });
