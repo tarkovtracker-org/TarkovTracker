@@ -801,10 +801,11 @@ function adaptTaskCore(raw: JsonRecord, context: AdapterContext): Task {
   }) as Task;
 }
 function adaptMap(raw: JsonRecord, mobs: unknown): TarkovMap {
+  const id = stringId(raw) ?? '';
   return compactObject({
     ...raw,
-    bossSpawns: projectBossSpawns(raw.bosses, mobs),
-    id: stringId(raw) ?? '',
+    bossSpawns: projectBossSpawns(raw.bosses, mobs, id),
+    id,
     name: typeof raw.name === 'string' ? raw.name : '',
   }) as TarkovMap;
 }
