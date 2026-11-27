@@ -33,16 +33,16 @@
     const guide = props.resource.guide;
     return [
       {
+        id: 'setup',
+        component: ResourceGuideSteps,
+        enabled: guide.steps.length > 0,
+        props: { resource: props.resource },
+      },
+      {
         id: 'video',
         component: ResourceGuideVideo,
         enabled: Boolean(props.resource.videoId),
         props: { resource: props.resource, guideTitle: props.guideTitle },
-      },
-      {
-        id: 'setup',
-        component: ResourceGuideSteps,
-        enabled: Boolean(guide.steps),
-        props: { resource: props.resource },
       },
       {
         id: 'troubleshooting',
@@ -59,7 +59,7 @@
       {
         id: 'faq',
         component: ResourceGuideFaq,
-        enabled: Boolean(guide.faq),
+        enabled: guide.faq.length > 0,
         props: { resource: props.resource },
       },
     ].filter((section) => section.enabled);

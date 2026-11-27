@@ -10,7 +10,7 @@
       v-else
       class="bg-primary-500/15 text-primary-300 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
     >
-      <UIcon name="i-mdi-bookmark" class="h-6 w-6" />
+      <UIcon :name="resource.icon ?? 'i-mdi-bookmark'" class="h-6 w-6" />
     </div>
     <div class="min-w-0 flex-1 space-y-2 wrap-break-word">
       <div>
