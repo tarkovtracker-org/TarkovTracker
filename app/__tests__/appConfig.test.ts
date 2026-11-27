@@ -7,6 +7,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
  * colors inherit the inverted foreground on their dark plates.
  */
 describe('app config theme guards', () => {
+  let colors: Record<string, string>;
+  let badge: {
+    variants: { size: Record<string, { base: string }> };
+    compoundVariants: { color?: string; variant?: string; class: string }[];
+  };
+  let button: {
+    compoundVariants: { color?: string; variant?: string; class: string }[];
+  };
   let checkbox: {
     slots: Record<string, string>;
     compoundVariants: { color?: string; class: Record<string, string> }[];
@@ -14,10 +22,33 @@ describe('app config theme guards', () => {
   beforeAll(async () => {
     vi.stubGlobal('defineAppConfig', (config: Record<string, unknown>) => config);
     const { default: appConfig } = await import('@/app.config');
-    checkbox = (appConfig.ui as { checkbox: typeof checkbox }).checkbox;
+    const ui = appConfig.ui as {
+      colors: typeof colors;
+      badge: typeof badge;
+      button: typeof button;
+      checkbox: typeof checkbox;
+    };
+    colors = ui.colors;
+    badge = ui.badge;
+    button = ui.button;
+    checkbox = ui.checkbox;
   });
   afterAll(() => {
     vi.unstubAllGlobals();
+  });
+  it('maps semantic info directly to the info palette and defines AA info button/badge variants', () => {
+    expect(colors.info).toBe('info');
+    expect(colors.accent).toBe('accent');
+    const infoSoftButton = button.compoundVariants.find(
+      (entry) => entry.color === 'info' && entry.variant === 'soft'
+    );
+    const infoSubtleBadge = badge.compoundVariants.find(
+      (entry) => entry.color === 'info' && entry.variant === 'subtle'
+    );
+    expect(infoSoftButton?.class).toContain('text-info-300');
+    expect(infoSubtleBadge?.class).toContain('text-info-300');
+    expect(badge.variants.size.xs?.base).toContain('text-xs');
+    expect(badge.variants.size.sm?.base).toContain('text-xs');
   });
   it('pairs the pale success indicator with a dark tick in light mode', () => {
     const successOverride = checkbox.compoundVariants.find((entry) => entry.color === 'success');

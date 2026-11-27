@@ -169,10 +169,6 @@
     copy('app_bar.keyboard_shortcuts', 'Keyboard shortcuts')
   );
   const reportProblemLabel = computed(() => copy('app_bar.report_problem', 'Report a problem'));
-  const closeLabel = computed(() => t('common.close'));
-  const previousLabel = computed(() => t('common.previous'));
-  const nextLabel = computed(() => t('common.next'));
-  const finishLabel = computed(() => t('common.finish'));
   const launcherTitle = computed(() => copy('page_help.launcher.title', 'Help and onboarding'));
   const helpPopoverContent = computed(() => ({
     align: 'end' as const,

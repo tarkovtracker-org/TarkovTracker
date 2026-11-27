@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSkillKeyAliases,
   collapseSkillOffsets,
+  formatSkillDisplayName,
   getCanonicalSkillKey,
   normalizeSkillToken,
   readSkillObjective,
@@ -18,6 +19,16 @@ const skillObjective = (overrides: Partial<TaskObjective> = {}): TaskObjective =
     skill: { id: 'Vitality', name: 'Vitality', imageLink: 'https://example.com/vitality.webp' },
   },
   ...overrides,
+});
+describe('formatSkillDisplayName', () => {
+  it('splits camelCase skill names while preserving acronyms', () => {
+    expect(formatSkillDisplayName('StressResistance')).toBe('Stress Resistance');
+    expect(formatSkillDisplayName('HideoutManagement')).toBe('Hideout Management');
+    expect(formatSkillDisplayName('SMG')).toBe('SMG');
+    expect(formatSkillDisplayName('DMR')).toBe('DMR');
+    expect(formatSkillDisplayName('Endurance')).toBe('Endurance');
+    expect(formatSkillDisplayName('  ')).toBe('');
+  });
 });
 describe('normalizeSkillToken', () => {
   it('returns null for null', () => {

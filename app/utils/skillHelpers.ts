@@ -5,6 +5,12 @@ export const normalizeSkillToken = (value: string | null | undefined): string | 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
 };
+/** Formats raw camelCase skill IDs (e.g. "StressResistance") while preserving acronyms ("SMG", "DMR"). */
+export const formatSkillDisplayName = (skillId: string): string => {
+  const trimmed = skillId.trim();
+  if (!trimmed) return '';
+  return trimmed.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+};
 export const getCanonicalSkillKey = (
   skillName: string | null | undefined,
   skillId?: string | null

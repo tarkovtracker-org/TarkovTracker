@@ -629,6 +629,91 @@ describe('useTarkovDevImport', () => {
       expect.any(Error)
     );
   });
+  it('sends allowStale=1 when explicitly opting in to stale profile data', async () => {
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316', {
+      allowStale: true,
+    });
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      query: { allowStale: '1', url: 'https://players.tarkov.dev/profile/8560316.json' },
+      retry: 0,
+    });
+  });
+  it('fetches multiple modes in one request and applies only selected ready modes', async () => {
+    const pvpData = createImportData({ displayName: 'PvpGuy', tarkovUid: 8560316, totalXP: 2500 });
+    const pveData = createImportData({ displayName: 'PveGuy', tarkovUid: 8560316, totalXP: 1000 });
+    mockFetch.mockResolvedValue({
+      tarkovUid: 8560316,
+      profiles: {
+        pvp: { status: 'ok', profile: { aid: 8560316, mode: 'pvp' } },
+        pve: { status: 'ok', profile: { aid: 8560316, mode: 'pve' } },
+        seasonal: { status: 'not_found' },
+      },
+    });
+    mockParseTarkovDevProfile.mockImplementation((raw: { mode?: string }) => ({
+      data: raw.mode === 'pve' ? pveData : pvpData,
+      ok: true,
+    }));
+    const composable = await loadComposable();
+    const preview = await composable.parseProfileModes(
+      'https://tarkov.dev/players/regular/8560316',
+      ['pvp', 'pve', 'seasonal']
+    );
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      query: {
+        modes: 'pvp,pve,seasonal',
+        url: 'https://players.tarkov.dev/profile/8560316.json',
+      },
+      retry: 0,
+    });
+    expect(composable.importState.value).toBe('preview');
+    expect(preview?.modes.pvp?.status).toBe('ok');
+    expect(preview?.modes.pve?.status).toBe('ok');
+    expect(preview?.modes.seasonal?.status).toBe('not_found');
+    const imported = await composable.confirmMultiImport(['pvp', 'pve']);
+    expect(imported).toEqual(['pvp', 'pve']);
+    expect(composable.importState.value).toBe('success');
+    expect(tarkovStore.setDisplayName).toHaveBeenNthCalledWith(1, 'PvpGuy');
+    expect(tarkovStore.setDisplayName).toHaveBeenNthCalledWith(2, 'PveGuy');
+    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'pvp', 60 * 60_000);
+    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'pve', 60 * 60_000);
+    expect(tarkovStore.switchGameMode).toHaveBeenLastCalledWith('pvp');
+  });
+  it('updates a single mode inside an active multi-mode preview via refetchPreviewMode', async () => {
+    const pvpData = createImportData({ displayName: 'PvpGuy', tarkovUid: 8560316 });
+    const pveData = createImportData({ displayName: 'PveStaleGuy', tarkovUid: 8560316 });
+    mockFetch
+      .mockResolvedValueOnce({
+        tarkovUid: 8560316,
+        profiles: {
+          pvp: { status: 'ok', profile: { aid: 8560316, mode: 'pvp' } },
+          pve: { status: 'stale', ageDays: 12, maxUpdatedAgeDays: 7, updatedAt: 1000 },
+        },
+      })
+      .mockResolvedValueOnce({ aid: 8560316, mode: 'pve' });
+    mockParseTarkovDevProfile.mockImplementation((raw: { mode?: string }) => ({
+      data: raw.mode === 'pve' ? pveData : pvpData,
+      ok: true,
+    }));
+    const composable = await loadComposable();
+    await composable.parseProfileModes('https://tarkov.dev/players/regular/8560316', [
+      'pvp',
+      'pve',
+    ]);
+    expect(composable.multiPreview.value?.modes.pve?.status).toBe('stale');
+    const ok = await composable.refetchPreviewMode('pve', { allowStale: true });
+    expect(ok).toBe(true);
+    expect(composable.multiPreview.value?.modes.pve).toMatchObject({
+      status: 'ok',
+      staleAccepted: true,
+      data: pveData,
+    });
+  });
   it('resets preview and errors back to idle', async () => {
     mockParseTarkovDevProfile.mockReturnValue({
       error: 'Invalid tarkov.dev profile format',
@@ -640,6 +725,7 @@ describe('useTarkovDevImport', () => {
     composable.reset();
     expect(composable.importState.value).toBe('idle');
     expect(composable.previewData.value).toBeNull();
+    expect(composable.multiPreview.value).toBeNull();
     expect(composable.importError.value).toBeNull();
   });
 });

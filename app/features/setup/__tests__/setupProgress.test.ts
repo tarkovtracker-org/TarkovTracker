@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { planSetupHideout, planSetupQuests } from '@/features/setup/setupProgress';
+import {
+  expandHideoutStationPrerequisites,
+  hasAnySubstantialProgress,
+  isTaskEligibleForFaction,
+  planSetupHideout,
+  planSetupQuests,
+} from '@/features/setup/setupProgress';
+import { defaultState } from '@/stores/progressState';
 import type { HideoutLevel, HideoutStation, Task } from '@/types/tarkov';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const need = (id: string, ...status: string[]) => ({ task: { id }, status });
@@ -68,9 +75,20 @@ describe('setup quest review', () => {
     );
     expect(plan).toEqual({ active: ['story'], completed: ['later'], suggested: [] });
   });
+  it('filters faction-specific quests to the player PMC faction', () => {
+    expect(isTaskEligibleForFaction({ factionName: 'Any' }, 'USEC')).toBe(true);
+    expect(isTaskEligibleForFaction({ factionName: undefined }, 'BEAR')).toBe(true);
+    expect(isTaskEligibleForFaction({ factionName: 'USEC' }, 'USEC')).toBe(true);
+    expect(isTaskEligibleForFaction({ factionName: 'BEAR' }, 'USEC')).toBe(false);
+    expect(isTaskEligibleForFaction({ factionName: 'BEAR' }, 'BEAR')).toBe(true);
+  });
 });
 describe('setup hideout review', () => {
-  const tier = (id: string, level: number) => ({ id, level }) as HideoutLevel;
+  const tier = (
+    id: string,
+    level: number,
+    stationLevelRequirements: HideoutLevel['stationLevelRequirements'] = []
+  ) => ({ id, level, stationLevelRequirements }) as HideoutLevel;
   const station = (id: string, levels: HideoutLevel[]): HideoutStation => ({
     id,
     name: id,
@@ -88,5 +106,58 @@ describe('setup hideout review', () => {
       tier('two', 2),
       tier('three', 3),
     ]);
+  });
+  it('transitively expands missing prerequisite station tiers without looping on cycles', () => {
+    const gen = station('generator', [
+      tier('gen-1', 1, [
+        { id: 'req-sec', station: { id: 'security', name: 'Security' }, level: 1 },
+      ]),
+      tier('gen-2', 2, [
+        { id: 'req-sec-2', station: { id: 'security', name: 'Security' }, level: 2 },
+      ]),
+    ]);
+    const sec = station('security', [
+      tier('sec-1', 1),
+      tier('sec-2', 2, [
+        { id: 'req-illum', station: { id: 'illumination', name: 'Illumination' }, level: 1 },
+      ]),
+    ]);
+    const illum = station('illumination', [
+      tier('illum-1', 1, [
+        { id: 'req-gen-cycle', station: { id: 'generator', name: 'Generator' }, level: 1 },
+      ]),
+    ]);
+    const expanded = expandHideoutStationPrerequisites(
+      [gen, sec, illum],
+      new Map([['generator', 2]]),
+      () => 0
+    );
+    expect(expanded).toEqual(
+      new Map([
+        ['generator', 2],
+        ['security', 2],
+        ['illumination', 1],
+      ])
+    );
+  });
+});
+describe('substantial progress detection', () => {
+  it('ignores profile-only tweaks like faction, level, or displayName', () => {
+    const state = structuredClone(defaultState);
+    state.pvp.level = 5;
+    state.pvp.pmcFaction = 'BEAR';
+    state.pvp.displayName = 'Timmy';
+    expect(hasAnySubstantialProgress(state)).toBe(false);
+  });
+  it('detects completed tasks, objectives, hideout modules, or story progress in any mode', () => {
+    const withTask = structuredClone(defaultState);
+    withTask.pve.taskCompletions = { 'task-1': { complete: true, failed: false } };
+    expect(hasAnySubstantialProgress(withTask)).toBe(true);
+    const withHideout = structuredClone(defaultState);
+    withHideout.seasonal.hideoutModules = { 'mod-1': { complete: true } };
+    expect(hasAnySubstantialProgress(withHideout)).toBe(true);
+    const withStory = structuredClone(defaultState);
+    withStory.pvp.storyChapters = { 'chap-1': { complete: true } };
+    expect(hasAnySubstantialProgress(withStory)).toBe(true);
   });
 });

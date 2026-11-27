@@ -1,44 +1,188 @@
 import { useStorage } from '@vueuse/core';
-export const setupImportSteps = ['backup', 'eft-logs', 'tarkov-dev'] as const;
+import { isGameMode, type GameMode } from '@/utils/constants';
+const setupImportSteps = ['backup', 'tarkov-dev', 'eft-logs'] as const;
 type SetupImportStep = (typeof setupImportSteps)[number];
-export type SetupStep = 'start' | SetupImportStep | 'review' | 'done';
-type Outcome = 'imported' | 'skipped' | 'failed';
-export const setupSteps: readonly SetupStep[] = ['start', ...setupImportSteps, 'review', 'done'];
+export type SetupPath = 'import' | 'manual' | 'backup';
+export type SetupStep =
+  'start' | 'tarkov-dev' | 'profile' | 'eft-logs' | 'catch-up' | 'backup' | 'done';
+export type SetupOutcome = 'imported' | 'skipped' | 'failed';
+const ALL_SETUP_STEPS: readonly SetupStep[] = [
+  'start',
+  'tarkov-dev',
+  'profile',
+  'eft-logs',
+  'catch-up',
+  'backup',
+  'done',
+];
+const ALL_SETUP_PATHS: readonly SetupPath[] = ['import', 'manual', 'backup'];
 type Checkpoint = {
+  path: SetupPath;
   step: SetupStep;
-  outcomes: Partial<Record<SetupImportStep, Outcome>>;
+  outcomes: Partial<Record<SetupImportStep, SetupOutcome>>;
+  tarkovDevImportedModes: GameMode[];
+  editionResolvedByImport?: boolean;
+  completedAt?: number;
   dismissed?: boolean;
+};
+const DEFAULT_CHECKPOINT: Checkpoint = {
+  path: 'import',
+  step: 'start',
+  outcomes: {},
+  tarkovDevImportedModes: [],
 };
 export const isSetupImportStep = (step: SetupStep): step is SetupImportStep =>
   setupImportSteps.some((source) => source === step);
 export function useSetupCheckpoint() {
   const { $supabase } = useNuxtApp();
-  const key = computed(() => `tarkovtracker-setup-v1:${$supabase.user.id ?? 'guest'}`);
-  const checkpoint = useStorage<Checkpoint>(key, { step: 'start', outcomes: {} }, undefined, {
+  const key = computed(() => `tarkovtracker-setup-v2:${$supabase.user.id ?? 'guest'}`);
+  const checkpoint = useStorage<Checkpoint>(key, { ...DEFAULT_CHECKPOINT }, undefined, {
     initOnMounted: true,
     listenToStorageChanges: false,
   });
-  const step = computed(() =>
-    setupSteps.includes(checkpoint.value?.step) ? checkpoint.value.step : 'start'
+  const path = computed<SetupPath>(() =>
+    ALL_SETUP_PATHS.includes(checkpoint.value?.path) ? checkpoint.value.path : 'import'
+  );
+  const step = computed<SetupStep>(() =>
+    ALL_SETUP_STEPS.includes(checkpoint.value?.step) ? checkpoint.value.step : 'start'
   );
   const dismissed = computed(() => checkpoint.value?.dismissed === true);
+  const isCompleted = computed(
+    () => step.value === 'done' || typeof checkpoint.value?.completedAt === 'number'
+  );
   const outcomes = computed(() => checkpoint.value?.outcomes ?? {});
-  function go(next: SetupStep, outcome?: Outcome) {
-    const source = step.value;
+  const tarkovDevImportedModes = computed<GameMode[]>(() =>
+    Array.isArray(checkpoint.value?.tarkovDevImportedModes)
+      ? checkpoint.value.tarkovDevImportedModes.filter(isGameMode)
+      : []
+  );
+  const editionResolvedByImport = computed(
+    () => checkpoint.value?.editionResolvedByImport === true
+  );
+  const needsProfileFallback = computed(() => {
+    if (path.value !== 'import') return false;
+    if (tarkovDevImportedModes.value.length > 0) return false;
+    return (
+      step.value === 'profile' ||
+      outcomes.value['tarkov-dev'] === 'skipped' ||
+      outcomes.value['tarkov-dev'] === 'failed'
+    );
+  });
+  const visibleSteps = computed<readonly SetupStep[]>(() => {
+    if (path.value === 'backup') return ['start', 'backup', 'done'];
+    if (path.value === 'manual') return ['start', 'profile', 'eft-logs', 'catch-up', 'done'];
+    return [
+      'start',
+      'tarkov-dev',
+      ...(needsProfileFallback.value ? (['profile'] as const) : []),
+      'eft-logs',
+      'catch-up',
+      'done',
+    ];
+  });
+  const stepIndex = computed(() => {
+    const idx = visibleSteps.value.indexOf(step.value);
+    return idx >= 0 ? idx : 0;
+  });
+  const previousStep = computed<SetupStep>(
+    () => visibleSteps.value[stepIndex.value - 1] ?? 'start'
+  );
+  const nextStep = computed<SetupStep>(() => visibleSteps.value[stepIndex.value + 1] ?? 'done');
+  function writeCheckpoint(patch: Partial<Checkpoint>) {
+    checkpoint.value = {
+      path: patch.path ?? path.value,
+      step: patch.step ?? step.value,
+      outcomes: patch.outcomes ?? { ...outcomes.value },
+      tarkovDevImportedModes: patch.tarkovDevImportedModes ?? [...tarkovDevImportedModes.value],
+      editionResolvedByImport: patch.editionResolvedByImport ?? editionResolvedByImport.value,
+      completedAt: 'completedAt' in patch ? patch.completedAt : checkpoint.value?.completedAt,
+      dismissed: patch.dismissed ?? dismissed.value,
+    };
+  }
+  function selectPath(nextPath: SetupPath) {
+    const firstStep: Record<SetupPath, SetupStep> = {
+      import: 'tarkov-dev',
+      manual: 'profile',
+      backup: 'backup',
+    };
+    writeCheckpoint({
+      path: nextPath,
+      step: firstStep[nextPath],
+      dismissed: false,
+    });
+  }
+  function mergeStepOutcome(source: SetupStep, outcome?: SetupOutcome) {
     const updated = { ...outcomes.value };
     if (outcome && isSetupImportStep(source) && updated[source] !== 'imported') {
       updated[source] = outcome;
     }
-    checkpoint.value = { step: next, outcomes: updated, dismissed: dismissed.value };
+    return updated;
   }
-  function remember(outcome: Outcome) {
+  function shouldFallbackToProfile(source: SetupStep, outcome?: SetupOutcome) {
+    const isSkippedProfile = outcome === 'skipped' || outcome === 'failed';
+    return (
+      path.value === 'import' &&
+      source === 'tarkov-dev' &&
+      tarkovDevImportedModes.value.length === 0 &&
+      isSkippedProfile
+    );
+  }
+  function go(next: SetupStep, outcome?: SetupOutcome) {
+    writeCheckpoint({
+      step: next,
+      outcomes: mergeStepOutcome(step.value, outcome),
+      completedAt: next === 'done' ? Date.now() : checkpoint.value?.completedAt,
+    });
+  }
+  function goNext(outcome?: SetupOutcome) {
+    const source = step.value;
+    const target = shouldFallbackToProfile(source, outcome) ? 'profile' : nextStep.value;
+    go(target, outcome);
+  }
+  function goBack() {
+    go(previousStep.value);
+  }
+  function remember(outcome: SetupOutcome) {
     go(step.value, outcome);
   }
+  function recordTarkovDevImport(modes: GameMode | GameMode[], editionResolved: boolean) {
+    const incoming = Array.isArray(modes) ? modes : [modes];
+    const nextModes = [...tarkovDevImportedModes.value];
+    for (const mode of incoming) {
+      if (!nextModes.includes(mode)) nextModes.push(mode);
+    }
+    const updated = { ...outcomes.value, 'tarkov-dev': 'imported' as const };
+    writeCheckpoint({
+      outcomes: updated,
+      tarkovDevImportedModes: nextModes,
+      editionResolvedByImport: editionResolvedByImport.value || editionResolved,
+    });
+  }
   function dismiss() {
-    checkpoint.value = { step: step.value, outcomes: outcomes.value, dismissed: true };
+    writeCheckpoint({ dismissed: true });
   }
   function restart() {
-    checkpoint.value = { step: 'start', outcomes: {} };
+    checkpoint.value = { ...DEFAULT_CHECKPOINT, outcomes: {}, tarkovDevImportedModes: [] };
   }
-  return { step, outcomes, go, remember, restart, dismissed, dismiss };
+  return {
+    path,
+    step,
+    visibleSteps,
+    stepIndex,
+    previousStep,
+    nextStep,
+    outcomes,
+    tarkovDevImportedModes,
+    editionResolvedByImport,
+    isCompleted,
+    dismissed,
+    selectPath,
+    go,
+    goNext,
+    goBack,
+    remember,
+    recordTarkovDevImport,
+    dismiss,
+    restart,
+  };
 }

@@ -4,21 +4,30 @@ Part of the [systems spec](./README.md): summary, flow, files, and invariants pe
 
 ## Guided progress setup
 
-The empty dashboard and Help menu link to `/setup`. Setup uses the same import controls and
-confirmation rules as Settings. A TarkovTracker backup can establish the baseline, followed by
-available EFT logs and the matching Tarkov.dev snapshot. Players without logs can start with the
-profile. All imports can be skipped. The browser remembers the current step and import outcomes
-for the current account on that device. Import files, previews, and unsaved manual selections
-stay in memory.
+The Dashboard Getting Started card (for accounts without substantial tracked progress) and the Help
+menu link to `/setup`. Setup uses the same import controls and confirmation rules as Settings,
+reusing `DataManagementCard` with restore-only mode.
 
-Manual review accepts active or completed quest selections. Suggestions follow explicit
-completion-only quest requirements, stop at story routes, and preserve existing progress. They
-require the player to opt in before saving. Choosing a hideout station level adds the missing
-tiers of that station. Setup previews the enabled hideout prerequisites before applying a draft,
-including skill rewards from its selected quests. Setup waits for task objectives and rewards
-before saving completed quests or hideout tiers. If a manual save fails, the player can retry or
-confirm continuing to the summary. Detailed storyline, handover, item, and companion setup
-remain available from the summary.
+Players choose between **Quick import** (starting with Tarkov.dev profile import, which detects
+the game mode from the profile URL and auto-fills level, faction, edition, prestige, and skills,
+followed by optional EFT game logs), **Set up manually / Fresh wipe** (mode selection, account-wide
+game edition, and per-mode faction, level, and PvP/PvE prestige), or **Restore a backup** (which
+jumps straight to the ready summary after restore). If Tarkov.dev is skipped on the import path,
+setup automatically falls back to the manual profile step. The browser remembers the active path,
+step, imported modes, and outcomes per account on that device; import files, previews, and unsaved
+catch-up selections stay in memory and prompt before leaving `/setup`.
+
+Optional quick catch-up organizes manual edits into **Quests**, **Traders**, and **Hideout** tabs.
+Quest search filters to the active mode's PMC faction, supports trader filters and direct Active or
+Completed actions, and suggests explicit completion-only prerequisite chains without crossing story
+routes. Choosing a hideout station level adds missing lower tiers; setup previews enabled hideout
+prerequisites via `describeBlockedHideoutTiers` (including planned quest skill rewards and trader
+loyalty drafts), displays the exact unmet station, trader, or skill requirements, and offers a
+one-click helper to include missing prerequisite stations. Setup waits for task objectives and
+rewards before saving completed quests or hideout tiers. If a manual save fails, the player can
+retry or confirm continuing to the summary. The ready launchpad summarizes configured progress,
+offers optional cloud sign-in for guests, and links to Dashboard, Tasks, Needed Items, and
+TarkovMonitor.
 
 ## Stash screenshot import
 
@@ -228,10 +237,13 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
 
 ### Flow
 
-1. Client (`useTarkovDevImport.parseProfileUrl`) resolves the pasted URL to the upstream JSON URL,
-   checks the per-profile client cooldown (localStorage, default 60 min after a confirmed import,
-   `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES`), obtains a Turnstile token when a sitekey is
-   configured, and calls the proxy with `retry: 0`.
+1. Client (`useTarkovDevImport.parseProfileUrl` or `parseProfileModes`) resolves the pasted URL
+   (and optional comma-separated `modes=pvp,pve,seasonal` list for the same `tarkovUid`) to the
+   upstream JSON URL(s), checks the per-profile client cooldown (localStorage, default 60 min after
+   a confirmed import, `NUXT_PUBLIC_TARKOV_DEV_IMPORT_COOLDOWN_MINUTES`), obtains a Turnstile token
+   when a sitekey is configured, and calls the proxy with `retry: 0`. Multi-mode requests share one
+   Turnstile verification and rate-limit check, returning per-mode `ok`, `stale`, `not_found`, or
+   `error` entries using the exact same per-mode cache, validation, and freshness checks.
 2. The proxy enforces, in order: a pre-verification per-IP rate limit when Turnstile is configured,
    Turnstile verification (production requires `NUXT_PUBLIC_TURNSTILE_SITE_KEY` and
    `NUXT_TURNSTILE_SECRET_KEY` to be paired; siteverify availability failures fail open), then the
@@ -249,9 +261,10 @@ through the Nitro proxy `/api/tarkov-dev/profile`, which layers cost and abuse c
    A `304` re-stamps a fresh cached entry without extending a payload that fails the freshness gate.
 4. The freshness gate rejects payloads whose `updated` field is older than
    `NUXT_TARKOV_DEV_PROFILE_MAX_UPDATED_AGE_DAYS` (default 7, `0` disables) with a structured
-   `422 profile_stale` error. Ordinary successful responses get
+   `422 profile_stale` error unless the user explicitly opts in with `?allowStale=1` after seeing
+   the stale-profile recovery prompt. Ordinary successful responses get
    `Cache-Control: private, max-age=<ttl>` so repeat clicks are served from the browser cache;
-   explicit `fresh=1` responses and all error paths stay `no-store`.
+   explicit `fresh=1`, `allowStale=1`, and all error paths stay `no-store`.
 5. The client parser surfaces `updated` as `updatedAt`; the preview UI shows the snapshot date and
    warns when it is 2+ days old. Structured error codes (`profile_stale`, `profile_not_generated`,
    `rate_limited`, `cooldown_active`, `turnstile_failed`) map to localized, actionable messages.

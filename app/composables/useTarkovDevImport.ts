@@ -10,6 +10,7 @@ import {
 } from '@/utils/tarkovDevImportCooldown';
 import { parseTarkovDevProfile, type TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
 import {
+  buildTarkovDevProfileSource,
   resolveTarkovDevProfileSource,
   type TarkovDevProfileSource,
 } from '@/utils/tarkovDevProfileSource';
@@ -25,10 +26,33 @@ export type ImportErrorCode =
   | 'tarkov_uid_conflict'
   | 'save_failed'
   | 'level_thresholds_unavailable';
+export type TarkovDevModeFetchStatus =
+  | {
+      status: 'ok';
+      data: TarkovDevImportResult;
+      source: TarkovDevProfileSource;
+      staleAccepted?: boolean;
+    }
+  | {
+      status: 'stale';
+      ageDays: number;
+      maxUpdatedAgeDays: number;
+      updatedAt: number;
+      source: TarkovDevProfileSource;
+    }
+  | { status: 'not_found'; source: TarkovDevProfileSource }
+  | { status: 'cooldown'; minutes: number; source: TarkovDevProfileSource }
+  | { status: 'error'; source: TarkovDevProfileSource };
+export interface TarkovDevMultiModePreview {
+  tarkovUid: number;
+  requestedModes: GameMode[];
+  modes: Partial<Record<GameMode, TarkovDevModeFetchStatus>>;
+}
 export interface UseTarkovDevImportReturn {
   isImporting: Ref<boolean>;
   importState: Ref<ImportState>;
   previewData: Ref<TarkovDevImportResult | null>;
+  multiPreview: Ref<TarkovDevMultiModePreview | null>;
   importError: Ref<string | null>;
   importErrorCode: Ref<ImportErrorCode | null>;
   importErrorMeta: Ref<Record<string, number> | null>;
@@ -37,11 +61,22 @@ export interface UseTarkovDevImportReturn {
     profileUrl: string,
     options?: TarkovDevProfileFetchOptions
   ) => Promise<TarkovDevProfileSource | null>;
+  parseProfileModes: (
+    profileUrl: string,
+    modes: GameMode[],
+    options?: TarkovDevProfileFetchOptions
+  ) => Promise<TarkovDevMultiModePreview | null>;
+  refetchPreviewMode: (mode: GameMode, options?: TarkovDevProfileFetchOptions) => Promise<boolean>;
   confirmImport: (targetMode: GameMode, editionOverride?: number | null) => Promise<void>;
+  confirmMultiImport: (
+    targetModes: GameMode[],
+    editionOverride?: number | null
+  ) => Promise<GameMode[]>;
   setError: (message: string) => void;
   reset: () => void;
 }
 export type TarkovDevProfileFetchOptions = {
+  allowStale?: boolean;
   fresh?: boolean;
   turnstileToken?: string | null;
 };
@@ -105,6 +140,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   const importState = ref<ImportState>('idle');
   const isImporting = ref(false);
   const previewData = ref<TarkovDevImportResult | null>(null);
+  const multiPreview = ref<TarkovDevMultiModePreview | null>(null);
   const importError = ref<string | null>(null);
   const importErrorCode = ref<ImportErrorCode | null>(null);
   const importErrorMeta = ref<Record<string, number> | null>(null);
@@ -120,6 +156,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     profileUrlRequestId++;
     importState.value = 'idle';
     previewData.value = null;
+    multiPreview.value = null;
     importError.value = null;
     importErrorCode.value = null;
     importErrorMeta.value = null;
@@ -136,6 +173,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
   ): void {
     importState.value = 'error';
     previewData.value = null;
+    multiPreview.value = null;
     importError.value = message;
     importErrorCode.value = code;
     importErrorMeta.value = meta;
@@ -199,10 +237,12 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     options: TarkovDevProfileFetchOptions
   ): Promise<unknown> {
     const wantsFresh = options.fresh === true || staleRetryJsonUrl === source.profileJsonUrl;
+    const allowStale = options.allowStale === true;
     return $fetch<unknown>('/api/tarkov-dev/profile', {
       query: {
         url: source.profileJsonUrl,
-        ...(wantsFresh ? { fresh: '1' } : {}),
+        ...(wantsFresh && !allowStale ? { fresh: '1' } : {}),
+        ...(allowStale ? { allowStale: '1' } : {}),
       },
       ...(options.turnstileToken
         ? { headers: { 'x-turnstile-token': options.turnstileToken } }
@@ -377,16 +417,350 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
       isImporting.value = false;
     }
   }
+  type MultiModeServerEntry =
+    | { status: 'ok'; profile: unknown }
+    | { status: 'stale'; ageDays: number; maxUpdatedAgeDays: number; updatedAt: number }
+    | { status: 'not_found' }
+    | { status: 'error' };
+  type MultiModeServerResponse = {
+    tarkovUid?: number;
+    profiles?: Partial<Record<GameMode, MultiModeServerEntry>>;
+  };
+  function parseServerModeEntry(
+    tarkovUid: number,
+    mode: GameMode,
+    entry: MultiModeServerEntry | undefined,
+    allowStale: boolean
+  ): TarkovDevModeFetchStatus {
+    const source = buildTarkovDevProfileSource(tarkovUid, mode);
+    if (!entry) return { status: 'error', source };
+    if (entry.status === 'ok') {
+      const parsed = parseTarkovDevProfile(entry.profile);
+      return parsed.ok
+        ? {
+            status: 'ok',
+            data: parsed.data,
+            source,
+            ...(allowStale ? { staleAccepted: true } : {}),
+          }
+        : { status: 'error', source };
+    }
+    if (entry.status === 'stale') {
+      return {
+        status: 'stale',
+        ageDays: entry.ageDays,
+        maxUpdatedAgeDays: entry.maxUpdatedAgeDays,
+        updatedAt: entry.updatedAt,
+        source,
+      };
+    }
+    if (entry.status === 'not_found') return { status: 'not_found', source };
+    return { status: 'error', source };
+  }
+  function syncPreviewDataFromMulti(preview: TarkovDevMultiModePreview): void {
+    const firstOk = preview.requestedModes
+      .map((mode) => preview.modes[mode])
+      .find((entry): entry is Extract<TarkovDevModeFetchStatus, { status: 'ok' }> =>
+        Boolean(entry && entry.status === 'ok')
+      );
+    previewData.value = firstOk?.data ?? null;
+    lastFetchedSource = firstOk?.source ?? null;
+  }
+  function fetchMultiModeProfiles(
+    source: TarkovDevProfileSource,
+    modes: GameMode[],
+    options: TarkovDevProfileFetchOptions
+  ): Promise<MultiModeServerResponse> {
+    const wantsFresh = options.fresh === true;
+    const allowStale = options.allowStale === true;
+    return $fetch<MultiModeServerResponse>('/api/tarkov-dev/profile', {
+      query: {
+        url: source.profileJsonUrl,
+        modes: modes.join(','),
+        ...(wantsFresh && !allowStale ? { fresh: '1' } : {}),
+        ...(allowStale ? { allowStale: '1' } : {}),
+      },
+      ...(options.turnstileToken
+        ? { headers: { 'x-turnstile-token': options.turnstileToken } }
+        : {}),
+      retry: 0,
+    });
+  }
+  function finalizeMultiModeResult(
+    requestId: number,
+    preview: TarkovDevMultiModePreview
+  ): TarkovDevMultiModePreview | null {
+    if (!isCurrentRequest(requestId)) return null;
+    const entries = preview.requestedModes.map((mode) => preview.modes[mode]);
+    const hasOk = entries.some((entry) => entry?.status === 'ok');
+    const staleEntries = entries.filter(
+      (entry): entry is Extract<TarkovDevModeFetchStatus, { status: 'stale' }> =>
+        entry?.status === 'stale'
+    );
+    if (hasOk || (preview.requestedModes.length > 1 && staleEntries.length > 0)) {
+      multiPreview.value = preview;
+      syncPreviewDataFromMulti(preview);
+      importState.value = 'preview';
+      importError.value = null;
+      importErrorCode.value = null;
+      importErrorMeta.value = null;
+      return preview;
+    }
+    if (staleEntries.length === 1) {
+      staleRetryJsonUrl = staleEntries[0]!.source.profileJsonUrl;
+      setCodedError(GENERIC_FETCH_ERROR, 'profile_stale', { days: staleEntries[0]!.ageDays });
+      return null;
+    }
+    const allNotFound = entries.every(
+      (entry) => entry?.status === 'not_found' || entry?.status === 'cooldown'
+    );
+    setCodedError(
+      GENERIC_FETCH_ERROR,
+      allNotFound ? 'profile_not_generated' : 'fetch_failed',
+      null
+    );
+    return null;
+  }
+  function partitionCooldownModes(tarkovUid: number, requestedModes: GameMode[]) {
+    const modeStatuses: Partial<Record<GameMode, TarkovDevModeFetchStatus>> = {};
+    const modesToFetch: GameMode[] = [];
+    let minCooldown = Number.POSITIVE_INFINITY;
+    for (const mode of requestedModes) {
+      const modeSource = buildTarkovDevProfileSource(tarkovUid, mode);
+      const minutes = getCooldownMinutes(modeSource);
+      if (minutes > 0) {
+        modeStatuses[mode] = { status: 'cooldown', minutes, source: modeSource };
+        minCooldown = Math.min(minCooldown, minutes);
+      } else {
+        modesToFetch.push(mode);
+      }
+    }
+    return {
+      modeStatuses,
+      modesToFetch,
+      minCooldown: Number.isFinite(minCooldown) ? minCooldown : 1,
+    };
+  }
+  async function parseProfileModes(
+    profileUrl: string,
+    modes: GameMode[],
+    options: TarkovDevProfileFetchOptions = {}
+  ): Promise<TarkovDevMultiModePreview | null> {
+    const requestId = ++profileUrlRequestId;
+    importError.value = null;
+    importErrorCode.value = null;
+    importErrorMeta.value = null;
+    const source = resolveTarkovDevProfileSource(profileUrl);
+    if (!source.ok) return rejectProfileUrl(requestId, source.error, null, null);
+    const uniqueModes = modes.filter(
+      (mode, index): mode is GameMode => isGameMode(mode) && modes.indexOf(mode) === index
+    );
+    const requestedModes = uniqueModes.length > 0 ? uniqueModes : [source.data.mode ?? 'pvp'];
+    const { modeStatuses, modesToFetch, minCooldown } = partitionCooldownModes(
+      source.data.tarkovUid,
+      requestedModes
+    );
+    if (modesToFetch.length === 0) {
+      return rejectProfileUrl(requestId, GENERIC_FETCH_ERROR, 'cooldown_active', {
+        minutes: minCooldown,
+      });
+    }
+    importState.value = 'loading';
+    previewData.value = null;
+    multiPreview.value = null;
+    try {
+      const response = await fetchMultiModeProfiles(source.data, modesToFetch, options);
+      if (!isCurrentRequest(requestId)) return null;
+      const allowStale = options.allowStale === true;
+      for (const mode of modesToFetch) {
+        modeStatuses[mode] = parseServerModeEntry(
+          source.data.tarkovUid,
+          mode,
+          response.profiles?.[mode],
+          allowStale
+        );
+      }
+      return finalizeMultiModeResult(requestId, {
+        tarkovUid: source.data.tarkovUid,
+        requestedModes,
+        modes: modeStatuses,
+      });
+    } catch (e) {
+      return failProfileFetch(requestId, source.data, e);
+    }
+  }
+  function classifyPreviewRefetchError(
+    error: unknown,
+    source: TarkovDevProfileSource
+  ): TarkovDevModeFetchStatus {
+    const classified = classifyProfileUrlError(error);
+    if (classified.code === 'profile_stale') {
+      return {
+        status: 'stale',
+        ageDays: classified.meta?.days ?? 0,
+        maxUpdatedAgeDays: 7,
+        updatedAt: 0,
+        source,
+      };
+    }
+    return classified.code === 'profile_not_generated'
+      ? { status: 'not_found', source }
+      : { status: 'error', source };
+  }
+  function updateMultiPreviewMode(
+    expectedUid: number,
+    mode: GameMode,
+    entry: TarkovDevModeFetchStatus
+  ): boolean {
+    if (multiPreview.value?.tarkovUid !== expectedUid) return false;
+    const nextPreview: TarkovDevMultiModePreview = {
+      ...multiPreview.value,
+      modes: { ...multiPreview.value.modes, [mode]: entry },
+    };
+    multiPreview.value = nextPreview;
+    syncPreviewDataFromMulti(nextPreview);
+    return true;
+  }
+  async function refetchPreviewMode(
+    mode: GameMode,
+    options: TarkovDevProfileFetchOptions = {}
+  ): Promise<boolean> {
+    const current = multiPreview.value;
+    if (!current || !isGameMode(mode)) return false;
+    const modeSource = buildTarkovDevProfileSource(current.tarkovUid, mode);
+    const minutes = getCooldownMinutes(modeSource);
+    if (minutes > 0) {
+      updateMultiPreviewMode(current.tarkovUid, mode, {
+        status: 'cooldown',
+        minutes,
+        source: modeSource,
+      });
+      return false;
+    }
+    try {
+      const json = await fetchProfileJson(modeSource, options);
+      const parsed = parseTarkovDevProfile(json);
+      const updatedEntry: TarkovDevModeFetchStatus = parsed.ok
+        ? {
+            status: 'ok',
+            data: parsed.data,
+            source: modeSource,
+            ...(options.allowStale ? { staleAccepted: true } : {}),
+          }
+        : { status: 'error', source: modeSource };
+      return updateMultiPreviewMode(current.tarkovUid, mode, updatedEntry) && parsed.ok;
+    } catch (error) {
+      updateMultiPreviewMode(
+        current.tarkovUid,
+        mode,
+        classifyPreviewRefetchError(error, modeSource)
+      );
+      logger.error('[TarkovDevImport] Single-mode preview refetch error:', error);
+      return false;
+    }
+  }
+  async function ensureLevelThresholdsLoaded(isCurrent: () => boolean): Promise<boolean> {
+    if (metadataStore.playerLevels.length === 0) await fetchLevelThresholds();
+    if (!isCurrent()) return false;
+    if (metadataStore.playerLevels.length > 0) return true;
+    setCodedError('Player level thresholds are unavailable', 'level_thresholds_unavailable', null);
+    return false;
+  }
+  async function applyModeInBatch(
+    mode: GameMode,
+    data: TarkovDevImportResult,
+    isCurrent: () => boolean,
+    editionOverride?: number | null
+  ): Promise<boolean> {
+    if (tarkovStore.getCurrentGameMode() !== mode) await tarkovStore.switchGameMode(mode);
+    if (!isCurrent() || tarkovStore.getCurrentGameMode() !== mode) return false;
+    applyImportData(data, editionOverride);
+    const saveError = await saveImport(data.tarkovUid);
+    if (!isCurrent()) return false;
+    if (saveError) {
+      setCodedError('Failed to save import data', saveError, null);
+      return false;
+    }
+    recordImportCompletion(data.tarkovUid, mode, cooldownMs);
+    return true;
+  }
+  type ReadyBatchEntry = {
+    mode: GameMode;
+    entry: Extract<TarkovDevModeFetchStatus, { status: 'ok' }>;
+  };
+  function collectReadyBatchEntries(
+    current: TarkovDevMultiModePreview | null,
+    targetModes: GameMode[]
+  ): ReadyBatchEntry[] {
+    if (!current) return [];
+    return targetModes
+      .filter(isGameMode)
+      .map((mode) => ({ mode, entry: current.modes[mode] }))
+      .filter((item): item is ReadyBatchEntry => item.entry?.status === 'ok');
+  }
+  async function runMultiImportBatch(
+    readyEntries: ReadyBatchEntry[],
+    isCurrent: () => boolean,
+    editionOverride?: number | null
+  ): Promise<GameMode[]> {
+    const importedModes: GameMode[] = [];
+    if (!(await ensureLevelThresholdsLoaded(isCurrent))) return importedModes;
+    for (const { mode, entry } of readyEntries) {
+      if (!isCurrent()) return importedModes;
+      const ok = await applyModeInBatch(mode, entry.data, isCurrent, editionOverride);
+      if (!ok) return importedModes;
+      importedModes.push(mode);
+    }
+    if (isCurrent() && importedModes.length > 0) importState.value = 'success';
+    return importedModes;
+  }
+  async function confirmMultiImport(
+    targetModes: GameMode[],
+    editionOverride?: number | null
+  ): Promise<GameMode[]> {
+    if (isImporting.value) return [];
+    const readyEntries = collectReadyBatchEntries(multiPreview.value, targetModes);
+    if (readyEntries.length === 0) return [];
+    const requestId = profileUrlRequestId;
+    const ownerId = getCurrentSupabaseUserId();
+    const ownsGeneration = captureStartupOwnership();
+    const ownsSession = () =>
+      ownsGeneration() &&
+      getCurrentSupabaseUserId() === ownerId &&
+      $supabase.user.loggedIn === (ownerId !== null);
+    const isCurrent = () => ownsSession() && isCurrentRequest(requestId);
+    isImporting.value = true;
+    const originalMode = tarkovStore.getCurrentGameMode();
+    try {
+      return await runMultiImportBatch(readyEntries, isCurrent, editionOverride);
+    } catch (e) {
+      if (isCurrent()) {
+        importState.value = 'error';
+        importError.value = 'Failed to apply import data';
+        logger.error('[TarkovDevImport] Multi-mode import error:', e);
+      }
+      return [];
+    } finally {
+      if (ownsSession() && tarkovStore.getCurrentGameMode() !== originalMode) {
+        await restoreGameMode(originalMode);
+      }
+      isImporting.value = false;
+    }
+  }
   return {
     isImporting,
     importState,
     previewData,
+    multiPreview,
     importError,
     importErrorCode,
     importErrorMeta,
     parseFile,
     parseProfileUrl,
+    parseProfileModes,
+    refetchPreviewMode,
     confirmImport,
+    confirmMultiImport,
     setError,
     reset,
   };
