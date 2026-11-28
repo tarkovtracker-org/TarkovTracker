@@ -51,7 +51,8 @@ PNG is at `public/img/demos/stash-1440p.png` and is also the offline regression 
 
 ### Read-only window capture
 
-**Scan stash window** opens a separate read-only review in browsers that support window sharing.
+**Scan stash window** opens a separate read-only review in browsers that can identify a shared window.
+Screenshot import is available regardless of window capture support.
 The player selects the Tarkov window in the browser picker. The dialog previews it locally
 without audio. **Scan current view** freezes one frame and sends it through the screenshot
 recognition worker. Players can confirm or correct detections and see the same sell advice.

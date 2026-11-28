@@ -127,7 +127,10 @@
   const stashScan = ref<'screenshot' | 'window'>();
   const canShareWindow = ref(false);
   onMounted(() => {
-    canShareWindow.value = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+    const devices = navigator.mediaDevices;
+    canShareWindow.value =
+      typeof devices?.getDisplayMedia === 'function' &&
+      devices.getSupportedConstraints().displaySurface === true;
   });
   const StashImportDialog = defineAsyncComponent(
     () => import('@/features/stash-import/StashImportDialog.vue')
