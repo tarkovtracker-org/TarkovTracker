@@ -225,8 +225,8 @@ captured at account startup or before the next local quest change. Dated EFT com
 than an explicit standing correction are treated as already included, including when the log
 and the correction were recorded on different devices. An undated or newer
 completion contributes when first recovered. Players can turn off quest reputation for a
-trader and edit the held value directly. Re-enabling establishes a new checkpoint at the
-current value and applies future quest changes.
+trader and edit the held value directly. Re-enabling applies future quest changes, and later
+reputation edits retain the distinction between quests completed before and after resuming.
 
 In Auto, standard trader loyalty uses the highest catalog tier whose PMC level and reputation
 are met. It skips tiers with a nonzero commerce requirement in the catalog since Tracker

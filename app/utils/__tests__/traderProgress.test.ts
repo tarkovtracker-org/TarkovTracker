@@ -104,9 +104,36 @@ describe('effective trader standing', () => {
     actions.setQuestReputationTracking.call(state, 'prapor', 0.3, false);
     actions.setTaskComplete.call(state, 'quest-a');
     actions.setQuestReputationTracking.call(state, 'prapor', 0.3, true);
-    actions.correctTraderReputation.call(state, 'prapor', 0.5);
+    actions.setTaskComplete.call(state, 'quest-b');
+    actions.correctTraderReputation.call(state, 'prapor', 0.6);
     actions.setTaskUncompleted.call(state, 'quest-a');
-    expect(effectiveTraderStanding(state.pvp, catalog).prapor?.reputation).toBe(0.5);
+    expect(effectiveTraderStanding(state.pvp, catalog).prapor?.reputation).toBe(0.6);
+    actions.setTaskUncompleted.call(state, 'quest-b');
+    expect(effectiveTraderStanding(state.pvp, catalog).prapor?.reputation).toBe(0.4);
+  });
+  it('keeps a known undone quest outside the correction even when an older date arrives later', () => {
+    const state = structuredClone(defaultState);
+    const sync = structuredClone(state);
+    actions.setTaskUncompleted.call(state, 'quest-a');
+    state.pvp.taskCompletions['quest-a']!.timestamp = Date.now() + 10_000;
+    actions.correctTraderReputation.call(state, 'prapor', 0.6);
+    actions.setTaskComplete.call(sync, 'quest-a');
+    actions.recordEftQuestCompletionTime.call(sync, 'quest-a', Date.now() - 10_000);
+    state.pvp = mergeProgressData(state.pvp, sync.pvp);
+    expect(effectiveTraderStanding(state.pvp, catalog).prapor?.reputation).toBe(0.6);
+  });
+  it('does not extend the historical cutoff when a synced correction clock is ahead', () => {
+    const state = structuredClone(defaultState);
+    const earlier = Date.now();
+    state.pvp.traders.prapor = {
+      level: 1,
+      reputation: 0.4,
+      reputationCheckpoint: { completedTaskIds: [], manual: true, timestamp: earlier + 60_000 },
+    };
+    actions.correctTraderReputation.call(state, 'prapor', 0.6);
+    actions.setTaskComplete.call(state, 'quest-a');
+    actions.recordEftQuestCompletionTime.call(state, 'quest-a', earlier + 30_000);
+    expect(effectiveTraderStanding(state.pvp, catalog).prapor?.reputation).toBe(0.7);
   });
   it('merges a manual loyalty choice independently of a reputation edit on another device', () => {
     const state = structuredClone(defaultState);
@@ -211,7 +238,7 @@ describe('effective trader standing', () => {
     const state = structuredClone(defaultState);
     const sync = structuredClone(state);
     actions.correctTraderReputation.call(state, 'prapor', 0.6);
-    const checkpoint = state.pvp.traders.prapor!.reputationCheckpoint!.timestamp;
+    const checkpoint = state.pvp.traders.prapor!.reputationCheckpoint!.observedAt!;
     actions.setTaskComplete.call(sync, 'quest-b');
     actions.recordEftQuestCompletionTime.call(sync, 'quest-b', checkpoint - 1);
     sync.pvp.taskCompletions = sanitizeTaskCompletionMap(sync.pvp.taskCompletions);

@@ -309,6 +309,16 @@ const setTaskStatus = (state: UserState, taskId: string, completion: TaskComplet
 type QuestRewardTracking = NonNullable<
   UserProgressData['traders'][string]['reputationCheckpoint']
 >['questRewardTracking'];
+const resumedQuestTracking = (
+  tracking: QuestRewardTracking,
+  existing: UserProgressData['traders'][string] | undefined,
+  at: number,
+  completedTaskIds: string[]
+) => {
+  if (tracking === 'paused') return undefined;
+  if (tracking === 'new-only') return { at, completedTaskIds };
+  return existing?.reputationCheckpoint?.resumedTracking;
+};
 const buildReputationCheckpoint = (
   progress: UserProgressData,
   existing: UserProgressData['traders'][string] | undefined,
@@ -316,12 +326,17 @@ const buildReputationCheckpoint = (
 ) => {
   const questRewardTracking = tracking ?? existing?.reputationCheckpoint?.questRewardTracking;
   const excludedHistoricalTaskIds = excludedHistoricalTraderQuestIds(progress);
+  const completedTaskIds = completedTraderQuestIds(progress);
+  const observedAt = Date.now();
+  const resumedTracking = resumedQuestTracking(tracking, existing, observedAt, completedTaskIds);
   return {
-    completedTaskIds: completedTraderQuestIds(progress),
+    completedTaskIds,
     timestamp: nextClock(existing?.reputationCheckpoint?.timestamp ?? 0),
+    observedAt,
     manual: true,
     ...(questRewardTracking ? { questRewardTracking } : {}),
     ...(excludedHistoricalTaskIds.length ? { excludedHistoricalTaskIds } : {}),
+    ...(resumedTracking ? { resumedTracking } : {}),
   };
 };
 const setTraderReputation = (

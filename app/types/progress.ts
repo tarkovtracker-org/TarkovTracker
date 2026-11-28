@@ -48,8 +48,11 @@ export interface TraderProgress {
     completedTaskIds: string[];
     excludedHistoricalTaskIds?: string[];
     timestamp: number;
+    /** Wall time for comparing EFT notifications. The timestamp orders saved edits. */
+    observedAt?: number;
     manual?: boolean;
     questRewardTracking?: 'paused' | 'new-only';
+    resumedTracking?: { at: number; completedTaskIds: string[] };
   };
 }
 export const MANUAL_ACTIVITY_TYPES = ['task', 'hideout', 'item', 'system'] as const;

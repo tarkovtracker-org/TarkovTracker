@@ -32,16 +32,14 @@ export function checkpointLegacyTraderStanding(progress: UserProgressData): numb
 }
 export const excludedHistoricalTraderQuestIds = (progress: UserProgressData) =>
   Object.keys(progress.taskCompletions)
-    .filter((id) => {
-      const completion = progress.taskCompletions[id];
-      return completion?.eftCompletedAt !== undefined && !isTaskComplete(completion);
-    })
+    .filter((id) => !isTaskComplete(progress.taskCompletions[id]))
     .sort();
 const indexTraderCheckpoint = (checkpoint: TraderProgress['reputationCheckpoint']) => ({
   included: new Set(checkpoint?.completedTaskIds),
   excluded: new Set(checkpoint?.excludedHistoricalTaskIds),
-  historicalCutoff: checkpoint?.manual ? checkpoint.timestamp : 0,
-  newQuestsOnly: checkpoint?.questRewardTracking === 'new-only',
+  historicalCutoff: checkpoint?.manual ? (checkpoint.observedAt ?? checkpoint.timestamp) : 0,
+  resumedAt: checkpoint?.resumedTracking?.at ?? 0,
+  beforeResume: new Set(checkpoint?.resumedTracking?.completedTaskIds),
 });
 const countedAtCheckpoint = (
   checkpoint: ReturnType<typeof indexTraderCheckpoint> | undefined,
@@ -60,8 +58,9 @@ const questRewardChange = (
   taskId: string,
   completion: TaskCompletion | undefined
 ) => {
+  if (checkpoint?.beforeResume.has(taskId)) return 0;
+  if ((completion?.eftCompletedAt ?? Infinity) < (checkpoint?.resumedAt ?? 0)) return 0;
   const included = countedAtCheckpoint(checkpoint, taskId, completion);
-  if (included && checkpoint?.newQuestsOnly) return 0;
   return Number(isTaskComplete(completion)) - Number(included);
 };
 const rewardDeltas = (progress: UserProgressData, tasks: Task[]) => {

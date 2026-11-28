@@ -346,6 +346,8 @@ const sameManualCorrection = (left: ReputationCheckpoint, right: ReputationCheck
   left.manual &&
   right.manual &&
   left.timestamp === right.timestamp &&
+  left.observedAt === right.observedAt &&
+  left.resumedTracking?.at === right.resumedTracking?.at &&
   left.questRewardTracking === right.questRewardTracking;
 const unionQuestIds = (left: string[] = [], right: string[] = []) =>
   [...new Set([...left, ...right])].sort();
@@ -355,6 +357,17 @@ const mergeRecoveredQuestIds = (left: ReputationCheckpoint, right: ReputationChe
     ...left,
     completedTaskIds: unionQuestIds(left.completedTaskIds, right.completedTaskIds),
     ...(excluded.length ? { excludedHistoricalTaskIds: excluded } : {}),
+    ...(left.resumedTracking
+      ? {
+          resumedTracking: {
+            at: left.resumedTracking.at,
+            completedTaskIds: unionQuestIds(
+              left.resumedTracking.completedTaskIds,
+              right.resumedTracking?.completedTaskIds
+            ),
+          },
+        }
+      : {}),
   };
 };
 const mergeEftCompletionTime = (local: TaskCompletion, remote: TaskCompletion) => {

@@ -148,6 +148,18 @@ const sanitizeCheckpointTaskIds = (ids: unknown[]) => [
 ];
 const sanitizeCheckpointTracking = (value: unknown) =>
   value === 'paused' || value === 'new-only' ? ({ questRewardTracking: value } as const) : {};
+const sanitizeCheckpointObservation = (value: Record<string, unknown>) => {
+  const observedAt = toFiniteNumber(value.observedAt);
+  return observedAt !== null && observedAt > 0 ? { observedAt } : {};
+};
+const sanitizeResumedTracking = (value: unknown) => {
+  if (!isRecord(value) || !Array.isArray(value.completedTaskIds)) return {};
+  const at = toFiniteNumber(value.at);
+  if (at === null || at <= 0) return {};
+  return {
+    resumedTracking: { at, completedTaskIds: sanitizeCheckpointTaskIds(value.completedTaskIds) },
+  };
+};
 const sanitizeReputationCheckpoint = (value: unknown) => {
   if (!isRecord(value) || !Array.isArray(value.completedTaskIds)) return undefined;
   const timestamp = toFiniteNumber(value.timestamp);
@@ -160,6 +172,8 @@ const sanitizeReputationCheckpoint = (value: unknown) => {
     timestamp,
     ...(value.manual === true ? { manual: true } : {}),
     ...sanitizeCheckpointTracking(value.questRewardTracking),
+    ...sanitizeCheckpointObservation(value),
+    ...sanitizeResumedTracking(value.resumedTracking),
   };
 };
 const sanitizeTraderLoyalty = (value: Record<string, unknown>, level: number | null) => {
