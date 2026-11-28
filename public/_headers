@@ -1,2 +1,4 @@
 /*
   Content-Security-Policy: frame-ancestors 'self'
+https://:deployment.tarkovtrackernuxt.pages.dev/about
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
