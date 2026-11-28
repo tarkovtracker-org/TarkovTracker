@@ -49,6 +49,17 @@ worker and review/preview flow. Demo counts cannot be saved. Choosing a personal
 leaves demo mode; a late or cancelled demo download cannot replace that selection. The original
 PNG is at `public/img/demos/stash-1440p.png` and is also the offline regression fixture.
 
+### Read-only window capture
+
+**Scan stash window** opens a separate read-only review in browsers that support window sharing.
+The player selects the Tarkov window in the browser picker. The dialog previews it locally
+without audio. **Scan current view** freezes one frame and sends it through the screenshot
+recognition worker. Players can confirm or correct detections and see the same sell advice.
+**Scan another view** clears that review and returns to the live preview using the same share.
+Stopping the share releases the capture while preserving any open review. Closing the dialog
+releases both. Window scans have no progress save step, so rescanning overlapping views
+cannot add duplicate counts.
+
 ### Read-only sell view
 
 The scan review starts with **What can I sell?**. This is scoped to the selected mode,

@@ -3,21 +3,31 @@
     <div class="min-w-0 flex-1 px-3 py-6 sm:px-6">
       <div class="mx-auto max-w-350">
         <slot name="header" />
-        <div class="mb-3 flex justify-end">
+        <div class="mb-3 flex flex-wrap justify-end gap-2">
+          <UButton
+            v-if="canShareWindow"
+            icon="i-mdi-monitor-eye"
+            variant="soft"
+            :disabled="!stashImportReady"
+            @click="stashScan = 'window'"
+          >
+            {{ $t('stash_import.window_title') }}
+          </UButton>
           <UButton
             data-testid="stash-import-open"
             icon="i-mdi-image-search"
             variant="soft"
             :disabled="!stashImportReady"
-            @click="stashImportOpen = true"
+            @click="stashScan = 'screenshot'"
           >
             {{ $t('stash_import.title') }}
           </UButton>
         </div>
         <StashImportDialog
-          v-if="stashImportOpen"
+          v-if="stashScan"
           :needs="allItems"
-          @close="stashImportOpen = false"
+          :window-scan="stashScan === 'window'"
+          @close="stashScan = undefined"
         />
         <NeededItemsFilterBar
           v-model="activeFilter"
@@ -114,7 +124,11 @@
   import { logger } from '@/utils/logger';
   import { perfNow, roundPerfMs } from '@/utils/perf';
   const { t } = useI18n({ useScope: 'global' });
-  const stashImportOpen = ref(false);
+  const stashScan = ref<'screenshot' | 'window'>();
+  const canShareWindow = ref(false);
+  onMounted(() => {
+    canShareWindow.value = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+  });
   const StashImportDialog = defineAsyncComponent(
     () => import('@/features/stash-import/StashImportDialog.vue')
   );
