@@ -33,6 +33,13 @@ const DEFAULT_CHECKPOINT: Checkpoint = {
 };
 export const isSetupImportStep = (step: SetupStep): step is SetupImportStep =>
   setupImportSteps.some((source) => source === step);
+const BACKUP_STEPS: readonly SetupStep[] = ['start', 'backup', 'done'];
+function setupPathForStep(path: SetupPath, step: SetupStep): SetupPath {
+  if (step === 'backup') return 'backup';
+  if (step === 'tarkov-dev') return 'import';
+  if (path === 'backup' && !BACKUP_STEPS.includes(step)) return 'manual';
+  return path;
+}
 export function useSetupCheckpoint() {
   const { $supabase } = useNuxtApp();
   const key = computed(() => `tarkovtracker-setup-v2:${$supabase.user.id ?? 'guest'}`);
@@ -40,12 +47,13 @@ export function useSetupCheckpoint() {
     initOnMounted: true,
     listenToStorageChanges: false,
   });
-  const path = computed<SetupPath>(() =>
-    ALL_SETUP_PATHS.includes(checkpoint.value?.path) ? checkpoint.value.path : 'import'
-  );
   const step = computed<SetupStep>(() =>
     ALL_SETUP_STEPS.includes(checkpoint.value?.step) ? checkpoint.value.step : 'start'
   );
+  const path = computed<SetupPath>(() => {
+    const saved = checkpoint.value?.path;
+    return setupPathForStep(ALL_SETUP_PATHS.includes(saved) ? saved : 'import', step.value);
+  });
   const dismissed = computed(() => checkpoint.value?.dismissed === true);
   const isCompleted = computed(
     () => step.value === 'done' || typeof checkpoint.value?.completedAt === 'number'
@@ -61,15 +69,12 @@ export function useSetupCheckpoint() {
   );
   const needsProfileFallback = computed(() => {
     if (path.value !== 'import') return false;
+    if (step.value === 'profile') return true;
     if (tarkovDevImportedModes.value.length > 0) return false;
-    return (
-      step.value === 'profile' ||
-      outcomes.value['tarkov-dev'] === 'skipped' ||
-      outcomes.value['tarkov-dev'] === 'failed'
-    );
+    return outcomes.value['tarkov-dev'] === 'skipped' || outcomes.value['tarkov-dev'] === 'failed';
   });
   const visibleSteps = computed<readonly SetupStep[]>(() => {
-    if (path.value === 'backup') return ['start', 'backup', 'done'];
+    if (path.value === 'backup') return BACKUP_STEPS;
     if (path.value === 'manual') return ['start', 'profile', 'eft-logs', 'catch-up', 'done'];
     return [
       'start',
@@ -129,6 +134,7 @@ export function useSetupCheckpoint() {
   }
   function go(next: SetupStep, outcome?: SetupOutcome) {
     writeCheckpoint({
+      path: setupPathForStep(path.value, next),
       step: next,
       outcomes: mergeStepOutcome(step.value, outcome),
       completedAt: next === 'done' ? Date.now() : checkpoint.value?.completedAt,

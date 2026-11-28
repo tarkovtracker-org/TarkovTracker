@@ -25,9 +25,6 @@
       </div>
     </div>
     <div class="flex shrink-0 items-center gap-2 self-end sm:self-center">
-      <UButton to="/setup" color="primary" size="sm" icon="i-mdi-arrow-right" trailing>
-        {{ $t(isResuming ? 'setup.resume' : 'setup.dashboard_cta') }}
-      </UButton>
       <UButton
         color="neutral"
         variant="ghost"
@@ -36,6 +33,9 @@
         :aria-label="$t('setup.dashboard_dismiss')"
         @click="dismiss"
       />
+      <UButton to="/setup" color="primary" size="sm" icon="i-mdi-arrow-right" trailing>
+        {{ $t(isResuming ? 'setup.resume' : 'setup.dashboard_cta') }}
+      </UButton>
     </div>
   </section>
 </template>

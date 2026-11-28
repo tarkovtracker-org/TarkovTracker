@@ -46,6 +46,32 @@ describe('useSetupCheckpoint', () => {
     expect(cp.step.value).toBe('done');
     expect(cp.isCompleted.value).toBe(true);
   });
+  it.each([
+    ['tarkov-dev', 'import', 'eft-logs'],
+    ['profile', 'manual', 'eft-logs'],
+    ['eft-logs', 'manual', 'catch-up'],
+    ['catch-up', 'manual', 'done'],
+  ] as const)('continues from %s after finishing a backup restore', (step, path, next) => {
+    const cp = useSetupCheckpoint();
+    cp.selectPath('backup');
+    cp.goNext('imported');
+    cp.go(step);
+    expect(cp.path.value).toBe(path);
+    expect(cp.visibleSteps.value).toContain(step);
+    cp.goNext('imported');
+    expect(cp.step.value).toBe(next);
+    expect(cp.outcomes.value.backup).toBe('imported');
+  });
+  it('keeps a manually opened profile in the stepper after a successful import', () => {
+    const cp = useSetupCheckpoint();
+    cp.selectPath('import');
+    cp.recordTarkovDevImport('pvp', true);
+    cp.go('done');
+    cp.go('profile');
+    expect(cp.visibleSteps.value).toContain('profile');
+    cp.goNext();
+    expect(cp.step.value).toBe('eft-logs');
+  });
   it('supports manual path, dismiss, and restart', () => {
     const cp = useSetupCheckpoint();
     cp.selectPath('manual');

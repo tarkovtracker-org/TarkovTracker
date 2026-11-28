@@ -509,6 +509,7 @@
     "skip_catch_up_finish": "Skip catch-up & finish",
     "profile": {
       "subtitle": "Tell TarkovTracker which mode(s) you play and your basic PMC info so quests and hideout unlocks match your account.",
+      "save_failed": "Your profile changes could not be saved. Your entries are still here. Retry saving to continue.",
       "modes_title": "Which game mode(s) do you play?",
       "modes_hint": "Select one or more modes. Each mode tracks quests, hideout, and level independently.",
       "mode_descriptions": {
@@ -588,7 +589,9 @@
       "title": "Your tracker is configured",
       "subtitle": "Here’s a snapshot of your active setup. You can switch modes or refine progress anytime.",
       "cloud_synced": "Cloud synced",
+      "cloud_unconfirmed": "Cloud save unconfirmed",
       "local_only": "Saved locally",
+      "local_device": "On this device",
       "stat_mode": "Mode",
       "stat_pmc": "PMC",
       "stat_tracked": "Tracked progress",

@@ -1591,6 +1591,31 @@ describe('DataManagementCard', () => {
       { allowStale: true, fresh: false, turnstileToken: null }
     );
   });
+  it('retries and accepts the last requested mode when the pasted profile has a different mode', async () => {
+    const wrapper = createWrapper({ view: 'imports' });
+    const vm = asVm<{
+      tarkovDevProfileUrlInput: string;
+      tarkovDevUrlModes: string[];
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      handleTarkovDevStaleRetry: () => Promise<void>;
+      handleTarkovDevAllowStale: () => Promise<void>;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/regular/8560316';
+    await wrapper.vm.$nextTick();
+    vm.tarkovDevUrlModes = ['pve'];
+    tarkovDevFns.parseProfileUrl.mockResolvedValue(null);
+    await vm.handleTarkovDevProfileUrlSubmit();
+    tarkovDevState.importState.value = 'error';
+    tarkovDevState.importErrorCode.value = 'profile_stale';
+    await vm.handleTarkovDevStaleRetry();
+    await vm.handleTarkovDevAllowStale();
+    const target = 'https://tarkov.dev/players/pve/8560316';
+    expect(tarkovDevFns.parseProfileUrl.mock.calls).toEqual([
+      [target, { fresh: false, turnstileToken: null }],
+      [target, { fresh: true, turnstileToken: null }],
+      [target, { fresh: false, allowStale: true, turnstileToken: null }],
+    ]);
+  });
   it('shows relative updated time in Tarkov.dev preview with full timestamp in tooltip', () => {
     const fiveMinsAgo = Date.now() - 5 * 60_000;
     tarkovDevState.importState.value = 'preview';

@@ -35,8 +35,9 @@
       <SetupProfileStep
         v-else-if="step === 'profile'"
         @back="goBack"
-        @continue="go('eft-logs')"
-        @finish="go('done')"
+        @busy="profileBusy = $event"
+        @continue="advanceAfterProfile('eft-logs')"
+        @finish="advanceAfterProfile('done')"
       />
       <SetupImportStep
         v-else-if="importStep"
@@ -60,8 +61,8 @@
           :key="mode"
           @busy="manualBusy = $event"
           @dirty="manualDirty = $event"
-          @saved="manualSaved = true"
-          @finish-after-failure="go('done')"
+          @saved="onManualSaved"
+          @finish-after-failure="finishAfterFailure"
         />
         <p v-if="manualDirty" class="text-surface-400 text-xs">{{ $t('setup.draft_pending') }}</p>
         <div class="flex flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-4">
@@ -85,7 +86,7 @@
           </UButton>
         </div>
       </template>
-      <SetupReadySummary v-else @jump-to="go" @restart="restartSetup" />
+      <SetupReadySummary v-else :save-result="saveResult" @jump-to="go" @restart="restartSetup" />
     </section>
     <UModal
       v-model:open="leaveConfirmOpen"
@@ -106,6 +107,7 @@
   </div>
 </template>
 <script setup lang="ts">
+  import { useEventListener } from '@vueuse/core';
   import GameModeBadge from '@/components/GameModeBadge.vue';
   import PageHeader from '@/components/ui/PageHeader.vue';
   import { useGameModeSwitch, useGameModeSwitchLock } from '@/composables/useGameModeSwitch';
@@ -120,14 +122,17 @@
   import { useTarkovStore } from '@/stores/useTarkov';
   import { getGameModeLabel, type GameMode } from '@/utils/constants';
   const { t } = useI18n({ useScope: 'global' });
+  const { $supabase } = useNuxtApp();
   const router = useRouter();
   const toast = useToast();
   const tarkov = useTarkovStore();
   const { switchMode } = useGameModeSwitch();
   const mode = computed(() => tarkov.getCurrentGameMode());
+  const profileBusy = ref(false);
   const manualBusy = ref(false);
   const manualDirty = ref(false);
   const manualSaved = ref(false);
+  const saveResult = ref<'unknown' | 'confirmed' | 'unconfirmed'>('unknown');
   const leaveConfirmOpen = ref(false);
   const pendingLeavePath = ref<string | null>(null);
   const allowRouteLeave = ref(false);
@@ -178,14 +183,16 @@
       session.eftLogs.isParsing.value ||
       ['loading', 'parsing', 'preview'].includes(importState.value)
   );
-  const hasBusyWork = computed(
+  const hasBusyImport = computed(
     () =>
       isApplying.value ||
-      manualBusy.value ||
       session.backup.importState.value === 'parsing' ||
       session.eftLogs.isParsing.value
   );
-  const stepperDisabled = computed(() => importBusy.value || manualBlocked.value);
+  const hasBusyWork = computed(() => hasBusyImport.value || profileBusy.value || manualBusy.value);
+  const stepperDisabled = computed(
+    () => importBusy.value || manualBlocked.value || profileBusy.value
+  );
   const stepSubtitle = computed(() => {
     if (importStep.value) return t(`setup.source_help.${importStep.value.replaceAll('-', '_')}`);
     if (step.value === 'profile') return t('setup.profile.subtitle');
@@ -226,6 +233,18 @@
     if (importBusy.value) return;
     go('done', currentImportOutcome());
   }
+  function advanceAfterProfile(next: 'eft-logs' | 'done') {
+    saveResult.value = 'confirmed';
+    go(next);
+  }
+  function onManualSaved() {
+    manualSaved.value = true;
+    saveResult.value = 'confirmed';
+  }
+  function finishAfterFailure() {
+    saveResult.value = 'unconfirmed';
+    go('done');
+  }
   function handleTarkovDevImported(payload: {
     mode: GameMode;
     modes?: GameMode[];
@@ -242,6 +261,7 @@
     session.eftLogs.reset();
     session.tarkovDev.reset();
     manualSaved.value = false;
+    saveResult.value = 'unknown';
     restart();
   }
   function cancelPendingLeave() {
@@ -262,8 +282,10 @@
   });
   watch(
     step,
-    () => {
+    (next) => {
       manualDirty.value = false;
+      profileBusy.value = false;
+      if (next !== 'done') saveResult.value = 'unknown';
       stepHeading.value?.focus();
     },
     { flush: 'post' }
@@ -271,6 +293,12 @@
   watch(mode, () => {
     manualSaved.value = false;
   });
+  watch(
+    () => $supabase.user.id,
+    () => {
+      saveResult.value = 'unknown';
+    }
+  );
   function guardRouteLeave(targetPath: string) {
     if (allowRouteLeave.value) {
       allowRouteLeave.value = false;
@@ -288,4 +316,9 @@
     return true;
   }
   onBeforeRouteLeave((to) => guardRouteLeave(to.fullPath));
+  useEventListener('beforeunload', (event) => {
+    if (!manualDirty.value && !profileBusy.value) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
 </script>

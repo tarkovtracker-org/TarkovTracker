@@ -14,8 +14,13 @@ followed by optional EFT game logs), **Set up manually / Fresh wipe** (mode sele
 game edition, and per-mode faction, level, and PvP/PvE prestige), or **Restore a backup** (which
 jumps straight to the ready summary after restore). If Tarkov.dev is skipped on the import path,
 setup automatically falls back to the manual profile step. The browser remembers the active path,
-step, imported modes, and outcomes per account on that device; import files, previews, and unsaved
-catch-up selections stay in memory and prompt before leaving `/setup`.
+step, imported modes, and outcomes per account on that device. Import files, previews, and unsaved
+catch-up selections stay in memory. Setup warns before leaving the route, closing the tab, or
+reloading with an unsaved catch-up selection. After a backup restore, opening an import from the ready
+summary continues through that import's setup steps.
+
+Profile changes stay open for retry if the selected primary mode fails to load or the save is
+unconfirmed. Retrying a stale Tarkov.dev profile uses the game mode selected for the original request.
 
 Optional quick catch-up organizes manual edits into **Quests**, **Traders**, and **Hideout** tabs.
 Quest search filters to the active mode's PMC faction, supports trader filters and direct Active or
@@ -25,7 +30,8 @@ prerequisites via `describeBlockedHideoutTiers` (including planned quest skill r
 loyalty drafts), displays the exact unmet station, trader, or skill requirements, and offers a
 one-click helper to include missing prerequisite stations. Setup waits for task objectives and
 rewards before saving completed quests or hideout tiers. If a manual save fails, the player can
-retry or confirm continuing to the summary. The ready launchpad summarizes configured progress,
+retry or confirm continuing to the summary, which reports an unconfirmed cloud save when applicable.
+The ready summary shows configured progress,
 offers optional cloud sign-in for guests, and links to Dashboard, Tasks, Needed Items, and
 TarkovMonitor.
 

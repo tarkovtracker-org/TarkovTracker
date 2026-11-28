@@ -17,12 +17,9 @@
             <p class="text-surface-400 text-xs">{{ $t('setup.ready.subtitle') }}</p>
           </div>
         </div>
-        <UBadge :color="isLoggedIn ? 'success' : 'neutral'" variant="subtle" size="sm">
-          <UIcon
-            :name="isLoggedIn ? 'i-mdi-cloud-check-outline' : 'i-mdi-laptop'"
-            class="mr-1 size-3.5"
-          />
-          {{ $t(isLoggedIn ? 'setup.ready.cloud_synced' : 'setup.ready.local_only') }}
+        <UBadge :color="saveBadge.color" variant="subtle" size="sm">
+          <UIcon :name="saveBadge.icon" class="mr-1 size-3.5" />
+          {{ $t(saveBadge.label) }}
         </UBadge>
       </div>
       <dl class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
@@ -162,17 +159,44 @@
 <script setup lang="ts">
   import FactionBadge from '@/components/FactionBadge.vue';
   import GameModeBadge from '@/components/GameModeBadge.vue';
+  import { useProgressSaveStatus } from '@/composables/useProgressSaveStatus';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { GAME_MODES, getGameModeLabel } from '@/utils/constants';
   import { isTaskComplete } from '@/utils/taskStatus';
   import type { SetupStep } from '@/features/setup/useSetupCheckpoint';
+  const props = defineProps<{ saveResult: 'unknown' | 'confirmed' | 'unconfirmed' }>();
   const emit = defineEmits<{ jumpTo: [step: SetupStep]; restart: [] }>();
   const { t } = useI18n({ useScope: 'global' });
   const { $supabase } = useNuxtApp();
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const isLoggedIn = computed(() => Boolean($supabase?.user?.loggedIn));
+  const { cloudPending, locallySaved } = useProgressSaveStatus();
+  const cloudUnconfirmed = computed(
+    () =>
+      props.saveResult === 'unconfirmed' || (props.saveResult === 'unknown' && cloudPending.value)
+  );
+  const saveBadge = computed(() => {
+    if (!isLoggedIn.value) {
+      return {
+        color: 'neutral',
+        icon: 'i-mdi-laptop',
+        label: locallySaved.value ? 'setup.ready.local_only' : 'setup.ready.local_device',
+      } as const;
+    }
+    return cloudUnconfirmed.value
+      ? ({
+          color: 'warning',
+          icon: 'i-mdi-cloud-alert-outline',
+          label: 'setup.ready.cloud_unconfirmed',
+        } as const)
+      : ({
+          color: 'success',
+          icon: 'i-mdi-cloud-check-outline',
+          label: 'setup.ready.cloud_synced',
+        } as const);
+  });
   const mode = computed(() => tarkovStore.getCurrentGameMode());
   const modeData = computed(() => tarkovStore.getCurrentProgressData());
   const faction = computed(() => tarkovStore.getPMCFaction());

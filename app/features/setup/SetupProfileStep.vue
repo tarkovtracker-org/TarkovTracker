@@ -2,117 +2,124 @@
   <form
     class="bg-surface-900/90 space-y-6 rounded-xl border border-white/10 p-5 shadow-sm sm:p-6"
     novalidate
-    @submit.prevent="submit(isFreshStart ? 'finish' : 'continue')"
+    @submit.prevent="submit(retryDestination ?? (isFreshStart ? 'finish' : 'continue'))"
   >
-    <SetupModeSelector
-      :selected-modes="selectedModes"
-      :primary-mode="primaryMode"
-      @toggle="toggleMode"
-      @update-primary="primaryMode = $event"
-    />
-    <div class="h-px bg-white/8" />
-    <section class="max-w-md space-y-2">
-      <label
-        for="setup-game-edition"
-        class="text-surface-100 block cursor-pointer text-sm font-semibold"
-      >
-        {{ $t('common.game_edition') }}
-      </label>
-      <p class="text-surface-400 text-xs">{{ $t('setup.profile.edition_hint') }}</p>
-      <SelectMenuFixed
-        id="setup-game-edition"
-        v-model="selectedEdition"
-        :items="gameEditionOptions"
-        value-key="value"
-        :placeholder="$t('setup.ready.edition_fallback')"
-        class="w-full"
-      >
-        <template #leading>
-          <UIcon name="i-mdi-gift-open" class="text-surface-300 size-4" />
-        </template>
-      </SelectMenuFixed>
-    </section>
-    <div class="h-px bg-white/8" />
-    <section class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div class="space-y-0.5">
-          <h3 class="text-surface-100 text-sm font-semibold">
-            {{ $t('setup.profile.character_title') }}
-          </h3>
-          <p class="text-surface-400 text-xs">{{ $t('setup.profile.character_hint') }}</p>
-        </div>
-        <div v-if="selectedModes.length > 1" class="flex flex-wrap gap-1.5" role="tablist">
-          <UButton
-            v-for="tab in characterModeTabs"
-            :key="tab.mode"
-            type="button"
-            role="tab"
-            size="xs"
-            :aria-selected="tab.active"
-            :color="tab.active ? 'primary' : 'neutral'"
-            :variant="tab.active ? 'solid' : 'soft'"
-            @click="editingMode = tab.mode"
-          >
-            <GameModeBadge :mode="tab.mode" :size="28" class="-my-1" />
-            <span>{{ tab.label }}</span>
-          </UButton>
-        </div>
-      </div>
-      <div class="bg-surface-950/55 grid gap-5 rounded-xl border border-white/8 p-4 sm:grid-cols-2">
-        <div class="space-y-2">
-          <p class="text-surface-200 text-sm font-medium">{{ $t('settings.faction.title') }}</p>
-          <FactionPicker v-model="activeDraft.faction" class="max-w-52" />
-          <p class="text-surface-400 text-xs">{{ $t('setup.profile.faction_hint') }}</p>
-        </div>
-        <UFormField
-          :label="$t('settings.player_level.label')"
-          :help="levelRangeHint"
-          :error="activeLevelError"
-          name="setup-player-level"
+    <fieldset :disabled="submitting" class="min-w-0 space-y-6">
+      <SetupModeSelector
+        :selected-modes="selectedModes"
+        :primary-mode="primaryMode"
+        @toggle="toggleMode"
+        @update-primary="primaryMode = $event"
+      />
+      <div class="h-px bg-white/8" />
+      <section class="max-w-md space-y-2">
+        <label
+          for="setup-game-edition"
+          class="text-surface-100 block cursor-pointer text-sm font-semibold"
         >
-          <UInput
-            v-model="activeDraft.levelText"
-            type="number"
-            inputmode="numeric"
-            step="1"
-            :min="minLevel"
-            :max="maxLevel"
-            class="w-28"
-          />
-        </UFormField>
-        <div v-if="showPrestigeField" class="space-y-2">
-          <label for="setup-prestige-level" class="text-surface-200 block text-sm font-medium">
-            {{ $t('common.prestige') }}
-          </label>
-          <SelectMenuFixed
-            id="setup-prestige-level"
-            v-model="activeDraft.prestigeLevel"
-            :items="prestigeOptions"
-            value-key="value"
-            class="max-w-xs"
+          {{ $t('common.game_edition') }}
+        </label>
+        <p class="text-surface-400 text-xs">{{ $t('setup.profile.edition_hint') }}</p>
+        <SelectMenuFixed
+          id="setup-game-edition"
+          v-model="selectedEdition"
+          :items="gameEditionOptions"
+          value-key="value"
+          :placeholder="$t('setup.ready.edition_fallback')"
+          class="w-full"
+        >
+          <template #leading>
+            <UIcon name="i-mdi-gift-open" class="text-surface-300 size-4" />
+          </template>
+        </SelectMenuFixed>
+      </section>
+      <div class="h-px bg-white/8" />
+      <section class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="space-y-0.5">
+            <h3 class="text-surface-100 text-sm font-semibold">
+              {{ $t('setup.profile.character_title') }}
+            </h3>
+            <p class="text-surface-400 text-xs">{{ $t('setup.profile.character_hint') }}</p>
+          </div>
+          <div v-if="selectedModes.length > 1" class="flex flex-wrap gap-1.5" role="tablist">
+            <UButton
+              v-for="tab in characterModeTabs"
+              :key="tab.mode"
+              type="button"
+              role="tab"
+              size="xs"
+              :aria-selected="tab.active"
+              :color="tab.active ? 'primary' : 'neutral'"
+              :variant="tab.active ? 'solid' : 'soft'"
+              @click="editingMode = tab.mode"
+            >
+              <GameModeBadge :mode="tab.mode" :size="28" class="-my-1" />
+              <span>{{ tab.label }}</span>
+            </UButton>
+          </div>
+        </div>
+        <div
+          class="bg-surface-950/55 grid gap-5 rounded-xl border border-white/8 p-4 sm:grid-cols-2"
+        >
+          <div class="space-y-2">
+            <p class="text-surface-200 text-sm font-medium">{{ $t('settings.faction.title') }}</p>
+            <FactionPicker v-model="activeDraft.faction" class="max-w-52" />
+            <p class="text-surface-400 text-xs">{{ $t('setup.profile.faction_hint') }}</p>
+          </div>
+          <UFormField
+            :label="$t('settings.player_level.label')"
+            :help="levelRangeHint"
+            :error="activeLevelError"
+            name="setup-player-level"
           >
-            <template #leading>
-              <UIcon name="i-mdi-trophy" class="text-warning-400 size-4" />
-            </template>
-          </SelectMenuFixed>
+            <UInput
+              v-model="activeDraft.levelText"
+              type="number"
+              inputmode="numeric"
+              step="1"
+              :min="minLevel"
+              :max="maxLevel"
+              class="w-28"
+            />
+          </UFormField>
+          <div v-if="showPrestigeField" class="space-y-2">
+            <label for="setup-prestige-level" class="text-surface-200 block text-sm font-medium">
+              {{ $t('common.prestige') }}
+            </label>
+            <SelectMenuFixed
+              id="setup-prestige-level"
+              v-model="activeDraft.prestigeLevel"
+              :items="prestigeOptions"
+              value-key="value"
+              class="max-w-xs"
+            >
+              <template #leading>
+                <UIcon name="i-mdi-trophy" class="text-warning-400 size-4" />
+              </template>
+            </SelectMenuFixed>
+          </div>
+          <div class="space-y-2">
+            <label for="setup-display-name" class="text-surface-200 block text-sm font-medium">
+              {{ $t('setup.profile.display_name_label') }}
+            </label>
+            <UInput
+              id="setup-display-name"
+              v-model="activeDraft.displayName"
+              :maxlength="LIMITS.DISPLAY_NAME_MAX_LENGTH"
+              :placeholder="$t('setup.profile.display_name_placeholder')"
+              class="max-w-xs"
+            />
+          </div>
         </div>
-        <div class="space-y-2">
-          <label for="setup-display-name" class="text-surface-200 block text-sm font-medium">
-            {{ $t('setup.profile.display_name_label') }}
-          </label>
-          <UInput
-            id="setup-display-name"
-            v-model="activeDraft.displayName"
-            :maxlength="LIMITS.DISPLAY_NAME_MAX_LENGTH"
-            :placeholder="$t('setup.profile.display_name_placeholder')"
-            class="max-w-xs"
-          />
-        </div>
-      </div>
-      <p v-if="switchModeError" class="text-error-400 text-sm" role="alert">
-        {{ $t(switchModeError) }}
-      </p>
-    </section>
+        <p v-if="switchModeError" class="text-error-400 text-sm" role="alert">
+          {{ $t(switchModeError) }}
+        </p>
+        <p v-else-if="retryDestination" class="text-error-400 text-sm" role="alert">
+          {{ $t('setup.profile.save_failed') }}
+        </p>
+      </section>
+    </fieldset>
     <div class="flex flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-4">
       <UButton
         type="button"
@@ -142,7 +149,7 @@
           :loading="submitting"
           :disabled="submitDisabled"
         >
-          {{ primaryAction.label }}
+          {{ retryDestination ? $t('setup.retry_save') : primaryAction.label }}
         </UButton>
       </div>
     </div>
@@ -154,6 +161,9 @@
   import { useGameModeSwitch } from '@/composables/useGameModeSwitch';
   import { parsePlayerLevel } from '@/composables/usePlayerLevelEditor';
   import SetupModeSelector from '@/features/setup/SetupModeSelector.vue';
+  import { flushActiveProgressWrites } from '@/stores/tarkov/localStorage';
+  import { progressSaveStatus } from '@/stores/tarkov/progressSaveStatus';
+  import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { useTarkovStore } from '@/stores/useTarkov';
   import {
@@ -163,14 +173,17 @@
     type GameMode,
     type PMCFaction,
   } from '@/utils/constants';
+  import { logger } from '@/utils/logger';
   type ModeDraft = {
     faction: PMCFaction;
     levelText: string;
     prestigeLevel: number;
     displayName: string;
   };
-  const emit = defineEmits<{ back: []; continue: []; finish: [] }>();
+  const emit = defineEmits<{ back: []; continue: []; finish: []; busy: [value: boolean] }>();
+  type SubmitDestination = 'continue' | 'finish';
   const { t } = useI18n({ useScope: 'global' });
+  const { $supabase } = useNuxtApp();
   const tarkovStore = useTarkovStore();
   const metadataStore = useMetadataStore();
   const { switchMode, switchModeError } = useGameModeSwitch();
@@ -180,6 +193,13 @@
   const editingMode = ref<GameMode>(initialMode);
   const selectedEdition = ref<number>(tarkovStore.getGameEdition() || 1);
   const submitting = ref(false);
+  const retryDestination = ref<SubmitDestination | null>(null);
+  let active = true;
+  watch(submitting, (value) => emit('busy', value), { flush: 'sync' });
+  onScopeDispose(() => {
+    active = false;
+    if (submitting.value) emit('busy', false);
+  });
   const normalizeFaction = (value: string | undefined): PMCFaction =>
     value === 'BEAR' ? 'BEAR' : 'USEC';
   function readModeDraft(mode: GameMode): ModeDraft {
@@ -280,28 +300,52 @@
       if (trimmedName) state[mode].displayName = trimmedName;
     });
   }
-  async function persistProfileChanges() {
+  async function selectPrimaryMode(): Promise<boolean> {
+    switchModeError.value = '';
+    const target = primaryMode.value;
+    if (tarkovStore.getCurrentGameMode() === target) return true;
+    await switchMode(target);
+    if (tarkovStore.getCurrentGameMode() === target && !switchModeError.value) return true;
+    switchModeError.value ||= 'settings.game_settings.switch_mode_failed';
+    return false;
+  }
+  async function persistProfileChanges(ownsSession: () => boolean): Promise<boolean> {
+    if (!(await selectPrimaryMode()) || !ownsSession()) return false;
     tarkovStore.setGameEdition(selectedEdition.value || 1);
     selectedModes.value.forEach(applySingleModeDraft);
-    if (tarkovStore.getCurrentGameMode() !== primaryMode.value) {
-      await switchMode(primaryMode.value);
-    }
-    await tarkovStore.saveProgressNow();
+    if (progressSaveStatus.local === 'failed') tarkovStore.$persist();
+    const saved = await tarkovStore.saveProgressNow();
+    if (!ownsSession()) return false;
+    await flushActiveProgressWrites();
+    return saved && progressSaveStatus.local !== 'failed';
   }
-  async function submit(destination: 'continue' | 'finish') {
+  async function submit(destination: SubmitDestination) {
     if (submitting.value) return;
     const invalidMode = selectedModes.value.find((mode) => !parsedLevelFor(mode).ok);
     if (invalidMode) {
       editingMode.value = invalidMode;
       return;
     }
+    const ownsGeneration = captureStartupOwnership();
+    const owner = $supabase.user.id;
+    const ownsSession = () => active && ownsGeneration() && $supabase.user.id === owner;
     submitting.value = true;
+    retryDestination.value = null;
     try {
-      await persistProfileChanges();
+      const saved = await persistProfileChanges(ownsSession);
+      if (!ownsSession()) return;
+      if (!saved) {
+        retryDestination.value = destination;
+        return;
+      }
       if (destination === 'finish') emit('finish');
       else emit('continue');
+    } catch (error) {
+      if (!ownsSession()) return;
+      retryDestination.value = destination;
+      logger.error('[Setup] Could not save the profile', error);
     } finally {
-      submitting.value = false;
+      if (active) submitting.value = false;
     }
   }
 </script>

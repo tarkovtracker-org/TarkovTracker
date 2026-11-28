@@ -1196,6 +1196,7 @@
     solved: isTurnstileSolved,
   } = useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
+  const lastTarkovDevSingleUrl = ref<string>();
   const tarkovDevRequestGeneration = ref(0);
   const currentTarkovDevMode = (): GameMode => tarkovStore.getCurrentGameMode();
   const currentImportableMode = (): GameMode => tarkovStore.getCurrentGameMode();
@@ -1476,8 +1477,12 @@
     () =>
       tarkovDevImportState.value === 'error' && tarkovDevImportErrorCode.value === 'profile_stale'
   );
-  const tarkovDevStaleRecoveryUrl = computed(() =>
-    isLinked.value ? tarkovDevProfileUrl.value : tarkovDevProfileUrlInput.value.trim() || undefined
+  const tarkovDevStaleRecoveryUrl = computed(
+    () =>
+      lastTarkovDevSingleUrl.value ??
+      (isLinked.value
+        ? tarkovDevProfileUrl.value
+        : tarkovDevProfileUrlInput.value.trim() || undefined)
   );
   const isTarkovDevRefetchDisabled = computed(
     () =>
@@ -1536,6 +1541,7 @@
   }
   async function fetchTarkovDevProfile(profileUrl: string, fresh = false, allowStale = false) {
     const requestGeneration = ++tarkovDevRequestGeneration.value;
+    lastTarkovDevSingleUrl.value = profileUrl;
     try {
       const verification = await verifyTurnstileToken();
       if (verification.status === 'failed') {
@@ -1559,6 +1565,7 @@
     allowStale = false
   ) {
     const requestGeneration = ++tarkovDevRequestGeneration.value;
+    lastTarkovDevSingleUrl.value = undefined;
     try {
       const verification = await verifyTurnstileToken();
       if (verification.status === 'failed') {
@@ -1647,7 +1654,7 @@
   }
   async function handleTarkovDevPreviewRefetch() {
     try {
-      const profileUrl = tarkovDevProfileUrl.value ?? tarkovDevProfileUrlInput.value;
+      const profileUrl = tarkovDevStaleRecoveryUrl.value;
       if (!profileUrl) return;
       const source = await fetchTarkovDevProfile(profileUrl, true);
       updateTarkovDevImportTarget(source?.mode);
@@ -1723,6 +1730,7 @@
   }
   function resetTarkovDevImport() {
     tarkovDevRequestGeneration.value += 1;
+    lastTarkovDevSingleUrl.value = undefined;
     tarkovDevFixedTargetMode.value = null;
     tarkovDevLinkedReadyToFetch.value = false;
     tarkovDevTurnstileEngaged.value = false;
