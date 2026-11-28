@@ -56,6 +56,10 @@
   const folderInputRef = ref<HTMLInputElement | null>(null);
   const filesInputRef = ref<HTMLInputElement | null>(null);
   const folderButtonRef = ref<{ $el?: HTMLElement } | null>(null);
+  let disposed = false;
+  onScopeDispose(() => {
+    disposed = true;
+  });
   const dragDepth = ref(0);
   const isDragging = computed(() => dragDepth.value > 0 && !props.disabled);
   const dropzoneClass = computed(() =>
@@ -154,7 +158,7 @@
     dragDepth.value = 0;
     if (props.disabled) return;
     const files = await extractDroppedFiles(event.dataTransfer);
-    if (files.length > 0) emit('selectFiles', files);
+    if (!disposed && !props.disabled && files.length > 0) emit('selectFiles', files);
   }
   defineExpose({
     focusFolderButton: () => folderButtonRef.value?.$el?.focus(),

@@ -150,6 +150,7 @@
     playerLevels: ReadonlyArray<{ level: number; exp: number }>;
     editions: ReadonlyArray<{ value: number; title: string }>;
     isImporting: boolean;
+    importBlocked?: boolean;
     refreshDisabled: boolean;
     refreshingMode: GameMode | null;
     formatDate: (timestamp: number) => string;
@@ -177,7 +178,9 @@
     { immediate: true }
   );
   const actionsLocked = computed(() => props.isImporting || props.refreshingMode !== null);
-  const confirmDisabled = computed(() => actionsLocked.value || selectedModes.value.length === 0);
+  const confirmDisabled = computed(
+    () => props.importBlocked || actionsLocked.value || selectedModes.value.length === 0
+  );
   const gridColumnsClass = computed(() => {
     const count = modeRows.value.length;
     if (count >= 3) return 'grid-cols-1 md:grid-cols-3';

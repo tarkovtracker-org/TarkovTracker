@@ -54,6 +54,12 @@
         class="max-w-sm"
       />
     </div>
+    <div v-if="modeSwitchFailed" class="flex flex-wrap items-center gap-2" role="alert">
+      <p class="text-warning text-sm">{{ $t('setup.import_mode_switch_failed') }}</p>
+      <UButton color="warning" variant="soft" @click="emit('retryModeSwitch')">
+        {{ $t('common.retry') }}
+      </UButton>
+    </div>
     <div
       v-if="!previewVisible"
       class="flex flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-4"
@@ -81,7 +87,7 @@
           :color="advanceButtonColor"
           :variant="advanceButtonVariant"
           :trailing-icon="advanceButtonIcon"
-          :disabled="busy"
+          :disabled="busy || advanceDisabled"
           @click="emit('advance')"
         >
           {{ primaryLabel }}
@@ -105,6 +111,8 @@
     sourceImported: boolean;
     previewVisible: boolean;
     busy: boolean;
+    advanceDisabled: boolean;
+    modeSwitchFailed: boolean;
     primaryLabel: string;
   }>();
   const emit = defineEmits<{
@@ -112,6 +120,7 @@
     advance: [];
     finishFromLogs: [];
     editProfile: [];
+    retryModeSwitch: [];
     tarkovDevImported: [payload: { mode: GameMode; modes?: GameMode[]; editionResolved: boolean }];
   }>();
   const { t } = useI18n({ useScope: 'global' });

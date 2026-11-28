@@ -570,6 +570,7 @@
     "hideout_open_traders": "Set trader loyalty",
     "save_changes": "Save changes",
     "retry_save": "Retry saving",
+    "import_mode_switch_failed": "Your progress was imported, but setup could not switch to that game mode. Retry to continue.",
     "save_failed": "Progress could not be saved. You can retry or continue.",
     "leave_failed_save_title": "Continue after a failed save?",
     "leave_failed_save_description": "Unsaved changes may be lost. Cancel to keep your selections and retry.",

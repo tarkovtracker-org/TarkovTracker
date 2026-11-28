@@ -1,3 +1,4 @@
+import { useProgressImportClaim } from '@/composables/useGameModeSwitch';
 import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
@@ -350,6 +351,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
   const preferencesStore = usePreferencesStore();
+  const claimImport = useProgressImportClaim();
   const isImporting = ref(false);
   const importState = ref<EftLogsImportState>('idle');
   const previewData = ref<EftLogsImportPreviewData | null>(null);
@@ -612,29 +614,42 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
     if (!taskSets) return;
     await applySelection(taskSets);
   }
-  async function applySelection(taskSets: ImportTaskSets) {
+  async function applyAndSave(taskSets: ImportTaskSets, ownsSession: () => boolean) {
     const originalMode = tarkovStore.getCurrentGameMode();
+    const applied = await applyAllModeImports(
+      tarkovStore,
+      catalogs,
+      originalMode,
+      taskSets,
+      preferencesStore.getTasksRequireTraderLevels,
+      ownsSession
+    );
+    if (!ownsSession()) return;
+    const failure = await restoreImportMode(
+      tarkovStore,
+      applied.activeMode,
+      originalMode,
+      applied.error
+    );
+    if (failure) throw failure;
+    if (!ownsSession()) return;
+    if (!(await tarkovStore.saveProgressNow())) {
+      throw new Error('Cloud save did not confirm the log import');
+    }
+  }
+  async function applySelection(taskSets: ImportTaskSets) {
+    const releaseImport = claimImport();
+    if (!releaseImport) return;
     const ownsSession = ownsPreview;
     isImporting.value = true;
     try {
-      const applied = await applyAllModeImports(
-        tarkovStore,
-        catalogs,
-        originalMode,
-        taskSets,
-        preferencesStore.getTasksRequireTraderLevels,
-        ownsSession
-      );
-      if (!ownsSession()) return;
-      const failure = await restoreImportMode(
-        tarkovStore,
-        applied.activeMode,
-        originalMode,
-        applied.error
-      );
-      if (ownsSession()) finishImport(failure);
+      await applyAndSave(taskSets, ownsSession);
+      if (ownsSession()) finishImport(null);
+    } catch (error) {
+      if (ownsSession()) finishImport(error);
     } finally {
       isImporting.value = false;
+      releaseImport();
       if (!ownsSession()) reset();
     }
   }

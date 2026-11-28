@@ -73,6 +73,7 @@
             :player-levels="metadataStore.playerLevels"
             :editions="metadataStore.editions"
             :is-importing="tarkovDevIsImporting"
+            :import-blocked="progressImportBlocked"
             :refresh-disabled="
               isTarkovDevProfileUrlLoading || !isTurnstileReady || !isTurnstileSolved
             "
@@ -237,7 +238,7 @@
                 variant="solid"
                 class="flex-1"
                 :loading="tarkovDevIsImporting"
-                :disabled="tarkovDevIsImporting"
+                :disabled="progressImportBlocked"
                 @click="handleTarkovDevConfirm"
               >
                 {{ $t('common.confirm_import') }}
@@ -640,7 +641,7 @@
                 class="flex-1"
                 :loading="eftLogsIsImporting"
                 :disabled="
-                  eftLogsIsImporting ||
+                  progressImportBlocked ||
                   eftLogsHasOutsideSeasonEvents ||
                   !eftLogsEffectiveEvents.length ||
                   eftLogsInvalidDate
@@ -992,6 +993,7 @@
   import FactionBadge from '@/components/FactionBadge.vue';
   import GameModeBadge from '@/components/GameModeBadge.vue';
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import { useProgressImportBlocked } from '@/composables/useGameModeSwitch';
   import { useTurnstileWidget } from '@/composables/useTurnstile';
   import BugReportCard from '@/features/settings/BugReportCard.vue';
   import EftLogDropzone from '@/features/settings/EftLogDropzone.vue';
@@ -1062,6 +1064,7 @@
   const toast = useToast();
   const tarkovStore = useTarkovStore();
   const metadataStore: MetadataStore = useMetadataStore();
+  const progressImportBlocked = useProgressImportBlocked();
   const dataManagementSession = props.session ?? useDataManagementSession();
   const {
     exportProgress,
@@ -1713,20 +1716,17 @@
   async function handleTarkovDevMultiConfirm(selectedModes: GameMode[]) {
     const preview = tarkovDevMultiPreview.value;
     if (!preview || selectedModes.length === 0) return;
-    const editionResolved = selectedModes.some((mode) => {
+    const importedModes = await confirmTarkovDevMultiImport(selectedModes);
+    if (importedModes.length === 0) return;
+    const editionResolved = importedModes.some((mode) => {
       const entry = preview.modes[mode];
       return entry?.status === 'ok' && entry.data.gameEditionGuess !== null;
     });
-    const importedModes = await confirmTarkovDevMultiImport(selectedModes);
-    if (importedModes.length > 0 && tarkovDevImportState.value === 'success') {
+    if (tarkovDevImportState.value === 'success') {
       tarkovDevLinkedReadyToFetch.value = false;
       tarkovDevTurnstileEngaged.value = false;
-      emit('tarkovDevImported', {
-        mode: importedModes[0]!,
-        modes: importedModes,
-        editionResolved,
-      });
     }
+    emit('tarkovDevImported', { mode: importedModes[0]!, modes: importedModes, editionResolved });
   }
   function resetTarkovDevImport() {
     tarkovDevRequestGeneration.value += 1;
@@ -1740,7 +1740,7 @@
   }
   async function handleEftLogsFiles(files: File[]) {
     try {
-      if (files.length === 0) return;
+      if (files.length === 0 || isAnyImportActive.value) return;
       await parseEftLogsFiles(files);
       if (shouldShowEftLogsCleanupHelpToast.value) {
         toast.add({

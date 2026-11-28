@@ -113,7 +113,7 @@
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
-  import { completeTaskForProgress } from '@/utils/taskProgress';
+  import { completeTaskForProgress, recordImpliedStoryObjectives } from '@/utils/taskProgress';
   const emit = defineEmits<{
     busy: [value: boolean];
     dirty: [value: boolean];
@@ -341,14 +341,18 @@
     }
   }
   function applySelectedQuests() {
+    const active = plan.value.active;
     questCompletions.value.forEach((id) =>
       completeTaskForProgress({ store: tarkov, taskId: id, tasksMap: allTasks.value })
     );
-    plan.value.active.forEach((id) => {
-      tarkov.setTaskUncompleted(id);
+    active.forEach((id) => tarkov.setTaskUncompleted(id));
+    const completions = tarkov.getCurrentProgressData().taskCompletions;
+    active.forEach((id) => {
       const task = allTasks.value.get(id);
-      const signature = task && otherRequirementsSignature(task);
+      if (!task) return;
+      const signature = otherRequirementsSignature(task, completions);
       if (signature) tarkov.confirmTaskAvailability(id, signature);
+      recordImpliedStoryObjectives(tarkov, task);
     });
   }
   function applySelectedUpgrades() {

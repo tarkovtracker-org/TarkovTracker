@@ -49,12 +49,15 @@
         :source-imported="sourceImported"
         :preview-visible="isImportPreviewVisible"
         :busy="importBusy"
+        :advance-disabled="importModePending"
+        :mode-switch-failed="importModePending && !switchingImportedMode"
         :primary-label="importPrimaryLabel"
         @back="goBack"
         @advance="advanceImport"
         @finish-from-logs="finishFromLogs"
         @edit-profile="go('profile')"
         @tarkov-dev-imported="handleTarkovDevImported"
+        @retry-mode-switch="switchToImportedMode"
       />
       <template v-else-if="step === 'catch-up'">
         <SetupManualReview
@@ -129,6 +132,8 @@
   const { switchMode } = useGameModeSwitch();
   const mode = computed(() => tarkov.getCurrentGameMode());
   const profileBusy = ref(false);
+  const pendingImportedMode = ref<GameMode | null>(null);
+  const switchingImportedMode = ref(false);
   const manualBusy = ref(false);
   const manualDirty = ref(false);
   const manualSaved = ref(false);
@@ -154,6 +159,9 @@
   const session = useDataManagementSession();
   const stepHeading = useTemplateRef<HTMLElement>('stepHeading');
   const importStep = computed(() => (isSetupImportStep(step.value) ? step.value : null));
+  const importModePending = computed(
+    () => importStep.value === 'tarkov-dev' && pendingImportedMode.value !== null
+  );
   const showHeaderModeBadge = computed(
     () => step.value === 'eft-logs' || step.value === 'catch-up'
   );
@@ -169,7 +177,10 @@
     Boolean(importStep.value && outcomes.value[importStep.value] === 'imported')
   );
   const isApplying = computed(
-    () => session.eftLogs.isImporting.value || session.tarkovDev.isImporting.value
+    () =>
+      session.eftLogs.isImporting.value ||
+      session.tarkovDev.isImporting.value ||
+      switchingImportedMode.value
   );
   const isImportPreviewVisible = computed(
     () =>
@@ -191,7 +202,7 @@
   );
   const hasBusyWork = computed(() => hasBusyImport.value || profileBusy.value || manualBusy.value);
   const stepperDisabled = computed(
-    () => importBusy.value || manualBlocked.value || profileBusy.value
+    () => importBusy.value || importModePending.value || manualBlocked.value || profileBusy.value
   );
   const stepSubtitle = computed(() => {
     if (importStep.value) return t(`setup.source_help.${importStep.value.replaceAll('-', '_')}`);
@@ -209,7 +220,7 @@
   const modeSwitchLocked = useGameModeSwitchLock();
   watchEffect(
     () => {
-      modeSwitchLocked.value = manualBlocked.value || isApplying.value;
+      modeSwitchLocked.value = manualBlocked.value;
     },
     { flush: 'sync' }
   );
@@ -226,7 +237,7 @@
     return importOutcomes[importState.value as keyof typeof importOutcomes] ?? 'skipped';
   }
   function advanceImport() {
-    if (!importStep.value || importBusy.value) return;
+    if (!importStep.value || importBusy.value || importModePending.value) return;
     goNext(currentImportOutcome());
   }
   function finishFromLogs() {
@@ -253,13 +264,25 @@
     const isFirstImport = tarkovDevImportedModes.value.length === 0;
     recordTarkovDevImport(payload.modes ?? payload.mode, payload.editionResolved);
     if (isFirstImport && tarkov.getCurrentGameMode() !== payload.mode) {
-      void switchMode(payload.mode);
+      pendingImportedMode.value = payload.mode;
+      void switchToImportedMode();
+    }
+  }
+  async function switchToImportedMode() {
+    const target = pendingImportedMode.value;
+    if (!target || switchingImportedMode.value) return;
+    switchingImportedMode.value = true;
+    try {
+      if (await switchMode(target, true)) pendingImportedMode.value = null;
+    } finally {
+      switchingImportedMode.value = false;
     }
   }
   function restartSetup() {
     session.backup.resetImport();
     session.eftLogs.reset();
     session.tarkovDev.reset();
+    pendingImportedMode.value = null;
     manualSaved.value = false;
     saveResult.value = 'unknown';
     restart();
@@ -297,6 +320,7 @@
     () => $supabase.user.id,
     () => {
       saveResult.value = 'unknown';
+      pendingImportedMode.value = null;
     }
   );
   function guardRouteLeave(targetPath: string) {

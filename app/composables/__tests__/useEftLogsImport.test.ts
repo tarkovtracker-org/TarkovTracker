@@ -31,6 +31,7 @@ const tarkovStore = {
   confirmTaskAvailability: vi.fn(),
   isStoryObjectiveComplete: vi.fn(() => false),
   setStoryObjectiveComplete: vi.fn(),
+  saveProgressNow: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
   switchGameMode: vi.fn(async (_mode: GameMode) => undefined),
 };
 const mockLogger = {
@@ -133,6 +134,19 @@ describe('useEftLogsImport', () => {
     tarkovStore.getCurrentGameMode.mockReturnValue('pvp');
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStore.switchGameMode.mockImplementation(async () => undefined);
+  });
+  it('waits for cloud acknowledgement and reports a rejected log save', async () => {
+    const save = Promise.withResolvers<boolean>();
+    tarkovStore.saveProgressNow.mockReturnValueOnce(save.promise);
+    const importer = await loadComposable();
+    await importer.parseFile(new File([completionLog()], 'notifications.log'));
+    const pending = importer.confirmImport('pvp');
+    await vi.waitFor(() => expect(tarkovStore.saveProgressNow).toHaveBeenCalledOnce());
+    expect(importer.isImporting.value).toBe(true);
+    expect(importer.importState.value).toBe('preview');
+    save.resolve(false);
+    await pending;
+    expect(importer.importState.value).toBe('error');
   });
   it('discards results from a log read that outlives its progress owner', async () => {
     const importer = await loadComposable();
