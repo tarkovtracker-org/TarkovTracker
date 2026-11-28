@@ -41,7 +41,6 @@ const createTarkovStore = (options: {
     getTraderLevel: vi.fn((traderId: string) => options.traderLevels?.[traderId] ?? 1),
     setTraderLevel: vi.fn(),
     getTraderReputation: vi.fn((traderId: string) => options.traderReputations?.[traderId] ?? 0),
-    setTraderReputation: vi.fn(),
     correctTraderReputation: vi.fn(),
     isTaskComplete: vi.fn((taskId: string) => {
       if (typeof options.isTaskComplete === 'function') {
@@ -601,7 +600,7 @@ describe('useTaskActions', () => {
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(task.id);
     expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
     expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
+    expect(tarkovStore.correctTraderReputation).not.toHaveBeenCalled();
     expect(tarkovStore.setLevel).not.toHaveBeenCalled();
   });
   it('marks the Fence-gated Is This a Reference task available', async () => {
@@ -691,8 +690,7 @@ describe('useTaskActions', () => {
       traders: [{ id: fenceId, name: 'Fence', normalizedName: 'fence' }],
     });
     actions.markTaskAvailable();
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalledWith(praporId, expect.any(Number));
+    expect(tarkovStore.correctTraderReputation).not.toHaveBeenCalled();
   });
   it('does not backfill trader requirements when gating is disabled', async () => {
     const fenceId = '579dc571d53a0658a154fbec';
@@ -723,7 +721,7 @@ describe('useTaskActions', () => {
     );
     actions.markTaskAvailable();
     expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
+    expect(tarkovStore.correctTraderReputation).not.toHaveBeenCalled();
   });
   it('marks a task failed and invokes onAction', async () => {
     const task: Task = {

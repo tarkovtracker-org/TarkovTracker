@@ -150,15 +150,7 @@ export function useTaskActions(
   };
   const ensureTraderRequirements = (currentTask: Task) => {
     if (!preferencesStore.getTasksRequireTraderLevels) return;
-    applyTaskTraderRequirements({
-      store: {
-        getTraderLevel: tarkovStore.getTraderLevel,
-        getTraderReputation: tarkovStore.getTraderReputation,
-        setTraderLevel: tarkovStore.setTraderLevel,
-        setTraderReputation: tarkovStore.correctTraderReputation,
-      },
-      task: currentTask,
-    });
+    applyTaskTraderRequirements({ store: tarkovStore, task: currentTask });
   };
   const isTaskManuallyFailed = (taskId: string) => {
     const completion = tarkovStore.getCurrentProgressData().taskCompletions?.[taskId];

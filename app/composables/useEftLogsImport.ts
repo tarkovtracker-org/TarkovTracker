@@ -180,13 +180,13 @@ const applyCompletedImports = (
 ) => {
   const processedCompleted = new Set<string>();
   const processedFailed = new Set<string>();
-  const completeTask = (taskId: string) => {
+  const completeTask = (taskId: string, latestPossibleCompletion?: number) => {
     const task = tasksMap.get(taskId);
     if (!task) return;
     if (processedCompleted.has(taskId) || explicitOtherStates.has(taskId)) return;
     recordImpliedStoryObjectives(store, task);
     completeTaskForProgress({ store, taskId, tasksMap });
-    const observedAt = completedAt.get(taskId);
+    const observedAt = completedAt.get(taskId) ?? latestPossibleCompletion;
     if (observedAt !== undefined) store.recordEftQuestCompletionTime(taskId, observedAt);
     processedCompleted.add(taskId);
   };
@@ -199,14 +199,18 @@ const applyCompletedImports = (
     failTaskForProgress({ store, taskId, tasksMap });
     processedFailed.add(taskId);
   };
-  for (const taskId of completedTaskIds) {
+  const datedFirst = [...completedTaskIds].toSorted(
+    (left, right) => (completedAt.get(left) ?? Infinity) - (completedAt.get(right) ?? Infinity)
+  );
+  for (const taskId of datedFirst) {
     const task = tasksMap.get(taskId);
+    const observedAt = completedAt.get(taskId);
     if (task) {
       applyTaskAvailabilityRequirements({
         getCompletion: (id) => store.getCurrentProgressData().taskCompletions?.[id],
         // A completion log does not identify which OR route the player used.
         skipTaskRequirements: Boolean(task.storyUnlocks?.length),
-        onCompleteRequirement: completeTask,
+        onCompleteRequirement: (id) => completeTask(id, observedAt),
         onFailRequirement: failTask,
         task,
       });

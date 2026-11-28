@@ -375,7 +375,8 @@ Explicit failure notifications use the persistent manual-failure flag so automat
 discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
 are preserved. Inferred prerequisite completions only write task IDs present in the destination
 catalog; explicit imported completion states remain authoritative. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
-Recovered quest completions contribute signed quest reputation, but the import does not persist
+Recovered quest completions contribute signed quest reputation. Inferred prerequisites use the
+dated completion that proves them as their latest possible completion time. The import does not persist
 player level or trader standing inferred from a quest's starting requirements.
 All destination catalogs are loaded before mutations, without changing the active metadata store.
 An explicit completion notification can also recover a catalog-missing task whose exact ID is

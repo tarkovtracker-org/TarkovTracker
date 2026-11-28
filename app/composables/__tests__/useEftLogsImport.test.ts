@@ -15,7 +15,7 @@ const tarkovStore = {
   getTraderLevel: vi.fn(() => 1),
   getTraderReputation: vi.fn(() => 0),
   setTraderLevel: vi.fn(),
-  setTraderReputation: vi.fn(),
+  correctTraderReputation: vi.fn(),
   getObjectiveCount: vi.fn(() => 0),
   getCurrentGameMode: vi.fn<() => GameMode>(() => 'pvp'),
   getCurrentProgressData: vi.fn(() => ({ taskCompletions: {} })),
@@ -600,6 +600,15 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskComplete).toHaveBeenNthCalledWith(2, completedTaskId);
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(2);
     expect(tarkovStore.setTaskObjectiveComplete).toHaveBeenCalledWith('obj-prerequisite');
+    const completionTime = Date.parse('2026-02-21T10:14:24.222Z');
+    expect(tarkovStore.recordEftQuestCompletionTime).toHaveBeenCalledWith(
+      prerequisiteTaskId,
+      completionTime
+    );
+    expect(tarkovStore.recordEftQuestCompletionTime).toHaveBeenCalledWith(
+      completedTaskId,
+      completionTime
+    );
     expect(tarkovStore.setObjectiveCount).toHaveBeenCalledWith('obj-prerequisite', 2);
     expect(composable.importState.value).toBe('success');
   });
@@ -1137,7 +1146,7 @@ describe('missing configured trader-unlock recovery', () => {
         tarkovStore.setTaskUncompleted,
         tarkovStore.setLevel,
         tarkovStore.setTraderLevel,
-        tarkovStore.setTraderReputation,
+        tarkovStore.correctTraderReputation,
         tarkovStore.setStoryObjectiveComplete,
       ])
         expect(method).not.toHaveBeenCalled();
@@ -1298,7 +1307,7 @@ describe('standing during import', () => {
     expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
     expect(tarkovStore.setLevel).not.toHaveBeenCalled();
     expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
+    expect(tarkovStore.correctTraderReputation).not.toHaveBeenCalled();
     expect(current).toBe('pvp');
   });
 });

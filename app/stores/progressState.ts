@@ -306,19 +306,20 @@ const setTaskStatus = (state: UserState, taskId: string, completion: TaskComplet
   }
   updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
 };
-type TraderReputationOptions = { manual: boolean; questRewardTracking?: 'paused' | 'new-only' };
+type QuestRewardTracking = NonNullable<
+  UserProgressData['traders'][string]['reputationCheckpoint']
+>['questRewardTracking'];
 const buildReputationCheckpoint = (
   progress: UserProgressData,
   existing: UserProgressData['traders'][string] | undefined,
-  options: TraderReputationOptions
+  tracking: QuestRewardTracking
 ) => {
-  const questRewardTracking =
-    options.questRewardTracking ?? existing?.reputationCheckpoint?.questRewardTracking;
+  const questRewardTracking = tracking ?? existing?.reputationCheckpoint?.questRewardTracking;
   const excludedHistoricalTaskIds = excludedHistoricalTraderQuestIds(progress);
   return {
     completedTaskIds: completedTraderQuestIds(progress),
     timestamp: nextClock(existing?.reputationCheckpoint?.timestamp ?? 0),
-    ...(options.manual ? { manual: true } : {}),
+    manual: true,
     ...(questRewardTracking ? { questRewardTracking } : {}),
     ...(excludedHistoricalTaskIds.length ? { excludedHistoricalTaskIds } : {}),
   };
@@ -327,7 +328,7 @@ const setTraderReputation = (
   state: UserState,
   traderId: string,
   reputation: number,
-  options: TraderReputationOptions
+  tracking?: QuestRewardTracking
 ) => {
   const progress = getCurrentData(state);
   const existing = progress.traders[traderId];
@@ -335,7 +336,7 @@ const setTraderReputation = (
     ...(existing ? {} : { automaticLoyalty: true }),
     level: existing?.level ?? 1,
     reputation,
-    reputationCheckpoint: buildReputationCheckpoint(progress, existing, options),
+    reputationCheckpoint: buildReputationCheckpoint(progress, existing, tracking),
   });
 };
 const setTraderLoyalty = (
@@ -511,14 +512,8 @@ export const actions = {
   setTraderLoyaltyAuto(this: UserState, traderId: string) {
     setTraderLoyalty(this, traderId, getCurrentData(this).traders[traderId]?.level ?? 1, true);
   },
-  setTraderReputation(this: UserState, traderId: string, reputation: number) {
-    const progress = getCurrentData(this);
-    checkpointLegacyTraderStanding(progress);
-    if (progress.traders[traderId]?.reputationCheckpoint?.manual) return;
-    setTraderReputation(this, traderId, reputation, { manual: false });
-  },
   correctTraderReputation(this: UserState, traderId: string, reputation: number) {
-    setTraderReputation(this, traderId, reputation, { manual: true });
+    setTraderReputation(this, traderId, reputation);
   },
   setQuestReputationTracking(
     this: UserState,
@@ -526,10 +521,7 @@ export const actions = {
     reputation: number,
     trackRewards: boolean
   ) {
-    setTraderReputation(this, traderId, reputation, {
-      manual: true,
-      questRewardTracking: trackRewards ? 'new-only' : 'paused',
-    });
+    setTraderReputation(this, traderId, reputation, trackRewards ? 'new-only' : 'paused');
   },
   setSkillLevel(this: UserState, skillName: string, level: number) {
     const currentData = getCurrentData(this);

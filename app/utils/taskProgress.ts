@@ -39,7 +39,7 @@ type TaskTraderProgressStore = {
   getTraderLevel: (traderId: string) => number;
   getTraderReputation: (traderId: string) => number;
   setTraderLevel: (traderId: string, level: number) => void;
-  setTraderReputation: (traderId: string, reputation: number) => void;
+  correctTraderReputation: (traderId: string, reputation: number) => void;
 };
 const getPositiveObjectiveCount = (objective: TaskObjective) => {
   const count = objective.count ?? 0;
@@ -164,7 +164,7 @@ const applyTraderMinimum = (
   // Standing has no declared increment; do not invent a value above a strict bound.
   if (requirement.compareMethod === '>') return;
   if (store.getTraderReputation(requirement.trader.id) < requirement.value)
-    store.setTraderReputation(requirement.trader.id, requirement.value);
+    store.correctTraderReputation(requirement.trader.id, requirement.value);
 };
 export type StoryObjectiveRef = { chapterId: string; objectiveId: string };
 type StoryObjectiveStore = {

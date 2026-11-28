@@ -169,7 +169,6 @@ describe('effective trader standing', () => {
     state.pvp.traders = sanitizeTraderMap(state.pvp.traders);
     state.pvp = mergeProgressData(state.pvp, earlier);
     actions.setTaskComplete.call(state, 'quest-a');
-    actions.setTraderReputation.call(state, 'prapor', 1);
     expect(effectiveTraderStanding(state.pvp, catalog).prapor?.reputation).toBe(0.25);
     actions.setTaskComplete.call(state, 'quest-c');
     expect(effectiveTraderStanding(state.pvp, catalog).prapor?.reputation).toBe(0.2);
