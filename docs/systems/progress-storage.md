@@ -124,10 +124,10 @@ retained device recovery copies are not rewritten or discarded by import.
   the accepted normalized-client protocol is retired.
 - Task completions preserve explicit `active` through local persistence, sync, realtime and sharing.
   Complete, failed and neutral writes clear acceptance. Missing legacy values remain unknown.
-  A same-epoch full save retains an accepted task it omits and keeps newer stored acceptance
-  when an incoming status write is older. An equal-clock legacy entry retains the existing flag,
-  and newer status writes or reset epochs keep their precedence. The forward merge also preserves
-  saved-level guards, activity epochs and availability confirmations.
+  Same-epoch full saves retain omitted unfinished tasks with known acceptance. An older status
+  write carrying acceptance keeps the newer stored status. An equal-clock legacy entry retains
+  the existing flag. Newer status writes and reset epochs keep their precedence. The forward merge
+  also preserves saved-level guards, activity epochs and availability confirmations.
 - API history allows `active`, `completed`, `failed` and `uncompleted`. Keep the first 20
   valid task updates in input order and report the original `taskCount` if truncated. The
   database preserves a higher stored count for the same ID/timestamp. Keep app, API and SQL

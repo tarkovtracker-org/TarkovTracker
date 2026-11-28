@@ -10,9 +10,12 @@ import {
 import { ACTIVE_SEASON_NUMBER, TASK_ID_REGISTRY } from '@/utils/constants';
 import {
   hasImportedAcceptance,
+  hasManualAcceptance,
   importedAcceptanceSignature,
 } from '@/utils/shiftingBalanceAcceptance';
 import { MAX_CONFIRMATION_TIMESTAMP } from '@/utils/taskAvailabilityConfirmation';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
+import type { Task } from '@/types/tarkov';
 const createBaseState = (): UserState =>
   ({
     currentGameMode: 'pvp',
@@ -112,6 +115,41 @@ describe('progressState task lifecycle', () => {
     actions.setTaskActive.call(state, id);
     expect(hasEvidence()).toBe(false);
   });
+  it.each([
+    { action: 'accept', prior: undefined, apply: actions.setTaskActive },
+    { action: 'undo', prior: true, apply: actions.setTaskAcceptanceUnknown },
+  ])(
+    'preserves the manual Jaeger observation through $action without reviving it after reset',
+    ({ prior, apply }) => {
+      const id = TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT;
+      const dependent: Task = {
+        id: TASK_ID_REGISTRY.PRESERVE_A_VALUABLE_PIECE,
+        taskRequirements: [{ task: { id }, status: ['active'] }],
+        otherRequirements: [{ type: 'dialogue', id: 'other-gate', traders: ['jaeger'] }],
+      };
+      const state = createBaseState();
+      const completions = state.pvp.taskCompletions;
+      completions[id] = { complete: false, timestamp: 1000, ...(prior && { active: prior }) };
+      const signature = () => otherRequirementsSignature(dependent, completions)!;
+      state.pvp.taskAvailability = {
+        [dependent.id]: { timestamp: 1000, requirements: signature() },
+      };
+      const hasEvidence = () =>
+        hasManualAcceptance(
+          dependent.id,
+          id,
+          { completions, confirmations: state.pvp.taskAvailability },
+          signature()
+        );
+      expect(hasEvidence()).toBe(true);
+      apply.call(state, id);
+      expect(hasEvidence()).toBe(true);
+      actions.setTaskUncompleted.call(state, id);
+      expect(hasEvidence()).toBe(false);
+      actions.setTaskActive.call(state, id);
+      expect(hasEvidence()).toBe(false);
+    }
+  );
   it.each([
     { previous: 5000, confirmation: undefined, expected: 5001 },
     { previous: 9000, confirmation: 8000, expected: 9001 },

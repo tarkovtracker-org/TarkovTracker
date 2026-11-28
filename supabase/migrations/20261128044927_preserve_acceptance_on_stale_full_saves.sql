@@ -17,21 +17,23 @@ BEGIN
     tasks := '{}'::jsonb;
   END IF;
 
-  WITH known_tasks AS (
+  WITH task_rows AS (
     SELECT key AS id, value AS old_entry, tasks->key AS new_entry
     FROM jsonb_each(old_tasks)
-    WHERE jsonb_typeof(value->'active') = 'boolean'
   ), task_clocks AS (
     SELECT *,
       CASE WHEN jsonb_typeof(old_entry->'timestamp') = 'number'
         THEN (old_entry->>'timestamp')::numeric ELSE 0 END AS old_timestamp,
       CASE WHEN jsonb_typeof(new_entry->'timestamp') = 'number'
         THEN (new_entry->>'timestamp')::numeric ELSE 0 END AS new_timestamp
-    FROM known_tasks
+    FROM task_rows
+    WHERE jsonb_typeof(old_entry) = 'object'
+      AND (jsonb_typeof(old_entry->'active') = 'boolean'
+        OR jsonb_typeof(new_entry->'active') = 'boolean')
   ), reconciled AS (
     SELECT id, CASE
       WHEN jsonb_typeof(new_entry) IS DISTINCT FROM 'object' THEN
-        CASE WHEN old_entry->'active' = 'true'::jsonb
+        CASE WHEN jsonb_typeof(old_entry->'active') = 'boolean'
           AND old_entry->'complete' IS DISTINCT FROM 'true'::jsonb
           AND old_entry->'failed' IS DISTINCT FROM 'true'::jsonb
           THEN old_entry END

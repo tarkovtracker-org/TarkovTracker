@@ -29,6 +29,7 @@ import {
 import {
   hasImportedAcceptance,
   importedAcceptanceSignature,
+  rebaseManualAcceptance,
 } from '@/utils/shiftingBalanceAcceptance';
 import { nextClock, taskStatusTimestamp } from '@/utils/taskAvailabilityConfirmation';
 import {
@@ -303,6 +304,19 @@ const getImportedAcceptance = (data: UserProgressData, taskId: string) => {
   )
     return signature;
 };
+const carryManualAcceptance = (state: UserState, taskId: string, previous: RawTaskCompletion) => {
+  if (taskId !== TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT) return;
+  const data = getCurrentData(state);
+  const dependent = TASK_ID_REGISTRY.PRESERVE_A_VALUABLE_PIECE;
+  const requirements = rebaseManualAcceptance(
+    data.taskAvailability?.[dependent],
+    data.taskCompletions[dependent],
+    taskId,
+    previous,
+    data.taskCompletions[taskId]
+  );
+  if (requirements) setAvailabilityConfirmation(state, dependent, requirements);
+};
 /** Status changes must follow the earlier task/Undo clock and retire live confirmations. */
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
   const data = getCurrentData(state);
@@ -405,9 +419,12 @@ export const actions = {
     setTaskStatus(this, taskId, createCompletion(true, false, false, false));
   },
   setTaskActive(this: UserState, taskId: string) {
-    const importedAcceptance = getImportedAcceptance(getCurrentData(this), taskId);
+    const data = getCurrentData(this);
+    const previous = data.taskCompletions[taskId];
+    const importedAcceptance = getImportedAcceptance(data, taskId);
     setTaskStatus(this, taskId, createCompletion(false, false, true, false));
     if (importedAcceptance) setAvailabilityConfirmation(this, taskId, importedAcceptance);
+    carryManualAcceptance(this, taskId, previous);
   },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
     setTaskStatus(this, taskId, createCompletion(true, true, false, failOptions?.manual));
@@ -425,6 +442,7 @@ export const actions = {
     // Replace atomically so sync observers never see an intermediate active: false.
     data.taskCompletions[taskId] = restored;
     if (importedAcceptance) setAvailabilityConfirmation(this, taskId, importedAcceptance);
+    carryManualAcceptance(this, taskId, previous);
   },
   setTaskUncompleted(this: UserState, taskId: string) {
     setTaskStatus(this, taskId, createCompletion(false, false, false, false));

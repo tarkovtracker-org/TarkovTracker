@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(43);
+SELECT plan(45);
 CREATE TEMP TABLE active_fixture AS SELECT
   '{"progressEpoch":0,"taskCompletions":{"accepted":{"complete":false,"failed":false,"active":true,"timestamp":100},"inactive":{"complete":false,"failed":false,"active":false,"timestamp":100}}}'::jsonb AS existing;
 SELECT is(public.merge_manual_activity_progress(existing,
@@ -56,12 +56,22 @@ SELECT is(public.merge_manual_activity_progress(existing,
   '{"taskCompletions":{"unrelated":{"complete":true,"timestamp":200}}}'::jsonb
 )->'taskCompletions', jsonb_build_object(
   'accepted', existing->'taskCompletions'->'accepted',
+  'inactive', existing->'taskCompletions'->'inactive',
   'unrelated', '{"complete":true,"timestamp":200}'::jsonb
 ), 'same-epoch save preserves an omitted accepted task and keeps the incoming task') FROM active_fixture;
 SELECT is(public.merge_manual_activity_progress(existing,
   '{"level":2}'::jsonb
 )->'taskCompletions'->'accepted', existing->'taskCompletions'->'accepted',
   'same-epoch save preserves acceptance when the task map is absent') FROM active_fixture;
+SELECT is(public.merge_manual_activity_progress(existing,
+  '{"taskCompletions":{}}'::jsonb
+)->'taskCompletions'->'inactive', existing->'taskCompletions'->'inactive',
+  'omitting a task cannot erase its explicit inactive state') FROM active_fixture;
+SELECT is(public.merge_manual_activity_progress(
+  '{"taskCompletions":{"undone":{"complete":false,"failed":false,"timestamp":110}}}'::jsonb,
+  '{"taskCompletions":{"undone":{"complete":false,"active":true,"timestamp":100}}}'::jsonb
+)->'taskCompletions'->'undone', '{"complete":false,"failed":false,"timestamp":110}'::jsonb,
+  'an older explicit acceptance cannot overwrite a newer Undo with unknown acceptance');
 SELECT is(public.merge_manual_activity_progress(existing,
   '{"taskCompletions":{"accepted":{"complete":false,"active":false,"timestamp":90}}}'::jsonb
 )->'taskCompletions'->'accepted', existing->'taskCompletions'->'accepted',
