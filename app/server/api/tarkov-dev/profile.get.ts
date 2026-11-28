@@ -20,8 +20,12 @@ import {
 } from '@/server/utils/sharedEdgeStore';
 import { verifyTurnstileToken } from '@/server/utils/turnstile';
 import { TARKOVTRACKER_USER_AGENT } from '@/server/utils/userAgent';
+import { isGameMode, type GameMode } from '@/utils/constants';
 import { validateTarkovDevProfile } from '@/utils/tarkovDevProfileParser';
-import { resolveTarkovDevProfileSource } from '@/utils/tarkovDevProfileSource';
+import {
+  buildTarkovDevProfileSource,
+  resolveTarkovDevProfileSource,
+} from '@/utils/tarkovDevProfileSource';
 import { TURNSTILE_TEST_SECRET_KEY } from '@/utils/turnstileKeys';
 import type { ApiProtectionConfig } from '@/server/middleware/api-protection';
 import type { H3Event } from 'h3';
@@ -107,8 +111,12 @@ function readUpdatedAt(body: unknown): number | null {
   const updated = (body as { updated?: unknown }).updated;
   return typeof updated === 'number' && Number.isFinite(updated) && updated > 0 ? updated : null;
 }
-function enforceProfileFreshness(body: unknown, maxUpdatedAgeDays: number): void {
-  if (maxUpdatedAgeDays <= 0) return;
+function enforceProfileFreshness(
+  body: unknown,
+  maxUpdatedAgeDays: number,
+  allowStale = false
+): void {
+  if (allowStale || maxUpdatedAgeDays <= 0) return;
   const updatedAt = readUpdatedAt(body);
   if (updatedAt === null) return;
   const ageMs = Date.now() - updatedAt;
@@ -194,6 +202,292 @@ function resolveAllowedTurnstileHostnames(appUrl: unknown, secretKey: string): s
     return ['tarkovtracker.org'];
   }
 }
+async function enforceProfileRequestGuards(params: {
+  appUrl: unknown;
+  clientIdentifier: string;
+  event: H3Event;
+  rateLimitPerHour: number;
+  rateLimitPerMinute: number;
+  sharedCacheHandle: SharedCacheHandle;
+  turnstileSecretKey: string;
+}): Promise<void> {
+  const {
+    appUrl,
+    clientIdentifier,
+    event,
+    rateLimitPerHour,
+    rateLimitPerMinute,
+    sharedCacheHandle,
+    turnstileSecretKey,
+  } = params;
+  const rateLimitKey = `profile:ip:${clientIdentifier}`;
+  if (turnstileSecretKey) {
+    const verificationLimit = await consumeRateLimit(
+      sharedCacheHandle,
+      PROFILE_VERIFICATION_RATE_LIMIT_PREFIX,
+      rateLimitKey,
+      rateLimitPerMinute,
+      MINUTE_MS
+    );
+    if (!verificationLimit.allowed) {
+      throw createRateLimitError(event, verificationLimit.resetAt, MINUTE_MS);
+    }
+    const verification = await verifyTurnstileToken({
+      secretKey: turnstileSecretKey,
+      token: getRequestHeader(event, 'x-turnstile-token'),
+      allowedHostnames: resolveAllowedTurnstileHostnames(appUrl, turnstileSecretKey),
+      remoteIp: clientIdentifier === 'unknown' ? null : clientIdentifier,
+    });
+    if (!verification.ok) {
+      logger.warn('Tarkov.dev profile request failed Turnstile verification', {
+        reason: verification.reason,
+      });
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Verification failed. Reload the page and try again.',
+        data: { code: 'turnstile_failed' },
+      });
+    }
+  } else {
+    const minuteLimit = await consumeRateLimit(
+      sharedCacheHandle,
+      PROFILE_RATE_LIMIT_PREFIX,
+      rateLimitKey,
+      rateLimitPerMinute,
+      MINUTE_MS
+    );
+    if (!minuteLimit.allowed) {
+      throw createRateLimitError(event, minuteLimit.resetAt, MINUTE_MS);
+    }
+  }
+  const hourlyLimit = await consumeRateLimit(
+    sharedCacheHandle,
+    PROFILE_HOURLY_RATE_LIMIT_PREFIX,
+    rateLimitKey,
+    rateLimitPerHour,
+    HOUR_MS
+  );
+  if (!hourlyLimit.allowed) {
+    throw createRateLimitError(event, hourlyLimit.resetAt, HOUR_MS);
+  }
+}
+async function fetchUpstreamProfileResponse(
+  profileJsonUrl: string,
+  etag: string | null | undefined
+): Promise<Response> {
+  const upstreamHeaders: Record<string, string> = {
+    accept: 'application/json',
+    'user-agent': TARKOVTRACKER_USER_AGENT,
+  };
+  if (etag) {
+    upstreamHeaders['if-none-match'] = etag;
+  }
+  try {
+    return await fetch(profileJsonUrl, {
+      headers: upstreamHeaders,
+      signal: AbortSignal.timeout(PROFILE_FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    logger.error('Tarkov.dev profile fetch failed', {
+      error: readErrorForLog(error),
+      profileJsonUrl,
+      statusCode: isAbortError(error) ? 504 : 502,
+    });
+    throw createProfileFetchError(isAbortError(error) ? 504 : 502);
+  }
+}
+async function parseAndValidateProfileResponse(
+  response: Response,
+  profileJsonUrl: string
+): Promise<unknown> {
+  let body: unknown;
+  try {
+    body = (await response.json()) as unknown;
+  } catch (error) {
+    logger.error('Tarkov.dev profile JSON parse failed', {
+      error: readErrorForLog(error),
+      profileJsonUrl,
+      status: response.status,
+    });
+    throw createProfileFetchError();
+  }
+  if (!validateTarkovDevProfile(body)) {
+    logger.error('Tarkov.dev profile returned an invalid payload', {
+      profileJsonUrl,
+      status: response.status,
+    });
+    throw createProfileFetchError();
+  }
+  return body;
+}
+type MultiModeProfileEntry =
+  | { status: 'ok'; profile: unknown }
+  | { status: 'stale'; ageDays: number; maxUpdatedAgeDays: number; updatedAt: number }
+  | { status: 'not_found' }
+  | { status: 'error' };
+function parseRequestedModes(raw: string): GameMode[] | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const parts = trimmed
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return [];
+  const unique: GameMode[] = [];
+  for (const part of parts) {
+    if (!isGameMode(part)) return [];
+    if (!unique.includes(part)) unique.push(part);
+  }
+  return unique;
+}
+async function handleUpstreamProfileResponse(params: {
+  allowStale: boolean;
+  cached: CachedProfileEntry | null;
+  cacheTtlMs: number;
+  maxUpdatedAgeDays: number;
+  profileJsonUrl: string;
+  response: Response;
+  sharedCacheHandle: SharedCacheHandle;
+}): Promise<unknown> {
+  const {
+    allowStale,
+    cached,
+    cacheTtlMs,
+    maxUpdatedAgeDays,
+    profileJsonUrl,
+    response,
+    sharedCacheHandle,
+  } = params;
+  if (response.status === 304 && cached?.status === 200) {
+    enforceProfileFreshness(cached.body, maxUpdatedAgeDays, allowStale);
+    await writeCachedProfile(
+      sharedCacheHandle,
+      profileJsonUrl,
+      { ...cached, fetchedAt: Date.now() },
+      cacheTtlMs
+    );
+    return cached.body;
+  }
+  if (response.status === 404) {
+    await writeCachedProfile(
+      sharedCacheHandle,
+      profileJsonUrl,
+      { fetchedAt: Date.now(), status: 404 },
+      PROFILE_NOT_FOUND_CACHE_TTL_MS
+    );
+    logger.error('Tarkov.dev profile returned 404', { profileJsonUrl, status: response.status });
+    throw createProfileFetchError(404);
+  }
+  if (!response.ok) {
+    logger.error('Tarkov.dev profile returned an upstream error', {
+      profileJsonUrl,
+      status: response.status,
+    });
+    throw createProfileFetchError();
+  }
+  const body = await parseAndValidateProfileResponse(response, profileJsonUrl);
+  enforceProfileFreshness(body, maxUpdatedAgeDays, allowStale);
+  await writeCachedProfile(
+    sharedCacheHandle,
+    profileJsonUrl,
+    {
+      body,
+      etag: response.headers.get('etag'),
+      fetchedAt: Date.now(),
+      status: 200,
+    },
+    cacheTtlMs
+  );
+  return body;
+}
+async function resolveSingleProfilePayload(params: {
+  allowStale: boolean;
+  cacheTtlMs: number;
+  maxUpdatedAgeDays: number;
+  profileJsonUrl: string;
+  sharedCacheHandle: SharedCacheHandle;
+  wantsFresh: boolean;
+}): Promise<unknown> {
+  const {
+    allowStale,
+    cacheTtlMs,
+    maxUpdatedAgeDays,
+    profileJsonUrl,
+    sharedCacheHandle,
+    wantsFresh,
+  } = params;
+  const cached = await readCachedProfile(sharedCacheHandle, profileJsonUrl);
+  if (cached && !wantsFresh) {
+    if (cached.status === 404) throw createProfileFetchError(404);
+    enforceProfileFreshness(cached.body, maxUpdatedAgeDays, allowStale);
+    return cached.body;
+  }
+  const conditionalEtag = wantsFresh && cached?.status === 200 ? cached.etag : null;
+  const response = await fetchUpstreamProfileResponse(profileJsonUrl, conditionalEtag);
+  return handleUpstreamProfileResponse({
+    allowStale,
+    cached,
+    cacheTtlMs,
+    maxUpdatedAgeDays,
+    profileJsonUrl,
+    response,
+    sharedCacheHandle,
+  });
+}
+function classifyMultiModeError(error: unknown): MultiModeProfileEntry {
+  const candidate = error as { statusCode?: number; data?: Record<string, unknown> };
+  if (candidate.statusCode === 404) return { status: 'not_found' };
+  if (candidate.statusCode === 422 && candidate.data?.code === 'profile_stale') {
+    return {
+      status: 'stale',
+      ageDays: typeof candidate.data.ageDays === 'number' ? candidate.data.ageDays : 0,
+      maxUpdatedAgeDays:
+        typeof candidate.data.maxUpdatedAgeDays === 'number'
+          ? candidate.data.maxUpdatedAgeDays
+          : DEFAULT_PROFILE_MAX_UPDATED_AGE_DAYS,
+      updatedAt: typeof candidate.data.updatedAt === 'number' ? candidate.data.updatedAt : 0,
+    };
+  }
+  return { status: 'error' };
+}
+async function resolveMultiModeProfiles(params: {
+  allowStale: boolean;
+  cacheTtlMs: number;
+  maxUpdatedAgeDays: number;
+  modes: GameMode[];
+  sharedCacheHandle: SharedCacheHandle;
+  tarkovUid: number;
+  wantsFresh: boolean;
+}): Promise<{
+  hasNonOk: boolean;
+  profiles: Partial<Record<GameMode, MultiModeProfileEntry>>;
+}> {
+  const entries = await Promise.all(
+    params.modes.map(async (mode): Promise<[GameMode, MultiModeProfileEntry]> => {
+      const modeSource = buildTarkovDevProfileSource(params.tarkovUid, mode);
+      try {
+        const profile = await resolveSingleProfilePayload({
+          allowStale: params.allowStale,
+          cacheTtlMs: params.cacheTtlMs,
+          maxUpdatedAgeDays: params.maxUpdatedAgeDays,
+          profileJsonUrl: modeSource.profileJsonUrl,
+          sharedCacheHandle: params.sharedCacheHandle,
+          wantsFresh: params.wantsFresh,
+        });
+        return [mode, { status: 'ok', profile }];
+      } catch (error) {
+        return [mode, classifyMultiModeError(error)];
+      }
+    })
+  );
+  const profiles: Partial<Record<GameMode, MultiModeProfileEntry>> = {};
+  let hasNonOk = false;
+  for (const [mode, entry] of entries) {
+    profiles[mode] = entry;
+    if (entry.status !== 'ok') hasNonOk = true;
+  }
+  return { hasNonOk, profiles };
+}
 export default defineEventHandler(async (event) => {
   setResponseHeaders(event, { 'Cache-Control': 'no-store' });
   const query = getQuery(event);
@@ -202,6 +496,13 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 400,
       statusMessage: source.error,
+    });
+  }
+  const requestedModes = parseRequestedModes(readSingleQueryValue(query.modes));
+  if (requestedModes !== null && requestedModes.length === 0) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid game mode list.',
     });
   }
   const typedConfig = useRuntimeConfig(event) as ReturnType<typeof useRuntimeConfig> &
@@ -236,153 +537,39 @@ export default defineEventHandler(async (event) => {
   );
   const trustProxy = Boolean(typedConfig.apiProtection?.trustProxy);
   const clientIdentifier = getProxyAwareClientIdentifier(event, trustProxy);
-  const rateLimitKey = `profile:ip:${clientIdentifier}`;
-  if (turnstileSecretKey) {
-    const verificationLimit = await consumeRateLimit(
-      sharedCacheHandle,
-      PROFILE_VERIFICATION_RATE_LIMIT_PREFIX,
-      rateLimitKey,
-      rateLimitPerMinute,
-      MINUTE_MS
-    );
-    if (!verificationLimit.allowed) {
-      throw createRateLimitError(event, verificationLimit.resetAt, MINUTE_MS);
-    }
-    const verification = await verifyTurnstileToken({
-      secretKey: turnstileSecretKey,
-      token: getRequestHeader(event, 'x-turnstile-token'),
-      allowedHostnames: resolveAllowedTurnstileHostnames(
-        typedConfig.public?.appUrl,
-        turnstileSecretKey
-      ),
-      remoteIp: clientIdentifier === 'unknown' ? null : clientIdentifier,
-    });
-    if (!verification.ok) {
-      logger.warn('Tarkov.dev profile request failed Turnstile verification', {
-        reason: verification.reason,
-      });
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Verification failed. Reload the page and try again.',
-        data: { code: 'turnstile_failed' },
-      });
-    }
-  }
-  const minuteLimit = turnstileSecretKey
-    ? { allowed: true, resetAt: null }
-    : await consumeRateLimit(
-        sharedCacheHandle,
-        PROFILE_RATE_LIMIT_PREFIX,
-        rateLimitKey,
-        rateLimitPerMinute,
-        MINUTE_MS
-      );
-  if (!minuteLimit.allowed) {
-    throw createRateLimitError(event, minuteLimit.resetAt, MINUTE_MS);
-  }
-  const hourlyLimit = await consumeRateLimit(
-    sharedCacheHandle,
-    PROFILE_HOURLY_RATE_LIMIT_PREFIX,
-    rateLimitKey,
+  await enforceProfileRequestGuards({
+    appUrl: typedConfig.public?.appUrl,
+    clientIdentifier,
+    event,
     rateLimitPerHour,
-    HOUR_MS
-  );
-  if (!hourlyLimit.allowed) {
-    throw createRateLimitError(event, hourlyLimit.resetAt, HOUR_MS);
-  }
-  const wantsFresh = readSingleQueryValue(query.fresh) === '1';
-  const cacheKey = source.data.profileJsonUrl;
-  const cached = await readCachedProfile(sharedCacheHandle, cacheKey);
-  if (cached && !wantsFresh) {
-    if (cached.status === 404) {
-      throw createProfileFetchError(404);
-    }
-    enforceProfileFreshness(cached.body, maxUpdatedAgeDays);
-    setSuccessCacheHeaders(event, cacheTtlMs, wantsFresh);
-    return cached.body;
-  }
-  const upstreamHeaders: Record<string, string> = {
-    accept: 'application/json',
-    'user-agent': TARKOVTRACKER_USER_AGENT,
-  };
-  if (wantsFresh && cached?.status === 200 && cached.etag) {
-    upstreamHeaders['if-none-match'] = cached.etag;
-  }
-  let response: Response;
-  try {
-    response = await fetch(source.data.profileJsonUrl, {
-      headers: upstreamHeaders,
-      signal: AbortSignal.timeout(PROFILE_FETCH_TIMEOUT_MS),
-    });
-  } catch (error) {
-    logger.error('Tarkov.dev profile fetch failed', {
-      error: readErrorForLog(error),
-      profileJsonUrl: source.data.profileJsonUrl,
-      statusCode: isAbortError(error) ? 504 : 502,
-    });
-    throw createProfileFetchError(isAbortError(error) ? 504 : 502);
-  }
-  if (response.status === 304 && cached?.status === 200) {
-    enforceProfileFreshness(cached.body, maxUpdatedAgeDays);
-    await writeCachedProfile(
-      sharedCacheHandle,
-      cacheKey,
-      { ...cached, fetchedAt: Date.now() },
-      cacheTtlMs
-    );
-    setSuccessCacheHeaders(event, cacheTtlMs, wantsFresh);
-    return cached.body;
-  }
-  if (response.status === 404) {
-    await writeCachedProfile(
-      sharedCacheHandle,
-      cacheKey,
-      { fetchedAt: Date.now(), status: 404 },
-      PROFILE_NOT_FOUND_CACHE_TTL_MS
-    );
-    logger.error('Tarkov.dev profile returned 404', {
-      profileJsonUrl: source.data.profileJsonUrl,
-      status: response.status,
-    });
-    throw createProfileFetchError(404);
-  }
-  if (!response.ok) {
-    logger.error('Tarkov.dev profile returned an upstream error', {
-      profileJsonUrl: source.data.profileJsonUrl,
-      status: response.status,
-    });
-    throw createProfileFetchError();
-  }
-  let body: unknown;
-  try {
-    body = (await response.json()) as unknown;
-  } catch (error) {
-    logger.error('Tarkov.dev profile JSON parse failed', {
-      error: readErrorForLog(error),
-      profileJsonUrl: source.data.profileJsonUrl,
-      status: response.status,
-    });
-    throw createProfileFetchError();
-  }
-  if (!validateTarkovDevProfile(body)) {
-    logger.error('Tarkov.dev profile returned an invalid payload', {
-      profileJsonUrl: source.data.profileJsonUrl,
-      status: response.status,
-    });
-    throw createProfileFetchError();
-  }
-  enforceProfileFreshness(body, maxUpdatedAgeDays);
-  await writeCachedProfile(
+    rateLimitPerMinute,
     sharedCacheHandle,
-    cacheKey,
-    {
-      body,
-      etag: response.headers.get('etag'),
-      fetchedAt: Date.now(),
-      status: 200,
-    },
-    cacheTtlMs
-  );
-  setSuccessCacheHeaders(event, cacheTtlMs, wantsFresh);
+    turnstileSecretKey,
+  });
+  const wantsFresh = readSingleQueryValue(query.fresh) === '1';
+  const allowStale = readSingleQueryValue(query.allowStale) === '1';
+  const bypassBrowserCache = wantsFresh || allowStale;
+  if (requestedModes) {
+    const { hasNonOk, profiles } = await resolveMultiModeProfiles({
+      allowStale,
+      cacheTtlMs,
+      maxUpdatedAgeDays,
+      modes: requestedModes,
+      sharedCacheHandle,
+      tarkovUid: source.data.tarkovUid,
+      wantsFresh,
+    });
+    setSuccessCacheHeaders(event, cacheTtlMs, bypassBrowserCache || hasNonOk);
+    return { tarkovUid: source.data.tarkovUid, profiles };
+  }
+  const body = await resolveSingleProfilePayload({
+    allowStale,
+    cacheTtlMs,
+    maxUpdatedAgeDays,
+    profileJsonUrl: source.data.profileJsonUrl,
+    sharedCacheHandle,
+    wantsFresh,
+  });
+  setSuccessCacheHeaders(event, cacheTtlMs, bypassBrowserCache);
   return body;
 });

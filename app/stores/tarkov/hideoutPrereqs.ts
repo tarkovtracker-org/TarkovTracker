@@ -147,7 +147,7 @@ const resolveValidHideoutModules = (
   completedModuleIds: Set<string>,
   edition: GameEdition | undefined,
   options: HideoutCheckOptions
-) => {
+): { validModules: Set<string>; stationLevels: Map<string, number> } => {
   const modulesByStation = new Map<string, HideoutModuleMeta[]>();
   for (const module of modules) {
     const list = modulesByStation.get(module.stationId) ?? [];
@@ -194,7 +194,7 @@ const resolveValidHideoutModules = (
       stationLevels: Object.fromEntries(stationLevels.entries()),
     });
   }
-  return validModules;
+  return { validModules, stationLevels };
 };
 const computeTotalSkills = (
   currentData: UserProgressData,
@@ -287,28 +287,82 @@ const getHideoutRequirementOptions = (): HideoutEnforcementContext['options'] | 
   };
   return Object.values(options).some(Boolean) ? options : null;
 };
+type PlannedHideoutProgress = {
+  moduleIds: readonly string[];
+  questIds: readonly string[];
+  traderLevels?: Readonly<Record<string, number>>;
+};
+export type BlockedHideoutTierDetail = {
+  moduleId: string;
+  stationId: string;
+  stationName: string;
+  level: number;
+  missingStations: Array<{
+    stationId: string;
+    stationName: string;
+    requiredLevel: number;
+    currentLevel: number;
+  }>;
+  missingTraders: Array<{
+    traderId: string;
+    traderName: string;
+    requiredLevel: number;
+    currentLevel: number;
+  }>;
+  missingSkills: Array<{
+    skillName: string;
+    requiredLevel: number;
+    currentLevel: number;
+  }>;
+};
+const withPlannedProgress = (
+  progress: UserProgressData,
+  planned: PlannedHideoutProgress
+): UserProgressData => {
+  const nextTraders = { ...(progress.traders ?? {}) };
+  if (planned.traderLevels) {
+    for (const [traderId, level] of Object.entries(planned.traderLevels)) {
+      nextTraders[traderId] = {
+        ...(nextTraders[traderId] ?? { reputation: 0 }),
+        level,
+      };
+    }
+  }
+  return {
+    ...progress,
+    taskCompletions: {
+      ...progress.taskCompletions,
+      ...Object.fromEntries(planned.questIds.map((id) => [id, { complete: true, failed: false }])),
+    },
+    traders: nextTraders,
+  };
+};
 const buildProgressEnforcementContext = (
   store: TarkovStoreInstance,
   metadataStore: ReturnType<typeof useMetadataStore>,
   stations: HideoutStation[],
-  options: HideoutEnforcementContext['options']
+  options: HideoutEnforcementContext['options'],
+  planned?: PlannedHideoutProgress
 ): HideoutEnforcementContext | null => {
-  const currentData = store[coerceGameMode(store.currentGameMode)];
+  const progress = store[coerceGameMode(store.currentGameMode)];
+  const currentData = planned ? withPlannedProgress(progress, planned) : progress;
   const completedModuleIds = collectCompletedModuleIds(currentData);
+  planned?.moduleIds.forEach((id) => completedModuleIds.add(id));
   if (!completedModuleIds.size) return null;
   const modules = buildHideoutModuleMeta(stations);
   if (!modules.length) return null;
   return { completedModuleIds, currentData, metadataStore, modules, options, stations };
 };
 const buildHideoutEnforcementContext = (
-  store: TarkovStoreInstance
+  store: TarkovStoreInstance,
+  planned?: PlannedHideoutProgress
 ): HideoutEnforcementContext | null => {
   const metadataStore = useMetadataStore();
   const stations = metadataStore.hideoutStations;
   if (!stations.length) return null;
   const options = getHideoutRequirementOptions();
   if (!options) return null;
-  return buildProgressEnforcementContext(store, metadataStore, stations, options);
+  return buildProgressEnforcementContext(store, metadataStore, stations, options, planned);
 };
 export const notifyHideoutPrereqEnforcement = (removedCount: number) => {
   if (!removedCount || !import.meta.client) return;
@@ -319,20 +373,145 @@ export const notifyHideoutPrereqEnforcement = (removedCount: number) => {
     logger.warn('[TarkovStore] Could not show hideout enforcement toast:', error);
   }
 };
-export const enforceHideoutPrereqs = (store: TarkovStoreInstance): string[] => {
-  const context = buildHideoutEnforcementContext(store);
-  if (!context) return [];
-  const { completedModuleIds, currentData, metadataStore, modules, options, stations } = context;
-  const edition = metadataStore.editions.find((entry) => entry.value === store.gameEdition);
+const buildCheckOptions = (context: HideoutEnforcementContext): HideoutCheckOptions => {
+  const { currentData, metadataStore, options } = context;
   const skillKeyAliases = buildSkillKeyAliases(metadataStore.tasks);
-  const validModules = resolveValidHideoutModules(modules, stations, completedModuleIds, edition, {
+  return {
     ...options,
     skills: computeTotalSkills(currentData, metadataStore.tasks, skillKeyAliases),
     skillKeyAliases,
     traders: currentData.traders ?? {},
-  });
-  const removedModules = collectRemovedModules(completedModuleIds, validModules);
+  };
+};
+const resolveValidationResult = (context: HideoutEnforcementContext, gameEdition: number) => {
+  const { completedModuleIds, metadataStore, modules, stations } = context;
+  const edition = metadataStore.editions.find((entry) => entry.value === gameEdition);
+  const checkOptions = buildCheckOptions(context);
+  const { validModules, stationLevels } = resolveValidHideoutModules(
+    modules,
+    stations,
+    completedModuleIds,
+    edition,
+    checkOptions
+  );
+  return {
+    checkOptions,
+    removedModules: collectRemovedModules(completedModuleIds, validModules),
+    stationLevels,
+  };
+};
+const describeBlockedModule = (
+  module: HideoutModuleMeta,
+  stationName: string,
+  stationsById: ReadonlyMap<string, HideoutStation>,
+  tradersById: ReadonlyMap<string, string>,
+  stationLevels: ReadonlyMap<string, number>,
+  options: HideoutCheckOptions
+): BlockedHideoutTierDetail => {
+  const missingStations = options.requireStationLevels
+    ? (module.stationLevelRequirements ?? [])
+        .filter((req) => (stationLevels.get(req.station.id) ?? 0) < req.level)
+        .map((req) => ({
+          stationId: req.station.id,
+          stationName: stationsById.get(req.station.id)?.name ?? req.station.name ?? req.station.id,
+          requiredLevel: req.level,
+          currentLevel: stationLevels.get(req.station.id) ?? 0,
+        }))
+    : [];
+  const missingTraders = options.requireTraderLoyalty
+    ? (module.traderRequirements ?? [])
+        .filter((req) => {
+          if (!req?.trader?.id || typeof req?.value !== 'number') return false;
+          const playerTraderLevel = options.traders?.[req.trader.id]?.level ?? 1;
+          const compareMethod = req.compareMethod ?? '>=';
+          return !(
+            compareRequirement(playerTraderLevel, compareMethod, req.value) ||
+            loyaltyLevels.some(
+              (level) =>
+                level <= playerTraderLevel && compareRequirement(level, compareMethod, req.value)
+            )
+          );
+        })
+        .map((req) => ({
+          traderId: req.trader.id,
+          traderName: tradersById.get(req.trader.id) ?? req.trader.name ?? req.trader.id,
+          requiredLevel: req.value,
+          currentLevel: options.traders?.[req.trader.id]?.level ?? 1,
+        }))
+    : [];
+  const missingSkills = options.requireSkillLevels
+    ? (module.skillRequirements ?? [])
+        .filter((req) => {
+          if (!req?.name || typeof req?.level !== 'number') return false;
+          const canonicalKey = getCanonicalSkillKey(req.name, req.skill?.id) ?? req.name;
+          const skillKey = resolveSkillKey(canonicalKey, options.skillKeyAliases);
+          return (options.skills?.[skillKey] ?? 0) < req.level;
+        })
+        .map((req) => {
+          const canonicalKey = getCanonicalSkillKey(req.name, req.skill?.id) ?? req.name;
+          const skillKey = resolveSkillKey(canonicalKey, options.skillKeyAliases);
+          return {
+            skillName: req.skill?.name ?? req.name,
+            requiredLevel: req.level,
+            currentLevel: options.skills?.[skillKey] ?? 0,
+          };
+        })
+    : [];
+  return {
+    moduleId: module.id,
+    stationId: module.stationId,
+    stationName,
+    level: module.level,
+    missingStations,
+    missingTraders,
+    missingSkills,
+  };
+};
+/** Checks setup candidates and returns structured unmet prerequisites for blocked tiers. */
+export function describeBlockedHideoutTiers(
+  store: TarkovStoreInstance,
+  planned: PlannedHideoutProgress
+): BlockedHideoutTierDetail[] {
+  if (!planned.moduleIds.length) return [];
+  const context = buildHideoutEnforcementContext(store, planned);
+  if (!context) return [];
+  const { checkOptions, removedModules, stationLevels } = resolveValidationResult(
+    context,
+    store.gameEdition
+  );
   if (!removedModules.size) return [];
-  resetHideoutPartItems(store, uncompleteModules(store, removedModules, modules));
+  const stationsById = new Map(context.stations.map((station) => [station.id, station]));
+  const modulesById = new Map(context.modules.map((module) => [module.id, module]));
+  const tradersById = new Map(
+    (context.metadataStore.traders ?? []).map((trader) => [trader.id, trader.name])
+  );
+  return planned.moduleIds
+    .filter((id) => removedModules.has(id))
+    .map((id) => modulesById.get(id))
+    .filter((module): module is HideoutModuleMeta => Boolean(module))
+    .map((module) =>
+      describeBlockedModule(
+        module,
+        stationsById.get(module.stationId)?.name ?? module.stationId,
+        stationsById,
+        tradersById,
+        stationLevels,
+        checkOptions
+      )
+    );
+}
+/** Checks setup candidates with the same rules used by persisted hideout progress. */
+export function previewBlockedHideoutTiers(
+  store: TarkovStoreInstance,
+  planned: PlannedHideoutProgress
+): string[] {
+  return describeBlockedHideoutTiers(store, planned).map((detail) => detail.moduleId);
+}
+export const enforceHideoutPrereqs = (store: TarkovStoreInstance): string[] => {
+  const context = buildHideoutEnforcementContext(store);
+  if (!context) return [];
+  const { removedModules } = resolveValidationResult(context, store.gameEdition);
+  if (!removedModules.size) return [];
+  resetHideoutPartItems(store, uncompleteModules(store, removedModules, context.modules));
   return Array.from(removedModules);
 };

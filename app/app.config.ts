@@ -7,8 +7,9 @@ const uiConfig = {
     // Game mode colors - map to in-game color palettes
     pvp: 'pvp', // in-game PvP tan (#DBD5C1)
     pve: 'pve', // in-game PvE blue (#73ADC3)
-    // Semantic colors - map to Tailwind's default palettes or custom ones
-    info: 'accent',
+    // Semantic colors - keep Nuxt UI aligned with Tailwind tokens in tailwind.css
+    info: 'info',
+    accent: 'accent',
     success: 'success',
     warning: 'warning',
     error: 'error',
@@ -120,38 +121,267 @@ const uiConfig = {
         'relative w-full max-w-md bg-surface-800 border border-surface-700 rounded-lg shadow-xl pointer-events-auto',
     },
   },
-  // Badge configuration for custom colors
+  // Badge configuration: readable minimum typography and AA contrast in dark & light themes
   badge: {
+    variants: {
+      size: {
+        xs: {
+          base: 'text-xs/4 px-1.5 py-0.5 gap-1 rounded-sm',
+          leadingIcon: 'size-3',
+          leadingAvatarSize: '3xs',
+          trailingIcon: 'size-3',
+        },
+        sm: {
+          base: 'text-xs px-2 py-0.5 gap-1 rounded-sm',
+          leadingIcon: 'size-3.5',
+          leadingAvatarSize: '3xs',
+          trailingIcon: 'size-3.5',
+        },
+        md: {
+          base: 'text-xs px-2.5 py-1 gap-1.5 rounded-md',
+          leadingIcon: 'size-4',
+          leadingAvatarSize: '3xs',
+          trailingIcon: 'size-4',
+        },
+        lg: {
+          base: 'text-sm px-2.5 py-1 gap-1.5 rounded-md',
+          leadingIcon: 'size-5',
+          leadingAvatarSize: '2xs',
+          trailingIcon: 'size-5',
+        },
+        xl: {
+          base: 'text-base px-3 py-1.5 gap-1.5 rounded-md',
+          leadingIcon: 'size-6',
+          leadingAvatarSize: '2xs',
+          trailingIcon: 'size-6',
+        },
+      },
+    },
     compoundVariants: [
       {
+        color: 'primary',
+        variant: 'solid',
+        class: 'bg-primary-500 light:bg-primary-800 text-surface-950 light:text-white',
+      },
+      {
+        color: 'primary',
+        variant: 'soft',
+        class: 'bg-primary-500/15 text-primary-300',
+      },
+      {
+        color: 'primary',
+        variant: 'subtle',
+        class: 'bg-primary-500/15 text-primary-300 ring ring-inset ring-primary-400/35',
+      },
+      {
+        color: 'primary',
+        variant: 'outline',
+        class: 'ring ring-inset ring-primary-400/50 text-primary-300',
+      },
+      {
+        color: 'info',
+        variant: 'solid',
+        class: 'bg-info-600 text-white',
+      },
+      {
+        color: 'info',
+        variant: 'soft',
+        class: 'bg-info-500/15 text-info-300',
+      },
+      {
+        color: 'info',
+        variant: 'subtle',
+        class: 'bg-info-500/15 text-info-300 ring ring-inset ring-info-400/35',
+      },
+      {
+        color: 'info',
+        variant: 'outline',
+        class: 'ring ring-inset ring-info-400/50 text-info-300',
+      },
+      {
+        color: 'secondary',
+        variant: 'solid',
+        class: 'bg-secondary-600 text-white',
+      },
+      {
+        color: 'secondary',
+        variant: 'soft',
+        class: 'bg-secondary-500/15 text-secondary-300',
+      },
+      {
+        color: 'secondary',
+        variant: 'subtle',
+        class: 'bg-secondary-500/15 text-secondary-300 ring ring-inset ring-secondary-400/35',
+      },
+      {
+        color: 'secondary',
+        variant: 'outline',
+        class: 'ring ring-inset ring-secondary-400/50 text-secondary-300',
+      },
+      {
+        color: 'accent',
+        variant: 'solid',
+        class: 'bg-accent-600 text-white',
+      },
+      {
+        color: 'accent',
+        variant: 'soft',
+        class: 'bg-accent-500/15 text-accent-300',
+      },
+      {
+        color: 'accent',
+        variant: 'subtle',
+        class: 'bg-accent-500/15 text-accent-300 ring ring-inset ring-accent-400/35',
+      },
+      {
+        color: 'accent',
+        variant: 'outline',
+        class: 'ring ring-inset ring-accent-400/50 text-accent-300',
+      },
+      {
+        color: 'success',
+        variant: 'solid',
+        class: 'bg-success-600 text-white',
+      },
+      {
+        color: 'success',
+        variant: 'soft',
+        class: 'bg-success-500/15 text-success-300',
+      },
+      {
+        color: 'success',
+        variant: 'subtle',
+        class: 'bg-success-500/15 text-success-300 ring ring-inset ring-success-400/35',
+      },
+      {
+        color: 'success',
+        variant: 'outline',
+        class: 'ring ring-inset ring-success-400/50 text-success-300',
+      },
+      {
+        color: 'warning',
+        variant: 'solid',
+        class: 'bg-warning-500 light:bg-warning-700 text-surface-950 light:text-white',
+      },
+      {
+        color: 'warning',
+        variant: 'soft',
+        class: 'bg-warning-500/15 text-warning-300',
+      },
+      {
+        color: 'warning',
+        variant: 'subtle',
+        class: 'bg-warning-500/15 text-warning-300 ring ring-inset ring-warning-400/35',
+      },
+      {
+        color: 'warning',
+        variant: 'outline',
+        class: 'ring ring-inset ring-warning-400/50 text-warning-300',
+      },
+      {
+        color: 'error',
+        variant: 'solid',
+        class: 'bg-error-600 text-white',
+      },
+      {
+        color: 'error',
+        variant: 'soft',
+        class: 'bg-error-500/15 text-error-300',
+      },
+      {
+        color: 'error',
+        variant: 'subtle',
+        class: 'bg-error-500/15 text-error-300 ring ring-inset ring-error-400/35',
+      },
+      {
+        color: 'error',
+        variant: 'outline',
+        class: 'ring ring-inset ring-error-400/50 text-error-300',
+      },
+      {
         color: 'kappa',
         variant: 'solid',
-        class: 'bg-kappa-500 text-white',
+        class: 'bg-kappa-600 text-white',
       },
       {
         color: 'kappa',
         variant: 'outline',
-        class: 'ring ring-inset ring-kappa-500 text-kappa-400',
+        class: 'ring ring-inset ring-kappa-400/50 text-kappa-300',
       },
       {
         color: 'kappa',
         variant: 'soft',
-        class: 'bg-kappa-500/15 text-kappa-400',
+        class: 'bg-kappa-500/15 text-kappa-300',
+      },
+      {
+        color: 'kappa',
+        variant: 'subtle',
+        class: 'bg-kappa-500/15 text-kappa-300 ring ring-inset ring-kappa-400/35',
       },
       {
         color: 'lightkeeper',
         variant: 'solid',
-        class: 'bg-lightkeeper-500 text-white',
+        class: 'bg-lightkeeper-500 light:bg-lightkeeper-700 text-surface-950 light:text-white',
       },
       {
         color: 'lightkeeper',
         variant: 'outline',
-        class: 'ring ring-inset ring-lightkeeper-500 text-lightkeeper-400',
+        class: 'ring ring-inset ring-lightkeeper-400/50 text-lightkeeper-300',
       },
       {
         color: 'lightkeeper',
         variant: 'soft',
-        class: 'bg-lightkeeper-500/15 text-lightkeeper-400',
+        class: 'bg-lightkeeper-500/15 text-lightkeeper-300',
+      },
+      {
+        color: 'lightkeeper',
+        variant: 'subtle',
+        class: 'bg-lightkeeper-500/15 text-lightkeeper-300 ring ring-inset ring-lightkeeper-400/35',
+      },
+    ],
+  },
+  // Alert configuration: AA-verified foregrounds on soft/subtle tints in dark & light themes
+  alert: {
+    compoundVariants: [
+      {
+        color: 'info',
+        variant: 'soft',
+        class: {
+          root: 'bg-info-500/12 text-info-200',
+          icon: 'text-info-300',
+        },
+      },
+      {
+        color: 'info',
+        variant: 'subtle',
+        class: {
+          root: 'bg-info-500/12 text-info-200 ring ring-inset ring-info-400/30',
+          icon: 'text-info-300',
+        },
+      },
+      {
+        color: 'warning',
+        variant: 'soft',
+        class: {
+          root: 'bg-warning-500/12 text-warning-200',
+          icon: 'text-warning-300',
+        },
+      },
+      {
+        color: 'error',
+        variant: 'soft',
+        class: {
+          root: 'bg-error-500/12 text-error-200',
+          icon: 'text-error-300',
+        },
+      },
+      {
+        color: 'success',
+        variant: 'soft',
+        class: {
+          root: 'bg-success-500/12 text-success-200',
+          icon: 'text-success-300',
+        },
       },
     ],
   },
@@ -219,7 +449,8 @@ const uiConfig = {
       {
         color: 'pvp',
         variant: 'solid',
-        class: 'bg-pvp-500 hover:bg-pvp-600 text-white',
+        class:
+          'bg-pvp-500 hover:bg-pvp-400 active:bg-pvp-600 text-surface-950 light:bg-pvp-800 light:hover:bg-pvp-900 light:text-white font-medium',
       },
       {
         color: 'pvp',
@@ -245,7 +476,8 @@ const uiConfig = {
       {
         color: 'pve',
         variant: 'solid',
-        class: 'bg-pve-500 hover:bg-pve-600 text-white',
+        class:
+          'bg-pve-500 hover:bg-pve-400 active:bg-pve-600 text-surface-950 light:bg-pve-700 light:hover:bg-pve-800 light:text-white font-medium',
       },
       {
         color: 'pve',
@@ -269,9 +501,165 @@ const uiConfig = {
         class: 'text-pve-400 hover:text-pve-300 underline-offset-4 hover:underline',
       },
       {
+        color: 'info',
+        variant: 'solid',
+        class: 'bg-info-600 hover:bg-info-500 active:bg-info-700 text-white font-medium',
+      },
+      {
+        color: 'info',
+        variant: 'soft',
+        class: 'bg-info-500/15 hover:bg-info-500/25 text-info-300',
+      },
+      {
+        color: 'info',
+        variant: 'subtle',
+        class: 'bg-info-500/15 hover:bg-info-500/25 text-info-300 ring ring-inset ring-info-400/35',
+      },
+      {
+        color: 'info',
+        variant: 'ghost',
+        class: 'text-info-300 hover:bg-info-500/15',
+      },
+      {
+        color: 'info',
+        variant: 'outline',
+        class: 'ring ring-inset ring-info-400/50 text-info-300 hover:bg-info-500/15',
+      },
+      {
+        color: 'info',
+        variant: 'link',
+        class: 'text-info-300 hover:text-info-200 underline-offset-4 hover:underline',
+      },
+      {
+        color: 'secondary',
+        variant: 'solid',
+        class:
+          'bg-secondary-600 hover:bg-secondary-500 active:bg-secondary-700 text-white font-medium',
+      },
+      {
+        color: 'secondary',
+        variant: 'soft',
+        class: 'bg-secondary-500/15 hover:bg-secondary-500/25 text-secondary-300',
+      },
+      {
+        color: 'secondary',
+        variant: 'subtle',
+        class:
+          'bg-secondary-500/15 hover:bg-secondary-500/25 text-secondary-300 ring ring-inset ring-secondary-400/35',
+      },
+      {
+        color: 'secondary',
+        variant: 'ghost',
+        class: 'text-secondary-300 hover:bg-secondary-500/15',
+      },
+      {
+        color: 'secondary',
+        variant: 'outline',
+        class: 'ring ring-inset ring-secondary-400/50 text-secondary-300 hover:bg-secondary-500/15',
+      },
+      {
+        color: 'secondary',
+        variant: 'link',
+        class: 'text-secondary-300 hover:text-secondary-200 underline-offset-4 hover:underline',
+      },
+      {
+        color: 'accent',
+        variant: 'solid',
+        class: 'bg-accent-600 hover:bg-accent-500 active:bg-accent-700 text-white font-medium',
+      },
+      {
+        color: 'accent',
+        variant: 'soft',
+        class: 'bg-accent-500/15 hover:bg-accent-500/25 text-accent-300',
+      },
+      {
+        color: 'accent',
+        variant: 'subtle',
+        class:
+          'bg-accent-500/15 hover:bg-accent-500/25 text-accent-300 ring ring-inset ring-accent-400/35',
+      },
+      {
+        color: 'accent',
+        variant: 'ghost',
+        class: 'text-accent-300 hover:bg-accent-500/15',
+      },
+      {
+        color: 'accent',
+        variant: 'outline',
+        class: 'ring ring-inset ring-accent-400/50 text-accent-300 hover:bg-accent-500/15',
+      },
+      {
+        color: 'accent',
+        variant: 'link',
+        class: 'text-accent-300 hover:text-accent-200 underline-offset-4 hover:underline',
+      },
+      {
+        color: 'warning',
+        variant: 'solid',
+        class:
+          'bg-warning-500 hover:bg-warning-400 active:bg-warning-600 text-surface-950 light:bg-warning-700 light:hover:bg-warning-800 light:text-white font-medium',
+      },
+      {
+        color: 'warning',
+        variant: 'soft',
+        class: 'bg-warning-500/15 hover:bg-warning-500/25 text-warning-300',
+      },
+      {
+        color: 'warning',
+        variant: 'subtle',
+        class:
+          'bg-warning-500/15 hover:bg-warning-500/25 text-warning-300 ring ring-inset ring-warning-400/35',
+      },
+      {
+        color: 'warning',
+        variant: 'ghost',
+        class: 'text-warning-300 hover:bg-warning-500/15',
+      },
+      {
+        color: 'warning',
+        variant: 'outline',
+        class: 'ring ring-inset ring-warning-400/50 text-warning-300 hover:bg-warning-500/15',
+      },
+      {
+        color: 'warning',
+        variant: 'link',
+        class: 'text-warning-300 hover:text-warning-200 underline-offset-4 hover:underline',
+      },
+      {
+        color: 'error',
+        variant: 'solid',
+        class: 'bg-error-600 hover:bg-error-500 active:bg-error-700 text-white font-medium',
+      },
+      {
+        color: 'error',
+        variant: 'soft',
+        class: 'bg-error-500/15 hover:bg-error-500/25 text-error-300',
+      },
+      {
+        color: 'error',
+        variant: 'subtle',
+        class:
+          'bg-error-500/15 hover:bg-error-500/25 text-error-300 ring ring-inset ring-error-400/35',
+      },
+      {
+        color: 'error',
+        variant: 'ghost',
+        class: 'text-error-300 hover:bg-error-500/15',
+      },
+      {
+        color: 'error',
+        variant: 'outline',
+        class: 'ring ring-inset ring-error-400/50 text-error-300 hover:bg-error-500/15',
+      },
+      {
+        color: 'error',
+        variant: 'link',
+        class: 'text-error-300 hover:text-error-200 underline-offset-4 hover:underline',
+      },
+      {
         color: 'success',
         variant: 'solid',
-        class: 'bg-success-500 hover:bg-success-600 active:bg-success-700 text-white',
+        class: 'bg-success-600 hover:bg-success-500 active:bg-success-700 text-white font-medium',
       },
       {
         color: 'success',
@@ -283,19 +671,19 @@ const uiConfig = {
         color: 'success',
         variant: 'ghost',
         class:
-          'text-success-500 light:text-success-800 hover:bg-success-950 light:hover:bg-success-100',
+          'text-success-400 light:text-success-800 hover:bg-success-950 light:hover:bg-success-100',
       },
       {
         color: 'success',
         variant: 'outline',
         class:
-          'ring ring-inset ring-success-500 text-success-500 light:text-success-800 hover:bg-success-950 light:hover:bg-success-100 hover:text-white light:hover:text-success-800',
+          'ring ring-inset ring-success-500 text-success-400 light:text-success-800 hover:bg-success-950 light:hover:bg-success-100 hover:text-white light:hover:text-success-800',
       },
       {
         color: 'success',
         variant: 'link',
         class:
-          'text-success-500 light:text-success-800 hover:text-success-400 light:hover:text-success-900 underline-offset-4 hover:underline',
+          'text-success-400 light:text-success-800 hover:text-success-300 light:hover:text-success-900 underline-offset-4 hover:underline',
       },
     ],
   },

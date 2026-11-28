@@ -30,7 +30,10 @@ function modeFromMappedValue(
   const entry = Object.entries(mapping).find(([, mappedValue]) => mappedValue === value);
   return (entry?.[0] as GameMode | undefined) ?? null;
 }
-function buildProfileSource(tarkovUid: number, mode: GameMode): TarkovDevProfileSource {
+export function buildTarkovDevProfileSource(
+  tarkovUid: number,
+  mode: GameMode
+): TarkovDevProfileSource {
   return {
     mode,
     profileJsonUrl: `${PROFILE_JSON_ORIGIN}/${PROFILE_JSON_PATHS[mode]}/${tarkovUid}.json`,
@@ -52,13 +55,13 @@ export function resolveTarkovDevProfileSource(input: string): TarkovDevProfileSo
     const mode = modeFromMappedValue(API_GAME_MODES, parts[1]);
     const tarkovUid = parseProfileId(parts[2]);
     if (!mode || tarkovUid === null) return { ok: false, error: PROFILE_ID_ERROR };
-    return { ok: true, data: buildProfileSource(tarkovUid, mode) };
+    return { ok: true, data: buildTarkovDevProfileSource(tarkovUid, mode) };
   }
   if (host === 'players.tarkov.dev') {
     const mode = modeFromMappedValue(PROFILE_JSON_PATHS, parts[0]);
     const tarkovUid = parseProfileId(parts[1]);
     if (!mode || tarkovUid === null) return { ok: false, error: PROFILE_ID_ERROR };
-    return { ok: true, data: buildProfileSource(tarkovUid, mode) };
+    return { ok: true, data: buildTarkovDevProfileSource(tarkovUid, mode) };
   }
   return { ok: false, error: PROFILE_URL_ERROR };
 }

@@ -8,9 +8,8 @@
     :description="activeDataFlowBlockedDescription"
     class="mb-4"
   />
-  <template v-if="showImportTools">
+  <template v-if="showProfileImport">
     <GenericCard
-      v-if="!isBlockedByOtherDataFlow && !isBackupOrEftLogsImportPreviewActive && !eftLogsIsParsing"
       icon="mdi-account-arrow-up"
       icon-color="info"
       highlight-color="info"
@@ -19,7 +18,7 @@
       title-classes="text-lg font-semibold"
     >
       <template #title-right>
-        <UBadge color="info" variant="subtle" size="xs">
+        <UBadge color="info" variant="subtle" size="sm">
           {{ $t('settings.data_management.recommended_badge') }}
         </UBadge>
       </template>
@@ -28,235 +27,133 @@
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.tarkov_dev_section_description') }}
           </p>
-          <template v-if="!isTarkovDevImportPreviewActive">
-            <template v-if="isLinked">
-              <div class="bg-surface-900/80 space-y-3 rounded-md border border-white/10 p-3">
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-surface-400 text-sm">
-                    {{ $t('settings.tarkov_dev_import.linked_uid') }}
-                  </span>
-                  <span class="text-surface-100 font-mono text-sm font-semibold">
-                    {{ tarkovUid }}
-                  </span>
-                </div>
-                <p class="text-surface-500 text-xs">
-                  {{ $t('settings.tarkov_dev_import.refetch_hint') }}
-                </p>
-                <div class="space-y-2">
-                  <span class="text-surface-300 text-xs font-semibold">
-                    {{ $t('settings.tarkov_dev_import.refetch_mode_label') }}
-                  </span>
-                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    <UButton
-                      v-for="option in tarkovDevRefetchModeOptions"
-                      :key="option.value"
-                      :variant="tarkovDevRefetchMode === option.value ? 'solid' : 'soft'"
-                      :color="option.value === TARKOV_DEV_ARENA_MODE ? 'neutral' : 'info'"
-                      size="xs"
-                      class="justify-center"
-                      :disabled="isAnyImportActive || option.disabled"
-                      @click="selectTarkovDevRefetchMode(option.value)"
-                    >
-                      <GameModeBadge :mode="option.value" class="-my-1" />
-                      <span class="min-w-0 wrap-anywhere">{{ option.label }}</span>
-                    </UButton>
-                  </div>
-                  <p class="text-surface-500 text-xs">
-                    {{ $t('settings.tarkov_dev_import.refetch_mode_arena_unavailable') }}
-                  </p>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <UButton
-                    icon="i-mdi-refresh"
-                    color="info"
-                    size="xs"
-                    :disabled="
-                      isAnyImportActive ||
-                      !isTurnstileReady ||
-                      !isTurnstileSolved ||
-                      !isTarkovDevRefetchModeSupported ||
-                      tarkovDevRefetchCooldownMinutes > 0
-                    "
-                    :loading="isTarkovDevProfileUrlLoading"
-                    @click="handleTarkovDevRefetch"
-                  >
-                    {{ $t('settings.tarkov_dev_import.refetch_profile') }}
-                  </UButton>
-                  <UButton
-                    icon="i-mdi-open-in-new"
-                    variant="soft"
-                    color="info"
-                    size="xs"
-                    :href="tarkovDevProfileUrl"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    :disabled="!tarkovDevProfileUrl"
-                  >
-                    {{ $t('common.view_on_tarkov_dev') }}
-                  </UButton>
-                  <UButton
-                    icon="i-mdi-link-off"
-                    variant="soft"
-                    color="neutral"
-                    size="xs"
-                    :disabled="isAnyImportActive"
-                    @click="handleTarkovDevUnlink"
-                  >
-                    {{ $t('settings.tarkov_dev_import.unlink_profile') }}
-                  </UButton>
-                </div>
-                <p v-if="tarkovDevRefetchCooldownMinutes > 0" class="text-surface-500 text-xs">
-                  {{
-                    $t('settings.tarkov_dev_import.cooldown_hint', {
-                      minutes: tarkovDevRefetchCooldownMinutes,
-                    })
-                  }}
-                </p>
-              </div>
-            </template>
-            <form
-              v-else
-              class="bg-surface-900/80 space-y-3 rounded-md border border-white/10 p-3"
-              @submit.prevent="handleTarkovDevProfileUrlSubmit"
-            >
-              <i18n-t
-                keypath="settings.tarkov_dev_import.profile_url_hint"
-                tag="p"
-                class="text-surface-400 text-sm"
-              >
-                <template #link>
-                  <a
-                    href="https://tarkov.dev/players"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-info-300 hover:text-info-200 underline"
-                  >
-                    {{ $t('settings.tarkov_dev_import.profile_url_hint_link') }}
-                  </a>
-                </template>
-              </i18n-t>
-              <p class="text-surface-500 text-xs">
-                {{ $t('settings.tarkov_dev_import.profile_url_refresh_hint') }}
-              </p>
-              <div class="flex flex-col gap-2 sm:flex-row">
-                <UInput
-                  v-model="tarkovDevProfileUrlInput"
-                  type="url"
-                  icon="i-mdi-link-variant"
-                  class="min-w-0 flex-1"
-                  :aria-label="$t('settings.tarkov_dev_import.profile_url_label')"
-                  :disabled="isAnyImportActive"
-                  :placeholder="$t('settings.tarkov_dev_import.profile_url_placeholder')"
-                />
-                <UButton
-                  type="submit"
-                  icon="i-mdi-account-search"
-                  color="info"
-                  class="justify-center"
-                  :disabled="
-                    isTarkovDevProfileUrlBlank ||
-                    isAnyImportActive ||
-                    !isTurnstileReady ||
-                    !isTurnstileSolved
-                  "
-                  :loading="isTarkovDevProfileUrlLoading"
-                >
-                  {{ $t('settings.tarkov_dev_import.fetch_profile') }}
-                </UButton>
-              </div>
-            </form>
+          <template v-if="!isTarkovDevImportPreviewActive && tarkovDevImportState !== 'success'">
+            <TarkovDevLinkedRefresh
+              v-if="isLinked"
+              :tarkov-uid="tarkovUid"
+              :selected-modes="tarkovDevRefetchModes"
+              :mode-options="tarkovDevRefetchModeOptions"
+              :mode-supported="isTarkovDevRefetchModeSupported"
+              :profile-url="tarkovDevProfileUrl"
+              :ready-to-fetch="tarkovDevLinkedReadyToFetch"
+              :any-import-active="isAnyImportActive"
+              :fetch-disabled="isTarkovDevRefetchDisabled"
+              :loading="isTarkovDevProfileUrlLoading"
+              :cooldown-minutes="tarkovDevRefetchCooldownMinutes"
+              @toggle-mode="toggleTarkovDevRefetchMode"
+              @select-all="selectAllTarkovDevRefetchModes"
+              @begin-refresh="beginLinkedRefresh"
+              @cancel-refresh="cancelLinkedRefresh"
+              @refetch="handleTarkovDevRefetch"
+              @unlink="handleTarkovDevUnlink"
+            />
+            <div v-else class="space-y-3">
+              <TarkovDevLookupHelper
+                :initial-mode="currentTarkovDevMode()"
+                :disabled="isAnyImportActive"
+                @opened-lookup="handleTarkovDevLookupOpened"
+              />
+              <TarkovDevUrlForm
+                ref="tarkovDevUrlFormRef"
+                v-model:profile-url="tarkovDevProfileUrlInput"
+                :selected-modes="tarkovDevUrlModes"
+                :any-import-active="isAnyImportActive"
+                :submit-disabled="isTarkovDevUrlSubmitDisabled"
+                :loading="isTarkovDevProfileUrlLoading"
+                @toggle-mode="toggleTarkovDevUrlMode"
+                @select-all="selectAllTarkovDevUrlModes"
+                @submit="handleTarkovDevProfileUrlSubmit"
+              />
+            </div>
           </template>
-          <template v-if="tarkovDevImportState === 'preview' && tarkovDevPreview">
-            <div
-              class="bg-surface-900/80 divide-surface-700 divide-y rounded-md border border-white/10"
-            >
-              <div class="flex items-center justify-between px-3 py-2">
-                <span class="text-surface-400 text-xs">
-                  {{ $t('settings.tarkov_dev_import.nickname') }}
-                </span>
-                <span class="text-surface-100 text-sm font-semibold">
+          <TarkovDevModeMultiPreview
+            v-if="tarkovDevImportState === 'preview' && tarkovDevMultiPreview"
+            :preview="tarkovDevMultiPreview"
+            :now="cooldownNow"
+            :player-levels="metadataStore.playerLevels"
+            :editions="metadataStore.editions"
+            :is-importing="tarkovDevIsImporting"
+            :import-blocked="progressImportBlocked"
+            :refresh-disabled="
+              isTarkovDevProfileUrlLoading || !isTurnstileReady || !isTurnstileSolved
+            "
+            :refreshing-mode="tarkovDevRefreshingMode"
+            :format-date="formatDate"
+            :format-relative-time="formatRelativeTime"
+            @confirm="handleTarkovDevMultiConfirm"
+            @cancel="resetTarkovDevImport()"
+            @refetch-mode="handleTarkovDevPreviewModeAction($event, false)"
+            @allow-stale-mode="handleTarkovDevPreviewModeAction($event, true)"
+          />
+          <template v-else-if="tarkovDevImportState === 'preview' && tarkovDevPreview">
+            <div class="bg-surface-900/80 space-y-3 rounded-md border border-white/10 p-3">
+              <div class="border-surface-800 flex items-center justify-between gap-2 border-b pb-2">
+                <span class="text-surface-100 min-w-0 truncate text-sm font-semibold">
                   {{ tarkovDevPreview.displayName }}
                 </span>
-              </div>
-              <div class="flex items-center justify-between px-3 py-2">
-                <span class="text-surface-400 text-xs">
-                  {{ $t('settings.tarkov_dev_import.faction') }}
-                </span>
-                <span class="text-surface-100 text-sm font-semibold">
-                  {{ tarkovDevPreview.pmcFaction }}
-                </span>
-              </div>
-              <div class="flex items-center justify-between px-3 py-2">
-                <span class="text-surface-400 text-xs">
-                  {{ $t('common.level') }}
-                </span>
-                <span class="text-surface-100 text-sm font-semibold">
-                  {{ previewLevel }}
-                </span>
-              </div>
-              <div class="flex items-center justify-between px-3 py-2">
-                <span class="text-surface-400 text-xs">
-                  {{ $t('common.prestige') }}
-                </span>
-                <span class="text-surface-100 text-sm font-semibold">
-                  {{ tarkovDevPreview.prestigeLevel }}
-                </span>
-              </div>
-              <div class="flex items-center justify-between px-3 py-2">
-                <span class="text-surface-400 text-xs">
-                  {{ $t('settings.tarkov_dev_import.last_refreshed') }}
-                </span>
                 <span
-                  class="text-sm font-semibold"
-                  :class="isTarkovDevPreviewDataAging ? 'text-warning-400' : 'text-surface-100'"
+                  class="text-surface-100 inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold"
                 >
-                  {{ tarkovDevPreviewUpdatedLabel }}
+                  <FactionBadge :faction="tarkovDevPreview.pmcFaction" :size="18" />
+                  <span>{{ tarkovDevPreview.pmcFaction }}</span>
                 </span>
               </div>
-              <div class="flex items-center justify-between px-3 py-2">
-                <span class="text-surface-400 text-xs">
-                  {{ $t('settings.tarkov_dev_import.skills_count', { count: skillCount }) }}
-                </span>
-              </div>
-              <details class="group px-3 py-2">
-                <summary
-                  class="text-info-300 hover:text-info-200 flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold select-none"
-                >
-                  <span>{{ $t('settings.tarkov_dev_import.skills_details_toggle') }}</span>
-                  <UIcon
-                    name="i-mdi-chevron-down"
-                    class="h-4 w-4 transition-transform group-open:rotate-180"
-                  />
-                </summary>
-                <div class="border-surface-700 mt-2 max-h-60 overflow-y-auto border-t pt-2">
-                  <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1">
-                    <div class="text-surface-500 text-xs font-semibold">
-                      {{ $t('settings.tarkov_dev_import.skills_details_skill') }}
-                    </div>
-                    <div class="text-surface-500 text-right text-xs font-semibold">
-                      {{ $t('common.level') }}
-                    </div>
-                    <template v-for="skill in tarkovDevSkillDetails" :key="skill.id">
-                      <div class="text-surface-200 truncate font-mono text-xs">
-                        {{ skill.id }}
-                      </div>
-                      <div class="text-surface-100 text-right font-mono text-xs font-semibold">
-                        {{ skill.value }}
-                      </div>
-                    </template>
-                  </div>
+              <dl class="grid grid-cols-2 gap-x-4 gap-y-2.5 sm:grid-cols-4">
+                <div>
+                  <dt class="text-surface-400 text-xs">{{ $t('common.level') }}</dt>
+                  <dd class="text-surface-100 text-sm font-semibold tabular-nums">
+                    {{ previewLevel }}
+                  </dd>
                 </div>
-              </details>
-              <div v-if="tarkovDevPreview.gameEditionGuess !== null" class="px-3 py-2">
-                <div class="flex items-center justify-between">
-                  <span class="text-surface-400 text-xs">
+                <div>
+                  <dt class="text-surface-400 text-xs">{{ $t('common.prestige') }}</dt>
+                  <dd class="text-surface-100 text-sm font-semibold tabular-nums">
+                    {{ tarkovDevPreview.prestigeLevel }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-surface-400 text-xs">
+                    {{ $t('settings.tarkov_dev_import.last_refreshed') }}
+                  </dt>
+                  <dd class="mt-0.5">
+                    <UTooltip
+                      v-if="tarkovDevPreviewUpdatedTooltip"
+                      :text="tarkovDevPreviewUpdatedTooltip"
+                    >
+                      <time
+                        :datetime="tarkovDevPreviewUpdatedIso"
+                        tabindex="0"
+                        class="cursor-help text-sm font-semibold underline decoration-dotted underline-offset-4"
+                        :class="
+                          isTarkovDevPreviewDataAging ? 'text-warning-400' : 'text-surface-100'
+                        "
+                      >
+                        {{ tarkovDevPreviewUpdatedLabel }}
+                      </time>
+                    </UTooltip>
+                    <span
+                      v-else
+                      class="text-sm font-semibold"
+                      :class="isTarkovDevPreviewDataAging ? 'text-warning-400' : 'text-surface-100'"
+                    >
+                      {{ tarkovDevPreviewUpdatedLabel }}
+                    </span>
+                  </dd>
+                </div>
+                <div v-if="tarkovDevPreview.gameEditionGuess !== null">
+                  <dt class="text-surface-400 text-xs">
                     {{ $t('settings.tarkov_dev_import.edition_guess') }}
-                  </span>
-                  <span class="text-surface-100 text-sm font-semibold">
+                  </dt>
+                  <dd class="text-surface-100 truncate text-sm font-semibold">
                     {{ editionLabel }}
-                  </span>
+                  </dd>
                 </div>
-              </div>
+              </dl>
+              <TarkovDevSkillsList
+                :skills="tarkovDevSkillDetails"
+                :columns="2"
+                :summary-label="`${$t('settings.tarkov_dev_import.skills_count', { count: skillCount })} · ${$t('settings.tarkov_dev_import.skills_details_toggle')}`"
+              />
             </div>
             <div
               v-if="isTarkovDevPreviewDataAging"
@@ -275,22 +172,36 @@
                       })
                     }}
                   </p>
-                  <UButton
-                    icon="i-mdi-refresh"
-                    color="warning"
-                    variant="soft"
-                    size="xs"
-                    :disabled="
-                      isTarkovDevProfileUrlLoading ||
-                      !isTurnstileReady ||
-                      !isTurnstileSolved ||
-                      tarkovDevRefetchCooldownMinutes > 0
-                    "
-                    :loading="isTarkovDevProfileUrlLoading"
-                    @click="handleTarkovDevPreviewRefetch"
-                  >
-                    {{ $t('settings.tarkov_dev_import.refetch_profile') }}
-                  </UButton>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UButton
+                      v-if="tarkovDevStaleRecoveryUrl"
+                      icon="i-mdi-open-in-new"
+                      color="info"
+                      variant="soft"
+                      size="xs"
+                      :href="tarkovDevStaleRecoveryUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {{ $t('settings.tarkov_dev_import.open_profile_again') }}
+                    </UButton>
+                    <UButton
+                      icon="i-mdi-refresh"
+                      color="warning"
+                      variant="soft"
+                      size="xs"
+                      :disabled="
+                        isTarkovDevProfileUrlLoading ||
+                        !isTurnstileReady ||
+                        !isTurnstileSolved ||
+                        tarkovDevRefetchCooldownMinutes > 0
+                      "
+                      :loading="isTarkovDevProfileUrlLoading"
+                      @click="handleTarkovDevPreviewRefetch"
+                    >
+                      {{ $t('settings.tarkov_dev_import.refetch_profile') }}
+                    </UButton>
+                  </div>
                 </div>
               </div>
             </div>
@@ -298,8 +209,8 @@
               v-if="tarkovDevFixedTargetMode"
               class="bg-surface-900/80 rounded-md border border-white/10 px-3 py-2"
             >
-              <div class="flex items-start gap-2">
-                <UIcon name="i-mdi-target-account" class="text-info-300 mt-0.5 h-4 w-4 shrink-0" />
+              <div class="flex items-center gap-2.5">
+                <GameModeBadge :mode="tarkovDevFixedTargetMode" class="-my-1.5" />
                 <p class="text-surface-200 text-sm">
                   {{ tarkovDevImportTargetNotice }}
                 </p>
@@ -313,16 +224,6 @@
             </div>
             <div class="flex gap-2">
               <UButton
-                icon="i-mdi-check"
-                color="primary"
-                class="flex-1"
-                :loading="tarkovDevIsImporting"
-                :disabled="tarkovDevIsImporting"
-                @click="handleTarkovDevConfirm"
-              >
-                {{ $t('common.confirm_import') }}
-              </UButton>
-              <UButton
                 variant="soft"
                 color="neutral"
                 class="flex-1"
@@ -331,9 +232,20 @@
               >
                 {{ $t('common.cancel') }}
               </UButton>
+              <UButton
+                icon="i-mdi-check"
+                color="primary"
+                variant="solid"
+                class="flex-1"
+                :loading="tarkovDevIsImporting"
+                :disabled="progressImportBlocked"
+                @click="handleTarkovDevConfirm"
+              >
+                {{ $t('common.confirm_import') }}
+              </UButton>
             </div>
           </template>
-          <div v-if="isTurnstileEnabled" class="space-y-1">
+          <div v-if="showTurnstileWidget" class="space-y-1">
             <p class="text-surface-500 text-xs">
               {{ $t('settings.tarkov_dev_import.turnstile_hint') }}
             </p>
@@ -344,6 +256,7 @@
             role="status"
             aria-live="polite"
             aria-atomic="true"
+            class="space-y-3"
           >
             <UAlert
               icon="i-mdi-check-circle"
@@ -352,9 +265,29 @@
               :title="$t('settings.tarkov_dev_import.success_title')"
               :description="$t('settings.tarkov_dev_import.success_description')"
             />
+            <div class="flex justify-start">
+              <UButton
+                size="xs"
+                color="neutral"
+                variant="soft"
+                icon="i-mdi-refresh"
+                @click="resetTarkovDevImport()"
+              >
+                {{ $t('settings.tarkov_dev_import.import_another_mode') }}
+              </UButton>
+            </div>
           </div>
+          <TarkovDevStaleAlert
+            v-if="isTarkovDevStaleError"
+            :age-days="tarkovDevImportErrorMeta?.days ?? 0"
+            :profile-url="tarkovDevStaleRecoveryUrl"
+            :loading="isTarkovDevProfileUrlLoading"
+            :disabled="isAnyImportActive || !isTurnstileReady || !isTurnstileSolved"
+            @retry-fresh="handleTarkovDevStaleRetry"
+            @allow-stale="handleTarkovDevAllowStale"
+          />
           <div
-            v-if="tarkovDevImportState === 'error' && tarkovDevErrorMessage"
+            v-else-if="tarkovDevImportState === 'error' && tarkovDevErrorMessage"
             role="alert"
             aria-live="assertive"
             aria-atomic="true"
@@ -370,8 +303,9 @@
         </div>
       </template>
     </GenericCard>
+  </template>
+  <template v-if="showLogImport">
     <GenericCard
-      v-if="!isBlockedByOtherDataFlow && !isTarkovDevImportPreviewActive"
       icon="mdi-folder-upload-outline"
       icon-color="info"
       highlight-color="info"
@@ -381,31 +315,15 @@
     >
       <template #content>
         <div class="space-y-3 px-4 py-4">
-          <input
-            ref="eftLogsFolderInputRef"
-            type="file"
-            webkitdirectory
-            directory
-            multiple
-            class="hidden"
-            @change="handleEftLogsFolderChange"
-          />
           <p class="text-surface-500 text-sm">
             {{ $t('settings.data_management.eft_logs_section_description') }}
           </p>
           <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
-            <UButton
-              ref="eftLogsFolderButtonRef"
-              icon="i-mdi-folder-upload-outline"
-              block
-              :ui="{
-                base: 'bg-info-900 light:bg-info-50 hover:bg-info-800 light:hover:bg-info-100 active:bg-info-700 light:active:bg-info-100 text-info-200 focus-visible:ring focus-visible:ring-info-500',
-              }"
+            <EftLogDropzone
+              ref="eftLogsDropzoneRef"
               :disabled="isAnyImportActive"
-              @click="showEftLogsFolderInput"
-            >
-              {{ $t('settings.data_management.import_eft_logs_folder_button') }}
-            </UButton>
+              @select-files="handleEftLogsFiles"
+            />
             <div class="bg-surface-900/80 rounded-md border border-white/10 p-3">
               <p class="text-surface-300 text-xs font-semibold">
                 {{ $t('settings.log_import.upload_hint') }}
@@ -477,7 +395,7 @@
                 :legend="$t('settings.log_import.account_filter_label')"
                 :ui="{ legend: 'sr-only' }"
                 value-key="value"
-                :disabled="eftLogsIsImporting"
+                :disabled="eftLogsEditLocked"
                 @update:model-value="(account) => handleEftLogsAccountChange(String(account))"
               />
             </div>
@@ -496,7 +414,7 @@
                   :key="version"
                   :model-value="eftLogsIncludedVersions.includes(version)"
                   :disabled="
-                    eftLogsIsImporting ||
+                    eftLogsEditLocked ||
                     (eftLogsIncludedVersions.length === 1 &&
                       eftLogsIncludedVersions.includes(version))
                   "
@@ -514,7 +432,7 @@
               :model-value="eftLogsSelection"
               :events="eftLogsPreview.events ?? []"
               :target-mode="eftLogsTargetMode"
-              :disabled="eftLogsIsImporting"
+              :disabled="eftLogsEditLocked"
               @update:model-value="setEftLogsSelection"
             />
             <div
@@ -708,21 +626,6 @@
             </p>
             <div class="flex gap-2">
               <UButton
-                icon="i-mdi-check"
-                color="primary"
-                class="flex-1"
-                :loading="eftLogsIsImporting"
-                :disabled="
-                  eftLogsIsImporting ||
-                  eftLogsHasOutsideSeasonEvents ||
-                  !eftLogsEffectiveEvents.length ||
-                  eftLogsInvalidDate
-                "
-                @click="handleEftLogsConfirm"
-              >
-                {{ $t('common.confirm_import') }}
-              </UButton>
-              <UButton
                 variant="soft"
                 color="neutral"
                 class="flex-1"
@@ -730,6 +633,17 @@
                 @click="resetEftLogsImport()"
               >
                 {{ $t('common.cancel') }}
+              </UButton>
+              <UButton
+                icon="i-mdi-check"
+                color="primary"
+                variant="solid"
+                class="flex-1"
+                :loading="eftLogsIsImporting"
+                :disabled="progressImportBlocked || eftLogsSelectionInvalid"
+                @click="handleEftLogsConfirm"
+              >
+                {{ $t(eftLogsNeedsSaveRetry ? 'setup.retry_save' : 'common.confirm_import') }}
               </UButton>
             </div>
           </template>
@@ -773,12 +687,6 @@
   </template>
   <template v-if="showBackupTools">
     <GenericCard
-      v-if="
-        !isBlockedByOtherDataFlow &&
-        !isTarkovDevImportPreviewActive &&
-        !isEftLogsPreviewActive &&
-        !eftLogsIsParsing
-      "
       icon="mdi-backup-restore"
       icon-color="primary"
       highlight-color="primary"
@@ -799,8 +707,11 @@
             {{ $t('settings.data_management.backup_restore_section_description') }}
           </p>
           <template v-if="!isAnyImportPreviewActive && !eftLogsIsParsing">
-            <div class="grid gap-3 md:grid-cols-2">
-              <div class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4">
+            <div class="grid gap-3" :class="{ 'md:grid-cols-2': !props.restoreOnly }">
+              <div
+                v-if="!props.restoreOnly"
+                class="bg-surface-900/80 space-y-4 rounded-md border border-white/10 p-4"
+              >
                 <div class="flex items-start gap-3">
                   <div
                     class="bg-primary-900/70 light:bg-primary-100 text-primary-200 border-primary-700/60 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border"
@@ -860,6 +771,7 @@
             </div>
           </template>
           <RecoveryCopiesPanel
+            v-if="!props.restoreOnly || recoveryCopiesImport"
             :backup="dataManagementSession.backup"
             :parsing="backupImportState === 'parsing'"
             :locked="isAnyImportActive"
@@ -1020,16 +932,17 @@
               </div>
             </div>
             <div class="flex gap-2">
+              <UButton variant="soft" color="neutral" class="flex-1" @click="resetBackupPreview">
+                {{ $t('common.cancel') }}
+              </UButton>
               <UButton
                 icon="i-mdi-check"
                 color="primary"
+                variant="solid"
                 class="flex-1"
                 @click="handleBackupConfirm"
               >
                 {{ $t('common.confirm_import') }}
-              </UButton>
-              <UButton variant="soft" color="neutral" class="flex-1" @click="resetBackupPreview">
-                {{ $t('common.cancel') }}
               </UButton>
             </div>
           </template>
@@ -1065,20 +978,29 @@
       </template>
     </GenericCard>
     <BugReportCard
-      v-if="!isBlockedByOtherDataFlow"
+      v-if="!props.restoreOnly && !isBlockedByOtherDataFlow"
       :backup="dataManagementSession.backup"
       :disabled="isAnyImportActive"
     />
   </template>
 </template>
 <script setup lang="ts">
+  import FactionBadge from '@/components/FactionBadge.vue';
   import GameModeBadge from '@/components/GameModeBadge.vue';
   import GenericCard from '@/components/ui/GenericCard.vue';
+  import { useProgressImportBlocked } from '@/composables/useGameModeSwitch';
   import { useTurnstileWidget } from '@/composables/useTurnstile';
   import BugReportCard from '@/features/settings/BugReportCard.vue';
+  import EftLogDropzone from '@/features/settings/EftLogDropzone.vue';
   import EftLogImportControls from '@/features/settings/EftLogImportControls.vue';
   import GameModeToggle from '@/features/settings/GameModeToggle.vue';
   import RecoveryCopiesPanel from '@/features/settings/RecoveryCopiesPanel.vue';
+  import TarkovDevLinkedRefresh from '@/features/settings/TarkovDevLinkedRefresh.vue';
+  import TarkovDevLookupHelper from '@/features/settings/TarkovDevLookupHelper.vue';
+  import TarkovDevModeMultiPreview from '@/features/settings/TarkovDevModeMultiPreview.vue';
+  import TarkovDevSkillsList from '@/features/settings/TarkovDevSkillsList.vue';
+  import TarkovDevStaleAlert from '@/features/settings/TarkovDevStaleAlert.vue';
+  import TarkovDevUrlForm from '@/features/settings/TarkovDevUrlForm.vue';
   import {
     useDataManagementSession,
     type DataManagementSession,
@@ -1106,21 +1028,24 @@
   } from '@/utils/eftLogQuestParser';
   import { logger } from '@/utils/logger';
   import { getImportCooldownRemainingMs } from '@/utils/tarkovDevImportCooldown';
+  import { resolveTarkovDevProfileSource } from '@/utils/tarkovDevProfileSource';
   import { buildTarkovDevProfileUrl } from '@/utils/tarkovDevProfileUrl';
   import type { BackupImportTargetModes } from '@/composables/useDataBackup';
   const TARKOV_DEV_ARENA_MODE = 'arena' as const;
-  type DataManagementView = 'all' | 'imports' | 'backup';
+  type DataManagementView = 'all' | 'imports' | 'backup' | 'eft-logs' | 'tarkov-dev';
   type TarkovDevRefetchMode = GameMode | typeof TARKOV_DEV_ARENA_MODE;
   type TarkovDevRefetchModeOption = {
+    color: 'info' | 'neutral';
     disabled: boolean;
     label: string;
     value: TarkovDevRefetchMode;
   };
-  const { t } = useI18n({ useScope: 'global' });
+  const { locale, t } = useI18n({ useScope: 'global' });
   const runtimeConfig = useRuntimeConfig();
   const props = withDefaults(
     defineProps<{
       session?: DataManagementSession;
+      restoreOnly?: boolean;
       view?: DataManagementView;
     }>(),
     {
@@ -1128,9 +1053,13 @@
       view: 'all',
     }
   );
+  const emit = defineEmits<{
+    tarkovDevImported: [payload: { mode: GameMode; modes?: GameMode[]; editionResolved: boolean }];
+  }>();
   const toast = useToast();
   const tarkovStore = useTarkovStore();
   const metadataStore: MetadataStore = useMetadataStore();
+  const progressImportBlocked = useProgressImportBlocked();
   const dataManagementSession = props.session ?? useDataManagementSession();
   const {
     exportProgress,
@@ -1244,11 +1173,15 @@
     importState: tarkovDevImportState,
     isImporting: tarkovDevIsImporting,
     previewData: tarkovDevPreview,
+    multiPreview: tarkovDevMultiPreview,
     importError: tarkovDevImportError,
     importErrorCode: tarkovDevImportErrorCode,
     importErrorMeta: tarkovDevImportErrorMeta,
     parseProfileUrl: parseTarkovDevProfileUrl,
+    parseProfileModes: parseTarkovDevProfileModes,
+    refetchPreviewMode: refetchTarkovDevPreviewMode,
     confirmImport: confirmTarkovDevImport,
+    confirmMultiImport: confirmTarkovDevMultiImport,
     setError: setTarkovDevImportError,
     reset: resetTarkovDevImportState,
   } = dataManagementSession.tarkovDev;
@@ -1261,18 +1194,42 @@
     solved: isTurnstileSolved,
   } = useTurnstileWidget(turnstileContainerRef);
   const tarkovDevProfileUrlInput = ref('');
+  const lastTarkovDevSingleUrl = ref<string>();
   const tarkovDevRequestGeneration = ref(0);
   const currentTarkovDevMode = (): GameMode => tarkovStore.getCurrentGameMode();
   const currentImportableMode = (): GameMode => tarkovStore.getCurrentGameMode();
   const tarkovDevFixedTargetMode = ref<GameMode | null>(null);
   const tarkovDevTargetMode = ref<GameMode>(currentTarkovDevMode());
-  const tarkovDevRefetchMode = ref<TarkovDevRefetchMode>(currentTarkovDevMode());
+  const tarkovDevUrlModes = ref<GameMode[]>([...GAME_MODE_VALUES]);
+  const tarkovDevRefetchModes = ref<GameMode[]>([currentTarkovDevMode()]);
+  const tarkovDevRefreshingMode = ref<GameMode | null>(null);
+  const isTarkovDevUrlSubmitDisabled = computed(
+    () =>
+      isTarkovDevProfileUrlBlank.value ||
+      isAnyImportActive.value ||
+      !isTurnstileReady.value ||
+      !isTurnstileSolved.value
+  );
+  function toggleTarkovDevUrlMode(mode: GameMode) {
+    if (tarkovDevUrlModes.value.includes(mode)) {
+      if (tarkovDevUrlModes.value.length <= 1) return;
+      tarkovDevUrlModes.value = tarkovDevUrlModes.value.filter((entry) => entry !== mode);
+      return;
+    }
+    tarkovDevUrlModes.value = GAME_MODE_VALUES.filter(
+      (entry) => entry === mode || tarkovDevUrlModes.value.includes(entry)
+    );
+  }
+  function selectAllTarkovDevUrlModes() {
+    tarkovDevUrlModes.value = [...GAME_MODE_VALUES];
+  }
   const isTarkovDevProfileUrlBlank = computed(
     () => tarkovDevProfileUrlInput.value.trim().length === 0
   );
   const isTarkovDevProfileUrlLoading = computed(() => tarkovDevImportState.value === 'loading');
   const {
     isImporting: eftLogsIsImporting,
+    needsSaveRetry: eftLogsNeedsSaveRetry,
     importState: eftLogsImportState,
     previewData: eftLogsPreview,
     importError: eftLogsImportError,
@@ -1286,19 +1243,26 @@
     confirmImport: confirmEftLogsImport,
     reset: resetEftLogsImport,
   } = dataManagementSession.eftLogs;
+  const eftLogsEditLocked = computed(() => eftLogsIsImporting.value || eftLogsNeedsSaveRetry.value);
+  const eftLogsSelectionInvalid = computed(() =>
+    eftLogsNeedsSaveRetry.value
+      ? false
+      : eftLogsHasOutsideSeasonEvents.value ||
+        !eftLogsEffectiveEvents.value.length ||
+        eftLogsInvalidDate.value
+  );
   const eftDefaultLogsPath = computed(() => t('settings.log_import.default_path_value'));
   const eftSessionFolderExamplePath = computed(() =>
     t('settings.log_import.session_folder_example_path')
   );
-  const eftLogsFolderInputRef = ref<HTMLInputElement | null>(null);
-  const eftLogsFolderButtonRef = ref<{ $el?: HTMLElement } | null>(null);
+  const eftLogsDropzoneRef = ref<{ focusFolderButton?: () => void } | null>(null);
   const eftLogsTargetMode = ref<GameMode>();
   watch([eftLogsImportState, () => eftLogsPreview.value?.selectedAccount], () => {
     eftLogsTargetMode.value = undefined;
   });
   const eftLogsDisabledTargetModes = computed(() =>
     GAME_MODE_VALUES.filter(
-      (mode) => eftLogsIsImporting.value || !eftLogsSelection.value.modes.includes(mode)
+      (mode) => eftLogsEditLocked.value || !eftLogsSelection.value.modes.includes(mode)
     )
   );
   const eftLogsNoQuestEventsError = computed(() =>
@@ -1315,23 +1279,30 @@
   );
   const tarkovUid = computed(() => tarkovStore.getTarkovUid());
   const isLinked = computed(() => tarkovUid.value !== null);
+  const tarkovDevUrlFormRef = ref<{ focusInput?: () => void } | null>(null);
+  const tarkovDevTurnstileEngaged = ref(false);
+  const tarkovDevLinkedReadyToFetch = ref(false);
   const tarkovDevRefetchModeOptions = computed<TarkovDevRefetchModeOption[]>(() => [
     {
+      color: 'info',
       disabled: false,
       label: t('common.pvp'),
       value: GAME_MODES.PVP,
     },
     {
+      color: 'info',
       disabled: false,
       label: t('common.pve'),
       value: GAME_MODES.PVE,
     },
     {
+      color: 'info',
       disabled: false,
       label: t('common.seasonal_pvp'),
       value: GAME_MODES.SEASONAL,
     },
     {
+      color: 'neutral',
       disabled: true,
       label: t('settings.tarkov_dev_import.refetch_mode_arena'),
       value: TARKOV_DEV_ARENA_MODE,
@@ -1340,12 +1311,15 @@
   function isTarkovDevProfileMode(mode: unknown): mode is GameMode {
     return mode === GAME_MODES.PVP || mode === GAME_MODES.PVE || mode === GAME_MODES.SEASONAL;
   }
-  const isTarkovDevRefetchModeSupported = computed(() =>
-    isTarkovDevProfileMode(tarkovDevRefetchMode.value)
+  const isTarkovDevRefetchModeSupported = computed(
+    () =>
+      tarkovDevRefetchModes.value.length > 0 &&
+      tarkovDevRefetchModes.value.every((mode) => isTarkovDevProfileMode(mode))
   );
   const tarkovDevProfileUrl = computed(() => {
-    if (!isTarkovDevProfileMode(tarkovDevRefetchMode.value)) return undefined;
-    return buildTarkovDevProfileUrl(tarkovUid.value, tarkovDevRefetchMode.value);
+    const primary = tarkovDevRefetchModes.value[0];
+    if (!isTarkovDevProfileMode(primary)) return undefined;
+    return buildTarkovDevProfileUrl(tarkovUid.value, primary);
   });
   const previewLevel = computed(() => {
     if (!tarkovDevPreview.value) return 1;
@@ -1403,10 +1377,18 @@
     if (!updatedAt) return null;
     return Math.max(0, Math.floor((cooldownNow.value - updatedAt) / DAY_MS));
   });
+  const tarkovDevPreviewUpdatedTooltip = computed(() => {
+    const updatedAt = tarkovDevPreview.value?.updatedAt;
+    return updatedAt ? formatDate(updatedAt) : null;
+  });
+  const tarkovDevPreviewUpdatedIso = computed(() => {
+    const updatedAt = tarkovDevPreview.value?.updatedAt;
+    return updatedAt ? new Date(updatedAt).toISOString() : undefined;
+  });
   const tarkovDevPreviewUpdatedLabel = computed(() => {
     const updatedAt = tarkovDevPreview.value?.updatedAt;
     if (!updatedAt) return t('settings.tarkov_dev_import.last_refreshed_unknown');
-    return formatDate(updatedAt);
+    return formatRelativeTime(updatedAt, cooldownNow.value);
   });
   const isTarkovDevPreviewDataAging = computed(
     () => (tarkovDevPreviewUpdatedAgeDays.value ?? 0) >= TARKOV_DEV_AGE_WARNING_DAYS
@@ -1421,19 +1403,17 @@
     if (cooldownTimer) clearInterval(cooldownTimer);
   });
   watch(tarkovDevImportState, (state) => {
-    if (state === 'success') cooldownNow.value = Date.now();
+    if (state === 'preview' || state === 'success') cooldownNow.value = Date.now();
   });
   const tarkovDevRefetchCooldownMinutes = computed(() => {
     const uid = tarkovUid.value;
-    const mode = tarkovDevRefetchMode.value;
-    if (uid === null || !isTarkovDevProfileMode(mode)) return 0;
-    const remainingMs = getImportCooldownRemainingMs(
-      uid,
-      mode,
-      tarkovDevImportCooldownMs.value,
-      cooldownNow.value
+    if (uid === null || tarkovDevRefetchModes.value.length === 0) return 0;
+    const remainingPerMode = tarkovDevRefetchModes.value.map((mode) =>
+      getImportCooldownRemainingMs(uid, mode, tarkovDevImportCooldownMs.value, cooldownNow.value)
     );
-    return Math.ceil(remainingMs / 60_000);
+    if (remainingPerMode.some((ms) => ms <= 0)) return 0;
+    const minRemaining = Math.min(...remainingPerMode);
+    return Math.ceil(minRemaining / 60_000);
   });
   const tarkovDevFixedTargetModeLabel = computed(() => {
     const mode = tarkovDevFixedTargetMode.value;
@@ -1444,13 +1424,10 @@
       mode: tarkovDevFixedTargetModeLabel.value,
     })
   );
-  function showEftLogsFolderInput() {
-    eftLogsFolderInputRef.value?.click();
-  }
   /** Cancelling unmounts the Cancel button, so return focus to the picker it replaced. */
   function cancelEftLogsParsing() {
     resetEftLogsImport();
-    void nextTick(() => eftLogsFolderButtonRef.value?.$el?.focus());
+    void nextTick(() => eftLogsDropzoneRef.value?.focusFolderButton?.());
   }
   function updateTarkovDevImportTarget(
     sourceMode: GameMode | null | undefined,
@@ -1459,14 +1436,96 @@
     const targetMode = isTarkovDevProfileMode(sourceMode) ? sourceMode : (fallbackMode ?? null);
     tarkovDevFixedTargetMode.value = targetMode;
     if (!targetMode) return;
-    tarkovDevRefetchMode.value = targetMode;
     tarkovDevTargetMode.value = targetMode;
   }
   function selectTarkovDevRefetchMode(mode: TarkovDevRefetchMode) {
     if (!isTarkovDevProfileMode(mode)) return;
-    tarkovDevRefetchMode.value = mode;
+    tarkovDevRefetchModes.value = [mode];
     tarkovDevTargetMode.value = mode;
+    tarkovDevLinkedReadyToFetch.value = false;
   }
+  function toggleTarkovDevRefetchMode(mode: TarkovDevRefetchMode) {
+    if (!isTarkovDevProfileMode(mode)) return;
+    if (tarkovDevRefetchModes.value.includes(mode)) {
+      if (tarkovDevRefetchModes.value.length <= 1) return;
+      tarkovDevRefetchModes.value = tarkovDevRefetchModes.value.filter((entry) => entry !== mode);
+    } else {
+      tarkovDevRefetchModes.value = GAME_MODE_VALUES.filter(
+        (entry) => entry === mode || tarkovDevRefetchModes.value.includes(entry)
+      );
+    }
+    tarkovDevTargetMode.value = tarkovDevRefetchModes.value[0] ?? currentTarkovDevMode();
+    tarkovDevLinkedReadyToFetch.value = false;
+  }
+  function selectAllTarkovDevRefetchModes() {
+    tarkovDevRefetchModes.value = [...GAME_MODE_VALUES];
+    tarkovDevTargetMode.value = tarkovDevRefetchModes.value[0] ?? currentTarkovDevMode();
+    tarkovDevLinkedReadyToFetch.value = false;
+  }
+  function handleTarkovDevLookupOpened() {
+    tarkovDevTurnstileEngaged.value = true;
+    void nextTick(() => tarkovDevUrlFormRef.value?.focusInput?.());
+  }
+  function beginLinkedRefresh() {
+    tarkovDevLinkedReadyToFetch.value = true;
+    tarkovDevTurnstileEngaged.value = true;
+  }
+  function cancelLinkedRefresh() {
+    tarkovDevLinkedReadyToFetch.value = false;
+  }
+  const isTarkovDevStaleError = computed(
+    () =>
+      tarkovDevImportState.value === 'error' && tarkovDevImportErrorCode.value === 'profile_stale'
+  );
+  const tarkovDevStaleRecoveryUrl = computed(
+    () =>
+      lastTarkovDevSingleUrl.value ??
+      (isLinked.value
+        ? tarkovDevProfileUrl.value
+        : tarkovDevProfileUrlInput.value.trim() || undefined)
+  );
+  const isTarkovDevRefetchDisabled = computed(
+    () =>
+      isAnyImportActive.value ||
+      !isTurnstileReady.value ||
+      !isTurnstileSolved.value ||
+      !isTarkovDevRefetchModeSupported.value ||
+      tarkovDevRefetchCooldownMinutes.value > 0
+  );
+  const doesMultiPreviewNeedTurnstile = computed(() => {
+    const preview = tarkovDevMultiPreview.value;
+    if (!preview) return false;
+    return preview.requestedModes.some((mode) => {
+      const entry = preview.modes[mode];
+      if (!entry) return false;
+      if (entry.status === 'stale' || entry.status === 'not_found' || entry.status === 'error') {
+        return true;
+      }
+      if (entry.status === 'ok' && entry.data.updatedAt !== null) {
+        return (
+          Math.floor((cooldownNow.value - entry.data.updatedAt) / DAY_MS) >=
+          TARKOV_DEV_AGE_WARNING_DAYS
+        );
+      }
+      return false;
+    });
+  });
+  const isTurnstileNeededForForm = computed(
+    () =>
+      tarkovDevTurnstileEngaged.value ||
+      !isTarkovDevProfileUrlBlank.value ||
+      tarkovDevLinkedReadyToFetch.value ||
+      tarkovDevImportState.value === 'error'
+  );
+  const showTurnstileWidget = computed(() => {
+    if (!isTurnstileEnabled || tarkovDevImportState.value === 'success') return false;
+    if (isTarkovDevImportPreviewActive.value) {
+      return tarkovDevMultiPreview.value
+        ? doesMultiPreviewNeedTurnstile.value
+        : isTarkovDevPreviewDataAging.value;
+    }
+    return isTurnstileNeededForForm.value;
+  });
   type TurnstileVerification = { status: 'failed' } | { status: 'ok'; token: string | null };
   function turnstileVerificationPending(): boolean {
     return isTurnstileEnabled && !isTurnstileSolved.value;
@@ -1480,8 +1539,9 @@
     if (turnstileTokenMissing(token)) return { status: 'failed' };
     return { status: 'ok', token };
   }
-  async function fetchTarkovDevProfile(profileUrl: string, fresh = false) {
+  async function fetchTarkovDevProfile(profileUrl: string, fresh = false, allowStale = false) {
     const requestGeneration = ++tarkovDevRequestGeneration.value;
+    lastTarkovDevSingleUrl.value = profileUrl;
     try {
       const verification = await verifyTurnstileToken();
       if (verification.status === 'failed') {
@@ -1491,15 +1551,60 @@
       if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
       return await parseTarkovDevProfileUrl(profileUrl, {
         fresh,
+        ...(allowStale ? { allowStale: true } : {}),
         turnstileToken: verification.token,
       });
     } finally {
       resetTurnstile();
     }
   }
+  async function fetchTarkovDevModes(
+    profileUrl: string,
+    modes: GameMode[],
+    fresh = false,
+    allowStale = false
+  ) {
+    const requestGeneration = ++tarkovDevRequestGeneration.value;
+    lastTarkovDevSingleUrl.value = undefined;
+    try {
+      const verification = await verifyTurnstileToken();
+      if (verification.status === 'failed') {
+        setTarkovDevImportError(t('settings.tarkov_dev_import.errors.verification_failed'));
+        return null;
+      }
+      if (requestGeneration !== tarkovDevRequestGeneration.value) return null;
+      return await parseTarkovDevProfileModes(profileUrl, modes, {
+        fresh,
+        ...(allowStale ? { allowStale: true } : {}),
+        turnstileToken: verification.token,
+      });
+    } finally {
+      resetTurnstile();
+    }
+  }
+  function resolveSingleSubmittedProfileUrl(rawInput: string, selectedMode: GameMode): string {
+    const parsed = resolveTarkovDevProfileSource(rawInput);
+    if (!parsed.ok || parsed.data.mode === selectedMode) return rawInput;
+    return buildTarkovDevProfileUrl(parsed.data.tarkovUid, selectedMode) ?? rawInput;
+  }
   async function handleTarkovDevProfileUrlSubmit() {
     try {
-      const source = await fetchTarkovDevProfile(tarkovDevProfileUrlInput.value);
+      if (tarkovDevUrlModes.value.length > 1) {
+        const preview = await fetchTarkovDevModes(
+          tarkovDevProfileUrlInput.value,
+          tarkovDevUrlModes.value
+        );
+        const firstReady = preview?.requestedModes.find(
+          (mode) => preview.modes[mode]?.status === 'ok'
+        );
+        updateTarkovDevImportTarget(firstReady);
+        return;
+      }
+      const selectedMode = tarkovDevUrlModes.value[0];
+      const targetUrl = selectedMode
+        ? resolveSingleSubmittedProfileUrl(tarkovDevProfileUrlInput.value, selectedMode)
+        : tarkovDevProfileUrlInput.value;
+      const source = await fetchTarkovDevProfile(targetUrl);
       updateTarkovDevImportTarget(source?.mode);
     } catch (err) {
       handleTarkovDevUnexpectedError('profile_url_submit', err);
@@ -1507,24 +1612,74 @@
   }
   async function handleTarkovDevRefetch() {
     try {
-      const refetchMode = tarkovDevRefetchMode.value;
-      if (!isTarkovDevProfileMode(refetchMode)) return;
+      const modes = tarkovDevRefetchModes.value;
+      if (modes.length === 0) return;
       const linkedProfileUrl = tarkovDevProfileUrl.value;
       if (!linkedProfileUrl) return;
+      if (modes.length > 1) {
+        const preview = await fetchTarkovDevModes(linkedProfileUrl, modes, true);
+        const firstReady = preview?.requestedModes.find(
+          (mode) => preview.modes[mode]?.status === 'ok'
+        );
+        updateTarkovDevImportTarget(firstReady, firstReady ? undefined : modes[0]);
+        return;
+      }
+      const refetchMode = modes[0]!;
       const source = await fetchTarkovDevProfile(linkedProfileUrl, true);
       updateTarkovDevImportTarget(source?.mode, source ? refetchMode : undefined);
     } catch (err) {
       handleTarkovDevUnexpectedError('profile_refetch', err);
     }
   }
+  async function handleTarkovDevPreviewModeAction(mode: GameMode, allowStale: boolean) {
+    if (tarkovDevRefreshingMode.value !== null || tarkovDevIsImporting.value) return;
+    tarkovDevRefreshingMode.value = mode;
+    try {
+      const verification = await verifyTurnstileToken();
+      if (verification.status === 'failed') {
+        setTarkovDevImportError(t('settings.tarkov_dev_import.errors.verification_failed'));
+        return;
+      }
+      await refetchTarkovDevPreviewMode(mode, {
+        fresh: !allowStale,
+        allowStale,
+        turnstileToken: verification.token,
+      });
+    } catch (err) {
+      handleTarkovDevUnexpectedError('profile_preview_mode_refetch', err);
+    } finally {
+      tarkovDevRefreshingMode.value = null;
+      resetTurnstile();
+    }
+  }
   async function handleTarkovDevPreviewRefetch() {
     try {
-      const profileUrl = tarkovDevProfileUrl.value ?? tarkovDevProfileUrlInput.value;
+      const profileUrl = tarkovDevStaleRecoveryUrl.value;
       if (!profileUrl) return;
       const source = await fetchTarkovDevProfile(profileUrl, true);
       updateTarkovDevImportTarget(source?.mode);
     } catch (err) {
       handleTarkovDevUnexpectedError('profile_preview_refetch', err);
+    }
+  }
+  async function handleTarkovDevStaleRetry() {
+    const profileUrl = tarkovDevStaleRecoveryUrl.value;
+    if (!profileUrl) return;
+    try {
+      const source = await fetchTarkovDevProfile(profileUrl, true);
+      updateTarkovDevImportTarget(source?.mode);
+    } catch (err) {
+      handleTarkovDevUnexpectedError('profile_stale_retry', err);
+    }
+  }
+  async function handleTarkovDevAllowStale() {
+    const profileUrl = tarkovDevStaleRecoveryUrl.value;
+    if (!profileUrl) return;
+    try {
+      const source = await fetchTarkovDevProfile(profileUrl, false, true);
+      updateTarkovDevImportTarget(source?.mode);
+    } catch (err) {
+      handleTarkovDevUnexpectedError('profile_allow_stale', err);
     }
   }
   function handleTarkovDevUnexpectedError(action: string, err: unknown) {
@@ -1538,23 +1693,51 @@
   }
   function handleTarkovDevUnlink() {
     tarkovDevFixedTargetMode.value = null;
-    tarkovDevRefetchMode.value = currentTarkovDevMode();
+    tarkovDevLinkedReadyToFetch.value = false;
+    tarkovDevTurnstileEngaged.value = false;
+    tarkovDevRefetchModes.value = [currentTarkovDevMode()];
     tarkovStore.setTarkovUid(null);
   }
   async function handleTarkovDevConfirm() {
-    await confirmTarkovDevImport(tarkovDevFixedTargetMode.value ?? tarkovDevTargetMode.value);
+    const targetMode = tarkovDevFixedTargetMode.value ?? tarkovDevTargetMode.value;
+    const editionResolved =
+      tarkovDevPreview.value?.gameEditionGuess !== null &&
+      tarkovDevPreview.value?.gameEditionGuess !== undefined;
+    await confirmTarkovDevImport(targetMode);
+    if (tarkovDevImportState.value === 'success') {
+      tarkovDevLinkedReadyToFetch.value = false;
+      tarkovDevTurnstileEngaged.value = false;
+      emit('tarkovDevImported', { mode: targetMode, modes: [targetMode], editionResolved });
+    }
+  }
+  async function handleTarkovDevMultiConfirm(selectedModes: GameMode[]) {
+    const preview = tarkovDevMultiPreview.value;
+    if (!preview || selectedModes.length === 0) return;
+    const importedModes = await confirmTarkovDevMultiImport(selectedModes);
+    if (importedModes.length === 0) return;
+    const editionResolved = importedModes.some((mode) => {
+      const entry = preview.modes[mode];
+      return entry?.status === 'ok' && entry.data.gameEditionGuess !== null;
+    });
+    if (tarkovDevImportState.value === 'success') {
+      tarkovDevLinkedReadyToFetch.value = false;
+      tarkovDevTurnstileEngaged.value = false;
+    }
+    emit('tarkovDevImported', { mode: importedModes[0]!, modes: importedModes, editionResolved });
   }
   function resetTarkovDevImport() {
     tarkovDevRequestGeneration.value += 1;
+    lastTarkovDevSingleUrl.value = undefined;
     tarkovDevFixedTargetMode.value = null;
+    tarkovDevLinkedReadyToFetch.value = false;
+    tarkovDevTurnstileEngaged.value = false;
+    tarkovDevRefreshingMode.value = null;
     resetTurnstile();
     resetTarkovDevImportState();
   }
-  async function handleEftLogsFolderChange(event: Event) {
-    const input = event.target as HTMLInputElement;
+  async function handleEftLogsFiles(files: File[]) {
     try {
-      const files = input.files ? Array.from(input.files) : [];
-      if (files.length === 0) return;
+      if (files.length === 0 || isAnyImportActive.value) return;
       await parseEftLogsFiles(files);
       if (shouldShowEftLogsCleanupHelpToast.value) {
         toast.add({
@@ -1563,11 +1746,15 @@
           color: 'info',
         });
       }
-      input.value = '';
     } catch (err) {
       logger.error('DataManagementCard: parseEftLogsFiles failed', err, eftLogsImportError.value);
-      return;
     }
+  }
+  async function handleEftLogsFolderChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const files = input.files ? Array.from(input.files) : [];
+    await handleEftLogsFiles(files);
+    input.value = '';
   }
   function handleEftLogsVersionToggle(version: string, enabled: boolean) {
     try {
@@ -1752,8 +1939,6 @@
     return labels.length ? labels.join(' + ') : t('common.unknown');
   });
   const editionLabelFromBackup = computed(() => getEditionLabel(backupPreview.value?.gameEdition));
-  const showImportTools = computed(() => props.view === 'all' || props.view === 'imports');
-  const showBackupTools = computed(() => props.view === 'all' || props.view === 'backup');
   const isTarkovDevImportPreviewActive = computed(() => tarkovDevImportState.value === 'preview');
   const isEftLogsPreviewActive = computed(() => eftLogsImportState.value === 'preview');
   type ActiveDataFlow = 'backup' | 'eft-logs' | 'tarkov-dev';
@@ -1771,7 +1956,7 @@
   });
   const visibleDataFlows = computed<ActiveDataFlow[]>(() => {
     if (props.view === 'imports') return ['eft-logs', 'tarkov-dev'];
-    if (props.view === 'backup') return ['backup'];
+    if (props.view !== 'all') return [props.view];
     return ['backup', 'eft-logs', 'tarkov-dev'];
   });
   const isBlockedByOtherDataFlow = computed(
@@ -1793,6 +1978,29 @@
   const isBackupOrEftLogsImportPreviewActive = computed(
     () => backupImportState.value === 'preview' || isEftLogsPreviewActive.value
   );
+  const showProfileImport = computed(
+    () =>
+      visibleDataFlows.value.includes('tarkov-dev') &&
+      !isBlockedByOtherDataFlow.value &&
+      !isBackupOrEftLogsImportPreviewActive.value &&
+      !eftLogsIsParsing.value
+  );
+  const showLogImport = computed(
+    () =>
+      visibleDataFlows.value.includes('eft-logs') &&
+      !isBlockedByOtherDataFlow.value &&
+      !isTarkovDevImportPreviewActive.value
+  );
+  const canShowBackup = computed(
+    () => visibleDataFlows.value.includes('backup') && !isBlockedByOtherDataFlow.value
+  );
+  const showBackupTools = computed(
+    () =>
+      canShowBackup.value &&
+      !isTarkovDevImportPreviewActive.value &&
+      !isEftLogsPreviewActive.value &&
+      !eftLogsIsParsing.value
+  );
   const isAnyImportPreviewActive = computed(
     () => isBackupOrEftLogsImportPreviewActive.value || isTarkovDevImportPreviewActive.value
   );
@@ -1803,6 +2011,23 @@
       tarkovDevImportState.value === 'loading' ||
       eftLogsIsParsing.value
   );
+  function formatRelativeTime(ts: number, now: number): string {
+    const diffSeconds = Math.max(0, Math.floor((now - ts) / 1000));
+    const rtf = new Intl.RelativeTimeFormat(locale?.value || undefined, {
+      numeric: 'auto',
+      style: 'long',
+    });
+    if (diffSeconds < 60) return rtf.format(0, 'second');
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) return rtf.format(-diffMinutes, 'minute');
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return rtf.format(-diffHours, 'hour');
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 30) return rtf.format(-diffDays, 'day');
+    const diffMonths = Math.floor(diffDays / 30);
+    if (diffDays < 365) return rtf.format(-diffMonths, 'month');
+    return rtf.format(-Math.floor(diffDays / 365), 'year');
+  }
   function formatDate(ts: number): string {
     return new Date(ts).toLocaleDateString(undefined, {
       year: 'numeric',

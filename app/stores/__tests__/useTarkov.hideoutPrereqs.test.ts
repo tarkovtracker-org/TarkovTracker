@@ -1,5 +1,9 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  describeBlockedHideoutTiers,
+  previewBlockedHideoutTiers,
+} from '@/stores/tarkov/hideoutPrereqs';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
@@ -52,6 +56,22 @@ describe('useTarkovStore hideout skill prerequisites', () => {
         traderRepBonus: {},
       },
     ] as GameEdition[];
+  });
+  it('previews blocked tiers and planned quest rewards without changing saved progress', () => {
+    const metadata = useMetadataStore();
+    const quest = metadata.tasks[0]!;
+    const level = metadata.hideoutStations[0]!.levels[0]!;
+    quest.finishRewards!.skillLevelReward![0]!.level = 10;
+    const store = useTarkovStore();
+    const draft = { moduleIds: [level.id], questIds: [] };
+    expect(previewBlockedHideoutTiers(store, draft)).toEqual([level.id]);
+    expect(previewBlockedHideoutTiers(store, { ...draft, questIds: [quest.id] })).toEqual([]);
+    expect(store.isTaskComplete(quest.id)).toBe(false);
+    expect(store.isHideoutModuleComplete(level.id)).toBe(false);
+    store.setTaskComplete(quest.id);
+    store.setHideoutModuleComplete(level.id);
+    expect(store.enforceHideoutPrereqsNow()).toBe(0);
+    expect(store.isHideoutModuleComplete(level.id)).toBe(true);
   });
   it.each([
     ['<', 3, true],
@@ -149,5 +169,82 @@ describe('useTarkovStore hideout skill prerequisites', () => {
     const removedCount = tarkovStore.enforceHideoutPrereqsNow();
     expect(removedCount).toBe(1);
     expect(tarkovStore.isHideoutModuleComplete('module-gym-1')).toBe(false);
+  });
+  it('describes exact unmet station, trader, and skill blockers and honors planned trader levels', () => {
+    const metadata = useMetadataStore();
+    metadata.traders = [{ id: 'mechanic', name: 'Mechanic' } as (typeof metadata.traders)[number]];
+    metadata.hideoutStations.push({
+      id: 'station-security',
+      name: 'Security',
+      normalizedName: 'security',
+      levels: [
+        {
+          id: 'module-security-1',
+          level: 1,
+          constructionTime: 0,
+          itemRequirements: [],
+          stationLevelRequirements: [],
+          skillRequirements: [],
+          traderRequirements: [],
+          crafts: [],
+        },
+      ],
+    } as HideoutStation);
+    const gymLevel = metadata.hideoutStations[0]!.levels[0]!;
+    gymLevel.stationLevelRequirements = [
+      { id: 'req-sec', station: { id: 'station-security', name: 'Security' }, level: 1 },
+    ];
+    gymLevel.traderRequirements = [
+      {
+        id: 'req-mech',
+        trader: { id: 'mechanic', name: 'Mechanic' },
+        compareMethod: '>=',
+        value: 2,
+      },
+    ] as typeof gymLevel.traderRequirements;
+    const store = useTarkovStore();
+    const details = describeBlockedHideoutTiers(store, {
+      moduleIds: [gymLevel.id],
+      questIds: [],
+    });
+    expect(details).toEqual([
+      {
+        moduleId: 'module-gym-1',
+        stationId: 'station-gym',
+        stationName: 'Gym',
+        level: 1,
+        missingStations: [
+          {
+            stationId: 'station-security',
+            stationName: 'Security',
+            requiredLevel: 1,
+            currentLevel: 0,
+          },
+        ],
+        missingTraders: [
+          {
+            traderId: 'mechanic',
+            traderName: 'Mechanic',
+            requiredLevel: 2,
+            currentLevel: 1,
+          },
+        ],
+        missingSkills: [
+          {
+            skillName: 'Strength',
+            requiredLevel: 10,
+            currentLevel: 0,
+          },
+        ],
+      },
+    ]);
+    const afterTraders = describeBlockedHideoutTiers(store, {
+      moduleIds: ['module-security-1', gymLevel.id],
+      questIds: [],
+      traderLevels: { mechanic: 2 },
+    });
+    expect(afterTraders[0]?.missingStations).toEqual([]);
+    expect(afterTraders[0]?.missingTraders).toEqual([]);
+    expect(afterTraders[0]?.missingSkills).toHaveLength(1);
   });
 });

@@ -3,12 +3,33 @@ import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
 import type { GameMode } from '@/utils/constants';
+export const useGameModeSwitchLock = () => useState('game-mode-switch-locked', () => false);
+const useModeSwitching = () => useState('game-mode-switching', () => false);
+const useImportingProgress = () => useState('game-mode-importing-progress', () => false);
+export function useProgressImportBlocked() {
+  const { loading } = storeToRefs(useMetadataStore());
+  const switching = useModeSwitching();
+  const importing = useImportingProgress();
+  return computed(() => switching.value || importing.value || Boolean(loading?.value));
+}
+export function useProgressImportClaim() {
+  const blocked = useProgressImportBlocked();
+  const importing = useImportingProgress();
+  return () => {
+    if (blocked.value) return null;
+    importing.value = true;
+    return () => {
+      importing.value = false;
+    };
+  };
+}
 export function useGameModeSwitch() {
   const metadata = useMetadataStore();
   const tarkov = useTarkovStore();
-  const { loading } = storeToRefs(metadata);
-  const switching = useState('game-mode-switching', () => false);
-  const dataLoading = computed(() => switching.value || loading.value);
+  const switching = useModeSwitching();
+  const locked = useGameModeSwitchLock();
+  const busy = useProgressImportBlocked();
+  const dataLoading = computed(() => busy.value || locked.value);
   const switchModeError = ref('');
   async function refreshMode() {
     metadata.updateLanguageAndGameMode();
@@ -18,17 +39,20 @@ export function useGameModeSwitch() {
     await tarkov.switchGameMode(mode);
     await refreshMode();
   }
-  async function switchMode(mode: GameMode) {
+  async function switchMode(mode: GameMode, refreshCurrent = false) {
     const previousMode = tarkov.getCurrentGameMode();
-    if (mode === previousMode || dataLoading.value) return;
+    if (dataLoading.value) return false;
+    if (mode === previousMode && !refreshCurrent) return true;
     switchModeError.value = '';
     switching.value = true;
     metadata.setLoading(true);
     let errorKey = 'settings.game_settings.switch_mode_failed';
     try {
-      await tarkov.switchGameMode(mode);
+      if (mode !== previousMode) await tarkov.switchGameMode(mode);
+      if (tarkov.getCurrentGameMode() !== mode) return false;
       errorKey = 'settings.game_settings.switch_mode_fetch_failed';
       await refreshMode();
+      return true;
     } catch (error) {
       logger.error('[GameMode] Could not switch mode and refresh data:', error);
       switchModeError.value = errorKey;
@@ -37,6 +61,7 @@ export function useGameModeSwitch() {
           logger.error('[GameMode] Could not restore the previous mode:', rollbackError);
         });
       }
+      return false;
     } finally {
       metadata.setLoading(false);
       switching.value = false;

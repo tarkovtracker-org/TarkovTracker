@@ -160,9 +160,11 @@ that meet AA in both HSL and OKLCH palettes. Card header and hideout avatar grad
 complete `SemanticColor` mapping in `app/utils/cardHighlights.ts`. Keep its classes literal so
 Tailwind can discover every stop.
 
-Note: Nuxt UI maps its semantic `info` color to the `accent` (teal) palette in `app.config.ts`, so
-`<UButton color="info">` renders teal, while the CSS `text-info-500` class renders blue. This is
-intentional — the teal accent is the primary informational tone in the UI.
+Note: Nuxt UI maps its semantic `info` color directly to the `info` (blue) palette in
+`app.config.ts` so `<UButton color="info">`, `<UBadge color="info">`, `<UAlert color="info">`, and
+Tailwind `info-*` utilities stay visually consistent and meet WCAG AA contrast in both dark and
+light themes. The muted teal `accent` palette remains available explicitly via `color="accent"` and
+`accent-*`.
 
 ## Typography
 
@@ -202,6 +204,9 @@ the app bar does not repeat the page title.
 
 For icon-only actions, use an icon and an accessible label. Do not use text-only rounded rectangles
 when a standard icon button is clearer.
+
+Action button order: always place cancel, back, dismiss, or secondary actions on the **left** and
+confirm, accept, continue, or primary submit actions on the **right**.
 
 ## Do's and Don'ts
 

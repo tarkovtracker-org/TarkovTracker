@@ -47,6 +47,8 @@ output). For `test:workflow`, set `NODE_OPTIONS=--test-reporter=dot`; failures s
 
 - Tailwind v4 utilities and theme tokens only; no `<style>`, SCSS, or scoped CSS. Use `@/` imports,
   not parent-relative paths.
+- Action button order: always place cancel, back, dismiss, or secondary actions on the left, and
+  confirm, accept, continue, or primary submit actions on the right (`DESIGN.md`).
 - User-facing copy goes in `en.json` only, snake_case keys, reusing `common.*` where appropriate;
   missing translations use the English fallback.
 - Game data comes only from `json.tarkov.dev` via `/api/tarkov/*`; never add the `api.tarkov.dev`

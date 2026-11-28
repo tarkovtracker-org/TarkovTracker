@@ -341,6 +341,12 @@ describe('formatSkillName', () => {
   it('leaves already formatted names unchanged', () => {
     expect(formatSkillName('Stress Resistance')).toBe('Stress Resistance');
   });
+  it('trims and splits uppercase prefixes and numeric skill names', () => {
+    expect(formatSkillName('  DMRHandling  ')).toBe('DMR Handling');
+    expect(formatSkillName('DMRs')).toBe('DMRs');
+    expect(formatSkillName('Level1Drills')).toBe('Level1 Drills');
+    expect(formatSkillName('  ')).toBe('');
+  });
 });
 describe('getNextRequiredLevel', () => {
   it('returns the lowest requirement above the current level', () => {

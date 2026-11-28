@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref, type Ref } from 'vue';
 import { invalidateStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import type { GameMode } from '@/utils/constants';
 import type { TarkovDevImportResult } from '@/utils/tarkovDevProfileParser';
@@ -8,6 +9,12 @@ const { importSession } = vi.hoisted(() => ({
   importSession: { userId: 'user-1', loggedIn: true },
 }));
 mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: importSession } }));
+const appState = new Map<string, Ref<boolean>>();
+mockNuxtImport('useState', () => (key: string, init: () => boolean) => {
+  const state = appState.get(key) ?? ref(init());
+  appState.set(key, state);
+  return state;
+});
 vi.mock('@/utils/userScopedStorage', () => ({
   getCurrentSupabaseUserId: () => importSession.userId,
 }));
@@ -115,7 +122,7 @@ describe('useTarkovDevImport', () => {
       else importSession.loggedIn = false;
       resolve(true);
       await pending;
-      expect(composable.importState.value).toBe('preview');
+      expect(composable.importState.value).toBe('idle');
       expect(tarkovStore.switchGameMode).toHaveBeenCalledTimes(1);
       expect(mockRecordImportCompletion).not.toHaveBeenCalled();
     }
@@ -159,6 +166,7 @@ describe('useTarkovDevImport', () => {
     await Promise.all([pending, duplicate]);
   });
   beforeEach(() => {
+    appState.clear();
     importSession.userId = 'user-1';
     importSession.loggedIn = true;
     vi.resetAllMocks();
@@ -629,6 +637,91 @@ describe('useTarkovDevImport', () => {
       expect.any(Error)
     );
   });
+  it('sends allowStale=1 when explicitly opting in to stale profile data', async () => {
+    mockFetch.mockResolvedValue({ aid: 8560316 });
+    mockParseTarkovDevProfile.mockReturnValue({
+      data: createImportData({ tarkovUid: 8560316 }),
+      ok: true,
+    });
+    const composable = await loadComposable();
+    await composable.parseProfileUrl('https://tarkov.dev/players/regular/8560316', {
+      allowStale: true,
+    });
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      query: { allowStale: '1', url: 'https://players.tarkov.dev/profile/8560316.json' },
+      retry: 0,
+    });
+  });
+  it('fetches multiple modes in one request and applies only selected ready modes', async () => {
+    const pvpData = createImportData({ displayName: 'PvpGuy', tarkovUid: 8560316, totalXP: 2500 });
+    const pveData = createImportData({ displayName: 'PveGuy', tarkovUid: 8560316, totalXP: 1000 });
+    mockFetch.mockResolvedValue({
+      tarkovUid: 8560316,
+      profiles: {
+        pvp: { status: 'ok', profile: { aid: 8560316, mode: 'pvp' } },
+        pve: { status: 'ok', profile: { aid: 8560316, mode: 'pve' } },
+        seasonal: { status: 'not_found' },
+      },
+    });
+    mockParseTarkovDevProfile.mockImplementation((raw: { mode?: string }) => ({
+      data: raw.mode === 'pve' ? pveData : pvpData,
+      ok: true,
+    }));
+    const composable = await loadComposable();
+    const preview = await composable.parseProfileModes(
+      'https://tarkov.dev/players/regular/8560316',
+      ['pvp', 'pve', 'seasonal']
+    );
+    expect(mockFetch).toHaveBeenCalledWith('/api/tarkov-dev/profile', {
+      query: {
+        modes: 'pvp,pve,seasonal',
+        url: 'https://players.tarkov.dev/profile/8560316.json',
+      },
+      retry: 0,
+    });
+    expect(composable.importState.value).toBe('preview');
+    expect(preview?.modes.pvp?.status).toBe('ok');
+    expect(preview?.modes.pve?.status).toBe('ok');
+    expect(preview?.modes.seasonal?.status).toBe('not_found');
+    const imported = await composable.confirmMultiImport(['pvp', 'pve']);
+    expect(imported).toEqual(['pvp', 'pve']);
+    expect(composable.importState.value).toBe('success');
+    expect(tarkovStore.setDisplayName).toHaveBeenNthCalledWith(1, 'PvpGuy');
+    expect(tarkovStore.setDisplayName).toHaveBeenNthCalledWith(2, 'PveGuy');
+    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'pvp', 60 * 60_000);
+    expect(mockRecordImportCompletion).toHaveBeenCalledWith(8560316, 'pve', 60 * 60_000);
+    expect(tarkovStore.switchGameMode).toHaveBeenLastCalledWith('pvp');
+  });
+  it('updates a single mode inside an active multi-mode preview via refetchPreviewMode', async () => {
+    const pvpData = createImportData({ displayName: 'PvpGuy', tarkovUid: 8560316 });
+    const pveData = createImportData({ displayName: 'PveStaleGuy', tarkovUid: 8560316 });
+    mockFetch
+      .mockResolvedValueOnce({
+        tarkovUid: 8560316,
+        profiles: {
+          pvp: { status: 'ok', profile: { aid: 8560316, mode: 'pvp' } },
+          pve: { status: 'stale', ageDays: 12, maxUpdatedAgeDays: 7, updatedAt: 1000 },
+        },
+      })
+      .mockResolvedValueOnce({ aid: 8560316, mode: 'pve' });
+    mockParseTarkovDevProfile.mockImplementation((raw: { mode?: string }) => ({
+      data: raw.mode === 'pve' ? pveData : pvpData,
+      ok: true,
+    }));
+    const composable = await loadComposable();
+    await composable.parseProfileModes('https://tarkov.dev/players/regular/8560316', [
+      'pvp',
+      'pve',
+    ]);
+    expect(composable.multiPreview.value?.modes.pve?.status).toBe('stale');
+    const ok = await composable.refetchPreviewMode('pve', { allowStale: true });
+    expect(ok).toBe(true);
+    expect(composable.multiPreview.value?.modes.pve).toMatchObject({
+      status: 'ok',
+      staleAccepted: true,
+      data: pveData,
+    });
+  });
   it('resets preview and errors back to idle', async () => {
     mockParseTarkovDevProfile.mockReturnValue({
       error: 'Invalid tarkov.dev profile format',
@@ -640,6 +733,103 @@ describe('useTarkovDevImport', () => {
     composable.reset();
     expect(composable.importState.value).toBe('idle');
     expect(composable.previewData.value).toBeNull();
+    expect(composable.multiPreview.value).toBeNull();
     expect(composable.importError.value).toBeNull();
+  });
+  const batchUrl = 'https://tarkov.dev/players/regular/8560316';
+  const batchResponse = {
+    tarkovUid: 8560316,
+    profiles: {
+      pvp: { status: 'ok', profile: { aid: 8560316 } },
+      pve: { status: 'ok', profile: { aid: 8560316 } },
+    },
+  };
+  it.each(['url', 'file'])('discards a batch when a new %s preview starts', async (source) => {
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    mockFetch.mockResolvedValueOnce(batchResponse).mockResolvedValueOnce({ aid: 8560316 });
+    const importer = await loadComposable();
+    await importer.parseProfileModes(batchUrl, ['pvp', 'pve']);
+    if (source === 'url') await importer.parseProfileUrl(batchUrl);
+    else await importer.parseFile(createFile('{}'));
+    expect(importer.importState.value).toBe('preview');
+    expect(importer.multiPreview.value).toBeNull();
+  });
+  it.each(['success', 'failure'])(
+    'ignores a refetch %s after a new preview for the same UID',
+    async (outcome) => {
+      mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+      const retry = Promise.withResolvers<unknown>();
+      mockFetch
+        .mockResolvedValueOnce(batchResponse)
+        .mockReturnValueOnce(retry.promise)
+        .mockResolvedValueOnce(batchResponse);
+      const importer = await loadComposable();
+      await importer.parseProfileModes(batchUrl, ['pvp', 'pve']);
+      const pending = importer.refetchPreviewMode('pve', { allowStale: true });
+      await importer.parseProfileModes(batchUrl, ['pvp', 'pve']);
+      const newPreview = importer.multiPreview.value;
+      if (outcome === 'success') retry.resolve({ aid: 8560316 });
+      else retry.reject(new Error('stale request'));
+      await expect(pending).resolves.toBe(false);
+      expect(importer.multiPreview.value).toBe(newPreview);
+    }
+  );
+  it.each(['single', 'batch'])(
+    'rejects a %s preview after session ownership changes',
+    async (kind) => {
+      mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+      mockFetch.mockResolvedValue(batchResponse);
+      const importer = await loadComposable();
+      if (kind === 'single') await importer.parseFile(createFile('{}'));
+      else await importer.parseProfileModes(batchUrl, ['pvp', 'pve']);
+      invalidateStartupOwnership();
+      if (kind === 'single') await importer.confirmImport('pvp');
+      else await expect(importer.confirmMultiImport(['pvp', 'pve'])).resolves.toEqual([]);
+      expect(tarkovStore.saveProgressNow).not.toHaveBeenCalled();
+      expect(importer.importState.value).toBe('idle');
+    }
+  );
+  it('reports modes already saved when a later batch entry throws', async () => {
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    mockFetch.mockResolvedValue(batchResponse);
+    tarkovStore.saveProgressNow.mockResolvedValueOnce(true).mockRejectedValueOnce(new Error());
+    const importer = await loadComposable();
+    await importer.parseProfileModes(batchUrl, ['pvp', 'pve']);
+    await expect(importer.confirmMultiImport(['pvp', 'pve'])).resolves.toEqual(['pvp']);
+    expect(importer.importState.value).toBe('error');
+    expect(tarkovStore.getCurrentGameMode()).toBe('pvp');
+  });
+  it('keeps the preview while restoring the original mode after a complete batch', async () => {
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    mockFetch.mockResolvedValue(batchResponse);
+    const restore = Promise.withResolvers<undefined>();
+    tarkovStore.switchGameMode.mockImplementation(async (mode: GameMode) => {
+      if (mode === 'pvp') await restore.promise;
+      tarkovStore.getCurrentGameMode.mockReturnValue(mode);
+    });
+    const importer = await loadComposable();
+    await importer.parseProfileModes(batchUrl, ['pvp', 'pve']);
+    const confirmation = importer.confirmMultiImport(['pvp', 'pve']);
+    await vi.waitFor(() => expect(tarkovStore.switchGameMode).toHaveBeenLastCalledWith('pvp'));
+    expect(importer.importState.value).toBe('preview');
+    restore.resolve(undefined);
+    await expect(confirmation).resolves.toEqual(['pvp', 'pve']);
+    expect(importer.importState.value).toBe('success');
+  });
+  it('allows retrying a preview after the active mode finishes switching', async () => {
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    const importer = await loadComposable();
+    await importer.parseFile(createFile('{}'));
+    const { useGameModeSwitch } = await import('@/composables/useGameModeSwitch');
+    useGameModeSwitch();
+    const switching = appState.get('game-mode-switching')!;
+    switching.value = true;
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.saveProgressNow).not.toHaveBeenCalled();
+    expect(importer.importState.value).toBe('preview');
+    switching.value = false;
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.saveProgressNow).toHaveBeenCalledOnce();
+    expect(importer.importState.value).toBe('success');
   });
 });

@@ -489,4 +489,58 @@ describe('/api/tarkov-dev/profile', () => {
     await expect(handler({})).rejects.toMatchObject({ statusCode: 400 });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it('allows stale snapshots with no-store caching when allowStale=1 is explicitly requested', async () => {
+    const staleBody = {
+      ...freshProfileBody(),
+      updated: Date.now() - 12 * 86_400_000,
+    };
+    getQueryMock.mockReturnValue({
+      allowStale: '1',
+      url: 'https://tarkov.dev/players/regular/8560316',
+    });
+    fetchMock.mockResolvedValue(upstreamResponse(staleBody));
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual(staleBody);
+    expect(setResponseHeaderMock).toHaveBeenCalledWith({}, 'Cache-Control', 'no-store');
+  });
+  it('fetches multiple game modes in one request with per-mode ok, stale, and not_found statuses', async () => {
+    const pvpBody = freshProfileBody();
+    const staleSeasonalBody = freshProfileBody(Date.now() - 10 * DAY_MS);
+    getQueryMock.mockReturnValue({
+      modes: 'pvp,pve,seasonal',
+      url: 'https://tarkov.dev/players/regular/8560316',
+    });
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === 'https://players.tarkov.dev/profile/8560316.json') {
+        return upstreamResponse(pvpBody);
+      }
+      if (url === 'https://players.tarkov.dev/pve/8560316.json') {
+        return upstreamResponse(null, { status: 404 });
+      }
+      if (url === 'https://players.tarkov.dev/pvp-season/8560316.json') {
+        return upstreamResponse(staleSeasonalBody);
+      }
+      throw new Error(`Unexpected url ${url}`);
+    });
+    const handler = await loadHandler();
+    await expect(handler({})).resolves.toEqual({
+      tarkovUid: 8560316,
+      profiles: {
+        pvp: { status: 'ok', profile: pvpBody },
+        pve: { status: 'not_found' },
+        seasonal: expect.objectContaining({ status: 'stale', maxUpdatedAgeDays: 7 }),
+      },
+    });
+    expect(consumeSharedRateLimitWithResetMock).toHaveBeenCalledTimes(2);
+    expect(setResponseHeaderMock).toHaveBeenCalledWith({}, 'Cache-Control', 'no-store');
+  });
+  it('rejects invalid modes query values with 400 before fetching upstream', async () => {
+    getQueryMock.mockReturnValue({
+      modes: 'pvp,arena',
+      url: 'https://tarkov.dev/players/regular/8560316',
+    });
+    const handler = await loadHandler();
+    await expect(handler({})).rejects.toMatchObject({ statusCode: 400 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

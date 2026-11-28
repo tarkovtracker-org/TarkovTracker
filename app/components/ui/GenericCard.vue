@@ -35,7 +35,7 @@
                   <UIcon
                     v-else
                     :name="props.icon?.startsWith('mdi-') ? `i-${props.icon}` : props.icon"
-                    :class="`text-${props.iconColor}`"
+                    :class="iconColorClass"
                     class="h-6 w-6"
                   />
                 </span>
@@ -129,5 +129,11 @@
     const colorKey = props.highlightColor;
     const selectedClass = CARD_HIGHLIGHT_GRADIENTS[colorKey] || CARD_HIGHLIGHT_GRADIENTS.accent;
     return { [selectedClass]: true };
+  });
+  const iconColorClass = computed(() => {
+    if (props.iconColor === 'white' || props.iconColor === props.highlightColor) {
+      return 'text-white';
+    }
+    return `text-${props.iconColor}`;
   });
 </script>
