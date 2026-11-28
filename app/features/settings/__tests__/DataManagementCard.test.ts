@@ -3,6 +3,8 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref, type Ref } from 'vue';
 import DataManagementCard from '@/features/settings/DataManagementCard.vue';
+import TarkovDevModeReadyBody from '@/features/settings/TarkovDevModeReadyBody.vue';
+import TarkovDevModeStatusBody from '@/features/settings/TarkovDevModeStatusBody.vue';
 import { ACTIVE_SEASON } from '@/utils/constants';
 import {
   createEftLogImportSelection,
@@ -63,6 +65,9 @@ const {
   },
   tarkovDevFns: {
     confirmImport: vi.fn(async () => undefined),
+    confirmMultiImport: vi.fn<
+      (modes: Array<'pvp' | 'pve' | 'seasonal'>) => Promise<Array<'pvp' | 'pve' | 'seasonal'>>
+    >(async (modes) => modes),
     parseFile: vi.fn(async () => undefined),
     parseProfileUrl: vi.fn<
       (
@@ -74,6 +79,19 @@ const {
         tarkovUid: number;
       } | null>
     >(async () => null),
+    parseProfileModes: vi.fn<
+      (
+        profileUrl: string,
+        modes: Array<'pvp' | 'pve' | 'seasonal'>,
+        options?: { allowStale?: boolean; fresh?: boolean; turnstileToken?: string | null }
+      ) => Promise<Record<string, unknown> | null>
+    >(async () => null),
+    refetchPreviewMode: vi.fn<
+      (
+        mode: 'pvp' | 'pve' | 'seasonal',
+        options?: { allowStale?: boolean; fresh?: boolean; turnstileToken?: string | null }
+      ) => Promise<boolean>
+    >(async () => true),
     reset: vi.fn(),
     setError: vi.fn<(message: string) => void>(),
   },
@@ -84,7 +102,9 @@ const {
       __v_isRef: true as const,
       value: null as Record<string, number> | null,
     },
+    isImporting: { __v_isRef: true as const, value: false },
     previewData: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
+    multiPreview: { __v_isRef: true as const, value: null as Record<string, unknown> | null },
     importState: {
       __v_isRef: true as const,
       value: 'idle' as 'idle' | 'loading' | 'preview' | 'success' | 'error',
@@ -104,6 +124,7 @@ const {
     isParsing: {} as Ref<boolean>,
     parseProgress: {} as Ref<{ bytesRead: number; totalBytes: number }>,
     isImporting: {} as Ref<boolean>,
+    needsSaveRetry: { __v_isRef: true as const, value: false },
     importError: { __v_isRef: true as const, value: null as string | null },
     previewData: {} as Ref<Record<string, unknown> | null>,
     importState: {
@@ -170,13 +191,18 @@ vi.mock('@/composables/useCopyToClipboard', () => ({
 vi.mock('@/composables/useTarkovDevImport', () => ({
   useTarkovDevImport: () => ({
     importState: tarkovDevState.importState,
+    isImporting: tarkovDevState.isImporting,
     previewData: tarkovDevState.previewData,
+    multiPreview: tarkovDevState.multiPreview,
     importError: tarkovDevState.importError,
     importErrorCode: tarkovDevState.importErrorCode,
     importErrorMeta: tarkovDevState.importErrorMeta,
     parseFile: tarkovDevFns.parseFile,
     parseProfileUrl: tarkovDevFns.parseProfileUrl,
+    parseProfileModes: tarkovDevFns.parseProfileModes,
+    refetchPreviewMode: tarkovDevFns.refetchPreviewMode,
     confirmImport: tarkovDevFns.confirmImport,
+    confirmMultiImport: tarkovDevFns.confirmMultiImport,
     setError: tarkovDevFns.setError,
     reset: tarkovDevFns.reset,
   }),
@@ -187,6 +213,7 @@ vi.mock('@/composables/useEftLogsImport', () => ({
     parseProgress: eftLogsState.parseProgress,
     importState: eftLogsState.importState,
     isImporting: eftLogsState.isImporting,
+    needsSaveRetry: eftLogsState.needsSaveRetry,
     previewData: eftLogsState.previewData,
     importError: eftLogsState.importError,
     parseFile: eftLogsFns.parseFile,
@@ -232,6 +259,7 @@ vi.mock('@/stores/useTarkov', () => ({
 vi.mock('vue-i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('vue-i18n')>()),
   useI18n: () => ({
+    locale: ref('en'),
     t: (key: string, params?: Record<string, unknown>) => {
       if (params && typeof params === 'object') {
         return `${key}:${JSON.stringify(params)}`;
@@ -271,8 +299,11 @@ describe('DataManagementCard', () => {
     backupFns.parseBackupFile.mockReset();
     backupFns.resetImport.mockReset();
     tarkovDevFns.confirmImport.mockReset();
+    tarkovDevFns.confirmMultiImport.mockReset().mockImplementation(async (modes) => modes);
     tarkovDevFns.parseFile.mockReset();
     tarkovDevFns.parseProfileUrl.mockReset();
+    tarkovDevFns.parseProfileModes.mockReset();
+    tarkovDevFns.refetchPreviewMode.mockReset().mockResolvedValue(true);
     tarkovDevFns.reset.mockReset();
     tarkovDevFns.setError.mockReset();
     eftLogsFns.confirmImport.mockReset();
@@ -306,6 +337,7 @@ describe('DataManagementCard', () => {
     tarkovDevState.importErrorMeta.value = null;
     tarkovDevState.importState.value = 'idle';
     tarkovDevState.previewData.value = null;
+    tarkovDevState.multiPreview.value = null;
     eftLogsState.importError.value = null;
     eftLogsState.importState.value = 'idle';
     eftLogsState.isImporting = ref(false);
@@ -342,7 +374,8 @@ describe('DataManagementCard', () => {
           ResetProgressSection: true,
           UAlert: {
             props: ['description', 'title'],
-            template: '<div><span>{{ title }}</span><span>{{ description }}</span></div>',
+            template:
+              '<div><span>{{ title }}</span><span>{{ description }}</span><slot name="description" /></div>',
           },
           UButton,
           UIcon: true,
@@ -353,7 +386,8 @@ describe('DataManagementCard', () => {
             emits: ['update:modelValue'],
           },
           UTooltip: {
-            template: '<div><slot /></div>',
+            props: ['text'],
+            template: '<div :data-tooltip="text"><slot /></div>',
           },
           UCheckbox: {
             template:
@@ -597,7 +631,9 @@ describe('DataManagementCard', () => {
   });
   it('limits the imports view to profile and log import actions', () => {
     const wrapper = createWrapper({ view: 'imports' });
-    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeTruthy();
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profiles_count')
+    ).toBeTruthy();
     expect(
       findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
     ).toBeTruthy();
@@ -611,7 +647,9 @@ describe('DataManagementCard', () => {
     expect(findButtonByText(wrapper, 'settings.data_management.export_button')).toBeTruthy();
     expect(findButtonByText(wrapper, 'settings.data_management.bug_report_download')).toBeTruthy();
     expect(findButtonByText(wrapper, 'settings.data_management.bug_report_copy')).toBeTruthy();
-    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profiles_count')
+    ).toBeUndefined();
     expect(
       findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
     ).toBeUndefined();
@@ -721,27 +759,32 @@ describe('DataManagementCard', () => {
       })
     );
   });
-  it('fetches tarkov.dev profile url and uses the url mode for import preview', async () => {
-    tarkovDevFns.parseProfileUrl.mockResolvedValue({
-      mode: 'pve',
-      profileJsonUrl: 'https://players.tarkov.dev/pve/8560316.json',
+  it('checks all game modes by default when submitting a tarkov.dev profile url', async () => {
+    tarkovDevFns.parseProfileModes.mockResolvedValue({
       tarkovUid: 8560316,
+      requestedModes: ['pvp', 'pve', 'seasonal'],
+      modes: {
+        pvp: { status: 'not_found' },
+        pve: { status: 'ok', data: { tarkovUid: 8560316 } },
+        seasonal: { status: 'not_found' },
+      },
     });
     const wrapper = createWrapper();
     const vm = asVm<{
       handleTarkovDevProfileUrlSubmit: () => Promise<void>;
       tarkovDevProfileUrlInput: string;
-      tarkovDevTargetMode: 'pvp' | 'pve';
+      tarkovDevTargetMode: 'pvp' | 'pve' | 'seasonal';
     }>(wrapper.vm);
     vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pve/8560316';
     await vm.handleTarkovDevProfileUrlSubmit();
-    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
+    expect(tarkovDevFns.parseProfileModes).toHaveBeenCalledWith(
       'https://tarkov.dev/players/pve/8560316',
+      ['pvp', 'pve', 'seasonal'],
       { fresh: false, turnstileToken: null }
     );
     expect(vm.tarkovDevTargetMode).toBe('pve');
   });
-  it('uses a pvp-season profile url as a fixed seasonal import target', async () => {
+  it('uses a pvp-season profile url as a fixed seasonal import target when only seasonal is selected', async () => {
     tarkovDevFns.parseProfileUrl.mockResolvedValue({
       mode: 'seasonal',
       profileJsonUrl: 'https://players.tarkov.dev/pvp-season/8560316.json',
@@ -753,7 +796,9 @@ describe('DataManagementCard', () => {
       tarkovDevFixedTargetMode: 'pvp' | 'pve' | 'seasonal' | null;
       tarkovDevProfileUrlInput: string;
       tarkovDevTargetMode: 'pvp' | 'pve' | 'seasonal';
+      tarkovDevUrlModes: Array<'pvp' | 'pve' | 'seasonal'>;
     }>(wrapper.vm);
+    vm.tarkovDevUrlModes = ['seasonal'];
     vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp-season/8560316';
     await vm.handleTarkovDevProfileUrlSubmit();
     expect(vm.tarkovDevFixedTargetMode).toBe('seasonal');
@@ -762,10 +807,10 @@ describe('DataManagementCard', () => {
   it('passes the Turnstile token to the fetch and resets the widget afterwards', async () => {
     turnstileState.enabled = true;
     turnstileState.getToken.mockResolvedValue('turnstile-token');
-    tarkovDevFns.parseProfileUrl.mockResolvedValue({
-      mode: 'pvp',
-      profileJsonUrl: 'https://players.tarkov.dev/pvp/8560316.json',
+    tarkovDevFns.parseProfileModes.mockResolvedValue({
       tarkovUid: 8560316,
+      requestedModes: ['pvp', 'pve', 'seasonal'],
+      modes: { pvp: { status: 'ok', data: { tarkovUid: 8560316 } } },
     });
     const wrapper = createWrapper();
     const vm = asVm<{
@@ -774,8 +819,9 @@ describe('DataManagementCard', () => {
     }>(wrapper.vm);
     vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
     await vm.handleTarkovDevProfileUrlSubmit();
-    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
+    expect(tarkovDevFns.parseProfileModes).toHaveBeenCalledWith(
       'https://tarkov.dev/players/pvp/8560316',
+      ['pvp', 'pve', 'seasonal'],
       { fresh: false, turnstileToken: 'turnstile-token' }
     );
     expect(turnstileState.reset).toHaveBeenCalled();
@@ -788,7 +834,9 @@ describe('DataManagementCard', () => {
     vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
     await wrapper.vm.$nextTick();
     expect(
-      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')?.attributes('disabled')
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profiles_count')?.attributes(
+        'disabled'
+      )
     ).toBeDefined();
     wrapper.unmount();
     turnstileState.solved.value = true;
@@ -797,9 +845,10 @@ describe('DataManagementCard', () => {
     solvedVm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
     await solvedWrapper.vm.$nextTick();
     expect(
-      findButtonByText(solvedWrapper, 'settings.tarkov_dev_import.fetch_profile')?.attributes(
-        'disabled'
-      )
+      findButtonByText(
+        solvedWrapper,
+        'settings.tarkov_dev_import.fetch_profiles_count'
+      )?.attributes('disabled')
     ).toBeUndefined();
   });
   it('surfaces a verification error and resets the widget when no token is issued', async () => {
@@ -812,7 +861,7 @@ describe('DataManagementCard', () => {
     }>(wrapper.vm);
     vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/pvp/8560316';
     await vm.handleTarkovDevProfileUrlSubmit();
-    expect(tarkovDevFns.parseProfileUrl).not.toHaveBeenCalled();
+    expect(tarkovDevFns.parseProfileModes).not.toHaveBeenCalled();
     expect(tarkovDevFns.setError).toHaveBeenCalled();
     expect(turnstileState.reset).toHaveBeenCalled();
   });
@@ -829,7 +878,7 @@ describe('DataManagementCard', () => {
     const pending = vm.handleTarkovDevProfileUrlSubmit();
     vm.resetTarkovDevImport();
     await pending;
-    expect(tarkovDevFns.parseProfileUrl).not.toHaveBeenCalled();
+    expect(tarkovDevFns.parseProfileModes).not.toHaveBeenCalled();
     expect(turnstileState.reset).toHaveBeenCalled();
   });
   it('keeps the current tarkov.dev target mode when the fetched source has no mode', async () => {
@@ -843,7 +892,9 @@ describe('DataManagementCard', () => {
       handleTarkovDevProfileUrlSubmit: () => Promise<void>;
       tarkovDevProfileUrlInput: string;
       tarkovDevTargetMode: 'pvp' | 'pve';
+      tarkovDevUrlModes: Array<'pvp' | 'pve' | 'seasonal'>;
     }>(wrapper.vm);
+    vm.tarkovDevUrlModes = ['pvp'];
     vm.tarkovDevTargetMode = 'pve';
     vm.tarkovDevProfileUrlInput = 'https://players.tarkov.dev/profile/8560316.json';
     await vm.handleTarkovDevProfileUrlSubmit();
@@ -868,7 +919,9 @@ describe('DataManagementCard', () => {
       )?.attributes('disabled')
     ).toBeDefined();
     expect(
-      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')?.attributes('disabled')
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profiles_count')?.attributes(
+        'disabled'
+      )
     ).toBeDefined();
     expect(wrapper.find('input:not([type="file"])').attributes('disabled')).toBeDefined();
     expect(asVm<{ isAnyImportActive: boolean }>(wrapper.vm).isAnyImportActive).toBe(true);
@@ -894,13 +947,15 @@ describe('DataManagementCard', () => {
     expect(wrapper.text()).toContain(
       'settings.data_management.active_flow_blocked_description:{"flow":"settings.data_management.flow_backup"}'
     );
-    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profiles_count')
+    ).toBeUndefined();
     expect(
       findButtonByText(wrapper, 'settings.data_management.import_eft_logs_folder_button')
     ).toBeUndefined();
   });
   it('puts tarkov.dev submit failures into a safe error state', async () => {
-    tarkovDevFns.parseProfileUrl.mockRejectedValue(new Error('submit failed'));
+    tarkovDevFns.parseProfileModes.mockRejectedValue(new Error('submit failed'));
     const wrapper = createWrapper();
     const vm = asVm<{
       handleTarkovDevProfileUrlSubmit: () => Promise<void>;
@@ -937,27 +992,33 @@ describe('DataManagementCard', () => {
       })
     );
   });
-  it('refetches a linked tarkov.dev profile from the selected source mode', async () => {
-    tarkovDevFns.parseProfileUrl.mockResolvedValue({
-      mode: 'pve',
-      profileJsonUrl: 'https://players.tarkov.dev/pve/123456.json',
+  it('refetches multiple linked tarkov.dev modes when toggled together', async () => {
+    tarkovDevFns.parseProfileModes.mockResolvedValueOnce(null);
+    tarkovDevFns.parseProfileModes.mockResolvedValue({
       tarkovUid: 123456,
+      requestedModes: ['pvp', 'pve'],
+      modes: {
+        pvp: { status: 'ok', data: { tarkovUid: 123456 } },
+        pve: { status: 'ok', data: { tarkovUid: 123456 } },
+      },
     });
     tarkovStoreState.currentMode = 'pvp';
     tarkovStoreState.tarkovUid = 123456;
     const wrapper = createWrapper();
-    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profile')).toBeUndefined();
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profiles_count')
+    ).toBeUndefined();
     await findButtonByText(wrapper, 'common.pve')!.trigger('click');
-    await asVm<{ handleTarkovDevRefetch: () => Promise<void> }>(
-      wrapper.vm
-    ).handleTarkovDevRefetch();
-    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
-      'https://tarkov.dev/players/pve/123456',
-      { fresh: true, turnstileToken: null }
-    );
-    expect(asVm<{ tarkovDevTargetMode: 'pvp' | 'pve' }>(wrapper.vm).tarkovDevTargetMode).toBe(
-      'pve'
-    );
+    const vm = asVm<{ handleTarkovDevRefetch: () => Promise<void> }>(wrapper.vm);
+    await vm.handleTarkovDevRefetch();
+    await vm.handleTarkovDevRefetch();
+    const request = [
+      'https://tarkov.dev/players/regular/123456',
+      ['pvp', 'pve'],
+      { fresh: true, turnstileToken: null },
+    ];
+    expect(tarkovDevFns.parseProfileModes.mock.calls).toEqual([request, request]);
+    wrapper.unmount();
   });
   it('shows the locked tarkov.dev target mode after refetching a mode-specific profile', async () => {
     tarkovDevState.importState.value = 'preview';
@@ -1094,7 +1155,7 @@ describe('DataManagementCard', () => {
     expect(wrapper.text()).toContain('settings.tarkov_dev_import.skills_details_toggle');
     expect(wrapper.text()).toContain('Endurance');
     expect(wrapper.text()).toContain('Strength');
-    expect(wrapper.text()).toContain('MyUnknownSkill');
+    expect(wrapper.text()).toContain('My Unknown Skill');
     expect(wrapper.text()).toContain('12');
   });
   it('forwards tarkov.dev confirmation using current target mode', async () => {
@@ -1481,6 +1542,214 @@ describe('DataManagementCard', () => {
       })
     );
     expect(wrapper.find('[data-testid="older-tab-cleanup-saved-confirm"]').exists()).toBe(true);
+  });
+  it('lazy-loads Turnstile only after engaging with Tarkov.dev profile import', async () => {
+    turnstileState.enabled = true;
+    const wrapper = createWrapper({ view: 'imports' });
+    expect(wrapper.text()).not.toContain('settings.tarkov_dev_import.turnstile_hint');
+    asVm<{ tarkovDevProfileUrlInput: string }>(wrapper.vm).tarkovDevProfileUrlInput =
+      'https://tarkov.dev/players/regular/8560316';
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain('settings.tarkov_dev_import.turnstile_hint');
+  });
+  it('guides linked users through opening their profile before showing refetch and Turnstile', async () => {
+    turnstileState.enabled = true;
+    tarkovStoreState.tarkovUid = 123456;
+    const wrapper = createWrapper({ view: 'imports' });
+    expect(wrapper.text()).not.toContain('settings.tarkov_dev_import.turnstile_hint');
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.open_profile_and_continue')
+    ).toBeDefined();
+    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_profile')).toBeUndefined();
+    await findButtonByText(wrapper, 'settings.tarkov_dev_import.already_viewed_continue')!.trigger(
+      'click'
+    );
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain('settings.tarkov_dev_import.turnstile_hint');
+    expect(findButtonByText(wrapper, 'settings.tarkov_dev_import.refetch_profile')).toBeDefined();
+  });
+  it('guides stale recovery through refreshing first before revealing stale opt-in', async () => {
+    tarkovDevState.importState.value = 'error';
+    tarkovDevState.importErrorCode.value = 'profile_stale';
+    tarkovDevState.importErrorMeta.value = { days: 12 };
+    tarkovDevFns.parseProfileUrl.mockResolvedValue({
+      mode: 'pvp',
+      profileJsonUrl: 'https://players.tarkov.dev/profile/8560316.json',
+      tarkovUid: 8560316,
+    });
+    const wrapper = createWrapper({ view: 'imports' });
+    asVm<{ tarkovDevProfileUrlInput: string }>(wrapper.vm).tarkovDevProfileUrlInput =
+      'https://tarkov.dev/players/regular/8560316';
+    await wrapper.vm.$nextTick();
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.refresh_on_tarkov_dev')
+    ).toBeDefined();
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.continue_stale_anyway')
+    ).toBeUndefined();
+    await findButtonByText(wrapper, 'settings.tarkov_dev_import.stale_skip_refresh_link')!.trigger(
+      'click'
+    );
+    await findButtonByText(wrapper, 'settings.tarkov_dev_import.continue_stale_anyway')!.trigger(
+      'click'
+    );
+    expect(tarkovDevFns.parseProfileUrl).toHaveBeenCalledWith(
+      'https://tarkov.dev/players/regular/8560316',
+      { allowStale: true, fresh: false, turnstileToken: null }
+    );
+  });
+  it('retries and accepts the last requested mode when the pasted profile has a different mode', async () => {
+    const wrapper = createWrapper({ view: 'imports' });
+    const vm = asVm<{
+      tarkovDevProfileUrlInput: string;
+      tarkovDevUrlModes: string[];
+      handleTarkovDevProfileUrlSubmit: () => Promise<void>;
+      handleTarkovDevStaleRetry: () => Promise<void>;
+      handleTarkovDevAllowStale: () => Promise<void>;
+    }>(wrapper.vm);
+    vm.tarkovDevProfileUrlInput = 'https://tarkov.dev/players/regular/8560316';
+    await wrapper.vm.$nextTick();
+    vm.tarkovDevUrlModes = ['pve'];
+    tarkovDevFns.parseProfileUrl.mockResolvedValue(null);
+    await vm.handleTarkovDevProfileUrlSubmit();
+    tarkovDevState.importState.value = 'error';
+    tarkovDevState.importErrorCode.value = 'profile_stale';
+    await vm.handleTarkovDevStaleRetry();
+    await vm.handleTarkovDevAllowStale();
+    const target = 'https://tarkov.dev/players/pve/8560316';
+    expect(tarkovDevFns.parseProfileUrl.mock.calls).toEqual([
+      [target, { fresh: false, turnstileToken: null }],
+      [target, { fresh: true, turnstileToken: null }],
+      [target, { fresh: false, allowStale: true, turnstileToken: null }],
+    ]);
+  });
+  it.each([
+    [5 * 60_000, '5 minutes ago'],
+    [362 * 86_400_000, '12 months ago'],
+  ])('shows relative updated time for %i ms with a timestamp tooltip', (age, label) => {
+    const updatedAt = Date.now() - age;
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.previewData.value = {
+      displayName: 'TarkovTrackrORG',
+      pmcFaction: 'USEC',
+      experience: 125000,
+      prestigeLevel: 0,
+      skills: {},
+      gameEditionGuess: null,
+      tarkovUid: 8560316,
+      updatedAt,
+    };
+    const wrapper = createWrapper({ view: 'imports' });
+    const timeEl = wrapper.get('time');
+    expect(timeEl.text()).toBe(label);
+    expect(timeEl.element.parentElement?.getAttribute('data-tooltip')).toContain(
+      String(new Date(updatedAt).getFullYear())
+    );
+    wrapper.unmount();
+  });
+  it('renders multi-mode tarkov.dev preview and imports selected ready modes together', async () => {
+    const now = Date.now();
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.multiPreview.value = {
+      tarkovUid: 8560316,
+      requestedModes: ['pvp', 'pve', 'seasonal'],
+      modes: {
+        pvp: {
+          status: 'ok',
+          source: {
+            mode: 'pvp',
+            profileJsonUrl: 'https://players.tarkov.dev/profile/8560316.json',
+            tarkovUid: 8560316,
+          },
+          data: {
+            displayName: 'PvpPlayer',
+            pmcFaction: 'USEC',
+            totalXP: 0,
+            prestigeLevel: 1,
+            skills: { Endurance: 10 },
+            gameEditionGuess: 1,
+            tarkovUid: 8560316,
+            updatedAt: now - 5 * 60_000,
+          },
+        },
+        pve: {
+          status: 'stale',
+          ageDays: 10,
+          maxUpdatedAgeDays: 7,
+          updatedAt: now - 10 * 86_400_000,
+          source: {
+            mode: 'pve',
+            profileJsonUrl: 'https://players.tarkov.dev/pve/8560316.json',
+            tarkovUid: 8560316,
+          },
+        },
+        seasonal: {
+          status: 'not_found',
+          source: {
+            mode: 'seasonal',
+            profileJsonUrl: 'https://players.tarkov.dev/pvp-season/8560316.json',
+            tarkovUid: 8560316,
+          },
+        },
+      },
+    };
+    tarkovDevFns.confirmMultiImport.mockImplementation(async (modes) => {
+      tarkovDevState.importState.value = 'success';
+      return modes;
+    });
+    tarkovDevState.isImporting.value = true;
+    const applying = createWrapper({ view: 'imports' });
+    expect(applying.getComponent(TarkovDevModeReadyBody).props('refreshDisabled')).toBe(true);
+    expect(applying.getComponent(TarkovDevModeStatusBody).props('refreshDisabled')).toBe(true);
+    applying.unmount();
+    tarkovDevState.isImporting.value = false;
+    const wrapper = createWrapper({ view: 'imports' });
+    expect(wrapper.find('[data-testid="tarkov-dev-mode-card-pvp"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="tarkov-dev-mode-card-pve"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="tarkov-dev-mode-card-seasonal"]').exists()).toBe(true);
+    expect(
+      findButtonByText(wrapper, 'settings.tarkov_dev_import.include_stale_mode')
+    ).toBeUndefined();
+    await findButtonByText(wrapper, 'settings.tarkov_dev_import.stale_skip_refresh_link')!.trigger(
+      'click'
+    );
+    await findButtonByText(wrapper, 'settings.tarkov_dev_import.include_stale_mode')!.trigger(
+      'click'
+    );
+    await vi.waitFor(() =>
+      expect(tarkovDevFns.refetchPreviewMode).toHaveBeenCalledWith('pve', {
+        allowStale: true,
+        fresh: false,
+        turnstileToken: null,
+      })
+    );
+    await vi.waitFor(() =>
+      expect(
+        findButtonByText(wrapper, 'common.confirm_import')!.attributes('disabled')
+      ).toBeUndefined()
+    );
+    await findButtonByText(wrapper, 'common.confirm_import')!.trigger('click');
+    expect(tarkovDevFns.confirmMultiImport).toHaveBeenCalledWith(['pvp']);
+  });
+  it('unlocks a cooldown row once its import cooldown expires', async () => {
+    vi.useFakeTimers();
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.multiPreview.value = {
+      tarkovUid: 8560316,
+      requestedModes: ['pve'],
+      modes: { pve: { status: 'cooldown', expiresAt: Date.now() + 20_000 } },
+    };
+    const wrapper = createWrapper({ view: 'imports' });
+    try {
+      const row = wrapper.get('[data-testid="tarkov-dev-mode-card-pve"]');
+      expect(row.text()).toContain('settings.tarkov_dev_import.mode_status_cooldown');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(row.text()).toContain('settings.tarkov_dev_import.mode_status_fetchable');
+      expect(row.find('input[type="checkbox"]').exists()).toBe(false);
+    } finally {
+      wrapper.unmount();
+      vi.useRealTimers();
+    }
   });
   it('keeps cleanup confirmation and shows failure when export or clearing fails', async () => {
     backupState.legacyProgressRecoveryCount.value = 1;

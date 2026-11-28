@@ -100,6 +100,8 @@ describe('parseTarkovDevProfile', () => {
     expect(invalid.ok && invalid.data.updatedAt).toBeNull();
     const negative = parseTarkovDevProfile(buildValidProfile({ updated: -5 }));
     expect(negative.ok && negative.data.updatedAt).toBeNull();
+    const outOfRange = parseTarkovDevProfile(buildValidProfile({ updated: 8.64e15 + 1 }));
+    expect(outOfRange.ok && outOfRange.data.updatedAt).toBeNull();
   });
   it('computes skill levels from Progress / 100 floored', () => {
     const result = parseTarkovDevProfile(buildValidProfile());

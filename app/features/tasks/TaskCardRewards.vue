@@ -75,6 +75,7 @@
   import TaskRewardItem from '@/features/tasks/TaskRewardItem.vue';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useLocaleNumberFormatter } from '@/utils/formatters';
+  import { formatSkillName } from '@/utils/skillHelpers';
   import type {
     ItemReward,
     OfferUnlockReward,
@@ -98,9 +99,6 @@
   }>();
   function forwardItemContextMenu(event: MouseEvent, item: TarkovItem) {
     emit('itemContextMenu', event, item);
-  }
-  function formatSkillName(name: string) {
-    return name.replace(/([a-z])([A-Z])/g, '$1 $2');
   }
   function endingQualifier(name?: string) {
     return name?.trim().match(/\([^()]+\)$/)?.[0];

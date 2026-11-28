@@ -431,6 +431,190 @@
       "title": "Failed to undo action: {description}"
     }
   },
+  "setup": {
+    "title": "Get started with TarkovTracker",
+    "resume": "Resume setup",
+    "back": "Back",
+    "continue": "Continue",
+    "entry_description": "Import your Tarkov.dev profile and EFT logs for an instant jump-start, or set up your basics in under a minute.",
+    "working_mode": "Active mode: {mode}",
+    "open_dashboard": "Open dashboard",
+    "skip_to_dashboard": "Skip setup for now",
+    "progress_label": "Setup progress",
+    "step_counter": "Step {current} of {total}",
+    "dashboard_welcome_title": "New to TarkovTracker? Get set up in under a minute",
+    "dashboard_welcome_description": "Import your Tarkov.dev profile and EFT game logs to skip manual entry, or configure your mode, faction, and edition directly.",
+    "dashboard_resume_title": "Finish setting up TarkovTracker",
+    "dashboard_resume_description": "Pick up where you left off to finish importing progress or catching up your quests and hideout.",
+    "dashboard_cta": "Start setup",
+    "dashboard_dismiss": "Dismiss setup prompt",
+    "stepper": {
+      "start": "Start",
+      "tarkov_dev": "Tarkov.dev",
+      "profile": "Profile",
+      "eft_logs": "Logs",
+      "catch_up": "Catch-up",
+      "backup": "Backup",
+      "done": "Ready"
+    },
+    "steps": {
+      "start": "How would you like to get started?",
+      "backup": "Restore a TarkovTracker backup",
+      "eft_logs": "Recover quests from EFT game logs",
+      "tarkov_dev": "Import your Tarkov.dev profile",
+      "profile": "Set up your PMC profile",
+      "catch_up": "Quick catch-up (optional)",
+      "done": "You’re ready to raid"
+    },
+    "start": {
+      "import": {
+        "label": "Quick import (Tarkov.dev + EFT logs)",
+        "description": "Fastest way to start—paste your Tarkov.dev profile URL to auto-fill level, faction, edition, and skills, then optionally import EFT game logs to recover quest history."
+      },
+      "manual": {
+        "label": "Set up manually / Fresh wipe",
+        "description": "Starting at Level 1 or prefer not to import? Pick your game mode(s), edition, faction, and level directly."
+      },
+      "backup": {
+        "label": "Restore a backup",
+        "description": "Upload an exported TarkovTracker JSON backup to restore your saved modes in one step."
+      },
+      "highlights": {
+        "auto_mode": "Auto-detects mode",
+        "profile_skills": "Level, faction, edition & skills",
+        "quest_logs": "Optional quest log recovery"
+      },
+      "reassurance": "Everything can be changed or imported later from Settings."
+    },
+    "fills": {
+      "mode": "Game mode",
+      "level": "Level",
+      "faction": "Faction",
+      "edition": "Game edition",
+      "skills": "Skills & Prestige"
+    },
+    "tarkov_dev_fills_label": "Auto-fills:",
+    "inline_edition_prompt": "We couldn’t detect your game edition automatically—choose it below:",
+    "profile_imported_summary": "Profile ready for {mode}: {faction} · Lv {level}",
+    "edit_profile_link": "Edit profile",
+    "source_help": {
+      "backup": "Select an exported TarkovTracker backup file to preview the modes and progress it contains.",
+      "eft_logs": "Select your EFT Logs folder, individual .log files, or a ZIP archive. One upload automatically detects PvP, PvE, and Seasonal quest activity.",
+      "tarkov_dev": "Find your character on Tarkov.dev and paste the profile link below. We can check PvP, PvE, and Seasonal PvP together using your account ID."
+    },
+    "skip": {
+      "backup": "Continue without a backup",
+      "eft_logs": "Continue without logs",
+      "tarkov_dev": "Skip — set up profile manually"
+    },
+    "skip_catch_up_finish": "Skip catch-up & finish",
+    "profile": {
+      "subtitle": "Tell TarkovTracker which mode(s) you play and your basic PMC info so quests and hideout unlocks match your account.",
+      "save_failed": "Your profile changes could not be saved. Your entries are still here. Retry saving to continue.",
+      "modes_title": "Which game mode(s) do you play?",
+      "modes_hint": "Select one or more modes. Each mode tracks quests, hideout, and level independently.",
+      "mode_descriptions": {
+        "pvp": "Persistent PvP",
+        "pve": "Solo / Co-op PvE",
+        "seasonal": "Current Seasonal PvP"
+      },
+      "primary_mode_label": "Open tracker into:",
+      "edition_hint": "Applies across all modes and sets your starting Stash, Cultist Circle, and trader rep bonuses.",
+      "character_title": "PMC details",
+      "character_hint": "Used to filter faction-only quests and level-gated tasks.",
+      "faction_hint": "Filters USEC-only and BEAR-only tasks.",
+      "display_name_label": "Display name (optional)",
+      "display_name_placeholder": "Shown in teams and shared profile",
+      "finish_fresh": "Finish setup",
+      "continue_to_imports": "Import logs or set quests",
+      "continue_logs": "Continue to EFT logs",
+      "skip_to_ready": "Skip imports & finish"
+    },
+    "catch_up_subtitle": "Optionally mark quests you’re currently on, set trader loyalty levels, or update built hideout stations.",
+    "traders_tab": "Traders",
+    "traders_title": "Trader loyalty levels",
+    "traders_help": "Set your current Loyalty Level (LL1–LL4) for each trader so task and hideout unlocks match your account.",
+    "trader_filter_label": "Filter quests by trader",
+    "catalog_loading": "Loading quests and hideout stations…",
+    "catalog_unavailable": "Quest and hideout data is unavailable for this mode. You can return to setup later.",
+    "details_loading": "Loading quest objectives and rewards…",
+    "details_unavailable": "Quest objectives or rewards are unavailable. Retry loading them to save these selections.",
+    "retry_details": "Retry loading quest data",
+    "quest_title": "Which quests are you on?",
+    "quest_help": "Pick a trader or search by name, then mark quests as Active or Completed. Earlier required quests will be suggested automatically.",
+    "quest_search": "Search by quest or trader",
+    "quest_search_placeholder": "e.g. Debut, Pocket Watch, Gunsmith…",
+    "quest_no_matches": "No matching quests available to add.",
+    "selected_quests_heading": "Selected quests ({count})",
+    "add_quest_active_label": "Mark {quest} as active",
+    "add_quest_completed_label": "Mark {quest} as completed",
+    "remove_quest_label": "Remove {quest}",
+    "quest_status_label": "Status for {quest}",
+    "quest_active": "Active",
+    "quest_completed": "Completed",
+    "include_prerequisites_count": "Also mark {count} required earlier quest as completed | Also mark {count} required earlier quests as completed",
+    "review_prerequisites": "Preview {count} suggested earlier quest | Preview {count} suggested earlier quests",
+    "quest_mark_available_tip": "Tip: Anytime on the Tasks page, you can click “Mark available” on any locked quest to backfill its prerequisite chain automatically.",
+    "hideout_title": "Hideout stations",
+    "hideout_help": "Choose the levels you’ve built in-game. Earlier tiers of those stations will be marked built too.",
+    "hideout_search_placeholder": "Filter stations…",
+    "station_level": "Level {level}",
+    "station_unbuilt": "Unbuilt",
+    "station_current": "Built Lv {level}",
+    "hideout_blocked_title": "Some selected hideout tiers need prerequisites first",
+    "hideout_blocked_help": "Include the missing prerequisite stations or set the required trader loyalty below before saving.",
+    "hideout_blocked_tier": "{station} Lv {level}",
+    "hideout_req_station": "Needs {station} Lv {level}",
+    "hideout_req_trader": "Needs {trader} LL{level}",
+    "hideout_req_skill": "Needs {skill} Lv {level}",
+    "hideout_include_prereqs": "Include required stations",
+    "hideout_open_traders": "Set trader loyalty",
+    "save_changes": "Save changes",
+    "retry_save": "Retry saving",
+    "import_mode_switch_failed": "Your progress was imported, but setup could not switch to that game mode. Retry to continue.",
+    "save_failed": "Progress could not be saved. You can retry or continue.",
+    "leave_failed_save_title": "Continue after a failed save?",
+    "leave_failed_save_description": "Unsaved changes may be lost. Cancel to keep your selections and retry.",
+    "leave_failed_save_action": "Continue without retrying",
+    "leave_unsaved_title": "Leave setup with unsaved changes?",
+    "leave_unsaved_description": "You have unsaved quest, trader, or hideout selections. Stay to save them, or discard them and leave.",
+    "stay_on_setup": "Stay on setup",
+    "discard_and_leave": "Discard & leave",
+    "leave_busy_notice": "Please wait for the current import or save to finish before leaving setup.",
+    "saved": "Changes saved.",
+    "finish": "Finish setup",
+    "finish_later": "Skip & finish",
+    "restart": "Start setup again",
+    "draft_pending": "Save or clear your selections to continue.",
+    "clear_selections": "Clear selections",
+    "ready": {
+      "title": "Your tracker is configured",
+      "subtitle": "Here’s a snapshot of your active setup. You can switch modes or refine progress anytime.",
+      "cloud_synced": "Cloud synced",
+      "cloud_unconfirmed": "Cloud save unconfirmed",
+      "local_only": "Saved locally",
+      "local_device": "On this device",
+      "stat_mode": "Mode",
+      "stat_pmc": "PMC",
+      "stat_tracked": "Tracked progress",
+      "tracked_counts": "{tasks} tasks · {hideout} hideout tiers",
+      "edition_fallback": "Standard",
+      "view_tasks": "View available tasks",
+      "sync_title": "Save your progress to the cloud (optional)",
+      "sync_description": "Sign in to sync across devices, join squad teams, and unlock API tokens for TarkovMonitor. Your local progress carries over automatically.",
+      "sign_in_cta": "Sign in & keep progress",
+      "next_steps_title": "What to do first",
+      "cards": {
+        "tasks_title": "Track tasks & backfill chains",
+        "tasks_description": "Check off quests as you raid, or use “Mark available” on any locked quest to backfill earlier tasks.",
+        "items_title": "See needed items & scan stash",
+        "items_description": "Check which Found-in-Raid and hideout items to keep, or import counts from a stash screenshot.",
+        "monitor_title": "Auto-sync with TarkovMonitor",
+        "monitor_description": "Connect the desktop companion app so completed and active quests update automatically."
+      },
+      "adjust_hint": "Need to tweak something?"
+    }
+  },
   "common": {
     "cancel": "Cancel",
     "close": "Close",
@@ -571,52 +755,7 @@
       "summary": "Pick a quick guide for this page or the full setup path.",
       "page_guide": "Guide this page",
       "page_guide_unavailable": "No page guide here yet. Use onboarding instead.",
-      "onboarding": "New user onboarding",
-      "onboarding_description": "Start with imports, finish the basics, then verify tasks.",
       "keyboard_shortcuts_error": "Could not open keyboard shortcuts. Please try again."
-    },
-    "onboarding": {
-      "title": "Getting set up",
-      "summary": "This is the recommended first pass for new or returning users. Use the action buttons to jump into the real pages.",
-      "actions": {
-        "account": "Open account",
-        "login": "Sign in"
-      },
-      "steps": {
-        "import": {
-          "title": "Import progress first",
-          "description": "Use imports before touching manual setup. They are the fastest way to get most of your tracker into a usable state.",
-          "bullets": {
-            "one": "Import your Tarkov.dev profile first when you have it. That usually fills most of the account basics and tracked progress.",
-            "two": "Import your EFT logs next. That can backfill quests and other progress with almost no manual clicking.",
-            "three": "If both imports land cleanly, manual setup becomes a quick verification pass instead of rebuilding everything by hand."
-          },
-          "actions": {
-            "open": "Open imports"
-          }
-        },
-        "profile": {
-          "title": "Finish the basics",
-          "description": "After imports, lock in the core profile fields and decide whether you want your progress synced to an account.",
-          "bullets": {
-            "one": "Set your game mode, edition, level, faction, and display name so filters and unlock requirements line up with your real account.",
-            "two": "Signing in unlocks teams, API-backed features, and cloud storage so progress is easier to keep across devices.",
-            "three": "If you are not ready to sign in yet, you can still track locally first and attach that progress to an account later."
-          },
-          "actions": {
-            "settings": "Open settings"
-          }
-        },
-        "tasks": {
-          "title": "Sanity-check tasks",
-          "description": "The last high-impact cleanup step is task availability. Once that is accurate, the rest of the site becomes much more reliable.",
-          "bullets": {
-            "one": "On the tasks page, mark the quests you currently have available in-game for each trader. That backfills prerequisite chains much faster than manually completing old tasks one by one.",
-            "two": "When something looks wrong, use the task card menu to report a data issue instead of forcing your tracker into a bad state.",
-            "three": "After this pass, use the app-bar help button on any supported page to reopen the page guide or this onboarding flow."
-          }
-        }
-      }
     },
     "dashboard": {
       "title": "Dashboard guide",
@@ -2132,9 +2271,9 @@
           "step_1_title": "Create or sign in to your TarkovTracker.org account",
           "step_1_desc": "Create a TarkovTracker.org account or sign in to the account where you want to track your current wipe progress.",
           "step_2_title": "Import your Tarkov.dev profile metadata",
-          "step_2_desc": "Go to Settings → Imports and run the Tarkov.dev profile import to restore supported profile details such as level, faction, and skills.",
+          "step_2_desc": "Open Get started with TarkovTracker from Help or the dashboard and choose Quick import. Paste your Tarkov.dev profile link to restore level, faction, edition, prestige, and skills.",
           "step_3_title": "Import your EFT game logs",
-          "step_3_desc": "In Settings → Imports, select your EFT logs folder to recover quest start and completion events still stored in your local logs.",
+          "step_3_desc": "Continue to the game logs step and select your EFT Logs folder or ZIP to recover quest start and completion events that are still in your local logs.",
           "step_4_title": "Verify tasks and hideout progress",
           "step_4_desc": "Review your task list and hideout, then manually check off anything your Tarkov.dev profile and local logs could not recover.",
           "step_5_title": "Reconnect companion tools to .org",
@@ -2887,23 +3026,40 @@
     },
     "skills": {
       "title": "Skills Management",
-      "explanation": "Quest rewards are auto-calculated. Enter your total skill level to adjust the offset.",
+      "intro": "Levels from completed quests are added automatically. Enter your in-game level (0-{max}) to override it.",
       "no_skills": "No skills found in game data.",
-      "show_all": "Show all",
-      "show_less": "Show less",
-      "quest": "Quest:",
-      "offset": "Offset:",
-      "req_count": "Req:",
-      "reward_count": "Reward:",
+      "no_matches": "No skills match your search or filter.",
+      "clear_filters": "Clear filters",
+      "search_placeholder": "Search skills",
+      "filter_label": "Filter skills",
+      "sort_label": "Skill order",
+      "filter": {
+        "needed": "Needed for quests",
+        "adjusted": "Adjusted"
+      },
+      "categories": {
+        "physical": "Physical",
+        "mental": "Mental",
+        "combat": "Combat",
+        "practical": "Practical",
+        "other": "Other"
+      },
+      "elite": "Elite",
+      "requirement_needed": "Quest needs Lv {level}",
+      "requirement_met": "Quest req. met",
+      "from_quests": "{level} from quests",
+      "manual_adjustment": "{offset} manual",
+      "reset_to_quest": "Reset to quest level ({level})",
+      "reset_all": "Reset all adjustments",
+      "reset_all_title": "Reset all skill adjustments?",
+      "reset_all_body": "Skills to reset: {count}. Each one returns to the level granted by your completed quests. This cannot be undone.",
+      "reset_all_confirm": "Reset skills",
       "limit_exceeded": "Limit Exceeded",
       "max_level": "Maximum skill level is 51.",
       "valid_range": "Valid range: 0-51",
       "sort": {
         "ingame": "In-Game"
-      },
-      "quest_tooltip": "Skill level granted automatically by completed quest rewards.",
-      "offset_tooltip": "Manual adjustment on top of the quest reward level. Positive means you trained the skill above quest rewards.",
-      "collapsed_hint": "Showing {shown} of {total} skills. Show all to see every skill."
+      }
     },
     "keybinds": {
       "title": "Keyboard Shortcuts",
@@ -2926,6 +3082,8 @@
       "confirm_word": "DELETE"
     },
     "log_import": {
+      "dropzone_hint": "Drop your Logs folder, .log files, or a .zip here, or",
+      "browse_files_link": "choose .log / .zip files",
       "reading_logs": "Reading logs and preparing the preview…",
       "large_folder_hint": "Large folders are read locally in chunks. Keep this page open; you can cancel while logs are being read.",
       "upload_hint": "Select your Escape from Tarkov Logs folder or a selection of session folders to import quest starts, completions, and failures.",
@@ -3005,6 +3163,8 @@
         "no_notification_logs_found": "No notification or output logs were found in the selected files.",
         "no_quest_events_found": "No quest start, completion, or failure events were found in the selected logs.",
         "parse_failed": "Failed to parse EFT logs.",
+        "drop_read_failed": "Some dropped files could not be opened. Drop the folder again or browse for the log files.",
+        "save_not_confirmed": "Your log progress was applied on this device. Retry saving to confirm it reached the cloud.",
         "task_metadata_not_loaded": "Task metadata is not loaded yet. Please refresh and try again.",
         "invalid_mode": "Select a valid destination game mode.",
         "invalid_date": "Enter a valid import start time or clear it to include all selected history.",
@@ -3026,12 +3186,56 @@
       "title": "Tarkov.dev Profile Import",
       "profile_url_label": "Tarkov.dev profile URL",
       "profile_url_placeholder": "https://tarkov.dev/players/regular/8560316",
-      "profile_url_hint": "Find your profile at {link}, open the matching PvP or PvE profile, then paste that page URL here.",
-      "profile_url_hint_link": "tarkov.dev/players",
-      "profile_url_refresh_hint": "Tarkov.dev refreshes the profile JSON after you open your profile page there.",
+      "guided_lookup_title": "How to find your Tarkov.dev profile URL",
+      "open_players_search": "Open Tarkov.dev Players",
+      "guided_step_1": "Open Tarkov.dev Players, pick your game mode, search your in-game name, and open your character’s profile page.",
+      "guided_step_2": "Wait for your profile to load so Tarkov.dev refreshes it, then copy the page URL from your browser’s address bar — e.g.",
+      "guided_step_3": "Paste your profile URL below, pick which game modes to check, and click Fetch Profile.",
+      "lookup_opened_hint": "Tarkov.dev opened in a new tab — search your in-game name, open your profile page, then copy its URL and paste it below.",
+      "modes_to_check_label": "Game modes to check",
+      "modes_to_check_hint": "We use your Tarkov account ID to check all selected modes at once. Each mode must have been viewed on Tarkov.dev at least once to have cached data.",
+      "select_all_modes": "All modes",
+      "linked_step_1_title": "1. Refresh your profile on Tarkov.dev",
+      "linked_step_1_hint": "Open your Tarkov.dev profile page first so Tarkov.dev updates your latest level, skills, and stats.",
+      "linked_step_1_hint_multi": "Open any mode you played on Tarkov.dev first so Tarkov.dev refreshes its snapshot, then continue to fetch all selected modes together.",
+      "open_profile_and_continue": "Open Tarkov.dev profile & continue",
+      "continue_to_fetch": "Continue to fetch",
+      "already_viewed_continue": "Already viewed — fetch now",
+      "linked_step_2_title": "2. Fetch your updated profile",
+      "linked_step_2_hint": "Once your Tarkov.dev profile page has loaded, verify below and fetch your updated snapshot.",
+      "stale_recovery_title": "Tarkov.dev profile data is {days} days old",
+      "stale_initial_description": "Refresh your profile on Tarkov.dev so it updates your latest stats, then check for the updated snapshot.",
+      "stale_recovery_description": "Still outdated — Tarkov.dev may be slow to update right now. Check again or continue with the older snapshot.",
+      "open_profile_again": "Open profile on Tarkov.dev",
+      "refresh_on_tarkov_dev": "Refresh on Tarkov.dev",
+      "load_on_tarkov_dev": "Load on Tarkov.dev",
+      "open_again": "Open again",
+      "stale_skip_refresh_link": "Already refreshed or use older data",
+      "check_for_update": "Check for update",
+      "check_again": "Check again",
+      "recheck_mode": "Recheck",
+      "continue_stale_anyway": "Continue with stale data anyway",
+      "include_stale_mode": "Use stale",
+      "multi_preview_title": "Choose game modes to import",
+      "multi_preview_selected_count": "{selected} of {total} ready selected",
+      "include_mode_aria": "Include {mode} in import",
+      "confirm_import_count": "Confirm Import ({count} modes)",
+      "mode_status_ready": "Ready",
+      "mode_status_aging": "Older snapshot",
+      "mode_status_stale_ok": "Stale (included)",
+      "mode_status_stale": "{days}d old",
+      "mode_status_not_cached": "Not cached",
+      "mode_status_cooldown": "Cooldown",
+      "mode_status_fetchable": "Ready to check",
+      "mode_fetchable_hint": "Check for an updated profile to include this mode.",
+      "mode_status_error": "Unavailable",
+      "multi_mode_stale_hint": "Snapshot is outdated. Refresh it on Tarkov.dev to fetch your latest stats.",
+      "multi_mode_awaiting": "Wait for the Tarkov.dev page to finish loading, then check for the update.",
+      "multi_mode_still_stale": "Still outdated — Tarkov.dev may be slow to update. Recheck or use the older data.",
+      "multi_mode_not_found_hint": "No snapshot cached yet. Open it on Tarkov.dev once to load it.",
+      "multi_mode_error_hint": "Could not load this snapshot. Try again.",
       "fetch_profile": "Fetch Profile",
-      "nickname": "Nickname",
-      "faction": "Faction",
+      "fetch_profiles_count": "Fetch {count} Modes",
       "skills_count": "{count} skills detected",
       "last_refreshed": "Tarkov.dev data updated",
       "last_refreshed_unknown": "Unknown",
@@ -3045,12 +3249,13 @@
       "import_target_notice": "This data will be imported into your {mode} profile.",
       "success_title": "Profile Imported",
       "success_description": "Your Tarkov.dev profile has been imported successfully.",
+      "import_another_mode": "Import or refetch another mode",
       "linked_uid": "Tarkov UID",
-      "refetch_hint": "Open your Tarkov.dev profile first so it refreshes there, then refetch it here.",
-      "refetch_mode_label": "Profile to refetch",
+      "refetch_modes_label": "Game modes to refetch",
       "refetch_mode_arena": "Arena",
       "refetch_mode_arena_unavailable": "Arena imports are coming soon.",
       "refetch_profile": "Refetch Profile",
+      "refetch_selected_profiles": "Refetch {count} Modes",
       "unlink_profile": "Unlink",
       "errors": {
         "unexpected_profile_flow": "Something went wrong while fetching the Tarkov.dev profile. Try again.",
@@ -3162,10 +3367,8 @@
     "collect": "Collect"
   },
   "skills": {
-    "req": "Req",
     "required_for": "Required for: {items}",
-    "required_levels": "Required levels: {items}",
-    "elite_level": "ELITE Level"
+    "required_levels": "Required levels: {items}"
   },
   "game_settings": {
     "seasonal_label": "Seasonal",
@@ -3229,6 +3432,10 @@
     "site_name": "TarkovTracker",
     "application_description": "Track Escape from Tarkov tasks, hideout upgrades, Kappa requirements, storyline quests, and needed items across PvP, PvE, and Seasonal modes.",
     "routes": {
+      "setup": {
+        "title": "Getting Started Setup · TarkovTracker.org",
+        "description": "Set up your Escape from Tarkov profile, import Tarkov.dev data and EFT logs, and configure quests, traders, and hideout progress."
+      },
       "home": {
         "title": "Escape from Tarkov Progress Tracker · TarkovTracker.org",
         "description": "Track Escape from Tarkov tasks, hideout upgrades, Kappa requirements, storyline quests, and needed items across PvP, PvE, and Seasonal modes.",

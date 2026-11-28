@@ -47,7 +47,7 @@ export function validateTarkovDevProfile(data: unknown): data is {
 function readUpdatedAt(data: unknown): number | null {
   if (!isRecord(data)) return null;
   const updated = data.updated;
-  return typeof updated === 'number' && Number.isFinite(updated) && updated > 0 ? updated : null;
+  return typeof updated === 'number' && updated > 0 && updated <= 8.64e15 ? updated : null;
 }
 function mapMemberCategoryToEdition(memberCategory: unknown): number | null {
   if (typeof memberCategory !== 'number') return null;

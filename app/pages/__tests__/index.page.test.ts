@@ -120,6 +120,7 @@ const setup = async (
       setTraderReputation: vi.fn(),
       isTaskComplete: vi.fn(() => false),
       getCurrentGameMode: vi.fn(() => 'pvp'),
+      getCurrentProgressData: vi.fn(() => undefined),
       isStoryObjectiveComplete: vi.fn(() => false),
       isStoryChapterComplete: vi.fn(() => false),
       ...tarkovOverrides,
