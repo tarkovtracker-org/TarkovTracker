@@ -11,7 +11,9 @@ import {
 import { mergeProgressData } from '@/stores/tarkov/progressMerge';
 import { buildTaskEvaluations } from '@/stores/taskAvailability';
 import { taskServerGateBlockers } from '@/stores/taskServerGates';
+import { TASK_ID_REGISTRY } from '@/utils/constants';
 import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
+import { hasManualAcceptance } from '@/utils/shiftingBalanceAcceptance';
 import { MAX_CONFIRMATION_TIMESTAMP } from '@/utils/taskAvailabilityConfirmation';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { UserProgressData } from '@/stores/progressState';
@@ -110,8 +112,9 @@ describe('useTaskNotification', () => {
       tarkovStore.setTaskActive.mockImplementation((id: string) =>
         progressActions.setTaskActive.call(state, id)
       );
-      tarkovStore.setTaskUncompleted.mockImplementation((id: string) =>
-        progressActions.setTaskUncompleted.call(state, id)
+      tarkovStore.setTaskUncompleted.mockImplementation(
+        (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+          progressActions.setTaskUncompleted.call(state, ...args)
       );
       tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
         progressActions.setTaskAcceptanceUnknown.call(state, id)
@@ -176,8 +179,9 @@ describe('useTaskNotification', () => {
       tarkovStore.setTaskActive.mockImplementation((id: string) =>
         progressActions.setTaskActive.call(state, id)
       );
-      tarkovStore.setTaskUncompleted.mockImplementation((id: string) =>
-        progressActions.setTaskUncompleted.call(state, id)
+      tarkovStore.setTaskUncompleted.mockImplementation(
+        (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+          progressActions.setTaskUncompleted.call(state, ...args)
       );
       tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
         progressActions.setTaskAcceptanceUnknown.call(state, id)
@@ -228,8 +232,9 @@ describe('useTaskNotification', () => {
       tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
         progressActions.setTaskAcceptanceUnknown.call(state, id)
       );
-      tarkovStore.setTaskUncompleted.mockImplementation((id: string) =>
-        progressActions.setTaskUncompleted.call(state, id)
+      tarkovStore.setTaskUncompleted.mockImplementation(
+        (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+          progressActions.setTaskUncompleted.call(state, ...args)
       );
       tarkovStore.confirmTaskAvailability.mockImplementation((id: string, requirements: string) =>
         progressActions.confirmTaskAvailability.call(state, id, requirements)
@@ -260,6 +265,49 @@ describe('useTaskNotification', () => {
       }
     }
   );
+  it('keeps the Jaeger observation when undoing acceptance back to explicit inactive', async () => {
+    const { CUT_DOWN_TO_THE_ROOT: id, PRESERVE_A_VALUABLE_PIECE: dependentId } = TASK_ID_REGISTRY;
+    const state = structuredClone(defaultState);
+    const progress = state.pvp;
+    const completions = progress.taskCompletions;
+    const task: Task = { id, name: 'Cut Down to the Root' };
+    const dependent: Task = {
+      id: dependentId,
+      taskRequirements: [{ task: { id }, status: ['active'] }],
+    };
+    completions[id] = { complete: false, failed: false, active: false, timestamp: 1000 };
+    const signature = () => otherRequirementsSignature(dependent, completions)!;
+    progress.taskAvailability = {
+      [dependentId]: { timestamp: 1000, requirements: signature() },
+    };
+    const hasObservation = () =>
+      hasManualAcceptance(
+        dependentId,
+        id,
+        { completions, confirmations: progress.taskAvailability },
+        signature()
+      );
+    const { notification, tarkovStore, stop } = await setup([task, dependent], {
+      progressData: progress,
+    });
+    tarkovStore.setTaskUncompleted.mockImplementation(
+      (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+        progressActions.setTaskUncompleted.call(state, ...args)
+    );
+    try {
+      expect(hasObservation()).toBe(true);
+      notification.onTaskAction({ action: 'active', taskId: id, taskName: task.name! });
+      progressActions.setTaskActive.call(state, id);
+      expect(hasObservation()).toBe(true);
+      await notification.undoLastAction();
+      expect(completions[id]?.active).toBe(false);
+      expect(hasObservation()).toBe(true);
+      progressActions.setTaskUncompleted.call(state, id);
+      expect(hasObservation()).toBe(false);
+    } finally {
+      stop();
+    }
+  });
   it('keeps failed unknown acceptance undo retryable at a saturated clock', async () => {
     const state = structuredClone(defaultState);
     state.pvp.taskAvailability = {
@@ -342,7 +390,9 @@ describe('useTaskNotification', () => {
       });
       notification.onTaskAction({ action, taskId: task.id, taskName: task.name! });
       await notification.undoLastAction();
-      expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
+      expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id, {
+        restoreAcceptance: true,
+      });
       expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
       stop();
     }
@@ -598,8 +648,9 @@ describe('useTaskNotification', () => {
       tarkovStore.setTaskActive.mockImplementation((id: string) =>
         progressActions.setTaskActive.call(state, id)
       );
-      tarkovStore.setTaskUncompleted.mockImplementation((id: string) =>
-        progressActions.setTaskUncompleted.call(state, id)
+      tarkovStore.setTaskUncompleted.mockImplementation(
+        (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+          progressActions.setTaskUncompleted.call(state, ...args)
       );
       tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
         progressActions.setTaskAcceptanceUnknown.call(state, id)

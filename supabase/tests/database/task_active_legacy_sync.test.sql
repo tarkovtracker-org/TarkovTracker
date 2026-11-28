@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(45);
+SELECT plan(49);
 CREATE TEMP TABLE active_fixture AS SELECT
   '{"progressEpoch":0,"taskCompletions":{"accepted":{"complete":false,"failed":false,"active":true,"timestamp":100},"inactive":{"complete":false,"failed":false,"active":false,"timestamp":100}}}'::jsonb AS existing;
 SELECT is(public.merge_manual_activity_progress(existing,
@@ -79,6 +79,29 @@ SELECT is(public.merge_manual_activity_progress(existing,
 SELECT is(public.merge_manual_activity_progress(existing,
   '{"progressEpoch":1,"taskCompletions":{}}'::jsonb
 )->'taskCompletions', '{}'::jsonb, 'newer reset does not reintroduce omitted accepted tasks') FROM active_fixture;
+CREATE TEMP TABLE omitted_undo AS SELECT public.merge_manual_activity_progress(
+  '{"progressEpoch":2,"taskCompletions":{"undone":{"complete":false,"failed":false,"timestamp":110},"unclocked":{"complete":false}}}'::jsonb,
+  '{"progressEpoch":2,"taskCompletions":{"other":{"complete":true,"timestamp":120}}}'::jsonb
+) AS progress;
+SELECT is(progress->'taskCompletions', '{
+  "undone":{"complete":false,"failed":false,"timestamp":110},
+  "other":{"complete":true,"timestamp":120}
+}'::jsonb, 'an omitted Undo retains its timestamp without retaining an unclocked legacy row') FROM omitted_undo;
+SELECT is(public.merge_manual_activity_progress(progress,
+  '{"progressEpoch":2,"taskCompletions":{"undone":{"complete":false,"active":true,"timestamp":100}}}'::jsonb
+)->'taskCompletions'->'undone', '{"complete":false,"failed":false,"timestamp":110}'::jsonb,
+  'a stale acceptance still loses after a same-epoch save omits the Undo') FROM omitted_undo;
+SELECT is(public.merge_manual_activity_progress(progress,
+  '{"progressEpoch":3,"taskCompletions":{}}'::jsonb
+)->'taskCompletions', '{}'::jsonb, 'a newer reset clears an omitted Undo timestamp') FROM omitted_undo;
+SELECT is(public.merge_manual_activity_progress(
+  public.merge_manual_activity_progress(
+    '{"progressEpoch":2,"taskCompletions":{"undone":{"complete":false,"failed":false,"timestamp":110}}}'::jsonb,
+    '{"progressEpoch":2,"taskCompletions":{"undone":{"complete":false,"failed":false,"timestamp":90}}}'::jsonb
+  ),
+  '{"progressEpoch":2,"taskCompletions":{"undone":{"complete":false,"active":true,"timestamp":100}}}'::jsonb
+)->'taskCompletions'->'undone', '{"complete":false,"failed":false,"timestamp":110}'::jsonb,
+  'an intervening older legacy row cannot lower the Undo clock');
 -- Same equal-time legacy-reset fixtures as the browser merge regression. The raw stored
 -- acceptance flag remains authoritative even on a malformed terminal row with active:true.
 CREATE TEMP TABLE terminal_active_fixture AS

@@ -116,7 +116,7 @@ export function useTaskNotification(): TaskNotificationReturn {
   const restoreTaskAcceptance = (taskId: string, active: boolean | undefined) => {
     if (active === undefined) tarkovStore.setTaskAcceptanceUnknown(taskId);
     else if (active) tarkovStore.setTaskActive(taskId);
-    else tarkovStore.setTaskUncompleted(taskId);
+    else tarkovStore.setTaskUncompleted(taskId, { restoreAcceptance: true });
   };
   const restoreSelectedAcceptance = ({ event, previousAcceptance }: UndoContext) =>
     restoreTaskAcceptance(event.taskId, previousAcceptance);

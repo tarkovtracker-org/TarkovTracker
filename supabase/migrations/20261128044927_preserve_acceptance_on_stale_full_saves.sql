@@ -29,16 +29,21 @@ BEGIN
     FROM task_rows
     WHERE jsonb_typeof(old_entry) = 'object'
       AND (jsonb_typeof(old_entry->'active') = 'boolean'
-        OR jsonb_typeof(new_entry->'active') = 'boolean')
+        OR jsonb_typeof(new_entry->'active') = 'boolean'
+        OR (jsonb_typeof(old_entry->'timestamp') = 'number'
+          AND old_entry->'complete' IS DISTINCT FROM 'true'::jsonb
+          AND old_entry->'failed' IS DISTINCT FROM 'true'::jsonb))
   ), reconciled AS (
     SELECT id, CASE
       WHEN jsonb_typeof(new_entry) IS DISTINCT FROM 'object' THEN
-        CASE WHEN jsonb_typeof(old_entry->'active') = 'boolean'
+        -- An omitted neutral row can be an Undo. Retain its clock for later stale writes.
+        CASE WHEN (jsonb_typeof(old_entry->'active') = 'boolean' OR old_timestamp > 0)
           AND old_entry->'complete' IS DISTINCT FROM 'true'::jsonb
           AND old_entry->'failed' IS DISTINCT FROM 'true'::jsonb
           THEN old_entry END
       WHEN new_timestamp < old_timestamp THEN old_entry
       WHEN jsonb_typeof(new_entry->'active') = 'boolean' THEN NULL
+      WHEN jsonb_typeof(old_entry->'active') IS DISTINCT FROM 'boolean' THEN NULL
       WHEN new_entry->'complete' = 'true'::jsonb OR new_entry->'failed' = 'true'::jsonb
         THEN new_entry || '{"active":false}'::jsonb
       WHEN new_timestamp = old_timestamp

@@ -444,8 +444,14 @@ export const actions = {
     if (importedAcceptance) setAvailabilityConfirmation(this, taskId, importedAcceptance);
     carryManualAcceptance(this, taskId, previous);
   },
-  setTaskUncompleted(this: UserState, taskId: string) {
+  setTaskUncompleted(
+    this: UserState,
+    taskId: string,
+    { restoreAcceptance = false }: { restoreAcceptance?: boolean } = {}
+  ) {
+    const previous = restoreAcceptance ? getCurrentData(this).taskCompletions[taskId] : undefined;
     setTaskStatus(this, taskId, createCompletion(false, false, false, false));
+    if (restoreAcceptance) carryManualAcceptance(this, taskId, previous);
   },
   setTaskObjectiveComplete(this: UserState, objectiveId: string) {
     updateObjective(this, 'taskObjectives', objectiveId, {
