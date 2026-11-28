@@ -148,12 +148,12 @@ describe('useTaskActions', () => {
     tarkovStore.setTaskActive.mockReturnValueOnce(123);
     onAction.mockImplementation((event) => {
       expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
-      expect(event.acceptanceWrite?.timestamp).toBeUndefined();
+      expect(event.statusWrite?.timestamp).toBeUndefined();
     });
     actions.markTaskActive();
     expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(task.id);
     expect(onAction).toHaveBeenCalledWith(
-      expect.objectContaining({ acceptanceWrite: { timestamp: 123 } })
+      expect.objectContaining({ statusWrite: { timestamp: 123 } })
     );
   });
   it('accepts an available task as explicitly active', async () => {

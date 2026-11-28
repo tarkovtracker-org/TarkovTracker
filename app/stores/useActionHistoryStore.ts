@@ -2,10 +2,13 @@ import { defineStore } from 'pinia';
 import { useSafeToast } from '@/composables/useSafeToast';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
+export type TaskStatusWrite = { timestamp?: number; alternatives?: Map<string, number> };
 interface ReversibleAction {
   id: string;
   description: string;
   undo: () => void | Promise<void>;
+  canUndo?: () => boolean;
+  taskStatusWrite?: { taskId: string; write: TaskStatusWrite };
   timestamp: number;
 }
 export const useActionHistoryStore = defineStore('actionHistory', () => {
@@ -67,6 +70,7 @@ export const useActionHistoryStore = defineStore('actionHistory', () => {
     if (!lastAction) return;
     const index = undoStack.value.length;
     try {
+      if (lastAction.canUndo?.() === false) return;
       await lastAction.undo();
       finishUndo(lastAction, capturedGeneration);
     } catch (error) {

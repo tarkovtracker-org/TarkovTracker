@@ -17,6 +17,7 @@ import { hasManualAcceptance } from '@/utils/shiftingBalanceAcceptance';
 import { MAX_CONFIRMATION_TIMESTAMP } from '@/utils/taskAvailabilityConfirmation';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { UserProgressData } from '@/stores/progressState';
+import type { TaskStatusWrite } from '@/stores/useActionHistoryStore';
 import type { TaskCompletion } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
 const sessionUser = reactive({ id: 'owner-a', loggedIn: true });
@@ -247,14 +248,14 @@ describe('useTaskNotification', () => {
         expect(blockers().map(({ type }) => type)).toEqual(
           confirmation === 'stale' ? ['dialogue'] : []
         );
-        const acceptanceWrite: { timestamp?: number } = {};
+        const statusWrite: { timestamp?: number } = {};
         notification.onTaskAction({
           action: 'active',
           taskId: id,
           taskName: task.name!,
-          acceptanceWrite,
+          statusWrite,
         });
-        acceptanceWrite.timestamp = progressActions.setTaskActive.call(state, id);
+        statusWrite.timestamp = progressActions.setTaskActive.call(state, id);
         if (confirmation === 'cleared') {
           progressActions.confirmTaskAvailability.call(state, id, '');
         }
@@ -267,6 +268,85 @@ describe('useTaskNotification', () => {
           expect(progress.taskAvailability?.[id]?.requirements).toBe('');
       } finally {
         now.mockRestore();
+        stop();
+      }
+    }
+  );
+  it.each([
+    { remoteEdit: false, completesAlternative: false },
+    { remoteEdit: false, completesAlternative: true },
+    { remoteEdit: true, completesAlternative: false },
+    { remoteEdit: true, completesAlternative: true },
+  ])(
+    'preserves Acceptance Undo after local Completion Undo (alternative: $completesAlternative, remote edit: $remoteEdit)',
+    async ({ remoteEdit, completesAlternative }) => {
+      const state = structuredClone(defaultState);
+      const task: Task = {
+        id: 'dialogue-quest',
+        name: 'Dialogue quest',
+        otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+      };
+      const id = task.id;
+      const completedTask: Task = completesAlternative
+        ? { id: 'alternative', name: 'Alternative', alternatives: [id] }
+        : task;
+      const progress = state.pvp;
+      const requirements = otherRequirementsSignature(task)!;
+      progressActions.confirmTaskAvailability.call(state, id, requirements);
+      const { notification, tarkovStore, stop } = await setup([task, completedTask], {
+        progressData: progress,
+      });
+      tarkovStore.setTaskActive.mockImplementation((taskId: string) =>
+        progressActions.setTaskActive.call(state, taskId)
+      );
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((taskId: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, taskId)
+      );
+      tarkovStore.confirmTaskAvailability.mockImplementation((taskId: string, signature: string) =>
+        progressActions.confirmTaskAvailability.call(state, taskId, signature)
+      );
+      try {
+        const statusWrite: { timestamp?: number } = {};
+        notification.onTaskAction({
+          action: 'active',
+          taskId: id,
+          taskName: task.name!,
+          statusWrite,
+        });
+        statusWrite.timestamp = progressActions.setTaskActive.call(state, id);
+        const completionWrite: TaskStatusWrite = {};
+        notification.onTaskAction({
+          action: 'complete',
+          taskId: completedTask.id,
+          taskName: completedTask.name!,
+          statusWrite: completionWrite,
+        });
+        progressActions.setTaskComplete.call(state, completedTask.id);
+        if (completesAlternative) {
+          progressActions.setTaskFailed.call(state, id);
+          completionWrite.alternatives = new Map([[id, progress.taskCompletions[id]!.timestamp!]]);
+        }
+        completionWrite.timestamp = progress.taskCompletions[completedTask.id]?.timestamp;
+        const terminalTimestamp = progress.taskCompletions[id]!.timestamp!;
+        if (remoteEdit) {
+          const remote = structuredClone(state);
+          progressActions.setTaskUncompleted.call(remote, id);
+          progressActions.setTaskActive.call(remote, id);
+          Object.assign(progress, mergeProgressData(progress, remote.pvp));
+        }
+        const beforeUndo = structuredClone(progress.taskCompletions[id]);
+        await notification.undoLastAction();
+        expect(progress.taskCompletions[id]?.active).toBe(true);
+        expect(progress.taskCompletions[id]?.timestamp).toBeGreaterThan(terminalTimestamp);
+        await notification.undoLastAction();
+        if (remoteEdit) {
+          expect(progress.taskCompletions[id]).toEqual(beforeUndo);
+          expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+        } else {
+          expect(progress.taskCompletions[id]?.active).toBeUndefined();
+          expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledWith(id, requirements);
+        }
+      } finally {
         stop();
       }
     }
@@ -292,22 +372,22 @@ describe('useTaskNotification', () => {
         progressActions.confirmTaskAvailability.call(state, taskId, signature)
       );
       try {
-        const acceptanceWrite: { timestamp?: number } = {};
+        const statusWrite: { timestamp?: number } = {};
         notification.onTaskAction({
           action: 'active',
           taskId: id,
           taskName: task.name!,
-          acceptanceWrite,
+          statusWrite,
         });
         progressActions.setTaskActive.call(state, id);
-        acceptanceWrite.timestamp = progress.taskCompletions[id]?.timestamp;
+        statusWrite.timestamp = progress.taskCompletions[id]?.timestamp;
         const remote = structuredClone(state);
         progressActions.setTaskUncompleted.call(remote, id);
         if (remoteAction === 'reset and reaccept') progressActions.setTaskActive.call(remote, id);
         Object.assign(progress, mergeProgressData(progress, remote.pvp));
         const newerStatus = structuredClone(progress.taskCompletions[id]);
         const retiredConfirmation = structuredClone(progress.taskAvailability?.[id]);
-        expect(newerStatus?.timestamp).toBeGreaterThan(acceptanceWrite.timestamp!);
+        expect(newerStatus?.timestamp).toBeGreaterThan(statusWrite.timestamp!);
         expect(retiredConfirmation?.timestamp).toBeLessThan(newerStatus!.timestamp!);
         await notification.undoLastAction();
         expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();

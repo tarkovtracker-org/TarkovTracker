@@ -142,11 +142,8 @@ export function useTaskNotification(): TaskNotificationReturn {
       return { ...confirmation };
     }
   };
-  const acceptanceWasSuperseded = ({ taskId, acceptanceWrite }: TaskActionPayload) => {
-    if (!acceptanceWrite) return false;
-    const current = tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId];
-    return !isTaskActive(current) || taskStatusTimestamp(current) !== acceptanceWrite.timestamp;
-  };
+  const currentStatusTimestamp = (taskId: string) =>
+    taskStatusTimestamp(tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId]);
   const confirmationStillMatches = (task: Task, previous: TaskAvailabilityConfirmation) => {
     const progress = tarkovStore.getCurrentProgressData();
     const current = progress?.taskAvailability?.[task.id];
@@ -191,7 +188,6 @@ export function useTaskNotification(): TaskNotificationReturn {
   const undoHandlers: Partial<Record<TaskActionPayload['action'], (context: UndoContext) => void>> =
     {
       active: (context) => {
-        if (acceptanceWasSuperseded(context.event)) return;
         restoreSelectedAcceptance(context);
         restoreAvailability(context);
         context.releaseStoryObjectives();
@@ -252,7 +248,7 @@ export function useTaskNotification(): TaskNotificationReturn {
       task,
       previousAcceptance: previousAcceptance(event.taskId),
       previousConfirmation:
-        event.action === 'active' && event.acceptanceWrite ? captureAvailability(task) : undefined,
+        event.action === 'active' && event.statusWrite ? captureAvailability(task) : undefined,
       alternativeAcceptances: captureAlternativeAcceptances(
         event.action === 'complete' ? task?.alternatives : undefined
       ),
@@ -264,11 +260,43 @@ export function useTaskNotification(): TaskNotificationReturn {
           provesStartGates: taskProvesStartGates,
         }),
     };
+    const { taskId, statusWrite } = event;
+    const previousStatuses = new Map(
+      [taskId, ...(task?.alternatives ?? [])].map((id) => [id, currentStatusTimestamp(id)])
+    );
+    const writtenStatuses = () =>
+      statusWrite
+        ? [[taskId, statusWrite.timestamp] as const, ...(statusWrite.alternatives ?? [])]
+        : [];
     actionHistoryStore.pushAction({
       id: `task-${event.taskId}-${Date.now()}`,
       description,
+      taskStatusWrite: statusWrite && { taskId, write: statusWrite },
+      canUndo: () => {
+        const statusMatches = writtenStatuses().every(
+          ([id, timestamp]) => currentStatusTimestamp(id) === timestamp
+        );
+        const isAcceptance = statusWrite && event.action === 'active';
+        const current = tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId];
+        const allowed = statusMatches && (!isAcceptance || isTaskActive(current));
+        if (!allowed) showUndoButton.value = false;
+        return allowed;
+      },
       undo: () => {
         handler(context);
+        // A local Undo writes a fresh clock for the state created by an older local action.
+        for (const [id] of writtenStatuses()) {
+          const prior = actionHistoryStore.undoStack.findLast(({ taskStatusWrite }) => {
+            if (!taskStatusWrite) return false;
+            const { taskId: priorTaskId, write } = taskStatusWrite;
+            const timestamp = id === priorTaskId ? write.timestamp : write.alternatives?.get(id);
+            return timestamp === previousStatuses.get(id);
+          })?.taskStatusWrite;
+          if (!prior) continue;
+          const timestamp = currentStatusTimestamp(id);
+          if (prior.taskId === id) prior.write.timestamp = timestamp;
+          else prior.write.alternatives?.set(id, timestamp);
+        }
         showUndoButton.value = false;
       },
     });

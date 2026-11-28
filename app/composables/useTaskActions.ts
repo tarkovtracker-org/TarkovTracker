@@ -22,6 +22,7 @@ import {
   uncompleteTaskForProgress,
   type StoryObjectiveRef,
 } from '@/utils/taskProgress';
+import type { TaskStatusWrite } from '@/stores/useActionHistoryStore';
 import type { Task, TaskRequirement } from '@/types/tarkov';
 export type TaskActionPayload = {
   taskId: string;
@@ -31,8 +32,8 @@ export type TaskActionPayload = {
   undoKey?: string;
   statusKey?: string;
   wasManualFail?: boolean;
-  /** Updated after emission so Undo can capture prior state before the acceptance write. */
-  acceptanceWrite?: { timestamp?: number };
+  /** Updated after emission so Undo can capture prior state before the task status write. */
+  statusWrite?: TaskStatusWrite;
   /** Story objectives this action newly recorded, released again by its undo. */
   recordedStoryObjectives?: StoryObjectiveRef[];
 };
@@ -176,15 +177,35 @@ export function useTaskActions(
     trackTaskAction(payload);
     onAction?.(payload);
   };
+  const taskStatusTimestamp = (id: string) =>
+    tarkovStore.getCurrentProgressData().taskCompletions?.[id]?.timestamp;
+  const captureAlternativeStatus = (task: Task) =>
+    new Map((task.alternatives ?? []).map((id) => [id, taskStatusTimestamp(id)]));
+  const recordStatusWrite = (
+    write: TaskStatusWrite,
+    taskId: string,
+    previousAlternatives?: ReadonlyMap<string, number | undefined>
+  ) => {
+    write.timestamp = taskStatusTimestamp(taskId);
+    if (!previousAlternatives?.size) return;
+    write.alternatives = new Map();
+    for (const [id, before] of previousAlternatives) {
+      const after = taskStatusTimestamp(id);
+      if (after !== undefined && after !== before) write.alternatives.set(id, after);
+    }
+  };
   const markTaskComplete = (isUndo = false) => {
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     const recordedStoryObjectives = recordImpliedStoryObjectives(tarkovStore, currentTask);
+    const statusWrite: TaskStatusWrite = {};
+    const alternativeStatus = captureAlternativeStatus(currentTask);
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
         taskName,
         action: 'complete',
+        statusWrite,
         analyticsParams: analyticsParams(currentTask, {
           objective_count: getTaskObjectiveCount(currentTask),
         }),
@@ -197,6 +218,7 @@ export function useTaskActions(
       taskId: currentTask.id,
       tasksMap: tasksMap.value,
     });
+    recordStatusWrite(statusWrite, currentTask.id, alternativeStatus);
     unpinTaskIfPinned(currentTask.id);
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
     ensureTraderRequirements(currentTask);
@@ -215,11 +237,14 @@ export function useTaskActions(
     const wasFailed = tarkovStore.isTaskFailed(currentTask.id);
     const wasManualFail = getWasManualFail(currentTask.id, wasFailed);
     const action = getUncompleteAction(wasFailed);
+    const statusWrite: TaskStatusWrite = {};
+    const alternativeStatus = captureAlternativeStatus(currentTask);
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
         taskName,
         action,
+        statusWrite,
         analyticsParams: analyticsParams(currentTask, {
           was_manual_fail: toYesNo(wasManualFail),
         }),
@@ -233,6 +258,7 @@ export function useTaskActions(
       tasksMap: tasksMap.value,
       restoreAlternatives: !wasFailed,
     });
+    recordStatusWrite(statusWrite, currentTask.id, alternativeStatus);
     if (isUndo) {
       emitAction({
         taskId: currentTask.id,
@@ -330,7 +356,7 @@ export function useTaskActions(
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     const recordedStoryObjectives = recordImpliedStoryObjectives(tarkovStore, currentTask);
-    const acceptanceWrite: NonNullable<TaskActionPayload['acceptanceWrite']> = {};
+    const statusWrite: TaskStatusWrite = {};
     emitAction({
       taskId: currentTask.id,
       taskName,
@@ -338,19 +364,21 @@ export function useTaskActions(
       analyticsParams: analyticsParams(currentTask),
       statusKey: 'page.tasks.questcard.status_active',
       recordedStoryObjectives,
-      acceptanceWrite,
+      statusWrite,
     });
-    acceptanceWrite.timestamp = tarkovStore.setTaskActive(currentTask.id);
+    statusWrite.timestamp = tarkovStore.setTaskActive(currentTask.id);
   };
   const markTaskFailed = (isUndo = false) => {
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     const recordedStoryObjectives = recordImpliedStoryObjectives(tarkovStore, currentTask);
+    const statusWrite: TaskStatusWrite = {};
     if (!isUndo) {
       emitAction({
         taskId: currentTask.id,
         taskName,
         action: 'fail',
+        statusWrite,
         analyticsParams: analyticsParams(currentTask, {
           was_manual_fail: 'yes',
         }),
@@ -364,6 +392,7 @@ export function useTaskActions(
       tasksMap: tasksMap.value,
       manual: true,
     });
+    recordStatusWrite(statusWrite, currentTask.id);
     unpinTaskIfPinned(currentTask.id);
     if (isUndo) {
       emitAction({
