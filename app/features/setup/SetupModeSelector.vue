@@ -38,6 +38,7 @@
           size="xs"
           :color="primaryMode === mode ? 'primary' : 'neutral'"
           :variant="primaryMode === mode ? 'solid' : 'soft'"
+          :aria-pressed="primaryMode === mode"
           @click="emit('updatePrimary', mode)"
         >
           {{ $t(getGameModeLabel(mode)) }}

@@ -3,6 +3,8 @@ import { mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref, type Ref } from 'vue';
 import DataManagementCard from '@/features/settings/DataManagementCard.vue';
+import TarkovDevModeReadyBody from '@/features/settings/TarkovDevModeReadyBody.vue';
+import TarkovDevModeStatusBody from '@/features/settings/TarkovDevModeStatusBody.vue';
 import { ACTIVE_SEASON } from '@/utils/constants';
 import {
   createEftLogImportSelection,
@@ -1616,8 +1618,11 @@ describe('DataManagementCard', () => {
       [target, { fresh: false, allowStale: true, turnstileToken: null }],
     ]);
   });
-  it('shows relative updated time in Tarkov.dev preview with full timestamp in tooltip', () => {
-    const fiveMinsAgo = Date.now() - 5 * 60_000;
+  it.each([
+    [5 * 60_000, '5 minutes ago'],
+    [362 * 86_400_000, '12 months ago'],
+  ])('shows relative updated time for %i ms with a timestamp tooltip', (age, label) => {
+    const updatedAt = Date.now() - age;
     tarkovDevState.importState.value = 'preview';
     tarkovDevState.previewData.value = {
       displayName: 'TarkovTrackrORG',
@@ -1627,12 +1632,15 @@ describe('DataManagementCard', () => {
       skills: {},
       gameEditionGuess: null,
       tarkovUid: 8560316,
-      updatedAt: fiveMinsAgo,
+      updatedAt,
     };
     const wrapper = createWrapper({ view: 'imports' });
     const timeEl = wrapper.get('time');
-    expect(timeEl.text()).toBe('5 minutes ago');
-    expect(timeEl.element.parentElement?.getAttribute('data-tooltip')).toContain('2026');
+    expect(timeEl.text()).toBe(label);
+    expect(timeEl.element.parentElement?.getAttribute('data-tooltip')).toContain(
+      String(new Date(updatedAt).getFullYear())
+    );
+    wrapper.unmount();
   });
   it('renders multi-mode tarkov.dev preview and imports selected ready modes together', async () => {
     const now = Date.now();
@@ -1684,6 +1692,12 @@ describe('DataManagementCard', () => {
       tarkovDevState.importState.value = 'success';
       return modes;
     });
+    tarkovDevState.isImporting.value = true;
+    const applying = createWrapper({ view: 'imports' });
+    expect(applying.getComponent(TarkovDevModeReadyBody).props('refreshDisabled')).toBe(true);
+    expect(applying.getComponent(TarkovDevModeStatusBody).props('refreshDisabled')).toBe(true);
+    applying.unmount();
+    tarkovDevState.isImporting.value = false;
     const wrapper = createWrapper({ view: 'imports' });
     expect(wrapper.find('[data-testid="tarkov-dev-mode-card-pvp"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="tarkov-dev-mode-card-pve"]').exists()).toBe(true);

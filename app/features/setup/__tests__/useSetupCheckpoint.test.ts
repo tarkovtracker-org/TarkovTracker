@@ -71,6 +71,8 @@ describe('useSetupCheckpoint', () => {
     expect(cp.visibleSteps.value).toContain('profile');
     cp.goNext();
     expect(cp.step.value).toBe('eft-logs');
+    cp.goBack();
+    expect(cp.step.value).toBe('profile');
   });
   it('supports manual path, dismiss, and restart', () => {
     const cp = useSetupCheckpoint();

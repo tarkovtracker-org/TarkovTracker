@@ -7,10 +7,13 @@
       {{ catalogStatusText }}
     </div>
     <div v-if="catalogReady" class="space-y-5">
-      <SetupCatchUpTabs :tabs="tabs" @select="activeTab = $event" />
+      <SetupCatchUpTabs :tabs="tabs" :id-prefix="tabId" @select="activeTab = $event" />
       <SetupQuestPicker
         v-show="activeTab === 'quests'"
+        :id="`${tabId}-panel-quests`"
         v-model:include-prerequisites="includePrerequisites"
+        role="tabpanel"
+        :aria-labelledby="`${tabId}-tab-quests`"
         :choices="choices"
         :tasks="eligibleTasks"
         :traders="questTraders"
@@ -21,12 +24,18 @@
       />
       <SetupTradersPicker
         v-show="activeTab === 'traders'"
+        :id="`${tabId}-panel-traders`"
+        role="tabpanel"
+        :aria-labelledby="`${tabId}-tab-traders`"
         :traders="loyaltyTraders"
         :saving="saving"
         @select-level="setTraderLevelDraft($event.id, $event.level)"
       />
       <SetupHideoutPicker
         v-show="activeTab === 'hideout'"
+        :id="`${tabId}-panel-hideout`"
+        role="tabpanel"
+        :aria-labelledby="`${tabId}-tab-hideout`"
         :stations="stations"
         :levels="levels"
         :blocked-details="blockedDetails"
@@ -110,10 +119,16 @@
   import { progressSaveStatus } from '@/stores/tarkov/progressSaveStatus';
   import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
   import { useMetadataStore } from '@/stores/useMetadata';
+  import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
-  import { completeTaskForProgress, recordImpliedStoryObjectives } from '@/utils/taskProgress';
+  import {
+    applyTaskTraderRequirements,
+    completeTaskForProgress,
+    ensureTaskMinPlayerLevel,
+    recordImpliedStoryObjectives,
+  } from '@/utils/taskProgress';
   const emit = defineEmits<{
     busy: [value: boolean];
     dirty: [value: boolean];
@@ -123,8 +138,10 @@
   const { t } = useI18n({ useScope: 'global' });
   const metadata = useMetadataStore();
   const tarkov = useTarkovStore();
+  const preferences = usePreferencesStore();
   const progress = useProgressStore();
   const mode = tarkov.getCurrentGameMode();
+  const tabId = useId();
   const activeTab = ref<'quests' | 'traders' | 'hideout'>('quests');
   const choices = reactive(new Map<string, 'active' | 'completed'>());
   const levels = reactive(new Map<string, number>());
@@ -350,6 +367,9 @@
     active.forEach((id) => {
       const task = allTasks.value.get(id);
       if (!task) return;
+      ensureTaskMinPlayerLevel(tarkov, task);
+      if (preferences.getTasksRequireTraderLevels)
+        applyTaskTraderRequirements({ store: tarkov, task });
       const signature = otherRequirementsSignature(task, completions);
       if (signature) tarkov.confirmTaskAvailability(id, signature);
       recordImpliedStoryObjectives(tarkov, task);

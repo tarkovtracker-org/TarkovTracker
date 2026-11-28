@@ -22,6 +22,7 @@ type Checkpoint = {
   outcomes: Partial<Record<SetupImportStep, SetupOutcome>>;
   tarkovDevImportedModes: GameMode[];
   editionResolvedByImport?: boolean;
+  importProfileVisited?: boolean;
   completedAt?: number;
   dismissed?: boolean;
 };
@@ -67,9 +68,14 @@ export function useSetupCheckpoint() {
   const editionResolvedByImport = computed(
     () => checkpoint.value?.editionResolvedByImport === true
   );
+  const importProfileVisited = computed(
+    () =>
+      checkpoint.value?.importProfileVisited === true ||
+      (path.value === 'import' && step.value === 'profile')
+  );
   const needsProfileFallback = computed(() => {
     if (path.value !== 'import') return false;
-    if (step.value === 'profile') return true;
+    if (importProfileVisited.value) return true;
     if (tarkovDevImportedModes.value.length > 0) return false;
     return outcomes.value['tarkov-dev'] === 'skipped' || outcomes.value['tarkov-dev'] === 'failed';
   });
@@ -95,13 +101,15 @@ export function useSetupCheckpoint() {
   const nextStep = computed<SetupStep>(() => visibleSteps.value[stepIndex.value + 1] ?? 'done');
   function writeCheckpoint(patch: Partial<Checkpoint>) {
     checkpoint.value = {
-      path: patch.path ?? path.value,
-      step: patch.step ?? step.value,
-      outcomes: patch.outcomes ?? { ...outcomes.value },
-      tarkovDevImportedModes: patch.tarkovDevImportedModes ?? [...tarkovDevImportedModes.value],
-      editionResolvedByImport: patch.editionResolvedByImport ?? editionResolvedByImport.value,
-      completedAt: 'completedAt' in patch ? patch.completedAt : checkpoint.value?.completedAt,
-      dismissed: patch.dismissed ?? dismissed.value,
+      path: path.value,
+      step: step.value,
+      outcomes: { ...outcomes.value },
+      tarkovDevImportedModes: [...tarkovDevImportedModes.value],
+      editionResolvedByImport: editionResolvedByImport.value,
+      importProfileVisited: importProfileVisited.value,
+      completedAt: checkpoint.value?.completedAt,
+      dismissed: dismissed.value,
+      ...patch,
     };
   }
   function selectPath(nextPath: SetupPath) {
@@ -133,9 +141,12 @@ export function useSetupCheckpoint() {
     );
   }
   function go(next: SetupStep, outcome?: SetupOutcome) {
+    const nextPath = setupPathForStep(path.value, next);
     writeCheckpoint({
-      path: setupPathForStep(path.value, next),
+      path: nextPath,
       step: next,
+      importProfileVisited:
+        importProfileVisited.value || (nextPath === 'import' && next === 'profile'),
       outcomes: mergeStepOutcome(step.value, outcome),
       completedAt: next === 'done' ? Date.now() : checkpoint.value?.completedAt,
     });

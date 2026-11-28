@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   currentMode: 'pvp' as GameMode,
   save: vi.fn<() => Promise<boolean>>(),
   switchMode: vi.fn<(mode: GameMode) => Promise<void>>(),
+  modes: {} as Record<GameMode, { displayName: string | null }>,
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
@@ -18,10 +19,10 @@ vi.mock('@/stores/useTarkov', () => ({
     seasonal: {},
     getCurrentGameMode: () => state.currentMode,
     getGameEdition: () => 1,
-    getModeDisplayName: () => '',
+    getModeDisplayName: (mode: GameMode) => state.modes[mode].displayName,
     setGameEdition: vi.fn(),
     saveProgressNow: state.save,
-    $patch: vi.fn(),
+    $patch: (patch: (progress: typeof state.modes) => void) => patch(state.modes),
   }),
 }));
 vi.mock('@/stores/useMetadata', () => ({
@@ -35,12 +36,39 @@ vi.mock(import('@/stores/tarkov/localStorage'), async (importOriginal) => ({
   flushActiveProgressWrites: vi.fn().mockResolvedValue(undefined),
 }));
 const i18n = createI18n({ legacy: false, locale: 'en', missingWarn: false });
-const mountProfile = () => shallowMount(SetupProfileStep, { global: { plugins: [i18n] } });
+const mountProfile = () =>
+  shallowMount(SetupProfileStep, {
+    global: {
+      plugins: [i18n],
+      stubs: {
+        UInput: {
+          props: ['modelValue'],
+          template:
+            '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+        },
+      },
+    },
+  });
 describe('SetupProfileStep', () => {
   beforeEach(() => {
     state.currentMode = 'pvp';
+    state.modes = {
+      pvp: { displayName: null },
+      pve: { displayName: null },
+      seasonal: { displayName: null },
+    };
     state.save.mockReset().mockResolvedValue(true);
     state.switchMode.mockReset().mockResolvedValue(undefined);
+  });
+  it('saves an explicitly cleared display name', async () => {
+    state.modes.pvp.displayName = 'Existing display name';
+    const wrapper = mountProfile();
+    await wrapper.get('#setup-display-name').setValue(' ');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(state.modes.pvp.displayName).toBeNull();
+    expect(wrapper.emitted('finish')).toHaveLength(1);
+    wrapper.unmount();
   });
   it('stays on the profile after a rejected save and advances only after retry succeeds', async () => {
     state.save.mockResolvedValueOnce(false);

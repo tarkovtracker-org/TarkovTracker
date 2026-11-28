@@ -11,6 +11,9 @@ const state = vi.hoisted(() => ({
   taskCompletions: {} as UserProgressData['taskCompletions'],
   confirmTaskAvailability: vi.fn(),
   setStoryObjectiveComplete: vi.fn(),
+  setTraderReputation: vi.fn(),
+  setLevel: vi.fn(),
+  requireTraderLevels: true,
 }));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
@@ -24,11 +27,18 @@ vi.mock('@/stores/useMetadata', () => ({
 vi.mock('@/stores/useProgress', () => ({
   useProgressStore: () => ({ hideoutLevels: {} }),
 }));
+vi.mock('@/stores/usePreferences', () => ({
+  usePreferencesStore: () => ({ getTasksRequireTraderLevels: state.requireTraderLevels }),
+}));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getCurrentGameMode: () => 'pvp',
     getCurrentProgressData: () => ({ taskCompletions: state.taskCompletions }),
     getPMCFaction: () => 'USEC',
+    playerLevel: () => 1,
+    setLevel: state.setLevel,
+    getTraderReputation: () => 0,
+    setTraderReputation: state.setTraderReputation,
     isHideoutModuleComplete: () => false,
     setTaskUncompleted: (id: string) => {
       state.taskCompletions[id] = { complete: false, timestamp: 200 };
@@ -100,4 +110,29 @@ describe('SetupManualReview active quests', () => {
     expect(state.confirmTaskAvailability).not.toHaveBeenCalled();
     expect(state.setStoryObjectiveComplete).toHaveBeenCalledWith('tour', 'talk');
   });
+  it.each([true, false])(
+    'restores the level and honors the trader requirements preference (%s)',
+    async (requireTraderLevels) => {
+      state.requireTraderLevels = requireTraderLevels;
+      state.tasks = [
+        {
+          id: 'trader-quest',
+          minPlayerLevel: 12,
+          traderRequirements: [
+            {
+              id: 'reputation-gate',
+              requirementType: 'reputation',
+              trader: { id: 'prapor', name: 'Prapor' },
+              value: 0.25,
+            },
+          ],
+        },
+      ] as Task[];
+      await saveActiveQuests('trader-quest');
+      expect(state.setLevel).toHaveBeenCalledWith(12);
+      expect(state.setTraderReputation.mock.calls).toEqual(
+        requireTraderLevels ? [['prapor', 0.25]] : []
+      );
+    }
+  );
 });

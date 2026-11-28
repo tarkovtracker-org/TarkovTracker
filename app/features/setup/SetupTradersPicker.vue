@@ -28,6 +28,7 @@
             size="xs"
             :color="trader.currentLevel === lvl ? 'primary' : 'neutral'"
             :variant="trader.currentLevel === lvl ? 'solid' : 'soft'"
+            :aria-pressed="trader.currentLevel === lvl"
             :disabled="saving"
             @click="emit('selectLevel', { id: trader.id, level: lvl })"
           >

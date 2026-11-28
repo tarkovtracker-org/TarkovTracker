@@ -54,7 +54,7 @@
           :skills="row.ready.skills"
           :profile-url="row.profileUrl"
           :refreshing="refreshingMode === row.mode"
-          :refresh-disabled="refreshDisabled || refreshingMode !== null"
+          :refresh-disabled="refreshDisabled || actionsLocked"
           @refetch="emit('refetchMode', row.mode)"
         />
         <TarkovDevModeStatusBody
@@ -63,7 +63,7 @@
           :message="row.nonReady.message"
           :profile-url="row.profileUrl"
           :refreshing="refreshingMode === row.mode"
-          :refresh-disabled="refreshDisabled || refreshingMode !== null"
+          :refresh-disabled="refreshDisabled || actionsLocked"
           @refetch="emit('refetchMode', row.mode)"
           @allow-stale="emit('allowStaleMode', row.mode)"
         />

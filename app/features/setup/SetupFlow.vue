@@ -341,7 +341,7 @@
   }
   onBeforeRouteLeave((to) => guardRouteLeave(to.fullPath));
   useEventListener('beforeunload', (event) => {
-    if (!manualDirty.value && !profileBusy.value) return;
+    if (!manualBlocked.value && !profileBusy.value) return;
     event.preventDefault();
     event.returnValue = '';
   });

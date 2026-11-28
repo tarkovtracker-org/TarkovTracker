@@ -118,18 +118,6 @@
     props.blockedDetails.some((detail) => detail.missingTraders.length > 0)
   );
   const blockedActions = computed(() => [
-    ...(hasMissingStations.value
-      ? [
-          {
-            id: 'stations',
-            color: 'warning' as const,
-            variant: 'solid' as const,
-            icon: 'i-mdi-auto-fix',
-            label: t('setup.hideout_include_prereqs'),
-            onClick: () => emit('includeStationPrereqs'),
-          },
-        ]
-      : []),
     ...(hasMissingTraders.value
       ? [
           {
@@ -139,6 +127,18 @@
             icon: 'i-mdi-account-group',
             label: t('setup.hideout_open_traders'),
             onClick: () => emit('openTradersTab'),
+          },
+        ]
+      : []),
+    ...(hasMissingStations.value
+      ? [
+          {
+            id: 'stations',
+            color: 'warning' as const,
+            variant: 'solid' as const,
+            icon: 'i-mdi-auto-fix',
+            label: t('setup.hideout_include_prereqs'),
+            onClick: () => emit('includeStationPrereqs'),
           },
         ]
       : []),

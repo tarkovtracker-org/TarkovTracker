@@ -3159,6 +3159,7 @@
         "no_notification_logs_found": "No notification or output logs were found in the selected files.",
         "no_quest_events_found": "No quest start, completion, or failure events were found in the selected logs.",
         "parse_failed": "Failed to parse EFT logs.",
+        "drop_read_failed": "Some dropped files could not be opened. Drop the folder again or browse for the log files.",
         "task_metadata_not_loaded": "Task metadata is not loaded yet. Please refresh and try again.",
         "invalid_mode": "Select a valid destination game mode.",
         "invalid_date": "Enter a valid import start time or clear it to include all selected history.",

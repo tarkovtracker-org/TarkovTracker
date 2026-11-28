@@ -12,6 +12,7 @@
         size="xs"
         :color="chip.color"
         :variant="chip.variant"
+        :aria-pressed="selectedTraderId === chip.id"
         @click="selectedTraderId = chip.id"
       >
         {{ chip.label }}

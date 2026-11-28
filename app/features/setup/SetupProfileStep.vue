@@ -297,7 +297,7 @@
       state[mode].pmcFaction = draft.faction;
       state[mode].level = parsed.level;
       if (mode !== GAME_MODES.SEASONAL) state[mode].prestigeLevel = draft.prestigeLevel;
-      if (trimmedName) state[mode].displayName = trimmedName;
+      state[mode].displayName = trimmedName || null;
     });
   }
   async function selectPrimaryMode(): Promise<boolean> {

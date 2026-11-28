@@ -47,6 +47,9 @@
           {{ $t('settings.log_import.browse_files_link') }}
         </button>
       </p>
+      <p v-if="dropReadFailed" class="text-error-400 text-xs" role="alert">
+        {{ $t('settings.log_import.errors.drop_read_failed') }}
+      </p>
     </div>
   </div>
 </template>
@@ -61,6 +64,7 @@
     disposed = true;
   });
   const dragDepth = ref(0);
+  const dropReadFailed = ref(false);
   const isDragging = computed(() => dragDepth.value > 0 && !props.disabled);
   const dropzoneClass = computed(() =>
     isDragging.value
@@ -76,6 +80,7 @@
     filesInputRef.value?.click();
   }
   function onInputChange(event: Event) {
+    dropReadFailed.value = false;
     const input = event.target as HTMLInputElement;
     const files = input.files ? Array.from(input.files) : [];
     input.value = '';
@@ -157,7 +162,11 @@
   async function onDrop(event: DragEvent) {
     dragDepth.value = 0;
     if (props.disabled) return;
-    const files = await extractDroppedFiles(event.dataTransfer);
+    dropReadFailed.value = false;
+    const files = await extractDroppedFiles(event.dataTransfer).catch(() => {
+      if (!disposed && !props.disabled) dropReadFailed.value = true;
+      return [];
+    });
     if (!disposed && !props.disabled && files.length > 0) emit('selectFiles', files);
   }
   defineExpose({

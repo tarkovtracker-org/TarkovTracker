@@ -1635,7 +1635,7 @@
     }
   }
   async function handleTarkovDevPreviewModeAction(mode: GameMode, allowStale: boolean) {
-    if (tarkovDevRefreshingMode.value !== null) return;
+    if (tarkovDevRefreshingMode.value !== null || tarkovDevIsImporting.value) return;
     tarkovDevRefreshingMode.value = mode;
     try {
       const verification = await verifyTurnstileToken();
@@ -2028,7 +2028,7 @@
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 30) return rtf.format(-diffDays, 'day');
     const diffMonths = Math.floor(diffDays / 30);
-    if (diffMonths < 12) return rtf.format(-diffMonths, 'month');
+    if (diffDays < 365) return rtf.format(-diffMonths, 'month');
     return rtf.format(-Math.floor(diffDays / 365), 'year');
   }
   function formatDate(ts: number): string {
