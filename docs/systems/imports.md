@@ -456,8 +456,8 @@ Use privacy-normalized fixtures. Never commit raw logs. An October 2026 sample t
   quests nor assigns the importing user's prestige. Do not infer reset boundaries from build
   versions or a profile ID changing between modes.
 
-Completed-task imports restore objectives and may infer prerequisite states, minimum level/trader
-requirements, and story gates. They do not provide exact self XP, skill snapshots, partial objective
-handovers, or hideout progress. Missing history remains missing. If combining log and profile
+Completed-task imports restore objectives and may infer prerequisite states and story gates.
+They do not provide exact self XP, skill snapshots, partial objective handovers, or hideout
+progress. Missing history remains missing. If combining log and profile
 imports, apply the selected logs first, then a refreshed matching profile to align level/skills to
 that snapshot. The profile importer derives and saves the level from cumulative profile XP.

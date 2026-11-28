@@ -229,11 +229,12 @@ trader and edit the held value directly. Re-enabling establishes a new checkpoin
 current value and applies future quest changes.
 
 In Auto, standard trader loyalty uses the highest catalog tier whose PMC level and reputation
-are met. Auto is the default when no loyalty has been saved. Existing saved loyalty stays
-manual until the player selects Auto. Manual loyalty and reputation can be set independently.
-Specialized traders keep their existing rules. Hideout
-reconciliation and public API reads use saved standing, so a change to the quest-derived
-estimate cannot revoke an existing build or change the public response contract.
+are met. It skips tiers with a nonzero commerce requirement in the catalog since Tracker
+has no commerce progress to evaluate. Auto is the default when no loyalty has been saved.
+Existing saved loyalty stays manual until the player selects Auto. Manual loyalty and reputation
+can be set independently. Specialized traders keep their existing rules. Hideout reconciliation
+and public API reads use saved standing, so a change to the quest-derived estimate cannot
+revoke an existing build or change the public response contract.
 
 ### Presentation and ordering
 

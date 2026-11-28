@@ -99,6 +99,15 @@ describe('effective trader standing', () => {
       reputation: 0.2,
     });
   });
+  it('keeps the resumed tracking policy when correcting the displayed reputation', () => {
+    const state = structuredClone(defaultState);
+    actions.setQuestReputationTracking.call(state, 'prapor', 0.3, false);
+    actions.setTaskComplete.call(state, 'quest-a');
+    actions.setQuestReputationTracking.call(state, 'prapor', 0.3, true);
+    actions.correctTraderReputation.call(state, 'prapor', 0.5);
+    actions.setTaskUncompleted.call(state, 'quest-a');
+    expect(effectiveTraderStanding(state.pvp, catalog).prapor?.reputation).toBe(0.5);
+  });
   it('merges a manual loyalty choice independently of a reputation edit on another device', () => {
     const state = structuredClone(defaultState);
     state.pvp.level = 20;

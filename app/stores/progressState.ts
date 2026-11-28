@@ -36,7 +36,6 @@ import {
   checkpointLegacyTraderStanding,
   completedTraderQuestIds,
   excludedHistoricalTraderQuestIds,
-  tracksQuestReputation,
 } from '@/utils/traderProgress';
 import type { ManualActivityEntry, TaskCompletion, UserProgressData } from '@/types/progress';
 import type { _GettersTree } from 'pinia';
@@ -314,7 +313,7 @@ const buildReputationCheckpoint = (
   options: TraderReputationOptions
 ) => {
   const questRewardTracking =
-    options.questRewardTracking ?? (tracksQuestReputation(existing) ? undefined : 'paused');
+    options.questRewardTracking ?? existing?.reputationCheckpoint?.questRewardTracking;
   const excludedHistoricalTaskIds = excludedHistoricalTraderQuestIds(progress);
   return {
     completedTaskIds: completedTraderQuestIds(progress),

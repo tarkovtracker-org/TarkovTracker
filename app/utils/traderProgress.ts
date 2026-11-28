@@ -88,6 +88,7 @@ const meetsLoyaltyRequirements = (
   level: number,
   reputation: number
 ) =>
+  // Current tiers have no commerce requirement. A positive catalog value needs manual verification.
   tier.requiredCommerce === 0 &&
   level >= tier.requiredPlayerLevel &&
   reputation >= tier.requiredReputation;
