@@ -87,8 +87,9 @@ describe('progressState getters task completion compatibility', () => {
   });
 });
 describe('progressState task lifecycle', () => {
+  const acceptTask: (this: UserState, taskId: string) => void = actions.setTaskActive;
   it.each([
-    { action: 'accept', prior: undefined, apply: actions.setTaskActive, next: true },
+    { action: 'accept', prior: undefined, apply: acceptTask, next: true },
     { action: 'undo', prior: true, apply: actions.setTaskAcceptanceUnknown, next: undefined },
   ])('preserves valid legacy Jaeger evidence through $action', ({ prior, apply, next }) => {
     const id = TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT;
@@ -116,7 +117,7 @@ describe('progressState task lifecycle', () => {
     expect(hasEvidence()).toBe(false);
   });
   it.each([
-    { action: 'accept', prior: undefined, apply: actions.setTaskActive },
+    { action: 'accept', prior: undefined, apply: acceptTask },
     { action: 'undo', prior: true, apply: actions.setTaskAcceptanceUnknown },
   ])(
     'preserves the manual Jaeger observation through $action without reviving it after reset',

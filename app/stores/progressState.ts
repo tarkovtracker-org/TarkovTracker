@@ -332,6 +332,7 @@ const setTaskStatus = (state: UserState, taskId: string, completion: TaskComplet
       ? Math.max(previousTimestamp, timestamp)
       : timestamp;
   updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp: statusTimestamp });
+  return statusTimestamp;
 };
 // Simplified actions
 export const actions = {
@@ -422,9 +423,10 @@ export const actions = {
     const data = getCurrentData(this);
     const previous = data.taskCompletions[taskId];
     const importedAcceptance = getImportedAcceptance(data, taskId);
-    setTaskStatus(this, taskId, createCompletion(false, false, true, false));
+    const timestamp = setTaskStatus(this, taskId, createCompletion(false, false, true, false));
     if (importedAcceptance) setAvailabilityConfirmation(this, taskId, importedAcceptance);
     carryManualAcceptance(this, taskId, previous);
+    return timestamp;
   },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
     setTaskStatus(this, taskId, createCompletion(true, true, false, failOptions?.manual));

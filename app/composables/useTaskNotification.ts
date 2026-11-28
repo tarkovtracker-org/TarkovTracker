@@ -4,9 +4,11 @@ import { useTarkovStore } from '@/stores/useTarkov';
 import {
   hasUnconfirmableStatusClock,
   isAvailabilityConfirmed,
+  taskStatusTimestamp,
 } from '@/utils/taskAvailabilityConfirmation';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import { provesStartGates, releaseRecordedStoryObjectives } from '@/utils/taskProgress';
+import { isTaskActive } from '@/utils/taskStatus';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { TaskAvailabilityConfirmation } from '@/types/progress';
 import type { Task, TaskObjective } from '@/types/tarkov';
@@ -140,6 +142,11 @@ export function useTaskNotification(): TaskNotificationReturn {
       return { ...confirmation };
     }
   };
+  const acceptanceWasSuperseded = ({ taskId, acceptanceWrite }: TaskActionPayload) => {
+    if (!acceptanceWrite) return false;
+    const current = tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId];
+    return !isTaskActive(current) || taskStatusTimestamp(current) !== acceptanceWrite.timestamp;
+  };
   const confirmationStillMatches = (task: Task, previous: TaskAvailabilityConfirmation) => {
     const progress = tarkovStore.getCurrentProgressData();
     const current = progress?.taskAvailability?.[task.id];
@@ -184,6 +191,7 @@ export function useTaskNotification(): TaskNotificationReturn {
   const undoHandlers: Partial<Record<TaskActionPayload['action'], (context: UndoContext) => void>> =
     {
       active: (context) => {
+        if (acceptanceWasSuperseded(context.event)) return;
         restoreSelectedAcceptance(context);
         restoreAvailability(context);
         context.releaseStoryObjectives();
@@ -243,7 +251,8 @@ export function useTaskNotification(): TaskNotificationReturn {
       event,
       task,
       previousAcceptance: previousAcceptance(event.taskId),
-      previousConfirmation: event.action === 'active' ? captureAvailability(task) : undefined,
+      previousConfirmation:
+        event.action === 'active' && event.acceptanceWrite ? captureAvailability(task) : undefined,
       alternativeAcceptances: captureAlternativeAcceptances(
         event.action === 'complete' ? task?.alternatives : undefined
       ),

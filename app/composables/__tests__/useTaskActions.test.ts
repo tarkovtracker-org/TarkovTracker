@@ -145,11 +145,16 @@ describe('useTaskActions', () => {
   it('registers acceptance undo before changing the task state', async () => {
     const task: Task = { id: 'accept-order', name: 'Accept order' };
     const { actions, onAction, tarkovStore } = await setup(task, [task], {});
-    onAction.mockImplementation(() => {
+    tarkovStore.setTaskActive.mockReturnValueOnce(123);
+    onAction.mockImplementation((event) => {
       expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+      expect(event.acceptanceWrite?.timestamp).toBeUndefined();
     });
     actions.markTaskActive();
     expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(task.id);
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({ acceptanceWrite: { timestamp: 123 } })
+    );
   });
   it('accepts an available task as explicitly active', async () => {
     const task: Task = { id: 'task-active', name: 'Task Active' };

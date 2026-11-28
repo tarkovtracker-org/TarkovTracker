@@ -31,6 +31,8 @@ export type TaskActionPayload = {
   undoKey?: string;
   statusKey?: string;
   wasManualFail?: boolean;
+  /** Updated after emission so Undo can capture prior state before the acceptance write. */
+  acceptanceWrite?: { timestamp?: number };
   /** Story objectives this action newly recorded, released again by its undo. */
   recordedStoryObjectives?: StoryObjectiveRef[];
 };
@@ -328,6 +330,7 @@ export function useTaskActions(
     const currentTask = task();
     const taskName = getTaskName(currentTask, () => t('common.task', 'Task'));
     const recordedStoryObjectives = recordImpliedStoryObjectives(tarkovStore, currentTask);
+    const acceptanceWrite: NonNullable<TaskActionPayload['acceptanceWrite']> = {};
     emitAction({
       taskId: currentTask.id,
       taskName,
@@ -335,8 +338,9 @@ export function useTaskActions(
       analyticsParams: analyticsParams(currentTask),
       statusKey: 'page.tasks.questcard.status_active',
       recordedStoryObjectives,
+      acceptanceWrite,
     });
-    tarkovStore.setTaskActive(currentTask.id);
+    acceptanceWrite.timestamp = tarkovStore.setTaskActive(currentTask.id);
   };
   const markTaskFailed = (isUndo = false) => {
     const currentTask = task();
