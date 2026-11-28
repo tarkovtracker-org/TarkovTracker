@@ -1,9 +1,14 @@
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
-import { hasUnconfirmableStatusClock } from '@/utils/taskAvailabilityConfirmation';
+import {
+  hasUnconfirmableStatusClock,
+  isAvailabilityConfirmed,
+} from '@/utils/taskAvailabilityConfirmation';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import { provesStartGates, releaseRecordedStoryObjectives } from '@/utils/taskProgress';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
+import type { TaskAvailabilityConfirmation } from '@/types/progress';
 import type { Task, TaskObjective } from '@/types/tarkov';
 interface TaskNotificationReturn {
   taskStatusUpdated: Ref<boolean>;
@@ -104,6 +109,7 @@ export function useTaskNotification(): TaskNotificationReturn {
     event: TaskActionPayload;
     task: Task | undefined;
     previousAcceptance: boolean | undefined;
+    previousConfirmation: TaskAvailabilityConfirmation | undefined;
     alternativeAcceptances: ReadonlyMap<string, boolean | undefined>;
     releaseStoryObjectives: () => void;
   };
@@ -117,6 +123,36 @@ export function useTaskNotification(): TaskNotificationReturn {
   const previousAcceptance = (taskId: string): boolean | undefined => {
     const active = tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId]?.active;
     return typeof active === 'boolean' ? active : undefined;
+  };
+  const captureAvailability = (task: Task | undefined) => {
+    if (!task) return;
+    const progress = tarkovStore.getCurrentProgressData();
+    const confirmation = progress?.taskAvailability?.[task.id];
+    const completions = progress?.taskCompletions;
+    if (
+      confirmation &&
+      isAvailabilityConfirmed(
+        confirmation,
+        completions?.[task.id],
+        otherRequirementsSignature(task, completions)
+      )
+    ) {
+      return { ...confirmation };
+    }
+  };
+  const confirmationStillMatches = (task: Task, previous: TaskAvailabilityConfirmation) => {
+    const progress = tarkovStore.getCurrentProgressData();
+    const current = progress?.taskAvailability?.[task.id];
+    return (
+      current?.timestamp === previous.timestamp &&
+      current.requirements === previous.requirements &&
+      otherRequirementsSignature(task, progress?.taskCompletions) === previous.requirements
+    );
+  };
+  const restoreAvailability = ({ task, previousConfirmation }: UndoContext) => {
+    if (task && previousConfirmation && confirmationStillMatches(task, previousConfirmation)) {
+      tarkovStore.confirmTaskAvailability(task.id, previousConfirmation.requirements);
+    }
   };
   const captureAlternativeAcceptances = (alternatives: string[] | undefined) =>
     new Map(
@@ -149,6 +185,7 @@ export function useTaskNotification(): TaskNotificationReturn {
     {
       active: (context) => {
         restoreSelectedAcceptance(context);
+        restoreAvailability(context);
         context.releaseStoryObjectives();
         showUndoStatus(context, 'page.tasks.questcard.undo_active');
       },
@@ -206,6 +243,7 @@ export function useTaskNotification(): TaskNotificationReturn {
       event,
       task,
       previousAcceptance: previousAcceptance(event.taskId),
+      previousConfirmation: event.action === 'active' ? captureAvailability(task) : undefined,
       alternativeAcceptances: captureAlternativeAcceptances(
         event.action === 'complete' ? task?.alternatives : undefined
       ),

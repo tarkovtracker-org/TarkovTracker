@@ -1,7 +1,11 @@
+import {
+  TASK_SECONDARY_VIEWS,
+  type TaskFilterAndSortOptions,
+  type TaskSecondaryView,
+} from '@/types/taskFilter';
 import { fuzzyMatchScore } from '@/utils/fuzzySearch';
 import { getTaskRewardItems } from '@/utils/taskRewards';
 import type { Task } from '@/types/tarkov';
-import type { TaskFilterAndSortOptions, TaskSecondaryView } from '@/types/taskFilter';
 type RefLike<T> = { value: T };
 type ComputedRefLike<T> = Readonly<{ value: T }>;
 type TaskFilterInputs = {
@@ -48,13 +52,6 @@ export const applySearchToTaskList = (taskList: Task[], query: string): Task[] =
     .map(({ task }) => task);
 };
 export type TaskStatusCounts = Record<TaskSecondaryView, number>;
-const STATUS_VIEWS: readonly TaskSecondaryView[] = [
-  'all',
-  'available',
-  'locked',
-  'completed',
-  'failed',
-];
 export function useTaskFilters({
   calculateFilteredTasksForOptions,
   getTaskMapView,
@@ -100,7 +97,7 @@ export function useTaskFilters({
     if (!normalizedSearch.value) return null;
     const options = mapTaskVisibilityFilterOptions.value;
     const counts = {} as TaskStatusCounts;
-    for (const status of STATUS_VIEWS) {
+    for (const status of TASK_SECONDARY_VIEWS) {
       const statusTasks = calculateFilteredTasksForOptions(
         tasks.value,
         { ...options, secondaryView: status },

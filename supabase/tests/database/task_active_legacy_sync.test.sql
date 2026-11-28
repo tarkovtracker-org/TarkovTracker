@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(39);
+SELECT plan(43);
 CREATE TEMP TABLE active_fixture AS SELECT
   '{"progressEpoch":0,"taskCompletions":{"accepted":{"complete":false,"failed":false,"active":true,"timestamp":100},"inactive":{"complete":false,"failed":false,"active":false,"timestamp":100}}}'::jsonb AS existing;
 SELECT is(public.merge_manual_activity_progress(existing,
@@ -52,6 +52,23 @@ SELECT ok(NOT (public.merge_manual_activity_progress('{}'::jsonb,
 SELECT is(public.merge_manual_activity_progress(existing,
   '{"taskCompletions":{"accepted":{"complete":false,"failed":false,"active":false,"timestamp":101}}}'::jsonb
 )->'taskCompletions'->'accepted'->'active', 'false'::jsonb, 'explicit new-client inactive write stays authoritative') FROM active_fixture;
+SELECT is(public.merge_manual_activity_progress(existing,
+  '{"taskCompletions":{"unrelated":{"complete":true,"timestamp":200}}}'::jsonb
+)->'taskCompletions', jsonb_build_object(
+  'accepted', existing->'taskCompletions'->'accepted',
+  'unrelated', '{"complete":true,"timestamp":200}'::jsonb
+), 'same-epoch save preserves an omitted accepted task and keeps the incoming task') FROM active_fixture;
+SELECT is(public.merge_manual_activity_progress(existing,
+  '{"level":2}'::jsonb
+)->'taskCompletions'->'accepted', existing->'taskCompletions'->'accepted',
+  'same-epoch save preserves acceptance when the task map is absent') FROM active_fixture;
+SELECT is(public.merge_manual_activity_progress(existing,
+  '{"taskCompletions":{"accepted":{"complete":false,"active":false,"timestamp":90}}}'::jsonb
+)->'taskCompletions'->'accepted', existing->'taskCompletions'->'accepted',
+  'older explicit inactive row cannot erase newer acceptance') FROM active_fixture;
+SELECT is(public.merge_manual_activity_progress(existing,
+  '{"progressEpoch":1,"taskCompletions":{}}'::jsonb
+)->'taskCompletions', '{}'::jsonb, 'newer reset does not reintroduce omitted accepted tasks') FROM active_fixture;
 -- Same equal-time legacy-reset fixtures as the browser merge regression. The raw stored
 -- acceptance flag remains authoritative even on a malformed terminal row with active:true.
 CREATE TEMP TABLE terminal_active_fixture AS

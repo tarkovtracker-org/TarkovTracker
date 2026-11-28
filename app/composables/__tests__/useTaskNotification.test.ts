@@ -10,6 +10,7 @@ import {
 } from '@/stores/progressState';
 import { mergeProgressData } from '@/stores/tarkov/progressMerge';
 import { buildTaskEvaluations } from '@/stores/taskAvailability';
+import { taskServerGateBlockers } from '@/stores/taskServerGates';
 import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
 import { MAX_CONFIRMATION_TIMESTAMP } from '@/utils/taskAvailabilityConfirmation';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
@@ -33,6 +34,7 @@ const createTarkovStore = (options: {
     setTaskFailed: vi.fn(),
     setTaskUncompleted: vi.fn(),
     setTaskAcceptanceUnknown: vi.fn(),
+    confirmTaskAvailability: vi.fn(),
     setTaskObjectiveComplete: vi.fn(),
     setTaskObjectiveUncomplete: vi.fn(),
     setStoryObjectiveUncomplete: vi.fn(),
@@ -200,6 +202,58 @@ describe('useTaskNotification', () => {
         expect(afterAccept.taskCompletions.prior!.timestamp!).toBeGreaterThan(
           afterUndo.taskCompletions.prior!.timestamp!
         );
+      } finally {
+        now.mockRestore();
+        stop();
+      }
+    }
+  );
+  it.each(['valid', 'stale', 'cleared'] as const)(
+    'restores only a previously valid, unchanged availability confirmation (%s)',
+    async (confirmation) => {
+      const state = structuredClone(defaultState);
+      const task: Task = {
+        id: 'gated-task',
+        name: 'Gated task',
+        otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+      };
+      const progress = state.pvp;
+      const id = task.id;
+      const blockers = () =>
+        taskServerGateBlockers(task, {
+          completions: progress.taskCompletions,
+          confirmations: progress.taskAvailability,
+        });
+      const { notification, tarkovStore, stop } = await setup([task], { progressData: progress });
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, id)
+      );
+      tarkovStore.setTaskUncompleted.mockImplementation((id: string) =>
+        progressActions.setTaskUncompleted.call(state, id)
+      );
+      tarkovStore.confirmTaskAvailability.mockImplementation((id: string, requirements: string) =>
+        progressActions.confirmTaskAvailability.call(state, id, requirements)
+      );
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        const requirements = otherRequirementsSignature(task, progress.taskCompletions)!;
+        progressActions.confirmTaskAvailability.call(state, id, requirements);
+        if (confirmation === 'stale') progressActions.setTaskUncompleted.call(state, id);
+        expect(blockers().map(({ type }) => type)).toEqual(
+          confirmation === 'stale' ? ['dialogue'] : []
+        );
+        notification.onTaskAction({ action: 'active', taskId: id, taskName: task.name! });
+        progressActions.setTaskActive.call(state, id);
+        if (confirmation === 'cleared') {
+          progressActions.confirmTaskAvailability.call(state, id, '');
+        }
+        await notification.undoLastAction();
+        expect(progress.taskCompletions[id]?.active).not.toBe(true);
+        expect(blockers().map(({ type }) => type)).toEqual(
+          confirmation === 'valid' ? [] : ['dialogue']
+        );
+        if (confirmation === 'cleared')
+          expect(progress.taskAvailability?.[id]?.requirements).toBe('');
       } finally {
         now.mockRestore();
         stop();
