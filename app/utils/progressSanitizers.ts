@@ -51,6 +51,16 @@ export const sanitizeDisplayName = (value: unknown): string | null =>
   sanitizeClampedText(value, 64);
 export const sanitizeFaction = (value: unknown): 'BEAR' | 'USEC' =>
   value === 'BEAR' ? 'BEAR' : 'USEC';
+const sanitizeTaskCompletionTimes = (completion: Record<string, unknown>) => {
+  const timestamp = toFiniteNumber(completion.timestamp);
+  const eftCompletedAt = toFiniteNumber(completion.eftCompletedAt);
+  return {
+    ...(timestamp !== null ? { timestamp: Math.max(0, Math.trunc(timestamp)) } : {}),
+    ...(eftCompletedAt !== null && eftCompletedAt > 0
+      ? { eftCompletedAt: Math.trunc(eftCompletedAt) }
+      : {}),
+  };
+};
 export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['taskCompletions'] => {
   if (!isRecord(value)) {
     return {};
@@ -64,7 +74,8 @@ export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['tas
     if (!isRecord(completion)) {
       continue;
     }
-    const normalized: UserProgressData['taskCompletions'][string] = {};
+    const normalized: UserProgressData['taskCompletions'][string] =
+      sanitizeTaskCompletionTimes(completion);
     if (typeof completion.complete === 'boolean') {
       normalized.complete = completion.complete;
     }
@@ -73,10 +84,6 @@ export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['tas
     }
     if (typeof completion.manual === 'boolean') {
       normalized.manual = completion.manual;
-    }
-    const timestamp = toFiniteNumber(completion.timestamp);
-    if (timestamp !== null) {
-      normalized.timestamp = Math.max(0, Math.trunc(timestamp));
     }
     if (Object.keys(normalized).length > 0) {
       sanitized[taskId] = normalized;
@@ -136,18 +143,37 @@ export const sanitizeHideoutModuleMap = (value: unknown): UserProgressData['hide
   }
   return sanitized;
 };
+const sanitizeCheckpointTaskIds = (ids: unknown[]) => [
+  ...new Set(ids.filter((id): id is string => typeof id === 'string' && id.length > 0)),
+];
+const sanitizeCheckpointTracking = (value: unknown) =>
+  value === 'paused' || value === 'new-only' ? ({ questRewardTracking: value } as const) : {};
 const sanitizeReputationCheckpoint = (value: unknown) => {
   if (!isRecord(value) || !Array.isArray(value.completedTaskIds)) return undefined;
   const timestamp = toFiniteNumber(value.timestamp);
   if (timestamp === null || !Number.isSafeInteger(timestamp) || timestamp < 0) return undefined;
   return {
-    completedTaskIds: [
-      ...new Set(
-        value.completedTaskIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
-      ),
-    ],
+    completedTaskIds: sanitizeCheckpointTaskIds(value.completedTaskIds),
+    ...(Array.isArray(value.excludedHistoricalTaskIds)
+      ? { excludedHistoricalTaskIds: sanitizeCheckpointTaskIds(value.excludedHistoricalTaskIds) }
+      : {}),
     timestamp,
     ...(value.manual === true ? { manual: true } : {}),
+    ...sanitizeCheckpointTracking(value.questRewardTracking),
+  };
+};
+const sanitizeTraderLoyalty = (value: Record<string, unknown>, level: number | null) => {
+  const timestamp = toFiniteNumber(value.loyaltyUpdatedAt);
+  const automaticLoyalty =
+    typeof value.automaticLoyalty === 'boolean' ? value.automaticLoyalty : undefined;
+  return {
+    level: level === null ? 1 : Math.max(1, Math.trunc(level)),
+    ...(automaticLoyalty === undefined && level !== null
+      ? {}
+      : { automaticLoyalty: automaticLoyalty ?? true }),
+    ...(timestamp !== null && Number.isSafeInteger(timestamp) && timestamp >= 0
+      ? { loyaltyUpdatedAt: timestamp }
+      : {}),
   };
 };
 export const sanitizeTraderMap = (value: unknown): UserProgressData['traders'] => {
@@ -166,7 +192,7 @@ export const sanitizeTraderMap = (value: unknown): UserProgressData['traders'] =
     }
     const reputationCheckpoint = sanitizeReputationCheckpoint(traderValue.reputationCheckpoint);
     sanitized[traderId] = {
-      level: level !== null ? Math.max(1, Math.trunc(level)) : 1,
+      ...sanitizeTraderLoyalty(traderValue, level),
       reputation: reputation !== null ? reputation : 0,
       ...(reputationCheckpoint ? { reputationCheckpoint } : {}),
     };

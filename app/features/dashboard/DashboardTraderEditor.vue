@@ -3,14 +3,30 @@
     <label v-if="hasLoyalty" class="text-surface-200 grid gap-1 text-xs">
       {{ $t('page.dashboard.traders.loyalty_level') }}
       <select
-        :value="level"
+        :value="automaticLoyalty ? 'auto' : level"
         class="bg-surface-900 border-surface-600 focus-visible:ring-primary-500 min-h-11 rounded-md border px-2 text-base focus-visible:ring-2 focus-visible:outline-none"
         @change="updateLevel"
       >
+        <option value="auto">
+          {{
+            automaticLoyalty
+              ? $t('page.dashboard.traders.loyalty_auto_level', { level })
+              : $t('page.dashboard.traders.loyalty_auto')
+          }}
+        </option>
         <option v-for="option in loyaltyLevels" :key="option" :value="option">
           {{ $t('page.dashboard.traders.loyalty_short', { level: option }) }}
         </option>
       </select>
+    </label>
+    <label v-if="hasReputation" class="text-surface-200 flex min-h-11 items-center gap-2 text-xs">
+      <input
+        type="checkbox"
+        class="accent-primary-500 size-4"
+        :checked="questReputationTracking"
+        @change="updateQuestReputationTracking"
+      />
+      {{ $t('page.dashboard.traders.track_quest_reputation') }}
     </label>
     <label v-if="hasReputation" class="text-surface-200 grid gap-1 text-xs">
       {{ $t(reputationLabelKey) }}
@@ -62,6 +78,7 @@
   } from '@/features/dashboard/traderStanding';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useTarkovStore } from '@/stores/useTarkov';
+  import { tracksQuestReputation, usesAutomaticTraderLoyalty } from '@/utils/traderProgress';
   import type { Trader } from '@/types/tarkov';
   const props = defineProps<{ trader: Trader }>();
   const { t } = useI18n({ useScope: 'global' });
@@ -74,6 +91,11 @@
   );
   const level = computed(() => tarkovStore.getTraderLevel(props.trader.id));
   const reputation = computed(() => tarkovStore.getTraderReputation(props.trader.id) ?? 0);
+  const savedStanding = computed(
+    () => tarkovStore.getCurrentProgressData().traders[props.trader.id]
+  );
+  const automaticLoyalty = computed(() => usesAutomaticTraderLoyalty(savedStanding.value));
+  const questReputationTracking = computed(() => tracksQuestReputation(savedStanding.value));
   const loyaltyLevels = computed(() =>
     props.trader.levels?.length
       ? props.trader.levels.map((entry) => entry.level).toSorted((a, b) => a - b)
@@ -104,24 +126,11 @@
   );
   const draft = ref(reputation.value.toFixed(2));
   const draftBase = ref<number | null>(null);
-  const error = ref<'invalid' | 'minimum' | null>(null);
-  const updateFeedback = ref<{ kind: 'updated' } | { kind: 'raised'; value: string } | null>(null);
-  const minimumAllowed = computed(
-    () =>
-      minimumFor(tarkovStore.getCurrentProgressData().traders[props.trader.id]?.level ?? 1) || -10
-  );
-  function validationMessage(issue: 'invalid' | 'minimum') {
-    return issue === 'invalid'
-      ? t('page.dashboard.traders.rep_invalid')
-      : t('page.dashboard.traders.rep_below_minimum', { value: minimumAllowed.value.toFixed(2) });
-  }
+  const error = ref(false);
+  const updated = ref(false);
   const feedback = computed(() => {
-    if (error.value) return validationMessage(error.value);
-    const update = updateFeedback.value;
-    if (!update) return '';
-    return update.kind === 'raised'
-      ? t('page.dashboard.traders.rep_raised', { value: update.value })
-      : t('page.dashboard.traders.standing_saved');
+    if (error.value) return t('page.dashboard.traders.rep_invalid');
+    return updated.value ? t('page.dashboard.traders.standing_saved') : '';
   });
   watch(reputation, (value) => {
     const formatted = value.toFixed(2);
@@ -130,29 +139,25 @@
     clearFeedback();
   });
   function clearFeedback() {
-    error.value = null;
-    updateFeedback.value = null;
+    error.value = false;
+    updated.value = false;
   }
   function onReputationInput() {
     draftBase.value ??= reputation.value;
     clearFeedback();
   }
-  function raiseReputationForLevel(required: number) {
-    if (!hasReputation.value || required <= 0 || reputation.value >= required) return false;
-    tarkovStore.correctTraderReputation(props.trader.id, required);
-    return true;
-  }
   function updateLevel(event: Event) {
-    const next = Number((event.target as HTMLSelectElement).value);
-    const required = minimumFor(next);
+    const next = (event.target as HTMLSelectElement).value;
     clearFeedback();
-    const raised = raiseReputationForLevel(required);
-    tarkovStore.setTraderLevel(props.trader.id, next);
-    draftBase.value = null;
-    draft.value = reputation.value.toFixed(2);
-    updateFeedback.value = raised
-      ? { kind: 'raised', value: required.toFixed(2) }
-      : { kind: 'updated' };
+    if (next === 'auto') tarkovStore.setTraderLoyaltyAuto(props.trader.id);
+    else tarkovStore.setTraderLevel(props.trader.id, Number(next));
+    updated.value = true;
+  }
+  function updateQuestReputationTracking(event: Event) {
+    const enabled = (event.target as HTMLInputElement).checked;
+    clearFeedback();
+    tarkovStore.setQuestReputationTracking(props.trader.id, reputation.value, enabled);
+    updated.value = true;
   }
   function parseReputation(text: string): number | null {
     const normalized = text.trim().replace(',', '.');
@@ -167,7 +172,7 @@
     draftBase.value = null;
     const value = parseReputation(draft.value);
     if (value === null) {
-      error.value = 'invalid';
+      error.value = true;
       return;
     }
     applyReputationEdit(value, base);
@@ -177,12 +182,8 @@
       draft.value = reputation.value.toFixed(2);
       return;
     }
-    if (value < minimumAllowed.value) {
-      error.value = 'minimum';
-      return;
-    }
     tarkovStore.correctTraderReputation(props.trader.id, value);
     draft.value = value.toFixed(2);
-    updateFeedback.value = { kind: 'updated' };
+    updated.value = true;
   }
 </script>

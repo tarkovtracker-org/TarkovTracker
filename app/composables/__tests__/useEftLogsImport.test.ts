@@ -6,8 +6,6 @@ import * as logFileReader from '@/utils/eftLogFileReader';
 import { EftLogImportBudgetError } from '@/utils/eftLogImportBudget';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
-const preferences = { getTasksRequireTraderLevels: true };
-vi.mock('@/stores/usePreferences', () => ({ usePreferencesStore: () => preferences }));
 const metadataStore: { tasks: Task[] } = {
   tasks: [{ id: '61604635c725987e815b1a46' }],
 };
@@ -24,6 +22,7 @@ const tarkovStore = {
   isTaskComplete: vi.fn(() => false),
   setObjectiveCount: vi.fn(),
   setTaskComplete: vi.fn(),
+  recordEftQuestCompletionTime: vi.fn(),
   setTaskFailed: vi.fn(),
   setTaskObjectiveComplete: vi.fn(),
   setTaskObjectiveUncomplete: vi.fn(),
@@ -154,21 +153,14 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.saveProgressNow).toHaveBeenCalledTimes(2);
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledOnce();
   });
-  it('keeps a dated completion from being added again after a manual standing correction', async () => {
-    const checkpoint = {
-      completedTaskIds: [] as string[],
-      manual: true,
-      timestamp: Date.parse('2026-03-01T00:00:00Z'),
-    };
-    const progress = {
-      taskCompletions: {},
-      traders: { prapor: { level: 1, reputation: 0.7, reputationCheckpoint: checkpoint } },
-    };
-    tarkovStore.getCurrentProgressData.mockReturnValue(progress);
+  it('records the historical completion time even without a standing correction on this device', async () => {
     const importer = await loadComposable();
     await importer.parseFile(new File([completionLog()], 'notifications.log'));
     await importer.confirmImport('pvp');
-    expect(checkpoint.completedTaskIds).toEqual(['61604635c725987e815b1a46']);
+    expect(tarkovStore.recordEftQuestCompletionTime).toHaveBeenCalledExactlyOnceWith(
+      '61604635c725987e815b1a46',
+      expect.any(Number)
+    );
   });
   it('discards results from a log read that outlives its progress owner', async () => {
     const importer = await loadComposable();
@@ -1264,10 +1256,9 @@ describe('restart semantics', () => {
     expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(id);
   });
 });
-describe('trader gating preference during import', () => {
-  it.each([false, true])('respects trader gating = %s in the destination', async (enabled) => {
+describe('standing during import', () => {
+  it('recovers a gated quest in the destination without writing inferred standing', async () => {
     vi.clearAllMocks();
-    preferences.getTasksRequireTraderLevels = enabled;
     const id = '61604635c725987e815b1a46';
     metadataStore.tasks = [
       {
@@ -1292,13 +1283,9 @@ describe('trader gating preference during import', () => {
       },
     ] as Task[];
     let current: GameMode = 'pvp';
-    const writtenModes: GameMode[] = [];
     tarkovStore.getCurrentGameMode.mockImplementation(() => current);
     tarkovStore.switchGameMode.mockImplementation(async (mode) => {
       current = mode;
-    });
-    tarkovStore.setTraderLevel.mockImplementation(() => {
-      writtenModes.push(current);
     });
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     const importer = await loadComposable();
@@ -1308,11 +1295,10 @@ describe('trader gating preference during import', () => {
     ]);
     await importer.confirmImport('pvp');
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(id);
-    expect(tarkovStore.setLevel).toHaveBeenCalledWith(5);
-    expect(tarkovStore.setTraderLevel).toHaveBeenCalledTimes(enabled ? 1 : 0);
-    expect(tarkovStore.setTraderReputation).toHaveBeenCalledTimes(enabled ? 1 : 0);
-    expect(writtenModes).toEqual(enabled ? ['pve'] : []);
+    expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+    expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
+    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
     expect(current).toBe('pvp');
-    preferences.getTasksRequireTraderLevels = true;
   });
 });

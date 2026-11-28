@@ -9,6 +9,8 @@ export interface TaskCompletion {
   failed?: boolean;
   timestamp?: number;
   manual?: boolean;
+  /** Original EFT notification time, independent of the task's sync timestamp. */
+  eftCompletedAt?: number;
 }
 /**
  * In-game availability confirmation for a task's server-side start gates, stored separately from
@@ -40,10 +42,14 @@ export interface ApiUpdateMeta {
 export interface TraderProgress {
   level: number;
   reputation: number;
+  automaticLoyalty?: boolean;
+  loyaltyUpdatedAt?: number;
   reputationCheckpoint?: {
     completedTaskIds: string[];
+    excludedHistoricalTaskIds?: string[];
     timestamp: number;
     manual?: boolean;
+    questRewardTracking?: 'paused' | 'new-only';
   };
 }
 export const MANUAL_ACTIVITY_TYPES = ['task', 'hideout', 'item', 'system'] as const;
