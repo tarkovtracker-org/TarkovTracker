@@ -1,8 +1,8 @@
 <template>
   <UModal
     :open="true"
-    :title="$t('stash_import.title')"
-    :description="$t('stash_import.description')"
+    :title="dialogTitle"
+    :description="dialogDescription"
     :dismissible="!saving"
     :ui="{ content: modalContent }"
     @update:open="close"
@@ -22,16 +22,23 @@
           />
           <div class="min-w-0 flex-1">
             <h2 class="text-surface-50 text-base font-semibold sm:text-lg">
-              {{ $t('stash_import.title') }}
+              {{ dialogTitle }}
             </h2>
             <p class="text-surface-400 text-xs sm:text-sm">
-              {{
-                demoMode
-                  ? $t('stash_import.demo_destination')
-                  : $t('stash_import.destination', { mode: modeLabel })
-              }}
+              {{ destination }}
             </p>
           </div>
+          <UButton
+            v-if="stream"
+            size="sm"
+            icon="i-mdi-stop-circle-outline"
+            variant="soft"
+            color="neutral"
+            :aria-label="$t('stash_import.window_stop')"
+            @click="stopSharing"
+          >
+            <span class="hidden sm:inline">{{ $t('stash_import.window_stop') }}</span>
+          </UButton>
           <UButton
             icon="i-mdi-close"
             variant="ghost"
@@ -41,7 +48,7 @@
             @click="close(false)"
           />
         </header>
-        <div class="border-b border-white/10 px-4 py-2.5 sm:px-5">
+        <div v-if="!windowScan" class="border-b border-white/10 px-4 py-2.5 sm:px-5">
           <StashImportSteps :current="step" />
         </div>
         <div
@@ -60,7 +67,7 @@
             />
           </div>
           <p
-            v-if="step === 'review' && busy"
+            v-if="showReviewProgress"
             role="status"
             class="text-surface-200 mb-3 flex items-center gap-2 text-sm"
           >
@@ -68,7 +75,7 @@
             {{ $t(`stash_import.stage_${stage}`) }}
           </p>
           <StashImportIntake
-            v-if="step === 'intake'"
+            v-if="showScreenshotIntake"
             :busy="busy"
             :disabled="!canIntake"
             :dragging="dragging"
@@ -81,10 +88,19 @@
             @paste-request="pasteFromClipboard"
             @cancel="cancel"
           />
+          <StashWindowIntake
+            v-else-if="step === 'intake'"
+            :stream="stream"
+            :error="captureError"
+            :requesting="requesting"
+            :scanning="scanningWindow"
+            @share="share"
+            @scan="scanWindow"
+          />
           <div
             v-else-if="step === 'review'"
             class="grid gap-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]"
-            :class="busy ? 'opacity-60' : ''"
+            :class="{ 'opacity-60': busy }"
             :inert="reviewInert"
             :aria-busy="busy"
           >
@@ -180,6 +196,7 @@
   import StashRegionEditor from '@/features/stash-import/StashRegionEditor.vue';
   import StashScreenshot from '@/features/stash-import/StashScreenshot.vue';
   import StashSellAdvice from '@/features/stash-import/StashSellAdvice.vue';
+  import StashWindowIntake from '@/features/stash-import/StashWindowIntake.vue';
   import { useScreenshotBitmap } from '@/features/stash-import/useScreenshotBitmap';
   import {
     useStashImport,
@@ -189,6 +206,7 @@
   } from '@/features/stash-import/useStashImport';
   import { useStashScanSession } from '@/features/stash-import/useStashScanSession';
   import { useStashSellAdvice } from '@/features/stash-import/useStashSellAdvice';
+  import { useStashWindowCapture } from '@/features/stash-import/useStashWindowCapture';
   import { useTarkovStore } from '@/stores/useTarkov';
   import { reviewedTotals } from '@/utils/stashScan/review';
   import { scanError } from '@/utils/stashScan/types';
@@ -198,7 +216,10 @@
   /** Full screen on phones; a large fixed-height panel from the sm breakpoint. */
   const modalContent =
     'pointer-events-none inset-auto top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-none max-h-none rounded-none bg-transparent p-0 shadow-none ring-0 divide-y-0 sm:w-[calc(100vw-2rem)] sm:max-w-6xl';
-  const props = defineProps<{ needs: (NeededItemTaskObjective | NeededItemHideoutModule)[] }>();
+  const props = defineProps<{
+    needs: (NeededItemTaskObjective | NeededItemHideoutModule)[];
+    windowScan?: boolean;
+  }>();
   const emit = defineEmits<{ close: [] }>();
   const { t } = useI18n({ useScope: 'global' });
   const store = useTarkovStore();
@@ -228,11 +249,24 @@
     split,
     next,
   } = useStashScanSession();
+  const {
+    stream,
+    requesting,
+    error: captureError,
+    share,
+    stop: stopSharing,
+    frame,
+  } = useStashWindowCapture();
+  const scanningWindow = ref(false);
   // Decode for display only once the worker has finished, so the two decodes never overlap.
   const { bitmap, failed: bitmapFailed } = useScreenshotBitmap(() =>
     result.value ? image.value : undefined
   );
   const step = ref<Step>('intake');
+  const showReviewProgress = computed(() => step.value === 'review' && busy.value);
+  const showScreenshotIntake = computed(
+    () => step.value === 'intake' && (!props.windowScan || busy.value)
+  );
   const demoMode = ref(false);
   const demoController = shallowRef<AbortController>();
   const importMode = ref<ImportMode>('replace');
@@ -253,16 +287,28 @@
   const displayError = computed(() =>
     ['intake', 'review'].includes(step.value) ? error.value || importError.value : importError.value
   );
-  const canIntake = computed(() => !saving.value && step.value !== 'apply');
+  const canIntake = computed(() => !props.windowScan && !saving.value && step.value !== 'apply');
   const applyLocked = computed(
     () => saving.value || uncertain.value || conflicted.value || blockedSource.value
   );
   const modeLabels = { pvp: 'common.pvp', pve: 'common.pve', seasonal: 'common.seasonal_pvp' };
   const modeLabel = computed(() => t(modeLabels[store.currentGameMode]));
+  const dialogTitle = computed(() =>
+    t(props.windowScan ? 'stash_import.window_title' : 'stash_import.title')
+  );
+  const dialogDescription = computed(() =>
+    t(props.windowScan ? 'stash_import.window_hint' : 'stash_import.description')
+  );
+  const destination = computed(() => {
+    if (props.windowScan) return t('stash_import.window_destination', { mode: modeLabel.value });
+    if (demoMode.value) return t('stash_import.demo_destination');
+    return t('stash_import.destination', { mode: modeLabel.value });
+  });
   const allowDecreases = ref(false);
   const pendingRegion = ref<ScanRect>();
   const sellAdvice = useStashSellAdvice(rows, result);
   const totals = computed(() => {
+    if (props.windowScan) return undefined;
     try {
       return reviewedTotals(rows.value, tracked());
     } catch {
@@ -316,7 +362,9 @@
     const plan = importer.estimate(totals.value, all, importMode.value);
     return new Set(plan.changes.map((change) => `${change.type}:${change.id}`));
   });
-  const canContinue = computed(() => !busy.value && remaining.value === 0 && Boolean(totals.value));
+  const canContinue = computed(
+    () => !props.windowScan && !busy.value && remaining.value === 0 && Boolean(totals.value)
+  );
   const reviewHint = computed(() => {
     if (remaining.value) return t('stash_import.review_first', { count: remaining.value });
     if (!totals.value) return t('stash_import.errors.quantity');
@@ -327,6 +375,7 @@
   );
   const canSave = computed(
     () =>
+      !props.windowScan &&
       importer.signedIn.value &&
       liveChanges.value.length > 0 &&
       (decreaseCount.value === 0 || allowDecreases.value) &&
@@ -372,12 +421,24 @@
   });
   function intakeFooter() {
     return {
-      hint: t('stash_import.local_notice'),
+      hint: props.windowScan ? undefined : t('stash_import.local_notice'),
       hintTone: 'text-surface-400',
       primary: { label: t('common.close'), variant: 'ghost' as const, run: () => close(false) },
     };
   }
   function reviewFooter() {
+    if (props.windowScan) {
+      return {
+        hint: t('stash_import.window_review'),
+        hintTone: 'text-surface-400',
+        primary: {
+          label: t('stash_import.window_another'),
+          icon: 'i-mdi-monitor-eye',
+          disabled: busy.value,
+          run: guarded(startOver),
+        },
+      };
+    }
     return {
       back: {
         label: t('stash_import.other_image'),
@@ -529,8 +590,20 @@
     resetSelection();
     step.value = 'intake';
   }
+  async function scanWindow(video: HTMLVideoElement) {
+    if (scanningWindow.value) return;
+    scanningWindow.value = true;
+    try {
+      const file = await frame(video);
+      if (!file) return;
+      await select([file]);
+      if (result.value) step.value = 'review';
+    } finally {
+      scanningWindow.value = false;
+    }
+  }
   function dragEnter(event: DragEvent) {
-    if (!event.dataTransfer?.types.includes('Files')) return;
+    if (!canIntake.value || !event.dataTransfer?.types.includes('Files')) return;
     dragDepth++;
     dragging.value = true;
   }
@@ -543,7 +616,9 @@
     dragging.value = false;
     await intake(Array.from(event.dataTransfer?.files ?? []));
   }
-  onMounted(() => document.addEventListener('paste', paste));
+  onMounted(() => {
+    if (!props.windowScan) document.addEventListener('paste', paste);
+  });
   onBeforeUnmount(() => document.removeEventListener('paste', paste));
   onBeforeUnmount(cancelDemo);
   function cancelDemo() {

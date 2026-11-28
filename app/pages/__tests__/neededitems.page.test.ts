@@ -135,6 +135,30 @@ const defaultGlobalStubs = {
   UIcon: true,
 };
 describe('needed items page', () => {
+  it.each([false, true])(
+    'shows window scan only with display surface support (%s)',
+    async (supported) => {
+      vi.stubGlobal('navigator', {
+        mediaDevices: {
+          getDisplayMedia: vi.fn(),
+          getSupportedConstraints: () => (supported ? { displaySurface: true } : {}),
+        },
+      });
+      try {
+        const { NeededItemsPage } = await setup();
+        const wrapper = await mountSuspended(NeededItemsPage, {
+          global: { stubs: defaultGlobalStubs },
+        });
+        expect(
+          wrapper.findAll('button').some((button) => button.text() === 'Scan stash window')
+        ).toBe(supported);
+        expect(wrapper.find('[data-testid="stash-import-open"]').exists()).toBe(true);
+        wrapper.unmount();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
+  );
   it('waits for destination requirements before enabling screenshot imports', async () => {
     const { NeededItemsPage, state } = await setup();
     state.stashImportReady.value = false;

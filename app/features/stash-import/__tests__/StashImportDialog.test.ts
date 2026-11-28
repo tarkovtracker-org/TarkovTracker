@@ -6,6 +6,7 @@ import { computed, reactive, ref } from 'vue';
 import StashImportApply from '@/features/stash-import/StashImportApply.vue';
 import StashImportDialog from '@/features/stash-import/StashImportDialog.vue';
 import StashImportReview from '@/features/stash-import/StashImportReview.vue';
+import StashSellAdvice from '@/features/stash-import/StashSellAdvice.vue';
 type Change = { id: string; type: string; before: number; count: number; needed: number };
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
@@ -107,9 +108,9 @@ const button = (wrapper: ReturnType<typeof render>, key: string) => {
 };
 const hasButton = (wrapper: ReturnType<typeof render>, key: string) =>
   wrapper.findAll('button').some((entry) => entry.text().startsWith(`stash_import.${key}`));
-function render() {
+function render(windowScan = false) {
   return mount(StashImportDialog, {
-    props: { needs: [] },
+    props: { needs: [], windowScan },
     global: {
       mocks: { $t: (key: string) => key },
       stubs: {
@@ -149,6 +150,30 @@ async function toApply(wrapper: ReturnType<typeof render>) {
   settle();
   await click(wrapper, 'continue');
 }
+function mockWindowShare(displaySurface = 'window') {
+  const track = Object.assign(new EventTarget(), {
+    getSettings: () => ({ displaySurface }),
+    readyState: 'live',
+    muted: false,
+    stop: vi.fn(),
+  });
+  const stream = Object.assign(new MediaStream(), {
+    getTracks: () => [track],
+    getVideoTracks: () => [track],
+  });
+  const getDisplayMedia = vi.fn().mockResolvedValue(stream);
+  vi.stubGlobal('navigator', { platform: 'Win32', mediaDevices: { getDisplayMedia } });
+  return { track, getDisplayMedia, stream };
+}
+async function readyVideo(wrapper: ReturnType<typeof render>) {
+  const video = wrapper.get('video');
+  Object.defineProperties(video.element, {
+    videoWidth: { value: 2560 },
+    videoHeight: { value: 1440 },
+    readyState: { value: 2 },
+  });
+  await video.trigger('loadeddata');
+}
 const save = (wrapper: ReturnType<typeof render>) => wrapper.get('[data-testid=stash-save]');
 const saveNow = async (wrapper: ReturnType<typeof render>) => {
   await save(wrapper).trigger('click');
@@ -159,6 +184,60 @@ describe('stash import flow', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+  it('reviews repeated window frames with sell advice and no progress save path', async () => {
+    const { track, getDisplayMedia, stream } = mockWindowShare();
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+      callback(new Blob(['frame'], { type: 'image/png' }));
+    });
+    const wrapper = render(true);
+    await click(wrapper, 'window_share');
+    expect(getDisplayMedia).toHaveBeenCalledWith({
+      video: { displaySurface: 'window' },
+      audio: false,
+    });
+    expect(wrapper.get('video').element.srcObject).toBe(stream);
+    await readyVideo(wrapper);
+    await click(wrapper, 'window_scan');
+    expect(wrapper.findComponent(StashSellAdvice).exists()).toBe(true);
+    expect(wrapper.findComponent(StashImportReview).exists()).toBe(true);
+    expect(wrapper.find('[data-testid=stash-continue]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid=stash-save]').exists()).toBe(false);
+    await click(wrapper, 'window_another');
+    expect(wrapper.get('video').element.srcObject).toBe(stream);
+    await readyVideo(wrapper);
+    await click(wrapper, 'window_scan');
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+    expect(mocks.select).toHaveBeenLastCalledWith([expect.objectContaining({ type: 'image/png' })]);
+    expect(getDisplayMedia).toHaveBeenCalledTimes(1);
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.commit).not.toHaveBeenCalled();
+    wrapper.unmount();
+    expect(track.stop).toHaveBeenCalledOnce();
+  });
+  it('releases a monitor capture when the picker does not return a window', async () => {
+    const { track } = mockWindowShare('monitor');
+    const wrapper = render(true);
+    await click(wrapper, 'window_share');
+    expect(wrapper.text()).toContain('stash_import.errors.window_only');
+    expect(wrapper.find('video').exists()).toBe(false);
+    expect(track.stop).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('releases a window granted after the dialog closes', async () => {
+    const { track, getDisplayMedia, stream } = mockWindowShare();
+    const pending = Promise.withResolvers<typeof stream>();
+    getDisplayMedia.mockReturnValue(pending.promise);
+    const wrapper = render(true);
+    await button(wrapper, 'window_share').trigger('click');
+    wrapper.unmount();
+    pending.resolve(stream);
+    await flushPromises();
+    expect(track.stop).toHaveBeenCalledOnce();
   });
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
