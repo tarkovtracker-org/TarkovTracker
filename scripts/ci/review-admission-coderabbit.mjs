@@ -140,11 +140,11 @@ function consistentRisk(body) {
 function hasCleanRecentReview(text) {
   const recent = uniqueSection(text, 'recent_review');
   if (recent === null) return false;
-  // A partial split status must not fall back to older inline completion text.
-  if (/<!-- recent_review_status_(?:start|end) -->/.test(text)) {
-    return uniqueSection(text, 'recent_review_status')?.trim() === CLEAN_REVIEW;
-  }
-  return recent.trimStart().startsWith(CLEAN_REVIEW + ' 🎉\n');
+  const inline = recent.trimStart().startsWith(CLEAN_REVIEW + ' 🎉\n');
+  if (!/<!-- recent_review_status_(?:start|end) -->/.test(text)) return inline;
+  // Split markers require their own clean verdict and rule out an inline verdict.
+  const split = uniqueSection(text, 'recent_review_status')?.trim() === CLEAN_REVIEW;
+  return [split, !inline].every(Boolean);
 }
 function completed(body, head) {
   const text = withoutCode(body);

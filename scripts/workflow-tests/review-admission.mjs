@@ -3602,6 +3602,11 @@ test('CodeRabbit split status still rejects stale, dirty, or ambiguous evidence'
   const statusStart = '<!-- recent_review_status_start -->';
   const statusEnd = '<!-- recent_review_status_end -->';
   const mutations = {
+    'simultaneous inline and split verdicts': (body) =>
+      body.replace(
+        '<!-- recent_review_start -->',
+        '<!-- recent_review_start -->\n' + cleanReviewStatus + ' 🎉'
+      ),
     'missing status end': (body) => body.replace(statusEnd, ''),
     'duplicate status': (body) =>
       body + '\n' + body.slice(0, body.indexOf(statusEnd) + statusEnd.length),
