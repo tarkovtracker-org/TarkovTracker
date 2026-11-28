@@ -33,7 +33,10 @@ Trusted main verifies the current PR head and its native queue integration separ
 exact-head CodeRabbit/Cubic evidence, an independent collaborator review, or a valid admin
 attestation can admit an ordinary PR. Sensitive changes also need exact-head approval.
 Unresolved findings or threads, changes requested, drafts and closed PRs hold admission.
-A green provider check alone is insufficient. Scope and provider provenance are enforced in
+A green provider check alone is insufficient. The authenticated CodeRabbit summary may report a
+clean result inline or in its dedicated status section. In both formats, the source and covered
+commit IDs must match the current head and the result must report no actionable findings.
+Scope and provider provenance are enforced in
 [`review-admission-policy.mjs`](../scripts/ci/review-admission-policy.mjs).
 
 A policy hold publishes failure on the head and live queue commit while the controller run can
