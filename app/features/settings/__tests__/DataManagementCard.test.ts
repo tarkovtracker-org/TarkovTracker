@@ -124,6 +124,7 @@ const {
     isParsing: {} as Ref<boolean>,
     parseProgress: {} as Ref<{ bytesRead: number; totalBytes: number }>,
     isImporting: {} as Ref<boolean>,
+    needsSaveRetry: { __v_isRef: true as const, value: false },
     importError: { __v_isRef: true as const, value: null as string | null },
     previewData: {} as Ref<Record<string, unknown> | null>,
     importState: {
@@ -212,6 +213,7 @@ vi.mock('@/composables/useEftLogsImport', () => ({
     parseProgress: eftLogsState.parseProgress,
     importState: eftLogsState.importState,
     isImporting: eftLogsState.isImporting,
+    needsSaveRetry: eftLogsState.needsSaveRetry,
     previewData: eftLogsState.previewData,
     importError: eftLogsState.importError,
     parseFile: eftLogsFns.parseFile,
@@ -991,6 +993,7 @@ describe('DataManagementCard', () => {
     );
   });
   it('refetches multiple linked tarkov.dev modes when toggled together', async () => {
+    tarkovDevFns.parseProfileModes.mockResolvedValueOnce(null);
     tarkovDevFns.parseProfileModes.mockResolvedValue({
       tarkovUid: 123456,
       requestedModes: ['pvp', 'pve'],
@@ -1006,14 +1009,16 @@ describe('DataManagementCard', () => {
       findButtonByText(wrapper, 'settings.tarkov_dev_import.fetch_profiles_count')
     ).toBeUndefined();
     await findButtonByText(wrapper, 'common.pve')!.trigger('click');
-    await asVm<{ handleTarkovDevRefetch: () => Promise<void> }>(
-      wrapper.vm
-    ).handleTarkovDevRefetch();
-    expect(tarkovDevFns.parseProfileModes).toHaveBeenCalledWith(
+    const vm = asVm<{ handleTarkovDevRefetch: () => Promise<void> }>(wrapper.vm);
+    await vm.handleTarkovDevRefetch();
+    await vm.handleTarkovDevRefetch();
+    const request = [
       'https://tarkov.dev/players/regular/123456',
       ['pvp', 'pve'],
-      { fresh: true, turnstileToken: null }
-    );
+      { fresh: true, turnstileToken: null },
+    ];
+    expect(tarkovDevFns.parseProfileModes.mock.calls).toEqual([request, request]);
+    wrapper.unmount();
   });
   it('shows the locked tarkov.dev target mode after refetching a mode-specific profile', async () => {
     tarkovDevState.importState.value = 'preview';
@@ -1725,6 +1730,26 @@ describe('DataManagementCard', () => {
     );
     await findButtonByText(wrapper, 'common.confirm_import')!.trigger('click');
     expect(tarkovDevFns.confirmMultiImport).toHaveBeenCalledWith(['pvp']);
+  });
+  it('unlocks a cooldown row once its import cooldown expires', async () => {
+    vi.useFakeTimers();
+    tarkovDevState.importState.value = 'preview';
+    tarkovDevState.multiPreview.value = {
+      tarkovUid: 8560316,
+      requestedModes: ['pve'],
+      modes: { pve: { status: 'cooldown', expiresAt: Date.now() + 20_000 } },
+    };
+    const wrapper = createWrapper({ view: 'imports' });
+    try {
+      const row = wrapper.get('[data-testid="tarkov-dev-mode-card-pve"]');
+      expect(row.text()).toContain('settings.tarkov_dev_import.mode_status_cooldown');
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(row.text()).toContain('settings.tarkov_dev_import.mode_status_fetchable');
+      expect(row.find('input[type="checkbox"]').exists()).toBe(false);
+    } finally {
+      wrapper.unmount();
+      vi.useRealTimers();
+    }
   });
   it('keeps cleanup confirmation and shows failure when export or clearing fails', async () => {
     backupState.legacyProgressRecoveryCount.value = 1;

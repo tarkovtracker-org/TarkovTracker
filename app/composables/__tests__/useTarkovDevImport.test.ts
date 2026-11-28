@@ -799,6 +799,23 @@ describe('useTarkovDevImport', () => {
     expect(importer.importState.value).toBe('error');
     expect(tarkovStore.getCurrentGameMode()).toBe('pvp');
   });
+  it('keeps the preview while restoring the original mode after a complete batch', async () => {
+    mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
+    mockFetch.mockResolvedValue(batchResponse);
+    const restore = Promise.withResolvers<undefined>();
+    tarkovStore.switchGameMode.mockImplementation(async (mode: GameMode) => {
+      if (mode === 'pvp') await restore.promise;
+      tarkovStore.getCurrentGameMode.mockReturnValue(mode);
+    });
+    const importer = await loadComposable();
+    await importer.parseProfileModes(batchUrl, ['pvp', 'pve']);
+    const confirmation = importer.confirmMultiImport(['pvp', 'pve']);
+    await vi.waitFor(() => expect(tarkovStore.switchGameMode).toHaveBeenLastCalledWith('pvp'));
+    expect(importer.importState.value).toBe('preview');
+    restore.resolve(undefined);
+    await expect(confirmation).resolves.toEqual(['pvp', 'pve']);
+    expect(importer.importState.value).toBe('success');
+  });
   it('allows retrying a preview after the active mode finishes switching', async () => {
     mockParseTarkovDevProfile.mockReturnValue({ data: createImportData(), ok: true });
     const importer = await loadComposable();

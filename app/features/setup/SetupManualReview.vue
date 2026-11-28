@@ -292,10 +292,8 @@
   const detailsReady = computed(
     () => metadata.tasksObjectivesHydrated && metadata.tasksRewardsHydrated
   );
-  const needsDetails = computed(
-    () => questCompletions.value.length > 0 || upgrades.value.length > 0
-  );
-  const waitingForDetails = computed(() => needsDetails.value && !detailsReady.value);
+  // Trader and active quest writes can enforce hideout gates that depend on quest rewards.
+  const waitingForDetails = computed(() => hasChanges.value && !detailsReady.value);
   const detailMessage = computed(() =>
     t(detailsLoading.value ? 'setup.details_loading' : 'setup.details_unavailable')
   );
@@ -349,6 +347,9 @@
     includePrerequisites.value = true;
   }
   watchEffect(() => emit('dirty', hasChanges.value || saveFailed.value));
+  watch(hasChanges, (dirty) => {
+    if (dirty) saved.value = false;
+  });
   function setChoice(id: string, status: 'active' | 'completed') {
     choices.set(id, status);
   }

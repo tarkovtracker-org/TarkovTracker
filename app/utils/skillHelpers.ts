@@ -13,7 +13,7 @@ export const formatSkillName = (skillName: string): string =>
   skillName
     .trim()
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+    .replace(/([A-Z]+)([A-Z](?!s\b)[a-z])/g, '$1 $2');
 /**
  * Returns the lowest required level the current level does not meet yet, or null when every
  * requirement is met. Expects `requiredLevels` sorted ascending.

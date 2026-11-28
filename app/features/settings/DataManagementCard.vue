@@ -395,7 +395,7 @@
                 :legend="$t('settings.log_import.account_filter_label')"
                 :ui="{ legend: 'sr-only' }"
                 value-key="value"
-                :disabled="eftLogsIsImporting"
+                :disabled="eftLogsEditLocked"
                 @update:model-value="(account) => handleEftLogsAccountChange(String(account))"
               />
             </div>
@@ -414,7 +414,7 @@
                   :key="version"
                   :model-value="eftLogsIncludedVersions.includes(version)"
                   :disabled="
-                    eftLogsIsImporting ||
+                    eftLogsEditLocked ||
                     (eftLogsIncludedVersions.length === 1 &&
                       eftLogsIncludedVersions.includes(version))
                   "
@@ -432,7 +432,7 @@
               :model-value="eftLogsSelection"
               :events="eftLogsPreview.events ?? []"
               :target-mode="eftLogsTargetMode"
-              :disabled="eftLogsIsImporting"
+              :disabled="eftLogsEditLocked"
               @update:model-value="setEftLogsSelection"
             />
             <div
@@ -640,15 +640,10 @@
                 variant="solid"
                 class="flex-1"
                 :loading="eftLogsIsImporting"
-                :disabled="
-                  progressImportBlocked ||
-                  eftLogsHasOutsideSeasonEvents ||
-                  !eftLogsEffectiveEvents.length ||
-                  eftLogsInvalidDate
-                "
+                :disabled="progressImportBlocked || eftLogsSelectionInvalid"
                 @click="handleEftLogsConfirm"
               >
-                {{ $t('common.confirm_import') }}
+                {{ $t(eftLogsNeedsSaveRetry ? 'setup.retry_save' : 'common.confirm_import') }}
               </UButton>
             </div>
           </template>
@@ -1208,12 +1203,6 @@
   const tarkovDevUrlModes = ref<GameMode[]>([...GAME_MODE_VALUES]);
   const tarkovDevRefetchModes = ref<GameMode[]>([currentTarkovDevMode()]);
   const tarkovDevRefreshingMode = ref<GameMode | null>(null);
-  const tarkovDevRefetchMode = computed<TarkovDevRefetchMode>({
-    get: () => tarkovDevRefetchModes.value[0] ?? currentTarkovDevMode(),
-    set: (mode) => {
-      if (isTarkovDevProfileMode(mode)) tarkovDevRefetchModes.value = [mode];
-    },
-  });
   const isTarkovDevUrlSubmitDisabled = computed(
     () =>
       isTarkovDevProfileUrlBlank.value ||
@@ -1240,6 +1229,7 @@
   const isTarkovDevProfileUrlLoading = computed(() => tarkovDevImportState.value === 'loading');
   const {
     isImporting: eftLogsIsImporting,
+    needsSaveRetry: eftLogsNeedsSaveRetry,
     importState: eftLogsImportState,
     previewData: eftLogsPreview,
     importError: eftLogsImportError,
@@ -1253,6 +1243,14 @@
     confirmImport: confirmEftLogsImport,
     reset: resetEftLogsImport,
   } = dataManagementSession.eftLogs;
+  const eftLogsEditLocked = computed(() => eftLogsIsImporting.value || eftLogsNeedsSaveRetry.value);
+  const eftLogsSelectionInvalid = computed(() =>
+    eftLogsNeedsSaveRetry.value
+      ? false
+      : eftLogsHasOutsideSeasonEvents.value ||
+        !eftLogsEffectiveEvents.value.length ||
+        eftLogsInvalidDate.value
+  );
   const eftDefaultLogsPath = computed(() => t('settings.log_import.default_path_value'));
   const eftSessionFolderExamplePath = computed(() =>
     t('settings.log_import.session_folder_example_path')
@@ -1264,7 +1262,7 @@
   });
   const eftLogsDisabledTargetModes = computed(() =>
     GAME_MODE_VALUES.filter(
-      (mode) => eftLogsIsImporting.value || !eftLogsSelection.value.modes.includes(mode)
+      (mode) => eftLogsEditLocked.value || !eftLogsSelection.value.modes.includes(mode)
     )
   );
   const eftLogsNoQuestEventsError = computed(() =>
@@ -1438,7 +1436,6 @@
     const targetMode = isTarkovDevProfileMode(sourceMode) ? sourceMode : (fallbackMode ?? null);
     tarkovDevFixedTargetMode.value = targetMode;
     if (!targetMode) return;
-    tarkovDevRefetchMode.value = targetMode;
     tarkovDevTargetMode.value = targetMode;
   }
   function selectTarkovDevRefetchMode(mode: TarkovDevRefetchMode) {

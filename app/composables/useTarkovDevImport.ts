@@ -42,7 +42,7 @@ export type TarkovDevModeFetchStatus =
       source: TarkovDevProfileSource;
     }
   | { status: 'not_found'; source: TarkovDevProfileSource }
-  | { status: 'cooldown'; minutes: number; source: TarkovDevProfileSource }
+  | { status: 'cooldown'; expiresAt: number; source: TarkovDevProfileSource }
   | { status: 'error'; source: TarkovDevProfileSource };
 export interface TarkovDevMultiModePreview {
   tarkovUid: number;
@@ -240,14 +240,8 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     if (isCurrentRequest(requestId)) setCodedError(message, code, meta);
     return null;
   }
-  function getCooldownMinutes(source: TarkovDevProfileSource): number {
-    const remainingMs = getImportCooldownRemainingMs(
-      source.tarkovUid,
-      source.mode ?? 'pvp',
-      cooldownMs
-    );
-    return remainingMs > 0 ? Math.max(1, Math.ceil(remainingMs / MINUTE_MS)) : 0;
-  }
+  const getRemainingCooldown = (source: TarkovDevProfileSource) =>
+    getImportCooldownRemainingMs(source.tarkovUid, source.mode ?? 'pvp', cooldownMs);
   function fetchProfileJson(
     source: TarkovDevProfileSource,
     options: TarkovDevProfileFetchOptions
@@ -295,7 +289,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     const requestId = beginPreview();
     const source = resolveTarkovDevProfileSource(profileUrl);
     if (!source.ok) return rejectProfileUrl(requestId, source.error, null, null);
-    const minutes = getCooldownMinutes(source.data);
+    const minutes = Math.ceil(getRemainingCooldown(source.data) / MINUTE_MS);
     if (minutes > 0) {
       return rejectProfileUrl(requestId, GENERIC_FETCH_ERROR, 'cooldown_active', { minutes });
     }
@@ -378,6 +372,7 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     await runImport(data, isCurrent, editionOverride);
   }
   async function restoreGameMode(mode: GameMode): Promise<void> {
+    if (tarkovStore.getCurrentGameMode() === mode) return;
     try {
       await tarkovStore.switchGameMode(mode);
     } catch (e) {
@@ -538,10 +533,14 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     let minCooldown = Number.POSITIVE_INFINITY;
     for (const mode of requestedModes) {
       const modeSource = buildTarkovDevProfileSource(tarkovUid, mode);
-      const minutes = getCooldownMinutes(modeSource);
-      if (minutes > 0) {
-        modeStatuses[mode] = { status: 'cooldown', minutes, source: modeSource };
-        minCooldown = Math.min(minCooldown, minutes);
+      const remainingMs = getRemainingCooldown(modeSource);
+      if (remainingMs > 0) {
+        modeStatuses[mode] = {
+          status: 'cooldown',
+          expiresAt: Date.now() + remainingMs,
+          source: modeSource,
+        };
+        minCooldown = Math.min(minCooldown, Math.ceil(remainingMs / MINUTE_MS));
       } else {
         modesToFetch.push(mode);
       }
@@ -636,11 +635,11 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     const requestId = profileUrlRequestId;
     if (!isCurrentRequest(requestId) || isImporting.value) return false;
     const modeSource = buildTarkovDevProfileSource(current.tarkovUid, mode);
-    const minutes = getCooldownMinutes(modeSource);
-    if (minutes > 0) {
+    const remainingMs = getRemainingCooldown(modeSource);
+    if (remainingMs > 0) {
       updateMultiPreviewMode(requestId, mode, {
         status: 'cooldown',
-        minutes,
+        expiresAt: Date.now() + remainingMs,
         source: modeSource,
       });
       return false;
@@ -712,15 +711,15 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     isCurrent: () => boolean,
     importedModes: GameMode[],
     editionOverride?: number | null
-  ): Promise<void> {
-    if (!(await ensureLevelThresholdsLoaded(isCurrent))) return;
+  ): Promise<boolean> {
+    if (!(await ensureLevelThresholdsLoaded(isCurrent))) return false;
     for (const { mode, entry } of readyEntries) {
-      if (!isCurrent()) return;
+      if (!isCurrent()) return false;
       const ok = await applyModeInBatch(mode, entry.data, isCurrent, editionOverride);
-      if (!ok) return;
+      if (!ok) return false;
       importedModes.push(mode);
     }
-    if (isCurrent() && importedModes.length > 0) importState.value = 'success';
+    return true;
   }
   async function confirmMultiImport(
     targetModes: GameMode[],
@@ -735,10 +734,11 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
     if (!releaseImport) return [];
     const ownsSession = ownsPreview;
     const importedModes: GameMode[] = [];
+    let complete = false;
     isImporting.value = true;
     const originalMode = tarkovStore.getCurrentGameMode();
     try {
-      await runMultiImportBatch(readyEntries, isCurrent, importedModes, editionOverride);
+      complete = await runMultiImportBatch(readyEntries, isCurrent, importedModes, editionOverride);
     } catch (e) {
       if (isCurrent()) {
         importState.value = 'error';
@@ -746,13 +746,13 @@ export function useTarkovDevImport(): UseTarkovDevImportReturn {
         logger.error('[TarkovDevImport] Multi-mode import error:', e);
       }
     } finally {
-      if (ownsSession() && tarkovStore.getCurrentGameMode() !== originalMode) {
-        await restoreGameMode(originalMode);
-      }
+      if (ownsSession()) await restoreGameMode(originalMode);
       isImporting.value = false;
       releaseImport();
     }
-    return isCurrent() ? importedModes : [];
+    if (!isCurrent()) return [];
+    if (complete) importState.value = 'success';
+    return importedModes;
   }
   return {
     isImporting,

@@ -55,6 +55,7 @@ export interface EftLogsImportPreviewData extends EftQuestImportPreview {
 }
 export interface UseEftLogsImportReturn {
   isImporting: Ref<boolean>;
+  needsSaveRetry: Ref<boolean>;
   importError: Ref<string | null>;
   isParsing: Ref<boolean>;
   parseProgress: Ref<EftLogReadProgress>;
@@ -353,6 +354,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const preferencesStore = usePreferencesStore();
   const claimImport = useProgressImportClaim();
   const isImporting = ref(false);
+  const needsSaveRetry = ref(false);
   const importState = ref<EftLogsImportState>('idle');
   const previewData = ref<EftLogsImportPreviewData | null>(null);
   const importError = ref<string | null>(null);
@@ -404,7 +406,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   }
   /** Copies transient selections so caller mutations cannot change an in-flight import. */
   function setSelection(next: EftLogImportSelection): void {
-    if (!canEditPreview()) return;
+    if (!canEditPreview() || needsSaveRetry.value) return;
     selection.value = {
       modes: [...next.modes],
       statuses: [...next.statuses],
@@ -414,7 +416,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   }
   /** Updates a preview selection only while no import is applying. */
   function setIncludedVersions(versions: string[]): void {
-    if (!canEditPreview()) return;
+    if (!canEditPreview() || needsSaveRetry.value) return;
     if (!previewData.value) return;
     const availableSet = new Set(previewData.value.availableVersions);
     const normalized = Array.from(new Set(versions)).filter((version) => availableSet.has(version));
@@ -425,7 +427,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   }
   /** Switches the account whose sessions are previewed and resets versions to that account's defaults. */
   function setAccount(accountId: string): void {
-    if (!canEditPreview()) return;
+    if (!canEditPreview() || needsSaveRetry.value) return;
     const preview = previewData.value;
     if (!preview || preview.selectedAccount === accountId) return;
     if (!preview.availableAccounts.some((account) => account.id === accountId)) return;
@@ -441,6 +443,7 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   /** Invalidates pending parsing and clears transient import state unless progress application is active. */
   function reset(): void {
     if (isImporting.value) return;
+    needsSaveRetry.value = false;
     parseFilesRequestId++;
     ownsPreview = () => false;
     activeRead?.abort();
@@ -608,13 +611,17 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   /** Prevents concurrent application and restores the original progress mode before reporting the result. */
   async function confirmImport(targetMode: GameMode): Promise<void> {
     if (!canEditPreview()) return;
+    if (needsSaveRetry.value) {
+      await applySelection(null);
+      return;
+    }
     const preview = previewData.value;
     if (!preview) return;
     const taskSets = validateImport(preview, targetMode);
     if (!taskSets) return;
     await applySelection(taskSets);
   }
-  async function applyAndSave(taskSets: ImportTaskSets, ownsSession: () => boolean) {
+  async function applyProgress(taskSets: ImportTaskSets, ownsSession: () => boolean) {
     const originalMode = tarkovStore.getCurrentGameMode();
     const applied = await applyAllModeImports(
       tarkovStore,
@@ -632,18 +639,21 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       applied.error
     );
     if (failure) throw failure;
-    if (!ownsSession()) return;
-    if (!(await tarkovStore.saveProgressNow())) {
-      throw new Error('Cloud save did not confirm the log import');
-    }
   }
-  async function applySelection(taskSets: ImportTaskSets) {
+  async function saveImportedProgress(ownsSession: () => boolean) {
+    if (!ownsSession()) return;
+    needsSaveRetry.value = true;
+    if (!(await tarkovStore.saveProgressNow()))
+      throw new Error('Cloud save did not confirm the log import');
+  }
+  async function applySelection(taskSets: ImportTaskSets | null) {
     const releaseImport = claimImport();
     if (!releaseImport) return;
     const ownsSession = ownsPreview;
     isImporting.value = true;
     try {
-      await applyAndSave(taskSets, ownsSession);
+      if (taskSets) await applyProgress(taskSets, ownsSession);
+      await saveImportedProgress(ownsSession);
       if (ownsSession()) finishImport(null);
     } catch (error) {
       if (ownsSession()) finishImport(error);
@@ -656,16 +666,23 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   /** Converts the completed application result into a translated error or success state. */
   function finishImport(importFailure: unknown): void {
     if (importFailure) {
+      if (needsSaveRetry.value) {
+        importError.value = t('settings.log_import.errors.save_not_confirmed');
+        logger.error('[EftLogsImport] Save error:', importFailure);
+        return;
+      }
       importState.value = 'error';
       importError.value = t('settings.log_import.errors.apply_import_failed');
       logger.error('[EftLogsImport] Import error:', importFailure);
       return;
     }
+    needsSaveRetry.value = false;
     importState.value = 'success';
     importError.value = null;
   }
   return {
     isImporting,
+    needsSaveRetry,
     isParsing,
     parseProgress,
     importError,

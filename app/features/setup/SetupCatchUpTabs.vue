@@ -5,7 +5,7 @@
     :aria-label="$t('setup.steps.catch_up')"
   >
     <UButton
-      v-for="tab in tabs"
+      v-for="(tab, index) in tabs"
       :id="`${idPrefix}-tab-${tab.id}`"
       :key="tab.id"
       type="button"
@@ -14,9 +14,11 @@
       :icon="tab.icon"
       :aria-selected="tab.active"
       :aria-controls="`${idPrefix}-panel-${tab.id}`"
+      :tabindex="tab.active ? 0 : -1"
       :color="tab.color"
       :variant="tab.variant"
       @click="emit('select', tab.id)"
+      @keydown="selectWithKeyboard($event, index)"
     >
       <span>{{ tab.label }}</span>
       <UBadge v-if="tab.count > 0" size="xs" :color="tab.badgeColor" variant="subtle">
@@ -37,6 +39,21 @@
     variant: 'solid' | 'ghost';
     badgeColor: 'neutral' | 'primary';
   };
-  defineProps<{ tabs: readonly TabItem[]; idPrefix: string }>();
+  const props = defineProps<{ tabs: readonly TabItem[]; idPrefix: string }>();
   const emit = defineEmits<{ select: [id: CatchUpTabId] }>();
+  function selectWithKeyboard(event: KeyboardEvent, index: number) {
+    const count = props.tabs.length;
+    const destinations: Partial<Record<string, number>> = {
+      ArrowLeft: (index + count - 1) % count,
+      ArrowRight: (index + 1) % count,
+      Home: 0,
+      End: count - 1,
+    };
+    const destination = destinations[event.key];
+    const tab = destination === undefined ? undefined : props.tabs[destination];
+    if (!tab) return;
+    event.preventDefault();
+    emit('select', tab.id);
+    document.getElementById(`${props.idPrefix}-tab-${tab.id}`)?.focus();
+  }
 </script>

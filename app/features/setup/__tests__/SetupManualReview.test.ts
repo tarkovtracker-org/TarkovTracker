@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createI18n } from 'vue-i18n';
 import SetupManualReview from '@/features/setup/SetupManualReview.vue';
 import SetupQuestPicker from '@/features/setup/SetupQuestPicker.vue';
+import SetupTradersPicker from '@/features/setup/SetupTradersPicker.vue';
 import { TASK_ID_REGISTRY } from '@/utils/constants';
 import type { UserProgressData } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
@@ -14,13 +15,17 @@ const state = vi.hoisted(() => ({
   setTraderReputation: vi.fn(),
   setLevel: vi.fn(),
   requireTraderLevels: true,
+  rewardsHydrated: true,
+  setTraderLevel: vi.fn(),
 }));
 vi.mock('@/stores/useMetadata', () => ({
   useMetadataStore: () => ({
     tasks: state.tasks,
     tasksCoreGameMode: 'pvp',
     tasksObjectivesHydrated: true,
-    tasksRewardsHydrated: true,
+    tasksRewardsHydrated: state.rewardsHydrated,
+    fetchTaskObjectivesData: vi.fn().mockResolvedValue(undefined),
+    fetchTaskRewardsData: vi.fn().mockResolvedValue(undefined),
     hideoutStations: [{ id: 'station', name: 'Station', levels: [] }],
   }),
 }));
@@ -38,6 +43,8 @@ vi.mock('@/stores/useTarkov', () => ({
     playerLevel: () => 1,
     setLevel: state.setLevel,
     getTraderReputation: () => 0,
+    getTraderLevel: () => 1,
+    setTraderLevel: state.setTraderLevel,
     setTraderReputation: state.setTraderReputation,
     isHideoutModuleComplete: () => false,
     setTaskUncompleted: (id: string) => {
@@ -77,6 +84,23 @@ describe('SetupManualReview active quests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     state.taskCompletions = {};
+    state.rewardsHydrated = true;
+  });
+  it('blocks trader-only writes while quest reward details are unavailable', async () => {
+    state.rewardsHydrated = false;
+    const wrapper = shallowMount(SetupManualReview, {
+      global: {
+        plugins: [i18n],
+        stubs: { UButton: { template: '<button><slot /></button>' } },
+      },
+    });
+    wrapper.getComponent(SetupTradersPicker).vm.$emit('selectLevel', { id: 'prapor', level: 2 });
+    await wrapper.vm.$nextTick();
+    const save = wrapper.findAll('button').find((button) => button.text() === 'setup.save_changes');
+    expect(save?.attributes('disabled')).toBeDefined();
+    await save!.trigger('click');
+    expect(state.setTraderLevel).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
   it('binds acceptance to the predecessor status written in the same draft', async () => {
     state.tasks = [

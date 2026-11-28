@@ -55,7 +55,7 @@
         @back="goBack"
         @advance="advanceImport"
         @finish-from-logs="finishFromLogs"
-        @edit-profile="go('profile')"
+        @edit-profile="editProfileFromImport"
         @tarkov-dev-imported="handleTarkovDevImported"
         @retry-mode-switch="switchToImportedMode"
       />
@@ -239,6 +239,9 @@
   function advanceImport() {
     if (!importStep.value || importBusy.value || importModePending.value) return;
     goNext(currentImportOutcome());
+  }
+  function editProfileFromImport() {
+    if (!importBusy.value) go('profile');
   }
   function finishFromLogs() {
     if (importBusy.value) return;

@@ -89,26 +89,26 @@
               </UButton>
               <UButton
                 size="sm"
-                color="neutral"
+                color="warning"
                 variant="soft"
-                icon="i-mdi-arrow-right"
+                icon="i-mdi-refresh"
                 :loading="loading"
                 :disabled="disabled"
-                @click="emit('allowStale')"
+                @click="emit('retryFresh')"
               >
-                {{ $t('settings.tarkov_dev_import.continue_stale_anyway') }}
+                {{ $t('settings.tarkov_dev_import.check_again') }}
               </UButton>
             </div>
             <UButton
               size="sm"
               color="warning"
               variant="solid"
-              icon="i-mdi-refresh"
+              icon="i-mdi-arrow-right"
               :loading="loading"
               :disabled="disabled"
-              @click="emit('retryFresh')"
+              @click="emit('allowStale')"
             >
-              {{ $t('settings.tarkov_dev_import.check_again') }}
+              {{ $t('settings.tarkov_dev_import.continue_stale_anyway') }}
             </UButton>
           </template>
         </div>

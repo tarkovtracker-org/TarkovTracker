@@ -26,7 +26,13 @@
         <UIcon name="i-mdi-check-circle" class="text-success-400 size-4 shrink-0" />
         <span>{{ importedProfileSummary }}</span>
       </span>
-      <UButton color="neutral" variant="ghost" size="xs" @click="emit('editProfile')">
+      <UButton
+        color="neutral"
+        variant="ghost"
+        size="xs"
+        :disabled="busy"
+        @click="emit('editProfile')"
+      >
         {{ $t('setup.edit_profile_link') }}
       </UButton>
     </div>

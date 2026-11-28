@@ -130,9 +130,10 @@
     skills: Array<{ id: string; value: number }>;
   };
   type NonReadyRowData = {
-    status: 'stale' | 'not_found' | 'cooldown' | 'error';
+    status: 'stale' | 'not_found' | 'cooldown' | 'fetchable' | 'error';
     message: string;
   };
+  type DisplayModeStatus = TarkovDevModeFetchStatus | { status: 'fetchable' };
   type ModeRow = {
     mode: GameMode;
     label: string;
@@ -211,7 +212,7 @@
     );
   }
   function resolveBadge(
-    entry: TarkovDevModeFetchStatus,
+    entry: DisplayModeStatus,
     isAging: boolean
   ): { color: 'success' | 'warning' | 'neutral' | 'error'; label: string } {
     if (entry.status === 'ok') {
@@ -234,11 +235,12 @@
     if (entry.status === 'cooldown') {
       return { color: 'neutral', label: t('settings.tarkov_dev_import.mode_status_cooldown') };
     }
+    if (entry.status === 'fetchable') {
+      return { color: 'neutral', label: t('settings.tarkov_dev_import.mode_status_fetchable') };
+    }
     return { color: 'error', label: t('settings.tarkov_dev_import.mode_status_error') };
   }
-  function buildNonReadyMessage(
-    entry: Exclude<TarkovDevModeFetchStatus, { status: 'ok' }>
-  ): string {
+  function buildNonReadyMessage(entry: Exclude<DisplayModeStatus, { status: 'ok' }>): string {
     if (entry.status === 'stale') {
       return t('settings.tarkov_dev_import.multi_mode_stale_hint');
     }
@@ -246,8 +248,10 @@
       return t('settings.tarkov_dev_import.multi_mode_not_found_hint');
     }
     if (entry.status === 'cooldown') {
-      return t('settings.tarkov_dev_import.cooldown_hint', { minutes: entry.minutes });
+      const minutes = Math.ceil((entry.expiresAt - props.now) / 60_000);
+      return t('settings.tarkov_dev_import.cooldown_hint', { minutes });
     }
+    if (entry.status === 'fetchable') return t('settings.tarkov_dev_import.mode_fetchable_hint');
     return t('settings.tarkov_dev_import.multi_mode_error_hint');
   }
   function buildReadyRow(
@@ -292,8 +296,12 @@
     };
   }
   function buildModeRow(mode: GameMode): ModeRow | null {
-    const entry = props.preview.modes[mode];
-    if (!entry) return null;
+    const stored = props.preview.modes[mode];
+    if (!stored) return null;
+    const entry: DisplayModeStatus =
+      stored.status === 'cooldown' && stored.expiresAt <= props.now
+        ? { status: 'fetchable' }
+        : stored;
     const label = t(getGameModeLabel(mode));
     const profileUrl = buildTarkovDevProfileUrl(props.preview.tarkovUid, mode);
     if (entry.status === 'ok') return buildReadyRow(mode, label, profileUrl, entry);

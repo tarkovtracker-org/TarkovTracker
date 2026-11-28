@@ -343,6 +343,7 @@ describe('formatSkillName', () => {
   });
   it('trims and splits uppercase prefixes and numeric skill names', () => {
     expect(formatSkillName('  DMRHandling  ')).toBe('DMR Handling');
+    expect(formatSkillName('DMRs')).toBe('DMRs');
     expect(formatSkillName('Level1Drills')).toBe('Level1 Drills');
     expect(formatSkillName('  ')).toBe('');
   });

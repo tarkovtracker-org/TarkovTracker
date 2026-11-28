@@ -135,7 +135,7 @@ describe('useEftLogsImport', () => {
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     tarkovStore.switchGameMode.mockImplementation(async () => undefined);
   });
-  it('waits for cloud acknowledgement and reports a rejected log save', async () => {
+  it('preserves the reviewed logs and retries only the rejected save', async () => {
     const save = Promise.withResolvers<boolean>();
     tarkovStore.saveProgressNow.mockReturnValueOnce(save.promise);
     const importer = await loadComposable();
@@ -146,7 +146,13 @@ describe('useEftLogsImport', () => {
     expect(importer.importState.value).toBe('preview');
     save.resolve(false);
     await pending;
-    expect(importer.importState.value).toBe('error');
+    expect(importer.importState.value).toBe('preview');
+    expect(importer.needsSaveRetry.value).toBe(true);
+    expect(importer.importError.value).toBe('settings.log_import.errors.save_not_confirmed');
+    await importer.confirmImport('pvp');
+    expect(importer.importState.value).toBe('success');
+    expect(tarkovStore.saveProgressNow).toHaveBeenCalledTimes(2);
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledOnce();
   });
   it('discards results from a log read that outlives its progress owner', async () => {
     const importer = await loadComposable();

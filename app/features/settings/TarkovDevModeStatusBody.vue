@@ -167,7 +167,7 @@
     | 'not-found-awaiting'
     | 'error';
   const props = defineProps<{
-    status: 'stale' | 'not_found' | 'cooldown' | 'error';
+    status: 'stale' | 'not_found' | 'cooldown' | 'fetchable' | 'error';
     message: string;
     profileUrl?: string;
     refreshing: boolean;
