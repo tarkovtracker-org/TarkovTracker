@@ -173,9 +173,13 @@
   const metadataStore = useMetadataStore();
   const isLoggedIn = computed(() => Boolean($supabase?.user?.loggedIn));
   const { cloudPending, locallySaved } = useProgressSaveStatus();
+  // A direct setup save can finish before the background sync settles.
+  const summaryChanged = ref(false);
+  const canUseSaveReceipt = computed(
+    () => props.saveResult === 'confirmed' && !summaryChanged.value
+  );
   const cloudUnconfirmed = computed(
-    () =>
-      props.saveResult === 'unconfirmed' || (props.saveResult === 'unknown' && cloudPending.value)
+    () => props.saveResult === 'unconfirmed' || (!canUseSaveReceipt.value && cloudPending.value)
   );
   const saveBadge = computed(() => {
     if (!isLoggedIn.value) {
@@ -205,13 +209,12 @@
   const showPrestige = computed(
     () => mode.value !== GAME_MODES.SEASONAL && prestigeLevel.value > 0
   );
-  const editionTitle = computed(() => {
-    const editionValue = tarkovStore.getGameEdition();
-    return (
-      metadataStore.editions.find((entry) => entry.value === editionValue)?.title ??
+  const edition = computed(() => tarkovStore.getGameEdition());
+  const editionTitle = computed(
+    () =>
+      metadataStore.editions.find((entry) => entry.value === edition.value)?.title ??
       t('setup.ready.edition_fallback')
-    );
-  });
+  );
   const completedTaskCount = computed(
     () =>
       Object.values(modeData.value.taskCompletions ?? {}).filter((entry) => isTaskComplete(entry))
@@ -221,6 +224,12 @@
     () =>
       Object.values(modeData.value.hideoutModules ?? {}).filter((entry) => Boolean(entry?.complete))
         .length
+  );
+  watch(
+    [mode, faction, level, prestigeLevel, edition, completedTaskCount, builtHideoutCount],
+    () => {
+      summaryChanged.value = true;
+    }
   );
   const guideCards = [
     {
