@@ -612,6 +612,32 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setObjectiveCount).toHaveBeenCalledWith('obj-prerequisite', 2);
     expect(composable.importState.value).toBe('success');
   });
+  it('dates an already completed direct prerequisite without rewriting its progress', async () => {
+    const prerequisiteTaskId = '5ac2426c86f774138762edfe';
+    const completedTaskId = '61604635c725987e815b1a46';
+    metadataStore.tasks = [
+      { id: prerequisiteTaskId, objectives: [{ id: 'obj-prerequisite' }] },
+      {
+        id: completedTaskId,
+        taskRequirements: [{ task: { id: prerequisiteTaskId }, status: ['Complete'] }],
+      },
+    ];
+    tarkovStore.getCurrentProgressData.mockReturnValue({
+      taskCompletions: { [prerequisiteTaskId]: { complete: true, failed: false } },
+    });
+    const composable = await loadComposable();
+    await composable.parseFile(
+      new File([completionLog(completedTaskId)], 'notifications.log', { type: 'text/plain' })
+    );
+    await composable.confirmImport('pvp');
+    expect(composable.importState.value).toBe('success');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledExactlyOnceWith(completedTaskId);
+    expect(tarkovStore.setTaskObjectiveComplete).not.toHaveBeenCalledWith('obj-prerequisite');
+    expect(tarkovStore.recordEftQuestCompletionTime).toHaveBeenCalledWith(
+      prerequisiteTaskId,
+      Date.parse('2026-02-21T10:14:24.222Z')
+    );
+  });
   it('does not infer a quest route from missing story progress', async () => {
     const prerequisiteTaskId = '5ac2426c86f774138762edfe';
     const completedTaskId = '61604635c725987e815b1a46';

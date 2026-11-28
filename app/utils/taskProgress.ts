@@ -295,12 +295,14 @@ export function applyTaskAvailabilityRequirements(options: {
   getCompletion?: (taskId: string) => RawTaskCompletion;
   skipTaskRequirements?: boolean;
   onCompleteRequirement: (taskId: string) => void;
+  onSatisfiedCompletionRequirement?: (taskId: string) => void;
   onFailRequirement: (taskId: string) => void;
   task: Task;
 }): void {
   const {
     task,
     onCompleteRequirement,
+    onSatisfiedCompletionRequirement,
     onFailRequirement,
     getCompletion = () => undefined,
   } = options;
@@ -312,7 +314,11 @@ export function applyTaskAvailabilityRequirements(options: {
     const requirementTaskId = requiredTaskId(requirement);
     if (!requirementTaskId) return;
     handledRequirementTaskIds.add(requirementTaskId);
-    if (alreadyMeetsStatus(getCompletion(requirementTaskId), requirement.status)) return;
+    if (alreadyMeetsStatus(getCompletion(requirementTaskId), requirement.status)) {
+      if (completionOnlyRequirement(requirement))
+        onSatisfiedCompletionRequirement?.(requirementTaskId);
+      return;
+    }
     if (isFailedOnlyRequirement(requirement.status)) {
       onFailRequirement(requirementTaskId);
     } else if (completionOnlyRequirement(requirement)) {

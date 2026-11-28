@@ -180,14 +180,18 @@ const applyCompletedImports = (
 ) => {
   const processedCompleted = new Set<string>();
   const processedFailed = new Set<string>();
+  const recordCompletionTime = (taskId: string, latestPossibleCompletion?: number) => {
+    const observedAt = completedAt.get(taskId) ?? latestPossibleCompletion;
+    if (observedAt !== undefined && !explicitOtherStates.has(taskId))
+      store.recordEftQuestCompletionTime(taskId, observedAt);
+  };
   const completeTask = (taskId: string, latestPossibleCompletion?: number) => {
     const task = tasksMap.get(taskId);
     if (!task) return;
     if (processedCompleted.has(taskId) || explicitOtherStates.has(taskId)) return;
     recordImpliedStoryObjectives(store, task);
     completeTaskForProgress({ store, taskId, tasksMap });
-    const observedAt = completedAt.get(taskId) ?? latestPossibleCompletion;
-    if (observedAt !== undefined) store.recordEftQuestCompletionTime(taskId, observedAt);
+    recordCompletionTime(taskId, latestPossibleCompletion);
     processedCompleted.add(taskId);
   };
   const failTask = (taskId: string) => {
@@ -211,6 +215,7 @@ const applyCompletedImports = (
         // A completion log does not identify which OR route the player used.
         skipTaskRequirements: Boolean(task.storyUnlocks?.length),
         onCompleteRequirement: (id) => completeTask(id, observedAt),
+        onSatisfiedCompletionRequirement: (id) => recordCompletionTime(id, observedAt),
         onFailRequirement: failTask,
         task,
       });
