@@ -216,6 +216,20 @@ the preference captured at confirmation. Quest completion and level implications
 EFT cannot infer the quest branch from a completion with a story alternative. Tarkov.dev
 profile import has no quest-completion backfill.
 
+Personal quest gates and dashboard trader cards use standing derived from successful task IDs
+in the selected run. Finish rewards add signed reputation to each named recipient. Repeated
+completions contribute once, and undo removes the contribution. A manual reputation edit
+captures the completed IDs already included in that standing. Existing saved standing is
+captured at account startup or before the next local quest change. Dated EFT completions earlier
+than an explicit standing correction are included in that checkpoint. An undated or newer
+completion contributes when first recovered. Imports and ordinary completions preserve manual
+standing corrections when inferring trader start requirements.
+
+Standard trader loyalty uses the highest catalog tier whose PMC level and reputation are met.
+Saved loyalty remains a floor and specialized traders keep their existing rules. Hideout
+reconciliation and public API reads use saved standing, so a change to the quest-derived
+estimate cannot revoke an existing build or change the public response contract.
+
 ### Presentation and ordering
 
 Cards show a short collapsed blocker list and shared requirement explanations. Expanded rows

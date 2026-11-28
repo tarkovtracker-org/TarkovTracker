@@ -33,7 +33,8 @@ function getGameModeData(store: Store<string, UserState> | undefined): UserProgr
 }
 const createTaskAvailabilityTeamData = (
   store: Store<string, UserState>,
-  level: number
+  level: number,
+  traders?: UserProgressData['traders']
 ): TaskAvailabilityTeamData => {
   const currentData = getGameModeData(store);
   const metadata = useMetadataStore();
@@ -48,7 +49,7 @@ const createTaskAvailabilityTeamData = (
     faction: currentData.pmcFaction ?? 'USEC',
     completions: currentData.taskCompletions ?? {},
     confirmations: currentData.taskAvailability ?? {},
-    traders: currentData.traders ?? {},
+    traders: traders ?? currentData.traders ?? {},
     prestigeLevel: currentData.prestigeLevel,
     storyCatalog,
     storyChapters: effectiveStoryProgress(currentData.storyChapters, storyCatalog),
@@ -176,7 +177,8 @@ export const useProgressStore = defineStore('progress', () => {
     }
     const teamDataCache = new Map<string, TaskAvailabilityTeamData>();
     for (const [teamId, store] of Object.entries(visibleTeamStores.value)) {
-      teamDataCache.set(teamId, createTaskAvailabilityTeamData(store, getLevel(teamId)));
+      const traders = teamId === 'self' ? tarkovStore.effectiveTraders : undefined;
+      teamDataCache.set(teamId, createTaskAvailabilityTeamData(store, getLevel(teamId), traders));
     }
     const evaluations = buildTaskEvaluations(tasks, teamDataCache, {
       requireTraderLevels: preferencesStore.getTasksRequireTraderLevels,

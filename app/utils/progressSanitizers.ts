@@ -136,6 +136,20 @@ export const sanitizeHideoutModuleMap = (value: unknown): UserProgressData['hide
   }
   return sanitized;
 };
+const sanitizeReputationCheckpoint = (value: unknown) => {
+  if (!isRecord(value) || !Array.isArray(value.completedTaskIds)) return undefined;
+  const timestamp = toFiniteNumber(value.timestamp);
+  if (timestamp === null || !Number.isSafeInteger(timestamp) || timestamp < 0) return undefined;
+  return {
+    completedTaskIds: [
+      ...new Set(
+        value.completedTaskIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      ),
+    ],
+    timestamp,
+    ...(value.manual === true ? { manual: true } : {}),
+  };
+};
 export const sanitizeTraderMap = (value: unknown): UserProgressData['traders'] => {
   if (!isRecord(value)) {
     return {};
@@ -150,9 +164,11 @@ export const sanitizeTraderMap = (value: unknown): UserProgressData['traders'] =
     if (level === null && reputation === null) {
       continue;
     }
+    const reputationCheckpoint = sanitizeReputationCheckpoint(traderValue.reputationCheckpoint);
     sanitized[traderId] = {
       level: level !== null ? Math.max(1, Math.trunc(level)) : 1,
       reputation: reputation !== null ? reputation : 0,
+      ...(reputationCheckpoint ? { reputationCheckpoint } : {}),
     };
   }
   return sanitized;

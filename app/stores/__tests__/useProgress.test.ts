@@ -45,6 +45,7 @@ const setupMocks = ({
   selfCompletions = {},
   teammateCompletions = {},
   selfState,
+  effectiveTraders,
   teammateState,
   tasks = [{ id: 'task-1', name: 'Task One' }],
   traders = [],
@@ -55,6 +56,7 @@ const setupMocks = ({
   selfCompletions?: Record<string, unknown>;
   teammateCompletions?: Record<string, unknown>;
   selfState?: ReturnType<typeof createStoreState>;
+  effectiveTraders?: TraderProgress;
   teammateState?: ReturnType<typeof createStoreState>;
   tasks?: Array<Record<string, unknown>>;
   traders?: Array<Record<string, unknown>>;
@@ -66,6 +68,7 @@ const setupMocks = ({
   setActivePinia(createPinia());
   const selfStore = {
     $state: selfState ?? createStoreState({ pvpCompletions: selfCompletions }),
+    effectiveTraders,
   };
   const teammateStore = {
     $state: teammateState ?? createStoreState({ pvpCompletions: teammateCompletions }),
@@ -271,6 +274,18 @@ describe('useProgressStore', () => {
       const { useProgressStore } = await import('@/stores/useProgress');
       const store = useProgressStore();
       expect(store.unlockedTasks['prapor-ll2-task']?.self).toBe(true);
+    });
+    it('uses quest-derived loyalty in personal availability without changing a teammate’s gate', async () => {
+      setupMocks({
+        effectiveTraders: { [praporId]: { level: 2, reputation: 0.7 } },
+        tasks: [praporLevelTask],
+        traders: metadataTraders,
+      });
+      const { useProgressStore } = await import('@/stores/useProgress');
+      expect(useProgressStore().unlockedTasks['prapor-ll2-task']).toEqual({
+        self: true,
+        'teammate-1': false,
+      });
     });
     it('defaults missing trader data to level 1 and locks higher-level requirements', async () => {
       setupMocks({

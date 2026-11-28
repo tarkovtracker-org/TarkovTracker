@@ -32,6 +32,7 @@ import {
   isTaskFailed as isTaskCompletionFailed,
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
+import { checkpointLegacyTraderStanding, completedTraderQuestIds } from '@/utils/traderProgress';
 import type { ManualActivityEntry, TaskCompletion, UserProgressData } from '@/types/progress';
 import type { _GettersTree } from 'pinia';
 export type {
@@ -288,6 +289,7 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
  * clock from a device that runs ahead, so the status timestamp is advanced past it.
  */
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
+  checkpointLegacyTraderStanding(getCurrentData(state));
   const confirmationTs = getCurrentData(state).taskAvailability?.[taskId]?.timestamp;
   let timestamp =
     confirmationTs === undefined
@@ -299,6 +301,25 @@ const setTaskStatus = (state: UserState, taskId: string, completion: TaskComplet
     timestamp = Math.max(timestamp ?? 0, previous, nextClock(previous));
   }
   updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
+};
+const setTraderReputation = (
+  state: UserState,
+  traderId: string,
+  reputation: number,
+  manual: boolean
+) => {
+  const progress = getCurrentData(state);
+  const existing = progress.traders[traderId];
+  if (!manual && existing?.reputationCheckpoint?.manual) return;
+  updateObjective(state, 'traders', traderId, {
+    level: existing?.level ?? 1,
+    reputation,
+    reputationCheckpoint: {
+      completedTaskIds: completedTraderQuestIds(progress),
+      timestamp: nextClock(existing?.reputationCheckpoint?.timestamp ?? 0),
+      ...(manual ? { manual } : {}),
+    },
+  });
 };
 // Simplified actions
 export const actions = {
@@ -443,10 +464,23 @@ export const actions = {
     }
   },
   setTraderLevel(this: UserState, traderId: string, level: number) {
-    updateObjective(this, 'traders', traderId, { level: Math.max(1, level) });
+    const existing = getCurrentData(this).traders[traderId];
+    updateObjective(this, 'traders', traderId, {
+      ...(existing
+        ? {}
+        : {
+            reputation: 0,
+            reputationCheckpoint: { completedTaskIds: [], timestamp: 0 },
+          }),
+      level: Math.max(1, level),
+    });
   },
   setTraderReputation(this: UserState, traderId: string, reputation: number) {
-    updateObjective(this, 'traders', traderId, { reputation: reputation });
+    checkpointLegacyTraderStanding(getCurrentData(this));
+    setTraderReputation(this, traderId, reputation, false);
+  },
+  correctTraderReputation(this: UserState, traderId: string, reputation: number) {
+    setTraderReputation(this, traderId, reputation, true);
   },
   setSkillLevel(this: UserState, skillName: string, level: number) {
     const currentData = getCurrentData(this);

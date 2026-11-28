@@ -40,6 +40,11 @@ export interface ApiUpdateMeta {
 export interface TraderProgress {
   level: number;
   reputation: number;
+  reputationCheckpoint?: {
+    completedTaskIds: string[];
+    timestamp: number;
+    manual?: boolean;
+  };
 }
 export const MANUAL_ACTIVITY_TYPES = ['task', 'hideout', 'item', 'system'] as const;
 export type ManualActivityType = (typeof MANUAL_ACTIVITY_TYPES)[number];

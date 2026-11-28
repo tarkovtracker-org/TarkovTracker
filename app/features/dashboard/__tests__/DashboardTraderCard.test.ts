@@ -38,8 +38,11 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getTraderLevel: () => mockState.traderLevel,
     getTraderReputation: () => mockState.reputation,
+    getCurrentProgressData: () => ({
+      traders: { prapor: { level: mockState.traderLevel, reputation: mockState.reputation } },
+    }),
     setTraderLevel,
-    setTraderReputation,
+    correctTraderReputation: setTraderReputation,
   }),
 }));
 const mockTheme = {

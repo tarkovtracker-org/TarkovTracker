@@ -101,7 +101,7 @@ import {
 import { ProgressSyncSession } from '@/stores/tarkov/syncSession';
 import { recordLocalSyncTime } from '@/stores/tarkov/syncTimeline';
 import { useMetadataStore } from '@/stores/useMetadata';
-import { GAME_MODES, type GameMode } from '@/utils/constants';
+import { GAME_MODES, GAME_MODE_VALUES, type GameMode } from '@/utils/constants';
 import { logger } from '@/utils/logger';
 import { sanitizeOwnedUserState } from '@/utils/progressSanitizers';
 import {
@@ -110,6 +110,11 @@ import {
   isEffectiveStoryObjectiveComplete,
   storyCatalogForMode,
 } from '@/utils/storylineCompletion';
+import {
+  checkpointLegacyTraderStanding,
+  effectiveTraderStanding,
+  traderCatalogForMode,
+} from '@/utils/traderProgress';
 import { getCurrentSupabaseUserId, parseUserScopedStorage } from '@/utils/userScopedStorage';
 export type { PrestigeRunRecord } from '@/stores/tarkov/prestige';
 type TarkovStoreInstance = UserState & {
@@ -232,6 +237,21 @@ const archivePrestigeRun = async (store: TarkovStoreInstance, mode: GameMode) =>
 // ============================================================================
 const tarkovGetters = {
   ...getters,
+  effectiveTraders: (state: UserState) =>
+    effectiveTraderStanding(
+      state[state.currentGameMode],
+      traderCatalogForMode(useMetadataStore(), state.currentGameMode)
+    ),
+  getTraderLevel(this: {
+    effectiveTraders: UserProgressData['traders'];
+  }): (traderId: string) => number {
+    return (traderId) => this.effectiveTraders[traderId]?.level ?? 1;
+  },
+  getTraderReputation(this: {
+    effectiveTraders: UserProgressData['traders'];
+  }): (traderId: string) => number {
+    return (traderId) => this.effectiveTraders[traderId]?.reputation ?? 0;
+  },
   getEffectiveStoryProgress: (state: UserState) => () =>
     effectiveStoryProgress(state[state.currentGameMode]?.storyChapters, currentStoryCatalog(state)),
   isStoryObjectiveComplete: (state: UserState) => (chapterId: string, objectiveId: string) =>
@@ -1005,14 +1025,20 @@ export async function initializeTarkovSync() {
   );
   syncMetadataAfterStartup(tarkovStore, isStartupCurrent);
   if (preservedSnapshot) progressSync.consumePreservedSnapshot();
-  if (applyPostLoadRepairs(tarkovStore) > 0 || loadResult.needsRemoteCleanup) {
+  const repaired = applyPostLoadRepairs(tarkovStore);
+  const checkpoints = GAME_MODE_VALUES.reduce(
+    (count, mode) => count + checkpointLegacyTraderStanding(tarkovStore[mode]),
+    0
+  );
+  if (repaired > 0 || loadResult.needsRemoteCleanup) {
     await persistPostLoadChanges(tarkovStore, userId, isStartupCurrent);
     if (!isStartupCurrent()) return;
   }
   const syncStart = {
     hadRemoteData: loadResult.hadRemoteData,
     initialAcknowledgedState: loadResult.initialAcknowledgedState,
-    hasUnsavedHandoff: hasUnsavedProgressChanges() || startupCloudState.awaitsUpload,
+    hasUnsavedHandoff:
+      checkpoints > 0 || hasUnsavedProgressChanges() || startupCloudState.awaitsUpload,
     onSynced: retireRecoveryCopyOnFirstSync(userId, startupCloudState.retirementPending),
   };
   startProgressSync(tarkovStore, userId, syncStart, isStartupCurrent);

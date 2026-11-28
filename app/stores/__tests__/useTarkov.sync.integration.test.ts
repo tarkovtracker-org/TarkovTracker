@@ -1644,11 +1644,16 @@ describe('useTarkov sync integration', () => {
         skills: { Endurance: 10 },
       });
       const selected = useTarkovStore()[mode];
-      expect(selected.traders.prapor).toEqual({ level: 2, reputation: 0.2 });
+      expect(selected.traders.prapor).toEqual({
+        level: 2,
+        reputation: 0.2,
+        reputationCheckpoint: { completedTaskIds: [], timestamp: 0, manual: true },
+      });
       expect(selected.skills.Endurance).toBe(10);
       const uploads = rpc.mock.calls.filter(([name]) => name === 'sync_user_game_mode_progress');
       for (const [, payload] of uploads) {
         expect(payload?.p_modes[mode]?.traders?.prapor?.level ?? 2).toBe(2);
+        expect(payload?.p_modes[mode]?.traders?.prapor?.reputation ?? 0.2).toBe(0.2);
       }
     }
   );

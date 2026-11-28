@@ -154,6 +154,22 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.saveProgressNow).toHaveBeenCalledTimes(2);
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledOnce();
   });
+  it('keeps a dated completion from being added again after a manual standing correction', async () => {
+    const checkpoint = {
+      completedTaskIds: [] as string[],
+      manual: true,
+      timestamp: Date.parse('2026-03-01T00:00:00Z'),
+    };
+    const progress = {
+      taskCompletions: {},
+      traders: { prapor: { level: 1, reputation: 0.7, reputationCheckpoint: checkpoint } },
+    };
+    tarkovStore.getCurrentProgressData.mockReturnValue(progress);
+    const importer = await loadComposable();
+    await importer.parseFile(new File([completionLog()], 'notifications.log'));
+    await importer.confirmImport('pvp');
+    expect(checkpoint.completedTaskIds).toEqual(['61604635c725987e815b1a46']);
+  });
   it('discards results from a log read that outlives its progress owner', async () => {
     const importer = await loadComposable();
     const reading = importer.parseFile(new File([completionLog()], 'notifications.log'));

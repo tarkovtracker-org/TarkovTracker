@@ -106,11 +106,14 @@
   const draftBase = ref<number | null>(null);
   const error = ref<'invalid' | 'minimum' | null>(null);
   const updateFeedback = ref<{ kind: 'updated' } | { kind: 'raised'; value: string } | null>(null);
-  const minimumAllowed = computed(() => minimum.value || -10);
+  const minimumAllowed = computed(
+    () =>
+      minimumFor(tarkovStore.getCurrentProgressData().traders[props.trader.id]?.level ?? 1) || -10
+  );
   function validationMessage(issue: 'invalid' | 'minimum') {
     return issue === 'invalid'
       ? t('page.dashboard.traders.rep_invalid')
-      : t('page.dashboard.traders.rep_below_minimum', { value: minimum.value.toFixed(2) });
+      : t('page.dashboard.traders.rep_below_minimum', { value: minimumAllowed.value.toFixed(2) });
   }
   const feedback = computed(() => {
     if (error.value) return validationMessage(error.value);
@@ -136,7 +139,7 @@
   }
   function raiseReputationForLevel(required: number) {
     if (!hasReputation.value || required <= 0 || reputation.value >= required) return false;
-    tarkovStore.setTraderReputation(props.trader.id, required);
+    tarkovStore.correctTraderReputation(props.trader.id, required);
     return true;
   }
   function updateLevel(event: Event) {
@@ -178,7 +181,7 @@
       error.value = 'minimum';
       return;
     }
-    tarkovStore.setTraderReputation(props.trader.id, value);
+    tarkovStore.correctTraderReputation(props.trader.id, value);
     draft.value = value.toFixed(2);
     updateFeedback.value = { kind: 'updated' };
   }

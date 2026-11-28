@@ -148,10 +148,17 @@ export function useTaskActions(
     });
     recordStoryGates(taskId);
   };
-  const ensureTraderRequirements = (currentTask: Task) => {
+  const ensureTraderRequirements = (currentTask: Task, explicitlyAvailable = false) => {
     if (!preferencesStore.getTasksRequireTraderLevels) return;
     applyTaskTraderRequirements({
-      store: tarkovStore,
+      store: {
+        getTraderLevel: tarkovStore.getTraderLevel,
+        getTraderReputation: tarkovStore.getTraderReputation,
+        setTraderLevel: tarkovStore.setTraderLevel,
+        setTraderReputation: explicitlyAvailable
+          ? tarkovStore.correctTraderReputation
+          : tarkovStore.setTraderReputation,
+      },
       task: currentTask,
     });
   };
@@ -189,14 +196,14 @@ export function useTaskActions(
         recordedStoryObjectives,
       });
     }
+    ensureTaskMinPlayerLevel(tarkovStore, currentTask);
+    ensureTraderRequirements(currentTask);
     completeTaskForProgress({
       store: tarkovStore,
       taskId: currentTask.id,
       tasksMap: tasksMap.value,
     });
     unpinTaskIfPinned(currentTask.id);
-    ensureTaskMinPlayerLevel(tarkovStore, currentTask);
-    ensureTraderRequirements(currentTask);
     if (isUndo) {
       emitAction({
         taskId: currentTask.id,
@@ -311,7 +318,7 @@ export function useTaskActions(
       task: currentTask,
     });
     ensureTaskMinPlayerLevel(tarkovStore, currentTask);
-    ensureTraderRequirements(currentTask);
+    ensureTraderRequirements(currentTask, true);
     recordImpliedStoryObjectives(tarkovStore, currentTask);
     const requirements = otherRequirementsSignature(currentTask, taskCompletions());
     if (requirements) tarkovStore.confirmTaskAvailability(currentTask.id, requirements);
