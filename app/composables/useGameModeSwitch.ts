@@ -1,3 +1,4 @@
+import { storeToRefs } from 'pinia';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
 import { logger } from '@/utils/logger';
@@ -6,10 +7,10 @@ export const useGameModeSwitchLock = () => useState('game-mode-switch-locked', (
 const useModeSwitching = () => useState('game-mode-switching', () => false);
 const useImportingProgress = () => useState('game-mode-importing-progress', () => false);
 export function useProgressImportBlocked() {
-  const metadata = useMetadataStore();
+  const { loading } = storeToRefs(useMetadataStore());
   const switching = useModeSwitching();
   const importing = useImportingProgress();
-  return computed(() => switching.value || importing.value || metadata.loading);
+  return computed(() => switching.value || importing.value || Boolean(loading?.value));
 }
 export function useProgressImportClaim() {
   const blocked = useProgressImportBlocked();

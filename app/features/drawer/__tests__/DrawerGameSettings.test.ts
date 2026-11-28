@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import DrawerGameSettings from '@/features/drawer/DrawerGameSettings.vue';
 import { ACTIVE_SEASON, GAME_MODES, type GameMode } from '@/utils/constants';
-const switchGameModeMock = vi.fn(async () => undefined);
+const switchGameModeMock = vi.fn(async (mode: GameMode) => {
+  currentGameMode.value = mode;
+});
 const setPMCFactionMock = vi.fn();
 const metadataLoading = ref(false);
 const currentGameMode = ref<GameMode>(GAME_MODES.PVP);
@@ -67,8 +69,6 @@ describe('DrawerGameSettings', () => {
     await buttons[1]!.trigger('click');
     await vi.waitFor(() => expect(switchGameModeMock).toHaveBeenCalledWith(GAME_MODES.PVE));
     expect(fetchAllDataMock).toHaveBeenCalled();
-    currentGameMode.value = GAME_MODES.PVE;
-    await wrapper.vm.$nextTick();
     expect(group.get('[aria-pressed="true"]').text()).toBe('PvE');
     wrapper.unmount();
   });
