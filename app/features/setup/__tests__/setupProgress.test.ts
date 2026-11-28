@@ -45,6 +45,15 @@ describe('setup quest review', () => {
       suggested: ['previous', 'earliest'],
     });
   });
+  it('records an explicit setup choice for a legacy task whose acceptance is unknown', () => {
+    const tasks = catalog(task('legacy'));
+    const legacy = { complete: false, failed: false };
+    expect(planSetupQuests(tasks, new Map([['legacy', 'active']]), () => legacy)).toEqual({
+      active: ['legacy'],
+      completed: [],
+      suggested: [],
+    });
+  });
   it('preserves saved states and does not infer the route into a story-unlocked quest', () => {
     const story = {
       ...task('story', [need('unneeded', 'complete')]),
@@ -60,7 +69,7 @@ describe('setup quest review', () => {
     );
     const existing = new Map<string, RawTaskCompletion>([
       ['failed', { complete: true, failed: true }],
-      ['active', { complete: false, failed: false }],
+      ['active', { complete: false, failed: false, active: true }],
       ['complete', true],
     ]);
     const plan = planSetupQuests(

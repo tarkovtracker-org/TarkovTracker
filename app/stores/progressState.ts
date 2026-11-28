@@ -26,6 +26,10 @@ import {
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
+import {
+  hasImportedAcceptance,
+  importedAcceptanceSignature,
+} from '@/utils/shiftingBalanceAcceptance';
 import { nextClock, taskStatusTimestamp } from '@/utils/taskAvailabilityConfirmation';
 import {
   isTaskActive as isTaskCompletionActive,
@@ -287,6 +291,18 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
   // `statusTs - 1` so the confirmation may share the status millisecond (it still counts).
   confirmations[taskId] = { requirements, timestamp: nextClock(statusTs - 1, previousTs) };
 };
+/** Preserve valid EFT evidence when only the explicit acceptance flag changes. */
+const getImportedAcceptance = (data: UserProgressData, taskId: string) => {
+  const signature = importedAcceptanceSignature(taskId);
+  if (!signature) return;
+  if (
+    hasImportedAcceptance(taskId, {
+      completions: data.taskCompletions,
+      confirmations: data.taskAvailability,
+    })
+  )
+    return signature;
+};
 /** Status changes must follow the earlier task/Undo clock and retire live confirmations. */
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
   const data = getCurrentData(state);
@@ -389,13 +405,16 @@ export const actions = {
     setTaskStatus(this, taskId, createCompletion(true, false, false, false));
   },
   setTaskActive(this: UserState, taskId: string) {
+    const importedAcceptance = getImportedAcceptance(getCurrentData(this), taskId);
     setTaskStatus(this, taskId, createCompletion(false, false, true, false));
+    if (importedAcceptance) setAvailabilityConfirmation(this, taskId, importedAcceptance);
   },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
     setTaskStatus(this, taskId, createCompletion(true, true, false, failOptions?.manual));
   },
   setTaskAcceptanceUnknown(this: UserState, taskId: string) {
     const data = getCurrentData(this);
+    const importedAcceptance = getImportedAcceptance(data, taskId);
     const previous = data.taskCompletions[taskId];
     const previousTimestamp = previous?.timestamp ?? 0;
     const timestamp = nextClock(previousTimestamp, data.taskAvailability?.[taskId]?.timestamp ?? 0);
@@ -405,6 +424,7 @@ export const actions = {
     delete restored.active;
     // Replace atomically so sync observers never see an intermediate active: false.
     data.taskCompletions[taskId] = restored;
+    if (importedAcceptance) setAvailabilityConfirmation(this, taskId, importedAcceptance);
   },
   setTaskUncompleted(this: UserState, taskId: string) {
     setTaskStatus(this, taskId, createCompletion(false, false, false, false));

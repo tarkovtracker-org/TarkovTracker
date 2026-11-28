@@ -7,7 +7,11 @@ import {
   type ManualActivityEntry,
   type UserState,
 } from '@/stores/progressState';
-import { ACTIVE_SEASON_NUMBER } from '@/utils/constants';
+import { ACTIVE_SEASON_NUMBER, TASK_ID_REGISTRY } from '@/utils/constants';
+import {
+  hasImportedAcceptance,
+  importedAcceptanceSignature,
+} from '@/utils/shiftingBalanceAcceptance';
 import { MAX_CONFIRMATION_TIMESTAMP } from '@/utils/taskAvailabilityConfirmation';
 const createBaseState = (): UserState =>
   ({
@@ -80,6 +84,34 @@ describe('progressState getters task completion compatibility', () => {
   });
 });
 describe('progressState task lifecycle', () => {
+  it.each([
+    { action: 'accept', prior: undefined, apply: actions.setTaskActive, next: true },
+    { action: 'undo', prior: true, apply: actions.setTaskAcceptanceUnknown, next: undefined },
+  ])('preserves valid legacy Jaeger evidence through $action', ({ prior, apply, next }) => {
+    const id = TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT;
+    const state = createBaseState();
+    state.pvp.taskCompletions[id] = {
+      complete: false,
+      timestamp: 1000,
+      ...(prior && { active: prior }),
+    };
+    state.pvp.taskAvailability = {
+      [id]: { timestamp: 1000, requirements: importedAcceptanceSignature(id)! },
+    };
+    const hasEvidence = () =>
+      hasImportedAcceptance(id, {
+        completions: state.pvp.taskCompletions,
+        confirmations: state.pvp.taskAvailability,
+      });
+    expect(hasEvidence()).toBe(true);
+    apply.call(state, id);
+    expect(state.pvp.taskCompletions[id]?.active).toBe(next);
+    expect(hasEvidence()).toBe(true);
+    actions.setTaskUncompleted.call(state, id);
+    expect(hasEvidence()).toBe(false);
+    actions.setTaskActive.call(state, id);
+    expect(hasEvidence()).toBe(false);
+  });
   it.each([
     { previous: 5000, confirmation: undefined, expected: 5001 },
     { previous: 9000, confirmation: 8000, expected: 9001 },
