@@ -51,6 +51,16 @@ export const sanitizeDisplayName = (value: unknown): string | null =>
   sanitizeClampedText(value, 64);
 export const sanitizeFaction = (value: unknown): 'BEAR' | 'USEC' =>
   value === 'BEAR' ? 'BEAR' : 'USEC';
+const sanitizeTaskCompletionTimes = (completion: Record<string, unknown>) => {
+  const timestamp = toFiniteNumber(completion.timestamp);
+  const eftCompletedAt = toFiniteNumber(completion.eftCompletedAt);
+  return {
+    ...(timestamp !== null ? { timestamp: Math.max(0, Math.trunc(timestamp)) } : {}),
+    ...(eftCompletedAt !== null && eftCompletedAt > 0
+      ? { eftCompletedAt: Math.trunc(eftCompletedAt) }
+      : {}),
+  };
+};
 export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['taskCompletions'] => {
   if (!isRecord(value)) {
     return {};
@@ -64,7 +74,8 @@ export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['tas
     if (!isRecord(completion)) {
       continue;
     }
-    const normalized: UserProgressData['taskCompletions'][string] = {};
+    const normalized: UserProgressData['taskCompletions'][string] =
+      sanitizeTaskCompletionTimes(completion);
     if (typeof completion.complete === 'boolean') {
       normalized.complete = completion.complete;
     }
@@ -73,10 +84,6 @@ export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['tas
     }
     if (typeof completion.manual === 'boolean') {
       normalized.manual = completion.manual;
-    }
-    const timestamp = toFiniteNumber(completion.timestamp);
-    if (timestamp !== null) {
-      normalized.timestamp = Math.max(0, Math.trunc(timestamp));
     }
     if (Object.keys(normalized).length > 0) {
       sanitized[taskId] = normalized;
@@ -136,6 +143,62 @@ export const sanitizeHideoutModuleMap = (value: unknown): UserProgressData['hide
   }
   return sanitized;
 };
+const sanitizeCheckpointTaskIds = (ids: unknown[]) => [
+  ...new Set(ids.filter((id): id is string => typeof id === 'string' && id.length > 0)),
+];
+const sanitizeCheckpointTracking = (value: unknown) =>
+  value === 'paused' || value === 'new-only' ? ({ questRewardTracking: value } as const) : {};
+const sanitizeCheckpointObservation = (value: Record<string, unknown>) => {
+  const observedAt = toFiniteNumber(value.observedAt);
+  return observedAt !== null && observedAt > 0 ? { observedAt } : {};
+};
+const hasCheckpointTaskIds = (
+  value: unknown
+): value is Record<string, unknown> & { completedTaskIds: unknown[] } =>
+  isRecord(value) && Array.isArray(value.completedTaskIds);
+const sanitizeStandingClock = (value: unknown) => {
+  const timestamp = toFiniteNumber(value);
+  return timestamp !== null && Number.isSafeInteger(timestamp) && timestamp >= 0 ? timestamp : null;
+};
+const sanitizeResumedTracking = (value: unknown) => {
+  if (!hasCheckpointTaskIds(value)) return {};
+  const at = toFiniteNumber(value.at);
+  if (at === null || at <= 0) return {};
+  return {
+    resumedTracking: { at, completedTaskIds: sanitizeCheckpointTaskIds(value.completedTaskIds) },
+  };
+};
+const sanitizeCheckpointOptions = (value: Record<string, unknown>) => ({
+  ...(value.manual === true ? { manual: true } : {}),
+  ...sanitizeCheckpointTracking(value.questRewardTracking),
+  ...sanitizeCheckpointObservation(value),
+  ...sanitizeResumedTracking(value.resumedTracking),
+});
+const sanitizeReputationCheckpoint = (value: unknown) => {
+  if (!hasCheckpointTaskIds(value)) return undefined;
+  const timestamp = sanitizeStandingClock(value.timestamp);
+  if (timestamp === null) return undefined;
+  return {
+    completedTaskIds: sanitizeCheckpointTaskIds(value.completedTaskIds),
+    ...(Array.isArray(value.excludedHistoricalTaskIds)
+      ? { excludedHistoricalTaskIds: sanitizeCheckpointTaskIds(value.excludedHistoricalTaskIds) }
+      : {}),
+    timestamp,
+    ...sanitizeCheckpointOptions(value),
+  };
+};
+const sanitizeAutomaticLoyalty = (value: unknown, level: number | null) => {
+  if (typeof value === 'boolean') return { automaticLoyalty: value };
+  return level === null ? { automaticLoyalty: true } : {};
+};
+const sanitizeTraderLoyalty = (value: Record<string, unknown>, level: number | null) => {
+  const timestamp = sanitizeStandingClock(value.loyaltyUpdatedAt);
+  return {
+    level: level === null ? 1 : Math.max(1, Math.trunc(level)),
+    ...sanitizeAutomaticLoyalty(value.automaticLoyalty, level),
+    ...(timestamp === null ? {} : { loyaltyUpdatedAt: timestamp }),
+  };
+};
 export const sanitizeTraderMap = (value: unknown): UserProgressData['traders'] => {
   if (!isRecord(value)) {
     return {};
@@ -150,9 +213,11 @@ export const sanitizeTraderMap = (value: unknown): UserProgressData['traders'] =
     if (level === null && reputation === null) {
       continue;
     }
+    const reputationCheckpoint = sanitizeReputationCheckpoint(traderValue.reputationCheckpoint);
     sanitized[traderId] = {
-      level: level !== null ? Math.max(1, Math.trunc(level)) : 1,
+      ...sanitizeTraderLoyalty(traderValue, level),
       reputation: reputation !== null ? reputation : 0,
+      ...(reputationCheckpoint ? { reputationCheckpoint } : {}),
     };
   }
   return sanitized;

@@ -20,7 +20,7 @@ import {
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
 import { mergeTaskAvailability } from '@/utils/taskAvailabilityConfirmation';
-import type { ManualActivityEntry, TaskCompletion } from '@/types/progress';
+import type { ManualActivityEntry, TaskCompletion, TraderProgress } from '@/types/progress';
 import type { RawTaskCompletion } from '@/utils/taskStatus';
 const API_UPDATE_HISTORY_LIMIT = 50;
 type CountableEntry = { count?: number; complete?: boolean; timestamp?: number };
@@ -240,6 +240,9 @@ const normalizeTaskCompletionEntry = (
   if (typeof completion.manual === 'boolean') {
     normalized.manual = completion.manual;
   }
+  if (typeof completion.eftCompletedAt === 'number') {
+    normalized.eftCompletedAt = completion.eftCompletedAt;
+  }
   return normalized;
 };
 export const normalizeTaskCompletionsMap = (
@@ -338,6 +341,90 @@ export const mergeManualActivityHistory = (
     ]),
   };
 };
+type ReputationCheckpoint = NonNullable<TraderProgress['reputationCheckpoint']>;
+const sameManualCorrection = (left: ReputationCheckpoint, right: ReputationCheckpoint) =>
+  left.manual &&
+  right.manual &&
+  left.timestamp === right.timestamp &&
+  left.observedAt === right.observedAt &&
+  left.resumedTracking?.at === right.resumedTracking?.at &&
+  left.questRewardTracking === right.questRewardTracking;
+const unionQuestIds = (left: string[] = [], right: string[] = []) =>
+  [...new Set([...left, ...right])].sort();
+const mergeRecoveredQuestIds = (left: ReputationCheckpoint, right: ReputationCheckpoint) => {
+  const excluded = unionQuestIds(left.excludedHistoricalTaskIds, right.excludedHistoricalTaskIds);
+  return {
+    ...left,
+    completedTaskIds: unionQuestIds(left.completedTaskIds, right.completedTaskIds),
+    ...(excluded.length ? { excludedHistoricalTaskIds: excluded } : {}),
+    ...(left.resumedTracking
+      ? {
+          resumedTracking: {
+            at: left.resumedTracking.at,
+            completedTaskIds: unionQuestIds(
+              left.resumedTracking.completedTaskIds,
+              right.resumedTracking?.completedTaskIds
+            ),
+          },
+        }
+      : {}),
+  };
+};
+const mergeEftCompletionTime = (local: TaskCompletion, remote: TaskCompletion) => {
+  const eftCompletedAt = Math.min(
+    local.eftCompletedAt ?? Infinity,
+    remote.eftCompletedAt ?? Infinity
+  );
+  return Number.isFinite(eftCompletedAt) ? { eftCompletedAt } : {};
+};
+const newerCheckpoint = (local: ReputationCheckpoint, remote: ReputationCheckpoint) => {
+  const manualDifference = Number(Boolean(local.manual)) - Number(Boolean(remote.manual));
+  return (manualDifference || local.timestamp - remote.timestamp) > 0;
+};
+const newestTraderCorrection = (local: TraderProgress, remote: TraderProgress) => {
+  const left = local.reputationCheckpoint;
+  const right = remote.reputationCheckpoint;
+  if (!left) return remote;
+  if (!right) return local;
+  return newerCheckpoint(left, right) ? local : remote;
+};
+const legacyTraderReputation = (local: TraderProgress, remote: TraderProgress) =>
+  Math.max(local.reputation || 0, remote.reputation || 0);
+const traderReputationFields = ({ reputation, reputationCheckpoint }: TraderProgress) =>
+  reputationCheckpoint ? { reputation, reputationCheckpoint } : { reputation };
+const mergeTraderObservations = (local: TraderProgress, remote: TraderProgress) => {
+  const left = local.reputationCheckpoint;
+  const right = remote.reputationCheckpoint;
+  if (left && right && local.reputation === remote.reputation && sameManualCorrection(left, right))
+    return {
+      reputation: local.reputation,
+      reputationCheckpoint: mergeRecoveredQuestIds(left, right),
+    };
+  const chosen = newestTraderCorrection(local, remote);
+  return chosen.reputationCheckpoint
+    ? traderReputationFields(chosen)
+    : { reputation: legacyTraderReputation(local, remote) };
+};
+const hasOnlyLoyaltyEdit = ({ reputationCheckpoint }: TraderProgress) =>
+  reputationCheckpoint?.timestamp === 0 &&
+  !reputationCheckpoint.manual &&
+  reputationCheckpoint.completedTaskIds.length === 0;
+const mergeTraderReputation = (local: TraderProgress, remote: TraderProgress) => {
+  if (hasOnlyLoyaltyEdit(local)) return traderReputationFields(remote);
+  if (hasOnlyLoyaltyEdit(remote)) return traderReputationFields(local);
+  return mergeTraderObservations(local, remote);
+};
+const mergeTraderLoyalty = (local: TraderProgress, remote: TraderProgress) => {
+  const localTime = local.loyaltyUpdatedAt ?? -1;
+  const remoteTime = remote.loyaltyUpdatedAt ?? -1;
+  if (Math.max(localTime, remoteTime) < 0)
+    return {
+      level: Math.max(local.level || 1, remote.level || 1),
+      ...(local.automaticLoyalty && remote.automaticLoyalty ? { automaticLoyalty: true } : {}),
+    };
+  const { level, automaticLoyalty, loyaltyUpdatedAt } = localTime > remoteTime ? local : remote;
+  return { level, automaticLoyalty, loyaltyUpdatedAt };
+};
 export function mergeProgressData(
   local: UserProgressData | undefined,
   remote: UserProgressData | undefined,
@@ -389,7 +476,7 @@ export function mergeProgressData(
       merged.complete = true;
     }
     merged.timestamp = Math.max(localTs, remoteTs);
-    return merged;
+    return { ...merged, ...mergeEftCompletionTime(normalizedLocal, normalizedRemote) };
   };
   const resolveApiUpdate = (
     localUpdate?: ApiUpdateMeta,
@@ -449,8 +536,8 @@ export function mergeProgressData(
             return [
               traderId,
               {
-                level: Math.max(localTrader.level || 1, remoteTrader.level || 1),
-                reputation: Math.max(localTrader.reputation || 0, remoteTrader.reputation || 0),
+                ...mergeTraderLoyalty(localTrader, remoteTrader),
+                ...mergeTraderReputation(localTrader, remoteTrader),
               },
             ];
           }

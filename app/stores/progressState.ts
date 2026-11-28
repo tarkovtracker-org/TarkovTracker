@@ -32,6 +32,11 @@ import {
   isTaskFailed as isTaskCompletionFailed,
   type RawTaskCompletion,
 } from '@/utils/taskStatus';
+import {
+  checkpointLegacyTraderStanding,
+  completedTraderQuestIds,
+  excludedHistoricalTraderQuestIds,
+} from '@/utils/traderProgress';
 import type { ManualActivityEntry, TaskCompletion, UserProgressData } from '@/types/progress';
 import type { _GettersTree } from 'pinia';
 export type {
@@ -288,6 +293,7 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
  * clock from a device that runs ahead, so the status timestamp is advanced past it.
  */
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
+  checkpointLegacyTraderStanding(getCurrentData(state));
   const confirmationTs = getCurrentData(state).taskAvailability?.[taskId]?.timestamp;
   let timestamp =
     confirmationTs === undefined
@@ -299,6 +305,83 @@ const setTaskStatus = (state: UserState, taskId: string, completion: TaskComplet
     timestamp = Math.max(timestamp ?? 0, previous, nextClock(previous));
   }
   updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
+};
+type QuestRewardTracking = NonNullable<
+  UserProgressData['traders'][string]['reputationCheckpoint']
+>['questRewardTracking'];
+const resumedQuestTracking = (
+  tracking: QuestRewardTracking,
+  existing: UserProgressData['traders'][string] | undefined,
+  at: number,
+  completedTaskIds: string[]
+) => {
+  if (tracking === 'paused') return undefined;
+  if (tracking === 'new-only') return { at, completedTaskIds };
+  return existing?.reputationCheckpoint?.resumedTracking;
+};
+const reputationCheckpointOptions = (
+  questRewardTracking: QuestRewardTracking,
+  excludedHistoricalTaskIds: string[],
+  resumedTracking: ReturnType<typeof resumedQuestTracking>
+) => ({
+  ...(questRewardTracking ? { questRewardTracking } : {}),
+  ...(excludedHistoricalTaskIds.length ? { excludedHistoricalTaskIds } : {}),
+  ...(resumedTracking ? { resumedTracking } : {}),
+});
+const nextReputationCheckpointClock = (checkpoint: { timestamp: number } | undefined) =>
+  nextClock(checkpoint?.timestamp ?? 0);
+const buildReputationCheckpoint = (
+  progress: UserProgressData,
+  existing: UserProgressData['traders'][string] | undefined,
+  tracking: QuestRewardTracking
+) => {
+  const previous = existing?.reputationCheckpoint;
+  const questRewardTracking = tracking ?? previous?.questRewardTracking;
+  const excludedHistoricalTaskIds = excludedHistoricalTraderQuestIds(progress);
+  const completedTaskIds = completedTraderQuestIds(progress);
+  const observedAt = Date.now();
+  const resumedTracking = resumedQuestTracking(tracking, existing, observedAt, completedTaskIds);
+  return {
+    completedTaskIds,
+    timestamp: nextReputationCheckpointClock(previous),
+    observedAt,
+    manual: true,
+    ...reputationCheckpointOptions(questRewardTracking, excludedHistoricalTaskIds, resumedTracking),
+  };
+};
+const setTraderReputation = (
+  state: UserState,
+  traderId: string,
+  reputation: number,
+  tracking?: QuestRewardTracking
+) => {
+  const progress = getCurrentData(state);
+  const existing = progress.traders[traderId];
+  updateObjective(state, 'traders', traderId, {
+    ...(existing ? {} : { automaticLoyalty: true }),
+    level: existing?.level ?? 1,
+    reputation,
+    reputationCheckpoint: buildReputationCheckpoint(progress, existing, tracking),
+  });
+};
+const setTraderLoyalty = (
+  state: UserState,
+  traderId: string,
+  level: number,
+  automaticLoyalty: boolean
+) => {
+  const existing = getCurrentData(state).traders[traderId];
+  updateObjective(state, 'traders', traderId, {
+    ...(existing
+      ? {}
+      : {
+          reputation: 0,
+          reputationCheckpoint: { completedTaskIds: [], timestamp: 0 },
+        }),
+    level,
+    automaticLoyalty,
+    loyaltyUpdatedAt: nextClock(existing?.loyaltyUpdatedAt ?? 0),
+  });
 };
 // Simplified actions
 export const actions = {
@@ -385,6 +468,12 @@ export const actions = {
   setTaskComplete(this: UserState, taskId: string) {
     setTaskStatus(this, taskId, createCompletion(true, false, false));
   },
+  recordEftQuestCompletionTime(this: UserState, taskId: string, completedAt: number) {
+    const completion = getCurrentData(this).taskCompletions[taskId];
+    if (!isTaskCompletionComplete(completion)) return;
+    const eftCompletedAt = Math.min(completion?.eftCompletedAt ?? Infinity, completedAt);
+    updateObjective(this, 'taskCompletions', taskId, { eftCompletedAt });
+  },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
     setTaskStatus(this, taskId, createCompletion(true, true, failOptions?.manual));
   },
@@ -443,10 +532,21 @@ export const actions = {
     }
   },
   setTraderLevel(this: UserState, traderId: string, level: number) {
-    updateObjective(this, 'traders', traderId, { level: Math.max(1, level) });
+    setTraderLoyalty(this, traderId, Math.max(1, level), false);
   },
-  setTraderReputation(this: UserState, traderId: string, reputation: number) {
-    updateObjective(this, 'traders', traderId, { reputation: reputation });
+  setTraderLoyaltyAuto(this: UserState, traderId: string) {
+    setTraderLoyalty(this, traderId, getCurrentData(this).traders[traderId]?.level ?? 1, true);
+  },
+  correctTraderReputation(this: UserState, traderId: string, reputation: number) {
+    setTraderReputation(this, traderId, reputation);
+  },
+  setQuestReputationTracking(
+    this: UserState,
+    traderId: string,
+    reputation: number,
+    trackRewards: boolean
+  ) {
+    setTraderReputation(this, traderId, reputation, trackRewards ? 'new-only' : 'paused');
   },
   setSkillLevel(this: UserState, skillName: string, level: number) {
     const currentData = getCurrentData(this);

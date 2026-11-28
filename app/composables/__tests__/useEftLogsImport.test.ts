@@ -6,8 +6,6 @@ import * as logFileReader from '@/utils/eftLogFileReader';
 import { EftLogImportBudgetError } from '@/utils/eftLogImportBudget';
 import type { Task } from '@/types/tarkov';
 import type { GameMode } from '@/utils/constants';
-const preferences = { getTasksRequireTraderLevels: true };
-vi.mock('@/stores/usePreferences', () => ({ usePreferencesStore: () => preferences }));
 const metadataStore: { tasks: Task[] } = {
   tasks: [{ id: '61604635c725987e815b1a46' }],
 };
@@ -17,13 +15,14 @@ const tarkovStore = {
   getTraderLevel: vi.fn(() => 1),
   getTraderReputation: vi.fn(() => 0),
   setTraderLevel: vi.fn(),
-  setTraderReputation: vi.fn(),
+  correctTraderReputation: vi.fn(),
   getObjectiveCount: vi.fn(() => 0),
   getCurrentGameMode: vi.fn<() => GameMode>(() => 'pvp'),
   getCurrentProgressData: vi.fn(() => ({ taskCompletions: {} })),
   isTaskComplete: vi.fn(() => false),
   setObjectiveCount: vi.fn(),
   setTaskComplete: vi.fn(),
+  recordEftQuestCompletionTime: vi.fn(),
   setTaskFailed: vi.fn(),
   setTaskObjectiveComplete: vi.fn(),
   setTaskObjectiveUncomplete: vi.fn(),
@@ -153,6 +152,15 @@ describe('useEftLogsImport', () => {
     expect(importer.importState.value).toBe('success');
     expect(tarkovStore.saveProgressNow).toHaveBeenCalledTimes(2);
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledOnce();
+  });
+  it('records the historical completion time even without a standing correction on this device', async () => {
+    const importer = await loadComposable();
+    await importer.parseFile(new File([completionLog()], 'notifications.log'));
+    await importer.confirmImport('pvp');
+    expect(tarkovStore.recordEftQuestCompletionTime).toHaveBeenCalledExactlyOnceWith(
+      '61604635c725987e815b1a46',
+      expect.any(Number)
+    );
   });
   it('discards results from a log read that outlives its progress owner', async () => {
     const importer = await loadComposable();
@@ -592,8 +600,43 @@ describe('useEftLogsImport', () => {
     expect(tarkovStore.setTaskComplete).toHaveBeenNthCalledWith(2, completedTaskId);
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledTimes(2);
     expect(tarkovStore.setTaskObjectiveComplete).toHaveBeenCalledWith('obj-prerequisite');
+    const completionTime = Date.parse('2026-02-21T10:14:24.222Z');
+    expect(tarkovStore.recordEftQuestCompletionTime).toHaveBeenCalledWith(
+      prerequisiteTaskId,
+      completionTime
+    );
+    expect(tarkovStore.recordEftQuestCompletionTime).toHaveBeenCalledWith(
+      completedTaskId,
+      completionTime
+    );
     expect(tarkovStore.setObjectiveCount).toHaveBeenCalledWith('obj-prerequisite', 2);
     expect(composable.importState.value).toBe('success');
+  });
+  it('dates an already completed direct prerequisite without rewriting its progress', async () => {
+    const prerequisiteTaskId = '5ac2426c86f774138762edfe';
+    const completedTaskId = '61604635c725987e815b1a46';
+    metadataStore.tasks = [
+      { id: prerequisiteTaskId, objectives: [{ id: 'obj-prerequisite' }] },
+      {
+        id: completedTaskId,
+        taskRequirements: [{ task: { id: prerequisiteTaskId }, status: ['Complete'] }],
+      },
+    ];
+    tarkovStore.getCurrentProgressData.mockReturnValue({
+      taskCompletions: { [prerequisiteTaskId]: { complete: true, failed: false } },
+    });
+    const composable = await loadComposable();
+    await composable.parseFile(
+      new File([completionLog(completedTaskId)], 'notifications.log', { type: 'text/plain' })
+    );
+    await composable.confirmImport('pvp');
+    expect(composable.importState.value).toBe('success');
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledExactlyOnceWith(completedTaskId);
+    expect(tarkovStore.setTaskObjectiveComplete).not.toHaveBeenCalledWith('obj-prerequisite');
+    expect(tarkovStore.recordEftQuestCompletionTime).toHaveBeenCalledWith(
+      prerequisiteTaskId,
+      Date.parse('2026-02-21T10:14:24.222Z')
+    );
   });
   it('does not infer a quest route from missing story progress', async () => {
     const prerequisiteTaskId = '5ac2426c86f774138762edfe';
@@ -1129,7 +1172,7 @@ describe('missing configured trader-unlock recovery', () => {
         tarkovStore.setTaskUncompleted,
         tarkovStore.setLevel,
         tarkovStore.setTraderLevel,
-        tarkovStore.setTraderReputation,
+        tarkovStore.correctTraderReputation,
         tarkovStore.setStoryObjectiveComplete,
       ])
         expect(method).not.toHaveBeenCalled();
@@ -1248,10 +1291,9 @@ describe('restart semantics', () => {
     expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(id);
   });
 });
-describe('trader gating preference during import', () => {
-  it.each([false, true])('respects trader gating = %s in the destination', async (enabled) => {
+describe('standing during import', () => {
+  it('recovers a gated quest in the destination without writing inferred standing', async () => {
     vi.clearAllMocks();
-    preferences.getTasksRequireTraderLevels = enabled;
     const id = '61604635c725987e815b1a46';
     metadataStore.tasks = [
       {
@@ -1276,13 +1318,9 @@ describe('trader gating preference during import', () => {
       },
     ] as Task[];
     let current: GameMode = 'pvp';
-    const writtenModes: GameMode[] = [];
     tarkovStore.getCurrentGameMode.mockImplementation(() => current);
     tarkovStore.switchGameMode.mockImplementation(async (mode) => {
       current = mode;
-    });
-    tarkovStore.setTraderLevel.mockImplementation(() => {
-      writtenModes.push(current);
     });
     tarkovStore.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
     const importer = await loadComposable();
@@ -1292,11 +1330,10 @@ describe('trader gating preference during import', () => {
     ]);
     await importer.confirmImport('pvp');
     expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(id);
-    expect(tarkovStore.setLevel).toHaveBeenCalledWith(5);
-    expect(tarkovStore.setTraderLevel).toHaveBeenCalledTimes(enabled ? 1 : 0);
-    expect(tarkovStore.setTraderReputation).toHaveBeenCalledTimes(enabled ? 1 : 0);
-    expect(writtenModes).toEqual(enabled ? ['pve'] : []);
+    expect(tarkovStore.switchGameMode.mock.calls).toEqual([['pve'], ['pvp']]);
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+    expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
+    expect(tarkovStore.correctTraderReputation).not.toHaveBeenCalled();
     expect(current).toBe('pvp');
-    preferences.getTasksRequireTraderLevels = true;
   });
 });

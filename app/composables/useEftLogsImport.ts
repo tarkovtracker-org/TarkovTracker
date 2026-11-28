@@ -1,7 +1,6 @@
 import { useProgressImportClaim } from '@/composables/useGameModeSwitch';
 import { captureStartupOwnership } from '@/stores/tarkov/startupOwnership';
 import { useMetadataStore } from '@/stores/useMetadata';
-import { usePreferencesStore } from '@/stores/usePreferences';
 import { useTarkovStore } from '@/stores/useTarkov';
 import {
   configuredTraderUnlockTaskIds,
@@ -26,6 +25,7 @@ import {
   hasOutsideSeasonEvents,
   isEligibleImportEvent,
   isEftQuestEvidenceLogFileName,
+  knownQuestEventTime,
   parseEftLogsForQuestImport,
   UNKNOWN_LOG_VERSION,
   type EftParsedLogFile,
@@ -38,8 +38,6 @@ import { importedAcceptanceSignature } from '@/utils/shiftingBalanceAcceptance';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import {
   applyTaskAvailabilityRequirements,
-  applyTaskTraderRequirements,
-  ensureTaskMinPlayerLevel,
   completeTaskForProgress,
   failTaskForProgress,
   recordImpliedStoryObjectives,
@@ -143,6 +141,7 @@ function selectDefaultIncludedVersions(availableVersions: string[]): string[] {
 type ImportTaskIds = Record<GameMode, Set<string>>;
 type ImportTaskSets = {
   completed: ImportTaskIds;
+  completedAt: Record<GameMode, Map<string, number>>;
   started: ImportTaskIds;
   failed: ImportTaskIds;
 };
@@ -156,38 +155,43 @@ const buildImportTaskSets = (
   selection: EftLogImportSelection
 ): ImportTaskSets => {
   const create = (): ImportTaskIds => ({ pvp: new Set(), pve: new Set(), seasonal: new Set() });
-  const sets = { completed: create(), started: create(), failed: create() };
+  const completedAt: ImportTaskSets['completedAt'] = {
+    pvp: new Map(),
+    pve: new Map(),
+    seasonal: new Map(),
+  };
+  const sets = { completed: create(), started: create(), failed: create(), completedAt };
   for (const event of selectEftImportEvents(preview.events, selection, targetMode)) {
     if (!isEligibleImportEvent(event)) continue;
     sets[event.status][event.mode].add(event.questId);
+    const time = knownQuestEventTime(event);
+    if (event.status === 'completed' && time !== null)
+      completedAt[event.mode].set(event.questId, time);
   }
-  return { completed: sets.completed, started: sets.started, failed: sets.failed };
-};
-const applyImportedTaskRequirements = (
-  store: ReturnType<typeof useTarkovStore>,
-  task: Task,
-  requireTraders: boolean
-) => {
-  ensureTaskMinPlayerLevel(store, task);
-  if (requireTraders) applyTaskTraderRequirements({ store, task });
-  recordImpliedStoryObjectives(store, task);
+  return sets;
 };
 /** Applies completion requirements without overriding explicit imported states or existing completions. */
 const applyCompletedImports = (
   store: ReturnType<typeof useTarkovStore>,
   tasksMap: Map<string, Task>,
   completedTaskIds: Set<string>,
-  explicitOtherStates: Set<string>,
-  requireTraders: boolean
+  completedAt: ReadonlyMap<string, number>,
+  explicitOtherStates: Set<string>
 ) => {
   const processedCompleted = new Set<string>();
   const processedFailed = new Set<string>();
-  const completeTask = (taskId: string) => {
+  const recordCompletionTime = (taskId: string, latestPossibleCompletion?: number) => {
+    const observedAt = completedAt.get(taskId) ?? latestPossibleCompletion;
+    if (observedAt !== undefined && !explicitOtherStates.has(taskId))
+      store.recordEftQuestCompletionTime(taskId, observedAt);
+  };
+  const completeTask = (taskId: string, latestPossibleCompletion?: number) => {
     const task = tasksMap.get(taskId);
     if (!task) return;
     if (processedCompleted.has(taskId) || explicitOtherStates.has(taskId)) return;
+    recordImpliedStoryObjectives(store, task);
     completeTaskForProgress({ store, taskId, tasksMap });
-    applyImportedTaskRequirements(store, task, requireTraders);
+    recordCompletionTime(taskId, latestPossibleCompletion);
     processedCompleted.add(taskId);
   };
   const failTask = (taskId: string) => {
@@ -199,14 +203,19 @@ const applyCompletedImports = (
     failTaskForProgress({ store, taskId, tasksMap });
     processedFailed.add(taskId);
   };
-  for (const taskId of completedTaskIds) {
+  const datedFirst = [...completedTaskIds].toSorted(
+    (left, right) => (completedAt.get(left) ?? Infinity) - (completedAt.get(right) ?? Infinity)
+  );
+  for (const taskId of datedFirst) {
     const task = tasksMap.get(taskId);
+    const observedAt = completedAt.get(taskId);
     if (task) {
       applyTaskAvailabilityRequirements({
         getCompletion: (id) => store.getCurrentProgressData().taskCompletions?.[id],
         // A completion log does not identify which OR route the player used.
         skipTaskRequirements: Boolean(task.storyUnlocks?.length),
-        onCompleteRequirement: completeTask,
+        onCompleteRequirement: (id) => completeTask(id, observedAt),
+        onSatisfiedCompletionRequirement: (id) => recordCompletionTime(id, observedAt),
         onFailRequirement: failTask,
         task,
       });
@@ -261,7 +270,6 @@ const applyModeImports = async (
   activeMode: GameMode,
   taskSets: ImportTaskSets,
   onModeSwitched: (mode: GameMode) => void,
-  requireTraders: boolean,
   ownsSession: () => boolean
 ): Promise<GameMode> => {
   const tasksMap = new Map((catalogs.get(mode) ?? []).map((task) => [task.id, task]));
@@ -282,12 +290,15 @@ const applyModeImports = async (
     store,
     tasksMap,
     completed,
-    new Set([...started, ...failed]),
-    requireTraders
+    taskSets.completedAt[mode],
+    new Set([...started, ...failed])
   );
   // Only explicit, mode-allowlisted completions may recover without metadata. Do not infer gates or objectives.
   completed.forEach((id) => {
-    if (!tasksMap.has(id)) store.setTaskComplete(id);
+    if (tasksMap.has(id)) return;
+    store.setTaskComplete(id);
+    const observedAt = taskSets.completedAt[mode].get(id);
+    if (observedAt !== undefined) store.recordEftQuestCompletionTime(id, observedAt);
   });
   applyFailedImports(store, tasksMap, failed);
   applyStartedImports(store, tasksMap, completed, started);
@@ -315,7 +326,6 @@ const applyAllModeImports = async (
   catalogs: Map<GameMode, Task[]>,
   originalMode: GameMode,
   taskSets: ImportTaskSets,
-  requireTraders: boolean,
   ownsSession: () => boolean
 ): Promise<{ activeMode: GameMode; error: unknown }> => {
   let activeMode = originalMode;
@@ -332,7 +342,6 @@ const applyAllModeImports = async (
         activeMode,
         taskSets,
         trackMode,
-        requireTraders,
         ownsSession
       );
     }
@@ -351,7 +360,6 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
   const { t } = useI18n({ useScope: 'global' });
   const metadataStore = useMetadataStore();
   const tarkovStore = useTarkovStore();
-  const preferencesStore = usePreferencesStore();
   const claimImport = useProgressImportClaim();
   const isImporting = ref(false);
   const needsSaveRetry = ref(false);
@@ -628,7 +636,6 @@ export function useEftLogsImport(): UseEftLogsImportReturn {
       catalogs,
       originalMode,
       taskSets,
-      preferencesStore.getTasksRequireTraderLevels,
       ownsSession
     );
     if (!ownsSession()) return;

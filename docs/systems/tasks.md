@@ -207,14 +207,34 @@ reward-derived unlock tasks. Any completed unlock task opens that trader. It nev
 that recorded progress or [EFT import](imports.md#eft-log-import) may satisfy. Ref uses only
 the current mode's ID. Missing catalog data explains a blocker without exposing a raw ID.
 
-Completion/availability and EFT completion share trader lower-bound implications. Never
-reduce loyalty/reputation or infer upper-bound, inequality or strict reputation increments.
+Explicit Mark available and guided setup can record trader lower-bound implications. Never
+infer upper-bound, inequality or strict reputation increments from those actions.
 Strict integer loyalty advances one level. A built hideout module stays built when current
 or a lower valid loyalty satisfies an equality/upper-bound gate. Lower-bound downgrades can
-revoke a build. Disabled trader gating bypasses both checks. EFT trader implications honor
-the preference captured at confirmation. Quest completion and level implications still apply.
+revoke a build. Disabled trader gating bypasses both checks. Ordinary quest completion and
+EFT imports do not save inferred PMC level or trader standing, so undo can reverse the
+quest's standing changes without leaving a new saved minimum.
 EFT cannot infer the quest branch from a completion with a story alternative. Tarkov.dev
 profile import has no quest-completion backfill.
+
+Personal quest gates and dashboard trader cards use standing derived from successful task IDs
+in the selected run. Finish rewards add signed reputation to each named recipient. Repeated
+completions contribute once, and undo removes the contribution. A manual reputation edit
+captures the completed IDs already included in that standing. Existing saved standing is
+captured at account startup or before the next local quest change. Dated EFT completions earlier
+than an explicit standing correction are treated as already included, including when the log
+and the correction were recorded on different devices. An undated or newer
+completion contributes when first recovered. Players can turn off quest reputation for a
+trader and edit the held value directly. Re-enabling applies future quest changes, and later
+reputation edits retain the distinction between quests completed before and after resuming.
+
+In Auto, standard trader loyalty uses the highest catalog tier whose PMC level and reputation
+are met. It skips tiers with a nonzero commerce requirement in the catalog since Tracker
+has no commerce progress to evaluate. Auto is the default when no loyalty has been saved.
+Existing saved loyalty stays manual until the player selects Auto. Manual loyalty and reputation
+can be set independently. Specialized traders keep their existing rules. Hideout reconciliation
+and public API reads use saved standing, so a change to the quest-derived estimate cannot
+revoke an existing build or change the public response contract.
 
 ### Presentation and ordering
 

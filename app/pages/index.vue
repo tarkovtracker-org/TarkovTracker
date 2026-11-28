@@ -161,8 +161,9 @@
     storyTraderUnlocks: traderStoryUnlocks.value,
     isStoryObjectiveComplete: tarkovStore.isStoryObjectiveComplete,
     isStoryChapterComplete: tarkovStore.isStoryChapterComplete,
-    getTraderLevel: tarkovStore.getTraderLevel,
-    getTraderReputation: tarkovStore.getTraderReputation,
+    getTraderLevel: (id: string) => tarkovStore.getCurrentProgressData()?.traders[id]?.level ?? 1,
+    getTraderReputation: (id: string) =>
+      tarkovStore.getCurrentProgressData()?.traders[id]?.reputation ?? 0,
   }));
   const metadataTasksLoaded = computed(() => metadataStore.tasks.length > 0);
   const tradersWithUnlock = computed(() =>

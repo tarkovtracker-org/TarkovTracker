@@ -150,10 +150,7 @@ export function useTaskActions(
   };
   const ensureTraderRequirements = (currentTask: Task) => {
     if (!preferencesStore.getTasksRequireTraderLevels) return;
-    applyTaskTraderRequirements({
-      store: tarkovStore,
-      task: currentTask,
-    });
+    applyTaskTraderRequirements({ store: tarkovStore, task: currentTask });
   };
   const isTaskManuallyFailed = (taskId: string) => {
     const completion = tarkovStore.getCurrentProgressData().taskCompletions?.[taskId];
@@ -195,8 +192,6 @@ export function useTaskActions(
       tasksMap: tasksMap.value,
     });
     unpinTaskIfPinned(currentTask.id);
-    ensureTaskMinPlayerLevel(tarkovStore, currentTask);
-    ensureTraderRequirements(currentTask);
     if (isUndo) {
       emitAction({
         taskId: currentTask.id,

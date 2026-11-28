@@ -62,10 +62,12 @@ export const useHideoutStationStatus = (): UseHideoutStationStatusReturn => {
       });
       return true;
     }
+    const standing = tarkovStore.getCurrentProgressData().traders[requirement.trader.id] ?? {
+      level: 1,
+      reputation: 0,
+    };
     const currentLevel =
-      requirement.requirementType === 'reputation'
-        ? tarkovStore.getTraderReputation(requirement.trader.id)
-        : tarkovStore.getTraderLevel(requirement.trader.id);
+      requirement.requirementType === 'reputation' ? standing.reputation : standing.level;
     return compareRequirement(currentLevel, requirement.compareMethod ?? '>=', requirement.value);
   };
   const arePrereqsMet = (nextLevel: HideoutLevel | null): boolean => {

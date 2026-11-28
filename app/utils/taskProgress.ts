@@ -39,7 +39,7 @@ type TaskTraderProgressStore = {
   getTraderLevel: (traderId: string) => number;
   getTraderReputation: (traderId: string) => number;
   setTraderLevel: (traderId: string, level: number) => void;
-  setTraderReputation: (traderId: string, reputation: number) => void;
+  correctTraderReputation: (traderId: string, reputation: number) => void;
 };
 const getPositiveObjectiveCount = (objective: TaskObjective) => {
   const count = objective.count ?? 0;
@@ -164,7 +164,7 @@ const applyTraderMinimum = (
   // Standing has no declared increment; do not invent a value above a strict bound.
   if (requirement.compareMethod === '>') return;
   if (store.getTraderReputation(requirement.trader.id) < requirement.value)
-    store.setTraderReputation(requirement.trader.id, requirement.value);
+    store.correctTraderReputation(requirement.trader.id, requirement.value);
 };
 export type StoryObjectiveRef = { chapterId: string; objectiveId: string };
 type StoryObjectiveStore = {
@@ -295,12 +295,14 @@ export function applyTaskAvailabilityRequirements(options: {
   getCompletion?: (taskId: string) => RawTaskCompletion;
   skipTaskRequirements?: boolean;
   onCompleteRequirement: (taskId: string) => void;
+  onSatisfiedCompletionRequirement?: (taskId: string) => void;
   onFailRequirement: (taskId: string) => void;
   task: Task;
 }): void {
   const {
     task,
     onCompleteRequirement,
+    onSatisfiedCompletionRequirement,
     onFailRequirement,
     getCompletion = () => undefined,
   } = options;
@@ -312,7 +314,11 @@ export function applyTaskAvailabilityRequirements(options: {
     const requirementTaskId = requiredTaskId(requirement);
     if (!requirementTaskId) return;
     handledRequirementTaskIds.add(requirementTaskId);
-    if (alreadyMeetsStatus(getCompletion(requirementTaskId), requirement.status)) return;
+    if (alreadyMeetsStatus(getCompletion(requirementTaskId), requirement.status)) {
+      if (completionOnlyRequirement(requirement))
+        onSatisfiedCompletionRequirement?.(requirementTaskId);
+      return;
+    }
     if (isFailedOnlyRequirement(requirement.status)) {
       onFailRequirement(requirementTaskId);
     } else if (completionOnlyRequirement(requirement)) {

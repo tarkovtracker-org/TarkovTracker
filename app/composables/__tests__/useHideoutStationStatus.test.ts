@@ -38,8 +38,14 @@ vi.mock('@/stores/useProgress', () => ({
 }));
 vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
-    getTraderReputation: () => 0.25,
-    getTraderLevel: (id: string) => mockState.traderLevels[id] ?? 0,
+    getCurrentProgressData: () => ({
+      traders: Object.fromEntries(
+        Object.entries(mockState.traderLevels).map(([id, level]) => [
+          id,
+          { level, reputation: 0.25 },
+        ])
+      ),
+    }),
   }),
 }));
 vi.mock('@/composables/useSkillCalculation', () => ({

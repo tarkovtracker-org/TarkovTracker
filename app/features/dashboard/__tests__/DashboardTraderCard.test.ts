@@ -9,11 +9,21 @@ import type { Trader, TraderLoyaltyLevel } from '@/types/tarkov';
 const mockState = reactive({
   traderLevel: 1,
   reputation: 0,
+  automaticLoyalty: false,
+  trackQuestReputation: true,
   locale: 'en',
 });
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
 const setTraderLevel = vi.fn((_id: string, value: number) => {
   mockState.traderLevel = value;
+  mockState.automaticLoyalty = false;
+});
+const setTraderLoyaltyAuto = vi.fn(() => {
+  mockState.automaticLoyalty = true;
+  mockState.traderLevel = 3;
+});
+const setQuestReputationTracking = vi.fn((_id: string, _reputation: number, enabled: boolean) => {
+  mockState.trackQuestReputation = enabled;
 });
 const setTraderReputation = vi.fn((_id: string, value: number) => {
   mockState.reputation = value;
@@ -38,8 +48,22 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => ({
     getTraderLevel: () => mockState.traderLevel,
     getTraderReputation: () => mockState.reputation,
+    getCurrentProgressData: () => ({
+      traders: {
+        prapor: {
+          level: mockState.traderLevel,
+          reputation: mockState.reputation,
+          automaticLoyalty: mockState.automaticLoyalty,
+          reputationCheckpoint: {
+            questRewardTracking: mockState.trackQuestReputation ? undefined : 'paused',
+          },
+        },
+      },
+    }),
     setTraderLevel,
-    setTraderReputation,
+    setTraderLoyaltyAuto,
+    setQuestReputationTracking,
+    correctTraderReputation: setTraderReputation,
   }),
 }));
 const mockTheme = {
@@ -57,6 +81,8 @@ describe('DashboardTraderCard', () => {
   beforeEach(() => {
     mockState.traderLevel = 1;
     mockState.reputation = 0;
+    mockState.automaticLoyalty = false;
+    mockState.trackQuestReputation = true;
     mockState.locale = 'en';
     mockTheme.themeMode = 'dark';
     document.documentElement.removeAttribute('data-theme');
@@ -218,48 +244,59 @@ describe('DashboardTraderCard', () => {
     mount(DashboardTraderEditor, {
       props: { trader },
       global: {
-        mocks: { $t: (key: string) => key },
+        mocks: {
+          $t: (key: string, params?: Record<string, number>) =>
+            [key, ...Object.values(params ?? {})].join(' '),
+        },
         stubs: { UButton: true },
       },
     });
-  it('commits loyalty immediately and raises reputation before applying the new level', async () => {
+  it('switches between a manual level and Auto without changing reputation', async () => {
     const editor = createEditor();
-    const summary = createWrapper();
-    await editor.get('select').setValue('2');
-    expect(setTraderReputation).toHaveBeenCalledWith('prapor', 0.2);
+    const select = editor.get('select');
+    expect(select.element.value).toBe('1');
+    await select.setValue('auto');
+    expect(setTraderLoyaltyAuto).toHaveBeenCalledWith('prapor');
+    expect(select.get('option[value="auto"]').text()).toContain('loyalty_auto_level 3');
+    await select.setValue('2');
     expect(setTraderLevel).toHaveBeenCalledWith('prapor', 2);
-    expect(setTraderReputation.mock.invocationCallOrder[0]).toBeLessThan(
-      setTraderLevel.mock.invocationCallOrder[0]!
-    );
-    expect(summary.get('button').text()).toContain('reputation_short 0.20');
-    expect(editor.get('[role="status"]').text()).toContain('rep_raised 0.20');
+    expect(setTraderReputation).not.toHaveBeenCalled();
+    expect(select.element.value).toBe('2');
   });
-  it('preserves sufficient reputation when changing loyalty and rejects lower edits on blur', async () => {
+  it('allows a manual reputation correction below the selected loyalty tier threshold', async () => {
     mockState.reputation = 0.6;
     const editor = createEditor();
     await editor.get('select').setValue('3');
     expect(setTraderReputation).not.toHaveBeenCalled();
-    const rep = editor.get('input');
+    const rep = editor.get<HTMLInputElement>('input[type="text"]');
     await rep.setValue('0.34');
     await rep.trigger('blur');
-    expect(rep.attributes('aria-invalid')).toBe('true');
-    expect(setTraderReputation).not.toHaveBeenCalled();
-    await rep.setValue('0,42');
-    await rep.trigger('blur');
-    expect(setTraderReputation).toHaveBeenCalledWith('prapor', 0.42);
+    expect(setTraderReputation).toHaveBeenCalledWith('prapor', 0.34);
     expect(rep.attributes('aria-invalid')).toBe('false');
+  });
+  it('pauses and resumes quest reputation at the displayed value', async () => {
+    mockState.reputation = 0.45;
+    const editor = createEditor();
+    const tracking = editor.get<HTMLInputElement>('input[type="checkbox"]');
+    expect(tracking.element.checked).toBe(true);
+    await tracking.setValue(false);
+    await tracking.setValue(true);
+    expect(setQuestReputationTracking.mock.calls).toEqual([
+      ['prapor', 0.45, false],
+      ['prapor', 0.45, true],
+    ]);
   });
   it('supports signed Scav Karma without a loyalty selector', async () => {
     const editor = createEditor({ ...baseTrader, id: 'fence', normalizedName: 'fence' });
     expect(editor.find('select').exists()).toBe(false);
-    const karma = editor.get('input');
+    const karma = editor.get<HTMLInputElement>('input[type="text"]');
     await karma.setValue('-0.25');
     await karma.trigger('blur');
     expect(setTraderReputation).toHaveBeenCalledWith('fence', -0.25);
   });
   it('updates an untouched focused field when reputation syncs and skips the blur write', async () => {
     const editor = createEditor();
-    const rep = editor.get('input');
+    const rep = editor.get<HTMLInputElement>('input[type="text"]');
     await rep.trigger('focus');
     mockState.reputation = 0.5;
     await editor.vm.$nextTick();
@@ -269,7 +306,7 @@ describe('DashboardTraderCard', () => {
   });
   it('preserves a changed draft through sync and commits it when focus leaves', async () => {
     const editor = createEditor();
-    const rep = editor.get('input');
+    const rep = editor.get<HTMLInputElement>('input[type="text"]');
     await rep.trigger('focus');
     await rep.setValue('0.70');
     mockState.reputation = 0.5;
@@ -281,7 +318,7 @@ describe('DashboardTraderCard', () => {
   it('avoids a write for equivalent input, even when reputation synced during editing', async () => {
     mockState.reputation = 0.2;
     const editor = createEditor();
-    const rep = editor.get('input');
+    const rep = editor.get<HTMLInputElement>('input[type="text"]');
     await rep.setValue('0,2');
     mockState.reputation = 0.5;
     await editor.vm.$nextTick();
@@ -297,11 +334,11 @@ describe('DashboardTraderCard', () => {
     const editor = createEditor();
     const status = editor.get('[role="status"]');
     await editor.get('select').setValue('2');
-    expect(status.text()).toBe('page.dashboard.traders.rep_raised 0.20');
+    expect(status.text()).toBe('page.dashboard.traders.standing_saved');
     mockState.locale = 'de';
     await editor.vm.$nextTick();
-    expect(status.text()).toBe('de page.dashboard.traders.rep_raised 0.20');
-    const rep = editor.get('input');
+    expect(status.text()).toBe('de page.dashboard.traders.standing_saved');
+    const rep = editor.get<HTMLInputElement>('input[type="text"]');
     await rep.setValue('0.50');
     await rep.trigger('blur');
     expect(status.text()).toBe('de page.dashboard.traders.standing_saved');

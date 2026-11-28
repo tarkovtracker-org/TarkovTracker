@@ -41,7 +41,7 @@ const createTarkovStore = (options: {
     getTraderLevel: vi.fn((traderId: string) => options.traderLevels?.[traderId] ?? 1),
     setTraderLevel: vi.fn(),
     getTraderReputation: vi.fn((traderId: string) => options.traderReputations?.[traderId] ?? 0),
-    setTraderReputation: vi.fn(),
+    correctTraderReputation: vi.fn(),
     isTaskComplete: vi.fn((taskId: string) => {
       if (typeof options.isTaskComplete === 'function') {
         return options.isTaskComplete(taskId);
@@ -535,7 +535,7 @@ describe('useTaskActions', () => {
     expect(tarkovStore.setTaskFailed).toHaveBeenCalledWith('task-alt');
     expect(tarkovStore.setTaskObjectiveUncomplete).toHaveBeenCalledWith('obj-alt');
     expect(tarkovStore.setObjectiveCount).toHaveBeenCalledWith('obj-alt', 0);
-    expect(tarkovStore.setLevel).toHaveBeenCalledWith(5);
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
     expect(onAction).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'complete', taskId: 'task-main' })
     );
@@ -584,6 +584,25 @@ describe('useTaskActions', () => {
       expect.objectContaining({ action: 'available', taskId: 'task-main' })
     );
   });
+  it('completes and uncompletes a quest without saving its inferred start standing', async () => {
+    const trader = { id: 'prapor', name: 'Prapor' };
+    const task: Task = {
+      id: 'trader-gated-quest',
+      minPlayerLevel: 20,
+      traderLevelRequirements: [{ id: 'll', trader, level: 2 }],
+      traderRequirements: [
+        { id: 'rep', trader, requirementType: 'reputation', compareMethod: '>=', value: 0.3 },
+      ],
+    };
+    const { actions, tarkovStore } = await setup(task, [task], {});
+    actions.markTaskComplete();
+    actions.markTaskUncomplete();
+    expect(tarkovStore.setTaskComplete).toHaveBeenCalledWith(task.id);
+    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id);
+    expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
+    expect(tarkovStore.correctTraderReputation).not.toHaveBeenCalled();
+    expect(tarkovStore.setLevel).not.toHaveBeenCalled();
+  });
   it('marks the Fence-gated Is This a Reference task available', async () => {
     const fenceId = '579dc571d53a0658a154fbec';
     const task: Task = {
@@ -607,7 +626,7 @@ describe('useTaskActions', () => {
       traders: [{ id: fenceId, name: 'Fence', normalizedName: 'fence' }],
     });
     actions.markTaskAvailable();
-    expect(tarkovStore.setTraderReputation).toHaveBeenCalledWith(fenceId, 1);
+    expect(tarkovStore.correctTraderReputation).toHaveBeenCalledWith(fenceId, 1);
   });
   it('backfills trader loyalty and positive reputation without lowering met values', async () => {
     const praporId = '54cb50c76803fa8b248b4571';
@@ -642,8 +661,7 @@ describe('useTaskActions', () => {
     actions.markTaskAvailable();
     expect(tarkovStore.setTraderLevel).toHaveBeenCalledWith(praporId, 2);
     expect(tarkovStore.setTraderLevel).not.toHaveBeenCalledWith(skierId, expect.any(Number));
-    expect(tarkovStore.setTraderReputation).toHaveBeenCalledWith(praporId, 0.5);
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalledWith(skierId, expect.any(Number));
+    expect(tarkovStore.correctTraderReputation).toHaveBeenCalledExactlyOnceWith(praporId, 0.5);
   });
   it('does not lower earned reputation to satisfy upper bounds', async () => {
     const fenceId = '579dc571d53a0658a154fbec';
@@ -672,8 +690,7 @@ describe('useTaskActions', () => {
       traders: [{ id: fenceId, name: 'Fence', normalizedName: 'fence' }],
     });
     actions.markTaskAvailable();
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalledWith(praporId, expect.any(Number));
+    expect(tarkovStore.correctTraderReputation).not.toHaveBeenCalled();
   });
   it('does not backfill trader requirements when gating is disabled', async () => {
     const fenceId = '579dc571d53a0658a154fbec';
@@ -704,7 +721,7 @@ describe('useTaskActions', () => {
     );
     actions.markTaskAvailable();
     expect(tarkovStore.setTraderLevel).not.toHaveBeenCalled();
-    expect(tarkovStore.setTraderReputation).not.toHaveBeenCalled();
+    expect(tarkovStore.correctTraderReputation).not.toHaveBeenCalled();
   });
   it('marks a task failed and invokes onAction', async () => {
     const task: Task = {

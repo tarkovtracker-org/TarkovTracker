@@ -358,6 +358,7 @@ interface MetadataState {
   tasksObjectivesPending: boolean;
   tasksObjectivesHydrated: boolean;
   tasksRewardsHydrated: boolean;
+  tasksRewardsGameMode: GameMode | null;
   hideoutLoading: boolean;
   itemsLoading: boolean;
   mapSpawnsLoading: boolean;
@@ -727,6 +728,7 @@ export const useMetadataStore = defineStore('metadata', {
     tasksObjectivesPending: false,
     tasksObjectivesHydrated: false,
     tasksRewardsHydrated: false,
+    tasksRewardsGameMode: null,
     hideoutLoading: false,
     itemsLoading: false,
     mapSpawnsLoading: false,
@@ -1892,6 +1894,7 @@ export const useMetadataStore = defineStore('metadata', {
           this.mergeTaskRewards(data.tasks, { rebuildDerivedData: false });
           this.hydrateTaskItems();
           this.tasksRewardsHydrated = true;
+          this.tasksRewardsGameMode = gameModeForApiMode(requestGameMode);
         },
         logName: 'Task rewards',
         forceRefresh,
@@ -2306,6 +2309,7 @@ export const useMetadataStore = defineStore('metadata', {
       this.tasksObjectivesError = null;
       this.tasksObjectivesHydrated = false;
       this.tasksRewardsHydrated = false;
+      this.tasksRewardsGameMode = null;
       this.objectiveModeCountDifferences = markRaw({});
       this.objectiveModeCountDifferencesHydrated = false;
       getPromiseStore(this).taskCatalogEpoch += 1;
@@ -2852,6 +2856,7 @@ export const useMetadataStore = defineStore('metadata', {
       this.tasksObjectivesError = null;
       this.tasksObjectivesHydrated = false;
       this.tasksRewardsHydrated = false;
+      this.tasksRewardsGameMode = null;
       this.mapSpawnsLoaded = false;
       this.mapSpawnsLoading = false;
       this.mapSpawnsError = null;

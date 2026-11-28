@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   confirmTaskAvailability: vi.fn(),
   setStoryObjectiveComplete: vi.fn(),
   setTraderReputation: vi.fn(),
+  correctTraderReputation: vi.fn(),
   setLevel: vi.fn(),
   requireTraderLevels: true,
   rewardsHydrated: true,
@@ -46,6 +47,7 @@ vi.mock('@/stores/useTarkov', () => ({
     getTraderLevel: () => 1,
     setTraderLevel: state.setTraderLevel,
     setTraderReputation: state.setTraderReputation,
+    correctTraderReputation: state.correctTraderReputation,
     isHideoutModuleComplete: () => false,
     setTaskUncompleted: (id: string) => {
       state.taskCompletions[id] = { complete: false, timestamp: 200 };
@@ -154,7 +156,8 @@ describe('SetupManualReview active quests', () => {
       ] as Task[];
       await saveActiveQuests('trader-quest');
       expect(state.setLevel).toHaveBeenCalledWith(12);
-      expect(state.setTraderReputation.mock.calls).toEqual(
+      expect(state.setTraderReputation).not.toHaveBeenCalled();
+      expect(state.correctTraderReputation.mock.calls).toEqual(
         requireTraderLevels ? [['prapor', 0.25]] : []
       );
     }

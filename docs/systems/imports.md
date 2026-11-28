@@ -375,6 +375,10 @@ Explicit failure notifications use the persistent manual-failure flag so automat
 discard them when a triggering quest is missing from the logs. Existing completed tracker tasks
 are preserved. Inferred prerequisite completions only write task IDs present in the destination
 catalog; explicit imported completion states remain authoritative. Catalogs share metadata hydration's task-qualified duplicate-objective IDs.
+Recovered quest completions contribute signed quest reputation. Inferred prerequisites use the
+dated completion that proves them as their latest possible completion time, including direct
+requirements already marked complete. The import does not persist player level or trader standing
+inferred from a quest's starting requirements.
 All destination catalogs are loaded before mutations, without changing the active metadata store.
 An explicit completion notification can also recover a catalog-missing task whose exact ID is
 configured to unlock a trader in that destination mode. This completion-only allowlist comes from
@@ -454,8 +458,8 @@ Use privacy-normalized fixtures. Never commit raw logs. An October 2026 sample t
   quests nor assigns the importing user's prestige. Do not infer reset boundaries from build
   versions or a profile ID changing between modes.
 
-Completed-task imports restore objectives and may infer prerequisite states, minimum level/trader
-requirements, and story gates. They do not provide exact self XP, skill snapshots, partial objective
-handovers, or hideout progress. Missing history remains missing. If combining log and profile
+Completed-task imports restore objectives and may infer prerequisite states and story gates.
+They do not provide exact self XP, skill snapshots, partial objective handovers, or hideout
+progress. Missing history remains missing. If combining log and profile
 imports, apply the selected logs first, then a refreshed matching profile to align level/skills to
 that snapshot. The profile importer derives and saves the level from cumulative profile XP.

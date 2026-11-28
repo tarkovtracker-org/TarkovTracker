@@ -35,7 +35,7 @@ const createStore = (
     setTaskObjectiveUncomplete: vi.fn(),
     setTaskUncompleted: vi.fn(),
     setTraderLevel: vi.fn(),
-    setTraderReputation: vi.fn(),
+    correctTraderReputation: vi.fn(),
   };
 };
 const createTasksMap = (...tasks: Task[]) => new Map(tasks.map((task) => [task.id, task]));
@@ -194,8 +194,8 @@ describe('task progress requirements', () => {
     applyTaskTraderRequirements({ store, task });
     expect(store.setTraderLevel).toHaveBeenCalledTimes(1);
     expect(store.setTraderLevel).toHaveBeenCalledWith('fence', 2);
-    expect(store.setTraderReputation).toHaveBeenCalledTimes(1);
-    expect(store.setTraderReputation).toHaveBeenCalledWith('therapist', 0.5);
+    expect(store.correctTraderReputation).toHaveBeenCalledTimes(1);
+    expect(store.correctTraderReputation).toHaveBeenCalledWith('therapist', 0.5);
   });
   it('applies each requirement task once with failure taking precedence', () => {
     const onCompleteRequirement = vi.fn();
@@ -234,6 +234,6 @@ describe('task progress requirements', () => {
         ],
       },
     });
-    expect(store.setTraderReputation).not.toHaveBeenCalled();
+    expect(store.correctTraderReputation).not.toHaveBeenCalled();
   });
 });
