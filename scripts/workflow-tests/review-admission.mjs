@@ -5,9 +5,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { countApiCalls } from './helpers/api-count.mjs';
 import { fixture as automationFixture } from './helpers/automation-fixture.mjs';
 import { jobBlock, permissionsBlock, workflowStep } from './helpers/workflow-blocks.mjs';
-import { countApiCalls } from './helpers/api-count.mjs';
 const {
   activeQueueGroup,
   admissionRun,
@@ -3575,6 +3575,60 @@ test('captured CodeRabbit issue-comment completion admits only its exact reviewe
     commit: head,
     kind: 'issue-comment',
   });
+});
+const cleanReviewStatus = 'No actionable comments were generated in the recent review.';
+function splitStatusCommentFixture() {
+  const f = commentReviewFixture();
+  const status = [
+    '<!-- recent_review_status_start -->',
+    '',
+    cleanReviewStatus,
+    '',
+    '<!-- recent_review_status_end -->',
+  ].join('\n');
+  f.comments[0].body = status + '\n' + f.comments[0].body.replace(cleanReviewStatus + ' 🎉\n', '');
+  return f;
+}
+test('CodeRabbit split status admits a clean exact-head review without an admin attestation', () => {
+  const f = splitStatusCommentFixture();
+  assert.deepEqual(admissionDecision(f).review, {
+    provider: 'CodeRabbit',
+    reviewId: codeRabbitComment.id,
+    commit: head,
+    kind: 'issue-comment',
+  });
+});
+test('CodeRabbit split status still rejects stale, dirty, or ambiguous evidence', () => {
+  const statusStart = '<!-- recent_review_status_start -->';
+  const statusEnd = '<!-- recent_review_status_end -->';
+  const mutations = {
+    'missing status end': (body) => body.replace(statusEnd, ''),
+    'duplicate status': (body) =>
+      body + '\n' + body.slice(0, body.indexOf(statusEnd) + statusEnd.length),
+    'missing recent review section': (body) => body.replace('<!-- recent_review_start -->', ''),
+    'added status content': (body) =>
+      body.replace(cleanReviewStatus, cleanReviewStatus + ' Pending verification.'),
+    'quoted status': (body) => body.replace(statusStart, '> ' + statusStart),
+    'fenced status': (body) => '```\n' + body.replace(statusEnd, statusEnd + '\n```'),
+    'stale source': (body) =>
+      body.replace('"sourceCommitId":"' + head, '"sourceCommitId":"' + base),
+    'stale coverage': (body) =>
+      body.replace('"coveredCommitId":"' + head, '"coveredCommitId":"' + base),
+    'inherited coverage': (body) => body.replace('"kind":"reviewed"', '"kind":"inherited"'),
+    'actionable findings': (body) => body + '\n**Actionable comments posted: 1**',
+    'review pending': (body) => body + '\n<!-- review_in_progress_start -->',
+    'conflicting risk': (body) => body + '\nMerge Risk: High',
+  };
+  for (const [name, mutate] of Object.entries(mutations)) {
+    const f = splitStatusCommentFixture();
+    f.comments[0].body = mutate(f.comments[0].body);
+    assert.throws(() => admissionDecision(f), /Completed exact-head independent review/, name);
+  }
+});
+test('CodeRabbit does not fall back to legacy clean text when the split status is malformed', () => {
+  const f = commentReviewFixture();
+  f.comments[0].body = '<!-- recent_review_status_start -->\n' + f.comments[0].body;
+  assert.throws(() => admissionDecision(f), /Completed exact-head independent review/);
 });
 test('CodeRabbit comment identity, completion and unambiguous coverage fail closed', () => {
   const mutations = [

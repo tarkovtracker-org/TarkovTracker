@@ -1,5 +1,6 @@
 // GitHub-authenticated issue comments, not PR text or an Actions status, own this evidence.
 const BOT_ID = 136622811;
+const CLEAN_REVIEW = 'No actionable comments were generated in the recent review.';
 function providerIdentity(user = {}) {
   return [user?.id === BOT_ID, user?.type === 'Bot', user?.login === 'coderabbitai[bot]'].every(
     Boolean
@@ -136,14 +137,20 @@ function consistentRisk(body) {
       /\bMinimal\b/.test(statement) && !/\b(?:High|Medium|Low|Critical|Unknown)\b/i.test(statement)
   );
 }
+function hasCleanRecentReview(text) {
+  const recent = uniqueSection(text, 'recent_review');
+  if (recent === null) return false;
+  // A partial split status must not fall back to older inline completion text.
+  if (/<!-- recent_review_status_(?:start|end) -->/.test(text)) {
+    return uniqueSection(text, 'recent_review_status')?.trim() === CLEAN_REVIEW;
+  }
+  return recent.trimStart().startsWith(CLEAN_REVIEW + ' 🎉\n');
+}
 function completed(body, head) {
   const text = withoutCode(body);
-  const recent = uniqueSection(text, 'recent_review');
   const risk = uniqueSection(text, 'final_review_risk');
   return [
-    recent
-      ?.trimStart()
-      .startsWith('No actionable comments were generated in the recent review. 🎉\n'),
+    hasCleanRecentReview(text),
     body.split('**Merge Risk:**').length === 2,
     consistentRisk(body),
     minimalRisk(risk ?? ''),
