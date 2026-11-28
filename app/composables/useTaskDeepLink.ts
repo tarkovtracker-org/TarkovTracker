@@ -24,7 +24,6 @@ export interface UseTaskDeepLinkReturn {
   highlightObjective: (objectiveId: string) => Promise<void>;
   cleanup: () => void;
 }
-type TaskStatus = 'available' | 'locked' | 'completed' | 'failed';
 export function useTaskDeepLink({
   filteredTasks,
   leafletMapRef,
@@ -37,7 +36,7 @@ export function useTaskDeepLink({
   const progressStore = useProgressStore();
   const { trackFocusedTaskVisible } = useDashboardFocusAnalytics();
   const { tasks } = storeToRefs(metadataStore);
-  const { tasksCompletions, unlockedTasks, tasksFailed } = storeToRefs(progressStore);
+  const { unlockedTasks } = storeToRefs(progressStore);
   const pinnedTaskId = ref<string | null>(null);
   const highlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
   const objectiveHighlightTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
@@ -49,14 +48,13 @@ export function useTaskDeepLink({
     pinnedTaskId.value = null;
   };
   const lightkeeperTraderId = computed(() => metadataStore.getTraderByName('lightkeeper')?.id);
-  const getTaskStatus = (taskId: string): TaskStatus => {
-    const isFailed = tasksFailed.value?.[taskId]?.['self'] ?? false;
-    if (isFailed) return 'failed';
-    const isCompleted = tasksCompletions.value?.[taskId]?.['self'] ?? false;
-    if (isCompleted) return 'completed';
-    const isUnlocked = unlockedTasks.value?.[taskId]?.['self'] ?? false;
-    if (isUnlocked) return 'available';
-    return 'locked';
+  const linkedTaskStatus = (taskId: string) => {
+    const userView = preferencesStore.getTaskUserView;
+    // Teammates may have different statuses, so the aggregate view must include every status.
+    if (userView === 'all') return 'all';
+    const status = progressStore.getTaskStatus(userView, taskId);
+    if (status !== 'incomplete') return status;
+    return unlockedTasks.value[taskId]?.[userView] ? 'available' : 'locked';
   };
   const highlightTask = (taskElement: HTMLElement) => {
     taskElement.classList.add(
@@ -235,7 +233,7 @@ export function useTaskDeepLink({
       }
       const currentSecondaryView = preferencesStore.getTaskSecondaryView;
       if (currentSecondaryView !== 'all') {
-        const status = getTaskStatus(taskId);
+        const status = linkedTaskStatus(taskId);
         if (currentSecondaryView !== status) {
           preferencesStore.setTaskSecondaryView(status);
         }

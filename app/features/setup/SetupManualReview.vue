@@ -363,7 +363,7 @@
     questCompletions.value.forEach((id) =>
       completeTaskForProgress({ store: tarkov, taskId: id, tasksMap: allTasks.value })
     );
-    active.forEach((id) => tarkov.setTaskUncompleted(id));
+    active.forEach((id) => tarkov.setTaskActive(id));
     const completions = tarkov.getCurrentProgressData().taskCompletions;
     active.forEach((id) => {
       const task = allTasks.value.get(id);

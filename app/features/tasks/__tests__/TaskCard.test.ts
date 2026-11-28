@@ -6,6 +6,7 @@ import { nextTick, reactive } from 'vue';
 import TaskCard from '@/features/tasks/TaskCard.vue';
 import TaskCardAlternatives from '@/features/tasks/TaskCardAlternatives.vue';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
+import type { TaskActionPayload } from '@/composables/useTaskActions';
 import type { TaskEvaluationMap } from '@/stores/taskAvailability';
 import type { UserProgressData } from '@/types/progress';
 import type { StoryChapter, Task } from '@/types/tarkov';
@@ -13,6 +14,7 @@ const en = JSON.parse(readFileSync('app/locales/en.json', 'utf8'));
 const resolveEn = (key: string): unknown =>
   key.split('.').reduce<unknown>((value, part) => (value as Record<string, unknown>)?.[part], en);
 const taskState = reactive({
+  active: false,
   complete: false,
   failed: false,
 });
@@ -42,6 +44,7 @@ const tarkovStoreMock = {
   getPMCFaction: vi.fn(() => 'USEC'),
   getTraderLevel: vi.fn(() => 1),
   getTraderReputation: vi.fn(() => 0),
+  isTaskActive: vi.fn(() => taskState.active),
   isTaskComplete: vi.fn(() => taskState.complete),
   isTaskFailed: vi.fn(() => taskState.failed),
   isTaskObjectiveComplete: vi.fn(() => false),
@@ -67,12 +70,15 @@ const taskFilteringMock = {
   isGlobalTask: vi.fn(() => false),
 };
 const useTaskActionsMock = {
+  markTaskActive: vi.fn(),
   canMarkTaskAvailable: vi.fn(() => true),
   markTaskAvailable: vi.fn(),
   markTaskComplete: vi.fn(),
   markTaskFailed: vi.fn(),
   markTaskUncomplete: vi.fn(),
 };
+let mockTaskActionListener: ((payload: TaskActionPayload) => void) | undefined;
+let mockTaskGetter: (() => Task) | undefined;
 const useTaskCardLinksMock = {
   copyTaskLink: vi.fn(),
   openItemOnTarkovDev: vi.fn(),
@@ -118,7 +124,11 @@ vi.mock('@/stores/useTarkov', () => ({
   useTarkovStore: () => tarkovStoreMock,
 }));
 vi.mock('@/composables/useTaskActions', () => ({
-  useTaskActions: () => useTaskActionsMock,
+  useTaskActions: (getTask: () => Task, onAction: (payload: TaskActionPayload) => void) => {
+    mockTaskGetter = getTask;
+    mockTaskActionListener = onAction;
+    return useTaskActionsMock;
+  },
 }));
 vi.mock('@/composables/useTaskCardLinks', () => ({
   useTaskCardLinks: () => useTaskCardLinksMock,
@@ -162,15 +172,16 @@ const TaskCardHeaderStub = {
 const TaskCardBadgesStub = {
   template:
     '<div data-testid="task-card-badges"><slot name="alternatives" /><slot name="actions" /></div>',
-  props: ['task'],
+  props: ['task', 'isActive'],
 };
 const TaskCardActionsStub = {
-  props: ['showFail'],
-  emits: ['markFailed'],
+  props: ['state', 'size', 'isFailed', 'showFail'],
+  emits: ['complete', 'active', 'uncomplete', 'available', 'failed', 'markFailed'],
   template:
     '<div data-testid="task-card-actions" :data-show-fail="String(!!showFail)"><button v-if="showFail" data-testid="task-card-fail-stub" @click="$emit(\'markFailed\')" /></div>',
 };
 const TaskCardBackgroundStub = {
+  props: ['isComplete', 'isFailed', 'isLocked', 'isInvalid'],
   template: '<div data-testid="task-card-background" />',
 };
 const TaskCardRewardsStub = {
@@ -192,7 +203,10 @@ const QuestObjectivesStub = {
   template:
     '<div data-testid="task-objectives">{{ objectives.map((objective) => objective.id).join(",") }}</div>',
 };
-const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
+const mountTaskCard = async (
+  taskOverrides: Partial<Task> = {},
+  cardOverrides: { accentVariant?: 'default' | 'global' } = {}
+) =>
   mountSuspended(TaskCard, {
     props: {
       task: {
@@ -203,6 +217,7 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
         taskRequirements: [],
         ...taskOverrides,
       },
+      ...cardOverrides,
     },
     global: {
       stubs: {
@@ -224,6 +239,7 @@ const mountTaskCard = async (taskOverrides: Partial<Task> = {}) =>
   });
 describe('TaskCard appearance and expansion controls', () => {
   beforeEach(() => {
+    taskState.active = false;
     taskState.complete = false;
     taskState.failed = false;
     preferencesState.collapseDefault = false;
@@ -240,6 +256,8 @@ describe('TaskCard appearance and expansion controls', () => {
     progressStoreMock.tasksFailed = {};
     progressStoreMock.unlockedTasks = { 'task-1': { self: true } };
     vi.clearAllMocks();
+    mockTaskActionListener = undefined;
+    mockTaskGetter = undefined;
     metadataStoreMock.alternativeTasks = {};
     metadataStoreMock.alternativeTaskSources = {};
     metadataStoreMock.getTaskById.mockReset();
@@ -251,6 +269,7 @@ describe('TaskCard appearance and expansion controls', () => {
     metadataStoreMock.tasksObjectivesHydrated = true;
     metadataStoreMock.tasksObjectivesPending = false;
     tarkovStoreMock.getCurrentProgressData.mockReturnValue({ taskCompletions: {} });
+    tarkovStoreMock.getObjectiveCount.mockReturnValue(0);
   });
   it('shows counted groups of name-only quest links from a compact chip on a collapsed card', async () => {
     preferencesState.collapseDefault = true;
@@ -624,6 +643,38 @@ describe('TaskCard appearance and expansion controls', () => {
     expect(wrapper.find('[data-testid="task-requirements-blocking"]').exists()).toBe(false);
     wrapper.unmount();
   });
+  it('styles available global cards and wires accept actions', async () => {
+    const wrapper = await mountTaskCard({}, { accentVariant: 'global' });
+    const card = wrapper.get('article');
+    expect(card.classes()).toContain('bg-info-500/5');
+    expect(card.classes()).toContain('border-l-4');
+    expect(card.classes()).toContain('border-l-info-400');
+    const actions = wrapper.findComponent(TaskCardActionsStub);
+    expect(actions.props('state')).toBe('available');
+    expect(mockTaskGetter?.()).toBe(wrapper.props('task'));
+    useTaskActionsMock.markTaskActive.mockImplementation(() => {
+      mockTaskActionListener?.({ taskId: 'task-1', taskName: 'Sample task', action: 'active' });
+    });
+    actions.vm.$emit('active');
+    expect(useTaskActionsMock.markTaskActive).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('on-task-action')).toEqual([
+      [{ taskId: 'task-1', taskName: 'Sample task', action: 'active' }],
+    ]);
+  });
+  it('gives an active global card its active action and background state', async () => {
+    taskState.active = true;
+    const wrapper = await mountTaskCard({}, { accentVariant: 'global' });
+    expect(wrapper.get('article').classes()).toContain('border-primary-500/45');
+    expect(wrapper.get('article').classes()).toContain('border-l-info-400');
+    expect(wrapper.findComponent(TaskCardBadgesStub).props('isActive')).toBe(true);
+    expect(wrapper.findComponent(TaskCardActionsStub).props('state')).toBe('active');
+    expect(wrapper.findComponent(TaskCardBackgroundStub).props()).toEqual({
+      isComplete: false,
+      isFailed: false,
+      isLocked: false,
+      isInvalid: false,
+    });
+  });
   it('lists each unmet requirement once, in plain language, under the header', async () => {
     progressStoreMock.unlockedTasks = { 'task-1': { self: false } };
     progressStoreMock.taskEvaluations = {
@@ -917,5 +968,20 @@ describe('TaskCard appearance and expansion controls', () => {
     const reset = wrapper.get('button[aria-label="Reset item counts"]');
     expect(disclosure.element.contains(reset.element)).toBe(false);
     expect(disclosure.find('button').exists()).toBe(false);
+  });
+  it('enables item-count reset only while progress is nonterminal', async () => {
+    tarkovStoreMock.getObjectiveCount.mockReturnValue(2);
+    const wrapper = await mountTaskCard({
+      objectives: [{ id: 'objective-1', item: { id: 'item-1' } }],
+    });
+    const reset = wrapper.get('button[aria-label="Reset item counts"]');
+    expect(reset.attributes('disabled')).toBeUndefined();
+    taskState.complete = true;
+    await wrapper.vm.$nextTick();
+    expect(reset.attributes('disabled')).toBeDefined();
+    taskState.complete = false;
+    taskState.failed = true;
+    await wrapper.vm.$nextTick();
+    expect(reset.attributes('disabled')).toBeDefined();
   });
 });

@@ -92,14 +92,14 @@ button (`TaskMapVisibilityToggles`) for the separate map-view-only hidden state
 (`mapHiddenTaskIds`, keyed by task ID, so it applies on every map); it uses a distinct icon so it
 is not confused with the eye.
 
-- All, Available and Locked move hidden tasks into a collapsed "Hidden tasks (N)" section
+- All, Active, Available and Locked move hidden tasks into a collapsed "Hidden tasks (N)" section
   (`MapHiddenTasksSection` with `variant="list"`) whose Unhide all clears them.
 - Completed and Failed list hidden tasks normally, as does any search, so every hidden task stays
   findable. A deep-linked task is never hidden (`getListHiddenTaskIds` in
   `app/features/tasks/hiddenTasks.ts`).
 - The map shows exactly what the list shows: a hidden task draws no markers and leaves the
   completed-objectives notice count, except where the list shows it (search, Completed, Failed, a
-  deep link). Hidden tasks leave the All, Available and Locked status and trader counts;
+  deep link). Hidden tasks leave the All, Active, Available and Locked status and trader counts;
   Completed and Failed counts still include them (`useTaskCounts`).
 - Needed Items drops the user's own objectives of hidden tasks from every tab and count until the
   task is completed; completed (not failed) hidden tasks stay on the Completed tab. Hiding is
@@ -125,9 +125,9 @@ values stay unknown, including for `== 0`. Unknown gates stay locked and share e
 across cards and recommendations. Finish/fail conditions do not become start gates.
 
 Story gates use recorded objectives or the producer's tutorial baseline. Missing mode-scoped
-chapters/objectives become unknown. Mark available, complete, fail, implied prerequisite
-completion and EFT imports record the relevant story objective. A completed, manually failed
-or confirmed-available task proves its gates. Automatic branch failure does not. Repair
+chapters/objectives become unknown. Mark available, accept, complete, fail, implied prerequisite
+completion and EFT imports record the relevant story objective. An explicitly accepted, completed,
+manually failed or confirmed-available task proves its supported gates. Automatic branch failure does not. Repair
 backfills ordinary objectives after the latest unmark without fabricating baseline timestamps.
 Undo releases only the objectives that action introduced unless another task still proves
 them. Manual uncomplete keeps them. All mark/unmark writes advance the objective clock.
@@ -192,7 +192,8 @@ accepted. An imported EFT start or explicit in-game availability confirmation is
 a reset invalidates the confirmation even when the reset device runs behind. A terminal Jaeger
 status closes the route. The five-second game delay is informational because the tracker does
 not have an authoritative acceptance clock.
-Other active prerequisites retain their existing planning behavior.
+Other active prerequisites allow the planning fallback for legacy rows with unknown acceptance.
+Explicitly inactive rows cannot use that fallback.
 
 Eligibility and caches use the selected mode. An isolated profile uses its own metadata and
 progress and ignores superseded requests. Required core/objective failures are fatal;
@@ -217,6 +218,11 @@ EFT cannot infer the quest branch from a completion with a story alternative. Ta
 profile import has no quest-completion backfill.
 
 ### Presentation and ordering
+
+Accept records the task as Active and moves it out of Available. Completion, failure and a
+neutral reset clear acceptance. Undo restores prior acceptance, including unknown acceptance and
+alternatives affected by completion. The team All view includes active and available teammates
+under Needed by.
 
 Cards show a short collapsed blocker list and shared requirement explanations. Expanded rows
 put blockers first and group equivalent trader gates. Show story routes as independent

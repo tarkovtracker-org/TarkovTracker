@@ -78,6 +78,14 @@ describe('Shifting Balance acceptance', () => {
       expect(run(101).available).toBe(false);
     }
   );
+  it.each([true, false])('uses explicit acceptance %s alongside EFT evidence', (active) => {
+    const completions = { [jaeger.id]: { ...incomplete, active } };
+    const confirmations = { [jaeger.id]: imported };
+    expect(evaluate(lightkeeper, data({ completions, confirmations }), [jaeger]).available).toBe(
+      active
+    );
+    expect(evaluate(lightkeeper, data({ completions }), [jaeger]).available).toBe(false);
+  });
   it.each([
     ['confirmation first', 200],
     ['reset first', 200],
@@ -526,5 +534,29 @@ describe('reward-based trader unlocks', () => {
     expect(evaluate(introduction, data(), [acquaintance]).available).toBe(true);
     const other: Task = { id: 'other', trader: { id: 'prapor', name: 'Prapor' } };
     expect(evaluate(other, data(), [introduction]).available).toBe(true);
+  });
+});
+describe('active prerequisite requirements', () => {
+  const dependent: Task = {
+    id: 'dependent',
+    taskRequirements: [{ task: { id: 'prerequisite' }, status: ['active'] }],
+  };
+  const prerequisite: Task = { id: 'prerequisite' };
+  const availabilityFor = (completions: TaskAvailabilityTeamData['completions']) =>
+    evaluate(dependent, data({ completions }), [prerequisite], { requireTraderLevels: false })
+      .available;
+  it('keeps legacy incomplete prerequisites available for active requirements', () => {
+    expect(availabilityFor({ prerequisite: { complete: false, failed: false } })).toBe(true);
+  });
+  it('does not infer acceptance from an explicit inactive state', () => {
+    expect(
+      availabilityFor({ prerequisite: { active: false, complete: false, failed: false } })
+    ).toBe(false);
+  });
+  it('accepts explicitly active and completed prerequisites', () => {
+    expect(
+      availabilityFor({ prerequisite: { active: true, complete: false, failed: false } })
+    ).toBe(true);
+    expect(availabilityFor({ prerequisite: { complete: true, failed: false } })).toBe(true);
   });
 });

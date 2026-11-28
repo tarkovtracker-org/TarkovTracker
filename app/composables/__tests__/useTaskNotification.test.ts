@@ -3,12 +3,27 @@ import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, expect, it, vi } from 'vitest';
 import { effectScope, reactive } from 'vue';
+import {
+  actions as progressActions,
+  defaultState,
+  getters as progressGetters,
+} from '@/stores/progressState';
+import { mergeProgressData } from '@/stores/tarkov/progressMerge';
+import { buildTaskEvaluations } from '@/stores/taskAvailability';
+import { taskServerGateBlockers } from '@/stores/taskServerGates';
+import { TASK_ID_REGISTRY } from '@/utils/constants';
+import { sanitizeOwnedProgressData } from '@/utils/progressSanitizers';
+import { hasManualAcceptance } from '@/utils/shiftingBalanceAcceptance';
+import { MAX_CONFIRMATION_TIMESTAMP } from '@/utils/taskAvailabilityConfirmation';
 import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import type { UserProgressData } from '@/stores/progressState';
+import type { TaskStatusWrite } from '@/stores/useActionHistoryStore';
+import type { TaskCompletion } from '@/types/progress';
 import type { Task } from '@/types/tarkov';
 const sessionUser = reactive({ id: 'owner-a', loggedIn: true });
 mockNuxtImport('useNuxtApp', () => () => ({ $supabase: { user: sessionUser } }));
 const createTarkovStore = (options: {
+  isTaskActive?: (taskId: string) => boolean;
   isTaskComplete?: (taskId: string) => boolean;
   progressData?: Partial<UserProgressData>;
   objectiveCounts?: Record<string, number>;
@@ -21,6 +36,8 @@ const createTarkovStore = (options: {
     setTaskComplete: vi.fn(),
     setTaskFailed: vi.fn(),
     setTaskUncompleted: vi.fn(),
+    setTaskAcceptanceUnknown: vi.fn(),
+    confirmTaskAvailability: vi.fn(),
     setTaskObjectiveComplete: vi.fn(),
     setTaskObjectiveUncomplete: vi.fn(),
     setStoryObjectiveUncomplete: vi.fn(),
@@ -30,6 +47,8 @@ const createTarkovStore = (options: {
     getObjectiveCount: vi.fn((objectiveId: string) => objectiveCounts.get(objectiveId) ?? 0),
     playerLevel: vi.fn(() => options.playerLevel ?? 1),
     setLevel: vi.fn(),
+    isTaskActive: vi.fn((taskId: string) => options.isTaskActive?.(taskId) ?? false),
+    setTaskActive: vi.fn(),
     isTaskComplete: vi.fn((taskId: string) => options.isTaskComplete?.(taskId) ?? false),
     getCurrentProgressData: vi.fn(() => options.progressData ?? {}),
     // Manual activity-log entries live in the synced progress blob (issue #445).
@@ -70,6 +89,447 @@ const setup = async (tasks: Task[], options: Parameters<typeof createTarkovStore
   return { notification, tarkovStore, stop: () => scope.stop() };
 };
 describe('useTaskNotification', () => {
+  it.each<{ label: string; completion: TaskCompletion | undefined }>([
+    { label: 'missing entry', completion: undefined },
+    { label: 'legacy row', completion: { complete: false, failed: false, timestamp: 5000 } },
+    {
+      label: 'explicit false',
+      completion: { active: false, complete: false, failed: false, timestamp: 5000 },
+    },
+    {
+      label: 'explicit true',
+      completion: { active: true, complete: false, failed: false, timestamp: 5000 },
+    },
+  ])('restores $label through actual mutation and synced merges', async ({ completion }) => {
+    for (const action of ['complete', 'fail', 'active'] as const) {
+      const state = structuredClone(defaultState);
+      if (completion) state.pvp.taskCompletions.prior = completion;
+      const task: Task = { id: 'prior', name: 'Prior task' };
+      const { notification, tarkovStore, stop } = await setup([task], {
+        progressData: state.pvp,
+        isTaskActive: progressGetters.isTaskActive(state),
+        isTaskComplete: progressGetters.isTaskComplete(state),
+      });
+      tarkovStore.setTaskActive.mockImplementation((id: string) =>
+        progressActions.setTaskActive.call(state, id)
+      );
+      tarkovStore.setTaskUncompleted.mockImplementation(
+        (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+          progressActions.setTaskUncompleted.call(state, ...args)
+      );
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, id)
+      );
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        notification.onTaskAction({ action, taskId: task.id, taskName: task.name! });
+        if (action === 'complete') progressActions.setTaskComplete.call(state, task.id);
+        if (action === 'fail') progressActions.setTaskFailed.call(state, task.id);
+        if (action === 'active') progressActions.setTaskActive.call(state, task.id);
+        const afterAction = structuredClone(state.pvp);
+        await notification.undoLastAction();
+        const synced = sanitizeOwnedProgressData(state.pvp);
+        const restored = synced.taskCompletions[task.id]!;
+        expect(restored).toMatchObject({ complete: false, failed: false });
+        expect(restored.active).toBe(completion?.active);
+        if (completion?.active === undefined) {
+          expect(restored).not.toHaveProperty('active');
+          expect(restored.timestamp).toBeGreaterThan(
+            afterAction.taskCompletions[task.id]!.timestamp!
+          );
+        }
+        expect(mergeProgressData(afterAction, synced).taskCompletions[task.id]?.active).toBe(
+          completion?.active
+        );
+        const dependent: Task = {
+          id: 'dependent',
+          taskRequirements: [{ task: { id: task.id }, status: ['active'] }],
+        };
+        const evaluations = buildTaskEvaluations(
+          [task, dependent],
+          new Map([
+            [
+              'self',
+              {
+                completions: synced.taskCompletions,
+                faction: 'USEC',
+                level: 1,
+                mode: 'pvp' as const,
+                traders: {},
+              },
+            ],
+          ]),
+          { requireTraderLevels: false }
+        );
+        expect(evaluations.dependent?.self?.available).toBe(completion?.active !== false);
+      } finally {
+        now.mockRestore();
+        stop();
+      }
+    }
+  });
+  it.each([undefined, false] as const)(
+    'keeps Accept after Undo through both merge orders with prior acceptance %s and a future confirmation',
+    async (previousAcceptance) => {
+      const state = structuredClone(defaultState);
+      if (previousAcceptance !== undefined)
+        state.pvp.taskCompletions.prior = { active: previousAcceptance, timestamp: 1000 };
+      state.pvp.taskAvailability = { prior: { timestamp: 10000, requirements: 'gate' } };
+      const task: Task = { id: 'prior', name: 'Prior task' };
+      const { notification, tarkovStore, stop } = await setup([task], { progressData: state.pvp });
+      tarkovStore.setTaskActive.mockImplementation((id: string) =>
+        progressActions.setTaskActive.call(state, id)
+      );
+      tarkovStore.setTaskUncompleted.mockImplementation(
+        (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+          progressActions.setTaskUncompleted.call(state, ...args)
+      );
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, id)
+      );
+      const accept = () => {
+        notification.onTaskAction({ action: 'active', taskId: task.id, taskName: task.name! });
+        progressActions.setTaskActive.call(state, task.id);
+      };
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        accept();
+        await notification.undoLastAction();
+        const afterUndo = sanitizeOwnedProgressData(state.pvp);
+        expect(afterUndo.taskCompletions.prior?.active).toBe(previousAcceptance);
+        accept();
+        const afterAccept = sanitizeOwnedProgressData(state.pvp);
+        for (const [local, remote] of [
+          [afterUndo, afterAccept],
+          [afterAccept, afterUndo],
+        ] as const)
+          expect(mergeProgressData(local, remote).taskCompletions.prior?.active).toBe(true);
+        expect(afterAccept.taskCompletions.prior!.timestamp!).toBeGreaterThan(
+          afterUndo.taskCompletions.prior!.timestamp!
+        );
+      } finally {
+        now.mockRestore();
+        stop();
+      }
+    }
+  );
+  it.each(['valid', 'stale', 'cleared'] as const)(
+    'restores only a previously valid, unchanged availability confirmation (%s)',
+    async (confirmation) => {
+      const state = structuredClone(defaultState);
+      const task: Task = {
+        id: 'gated-task',
+        name: 'Gated task',
+        otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+      };
+      const progress = state.pvp;
+      const id = task.id;
+      const blockers = () =>
+        taskServerGateBlockers(task, {
+          completions: progress.taskCompletions,
+          confirmations: progress.taskAvailability,
+        });
+      const { notification, tarkovStore, stop } = await setup([task], { progressData: progress });
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, id)
+      );
+      tarkovStore.setTaskUncompleted.mockImplementation(
+        (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+          progressActions.setTaskUncompleted.call(state, ...args)
+      );
+      tarkovStore.confirmTaskAvailability.mockImplementation((id: string, requirements: string) =>
+        progressActions.confirmTaskAvailability.call(state, id, requirements)
+      );
+      const now = vi.spyOn(Date, 'now').mockReturnValue(5000);
+      try {
+        const requirements = otherRequirementsSignature(task, progress.taskCompletions)!;
+        progressActions.confirmTaskAvailability.call(state, id, requirements);
+        if (confirmation === 'stale') progressActions.setTaskUncompleted.call(state, id);
+        expect(blockers().map(({ type }) => type)).toEqual(
+          confirmation === 'stale' ? ['dialogue'] : []
+        );
+        const statusWrite: { timestamp?: number } = {};
+        notification.onTaskAction({
+          action: 'active',
+          taskId: id,
+          taskName: task.name!,
+          statusWrite,
+        });
+        statusWrite.timestamp = progressActions.setTaskActive.call(state, id);
+        if (confirmation === 'cleared') {
+          progressActions.confirmTaskAvailability.call(state, id, '');
+        }
+        await notification.undoLastAction();
+        expect(progress.taskCompletions[id]?.active).not.toBe(true);
+        expect(blockers().map(({ type }) => type)).toEqual(
+          confirmation === 'valid' ? [] : ['dialogue']
+        );
+        if (confirmation === 'cleared')
+          expect(progress.taskAvailability?.[id]?.requirements).toBe('');
+      } finally {
+        now.mockRestore();
+        stop();
+      }
+    }
+  );
+  it.each([
+    { remoteEdit: false, completesAlternative: false },
+    { remoteEdit: false, completesAlternative: true },
+    { remoteEdit: true, completesAlternative: false },
+    { remoteEdit: true, completesAlternative: true },
+  ])(
+    'preserves Acceptance Undo after local Completion Undo (alternative: $completesAlternative, remote edit: $remoteEdit)',
+    async ({ remoteEdit, completesAlternative }) => {
+      const state = structuredClone(defaultState);
+      const task: Task = {
+        id: 'dialogue-quest',
+        name: 'Dialogue quest',
+        otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+      };
+      const id = task.id;
+      const completedTask: Task = completesAlternative
+        ? { id: 'alternative', name: 'Alternative', alternatives: [id] }
+        : task;
+      const progress = state.pvp;
+      const requirements = otherRequirementsSignature(task)!;
+      progressActions.confirmTaskAvailability.call(state, id, requirements);
+      const { notification, tarkovStore, stop } = await setup([task, completedTask], {
+        progressData: progress,
+      });
+      tarkovStore.setTaskActive.mockImplementation((taskId: string) =>
+        progressActions.setTaskActive.call(state, taskId)
+      );
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((taskId: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, taskId)
+      );
+      tarkovStore.confirmTaskAvailability.mockImplementation((taskId: string, signature: string) =>
+        progressActions.confirmTaskAvailability.call(state, taskId, signature)
+      );
+      try {
+        const statusWrite: { timestamp?: number } = {};
+        notification.onTaskAction({
+          action: 'active',
+          taskId: id,
+          taskName: task.name!,
+          statusWrite,
+        });
+        statusWrite.timestamp = progressActions.setTaskActive.call(state, id);
+        const completionWrite: TaskStatusWrite = {};
+        notification.onTaskAction({
+          action: 'complete',
+          taskId: completedTask.id,
+          taskName: completedTask.name!,
+          statusWrite: completionWrite,
+        });
+        progressActions.setTaskComplete.call(state, completedTask.id);
+        if (completesAlternative) {
+          progressActions.setTaskFailed.call(state, id);
+          completionWrite.alternatives = new Map([[id, progress.taskCompletions[id]!.timestamp!]]);
+        }
+        completionWrite.timestamp = progress.taskCompletions[completedTask.id]?.timestamp;
+        const terminalTimestamp = progress.taskCompletions[id]!.timestamp!;
+        if (remoteEdit) {
+          const remote = structuredClone(state);
+          progressActions.setTaskUncompleted.call(remote, id);
+          progressActions.setTaskActive.call(remote, id);
+          Object.assign(progress, mergeProgressData(progress, remote.pvp));
+        }
+        const beforeUndo = structuredClone(progress.taskCompletions[id]);
+        await notification.undoLastAction();
+        expect(progress.taskCompletions[id]?.active).toBe(true);
+        expect(progress.taskCompletions[id]?.timestamp).toBeGreaterThan(terminalTimestamp);
+        await notification.undoLastAction();
+        if (remoteEdit) {
+          expect(progress.taskCompletions[id]).toEqual(beforeUndo);
+          expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+        } else {
+          expect(progress.taskCompletions[id]?.active).toBeUndefined();
+          expect(tarkovStore.confirmTaskAvailability).toHaveBeenCalledWith(id, requirements);
+        }
+      } finally {
+        stop();
+      }
+    }
+  );
+  it.each(['reset', 'reset and reaccept'] as const)(
+    'leaves newer progress intact when another client performs a %s before Undo',
+    async (remoteAction) => {
+      const state = structuredClone(defaultState);
+      const task: Task = {
+        id: 'dialogue-quest',
+        name: 'Dialogue quest',
+        otherRequirements: [{ type: 'dialogue', id: 'talk', traders: ['trader'] }],
+      };
+      const progress = state.pvp;
+      const id = task.id;
+      const requirements = otherRequirementsSignature(task)!;
+      progressActions.confirmTaskAvailability.call(state, id, requirements);
+      const { notification, tarkovStore, stop } = await setup([task], { progressData: progress });
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((taskId: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, taskId)
+      );
+      tarkovStore.confirmTaskAvailability.mockImplementation((taskId: string, signature: string) =>
+        progressActions.confirmTaskAvailability.call(state, taskId, signature)
+      );
+      try {
+        const statusWrite: { timestamp?: number } = {};
+        notification.onTaskAction({
+          action: 'active',
+          taskId: id,
+          taskName: task.name!,
+          statusWrite,
+        });
+        progressActions.setTaskActive.call(state, id);
+        statusWrite.timestamp = progress.taskCompletions[id]?.timestamp;
+        const remote = structuredClone(state);
+        progressActions.setTaskUncompleted.call(remote, id);
+        if (remoteAction === 'reset and reaccept') progressActions.setTaskActive.call(remote, id);
+        Object.assign(progress, mergeProgressData(progress, remote.pvp));
+        const newerStatus = structuredClone(progress.taskCompletions[id]);
+        const retiredConfirmation = structuredClone(progress.taskAvailability?.[id]);
+        expect(newerStatus?.timestamp).toBeGreaterThan(statusWrite.timestamp!);
+        expect(retiredConfirmation?.timestamp).toBeLessThan(newerStatus!.timestamp!);
+        await notification.undoLastAction();
+        expect(tarkovStore.confirmTaskAvailability).not.toHaveBeenCalled();
+        expect(progress.taskAvailability?.[id]).toEqual(retiredConfirmation);
+        expect(progress.taskCompletions[id]).toEqual(newerStatus);
+      } finally {
+        stop();
+      }
+    }
+  );
+  it('keeps the Jaeger observation when undoing acceptance back to explicit inactive', async () => {
+    const { CUT_DOWN_TO_THE_ROOT: id, PRESERVE_A_VALUABLE_PIECE: dependentId } = TASK_ID_REGISTRY;
+    const state = structuredClone(defaultState);
+    const progress = state.pvp;
+    const completions = progress.taskCompletions;
+    const task: Task = { id, name: 'Cut Down to the Root' };
+    const dependent: Task = {
+      id: dependentId,
+      taskRequirements: [{ task: { id }, status: ['active'] }],
+    };
+    completions[id] = { complete: false, failed: false, active: false, timestamp: 1000 };
+    const signature = () => otherRequirementsSignature(dependent, completions)!;
+    progress.taskAvailability = {
+      [dependentId]: { timestamp: 1000, requirements: signature() },
+    };
+    const hasObservation = () =>
+      hasManualAcceptance(
+        dependentId,
+        id,
+        { completions, confirmations: progress.taskAvailability },
+        signature()
+      );
+    const { notification, tarkovStore, stop } = await setup([task, dependent], {
+      progressData: progress,
+    });
+    tarkovStore.setTaskUncompleted.mockImplementation(
+      (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+        progressActions.setTaskUncompleted.call(state, ...args)
+    );
+    try {
+      expect(hasObservation()).toBe(true);
+      notification.onTaskAction({ action: 'active', taskId: id, taskName: task.name! });
+      progressActions.setTaskActive.call(state, id);
+      expect(hasObservation()).toBe(true);
+      await notification.undoLastAction();
+      expect(completions[id]?.active).toBe(false);
+      expect(hasObservation()).toBe(true);
+      progressActions.setTaskUncompleted.call(state, id);
+      expect(hasObservation()).toBe(false);
+    } finally {
+      stop();
+    }
+  });
+  it('keeps failed unknown acceptance undo retryable at a saturated clock', async () => {
+    const state = structuredClone(defaultState);
+    state.pvp.taskAvailability = {
+      prior: { timestamp: MAX_CONFIRMATION_TIMESTAMP, requirements: 'gate' },
+    };
+    const task: Task = { id: 'prior', name: 'Prior task' };
+    const { notification, tarkovStore, stop } = await setup([task], { progressData: state.pvp });
+    tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+      progressActions.setTaskAcceptanceUnknown.call(state, id)
+    );
+    notification.onTaskAction({
+      action: 'active',
+      taskId: task.id,
+      taskName: task.name!,
+      statusKey: 'page.tasks.questcard.status_active',
+      recordedStoryObjectives: [{ chapterId: 'tour', objectiveId: 'talk' }],
+    });
+    progressActions.setTaskActive.call(state, task.id);
+    const current = { ...state.pvp.taskCompletions[task.id] };
+    await notification.undoLastAction();
+    expect(state.pvp.taskCompletions[task.id]).toEqual(current);
+    expect(notification.taskStatusUpdated.value).toBe(true);
+    expect(notification.showUndoButton.value).toBe(true);
+    expect(tarkovStore.setStoryObjectiveUncomplete).not.toHaveBeenCalled();
+    const { useActionHistoryStore } = await import('@/stores/useActionHistoryStore');
+    expect(useActionHistoryStore().undoStack).toHaveLength(1);
+    stop();
+  });
+  it('records and reverses accepting a task', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { notification, tarkovStore, stop } = await setup([task]);
+    notification.onTaskAction({
+      action: 'active',
+      taskId: task.id,
+      taskName: task.name!,
+      statusKey: 'page.tasks.questcard.status_active',
+    });
+    await notification.undoLastAction();
+    expect(tarkovStore.setTaskAcceptanceUnknown).toHaveBeenCalledWith(task.id);
+    stop();
+  });
+  it('releases the story objectives an undone acceptance recorded', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { notification, tarkovStore, stop } = await setup([task]);
+    notification.onTaskAction({
+      action: 'active',
+      taskId: task.id,
+      taskName: task.name!,
+      statusKey: 'page.tasks.questcard.status_active',
+      recordedStoryObjectives: [{ chapterId: 'tour', objectiveId: 'talk' }],
+    });
+    await notification.undoLastAction();
+    expect(tarkovStore.setStoryObjectiveUncomplete).toHaveBeenCalledWith('tour', 'talk');
+    stop();
+  });
+  it.each(['complete', 'fail'] as const)('restores acceptance when undoing %s', async (action) => {
+    const task: Task = { id: 'accepted', name: 'Accepted task' };
+    const { notification, tarkovStore, stop } = await setup([task], {
+      isTaskActive: () => true,
+      progressData: {
+        taskCompletions: { accepted: { active: true, complete: false, failed: false } },
+      },
+    });
+    notification.onTaskAction({ action, taskId: task.id, taskName: task.name! });
+    tarkovStore.isTaskActive.mockReturnValue(false);
+    await notification.undoLastAction();
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(task.id);
+    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskAcceptanceUnknown).not.toHaveBeenCalled();
+    stop();
+  });
+  it.each(['complete', 'fail'] as const)(
+    'keeps a neutral task neutral when undoing %s',
+    async (action) => {
+      const task: Task = { id: 'neutral', name: 'Neutral task' };
+      const { notification, tarkovStore, stop } = await setup([task], {
+        progressData: {
+          taskCompletions: { neutral: { active: false, complete: false, failed: false } },
+        },
+      });
+      notification.onTaskAction({ action, taskId: task.id, taskName: task.name! });
+      await notification.undoLastAction();
+      expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith(task.id, {
+        restoreAcceptance: true,
+      });
+      expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+      stop();
+    }
+  );
   it('closes an empty-history status notification on a mode change', async () => {
     const { notification, tarkovStore, stop } = await setup([]);
     notification.onTaskAction({
@@ -91,12 +551,12 @@ describe('useTaskNotification', () => {
       taskName: 'Task A',
       statusKey: 'status',
     });
-    tarkovStore.setTaskUncompleted.mockImplementationOnce(() => {
+    tarkovStore.setTaskAcceptanceUnknown.mockImplementationOnce(() => {
       throw new Error('retry');
     });
     const { useActionHistoryStore } = await import('@/stores/useActionHistoryStore');
     await useActionHistoryStore().undoLastAction();
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('task-a');
+    expect(tarkovStore.setTaskAcceptanceUnknown).toHaveBeenCalledWith('task-a');
     expect(notification.taskStatusUpdated.value).toBe(true);
     expect(notification.showUndoButton.value).toBe(true);
     stop();
@@ -121,6 +581,7 @@ describe('useTaskNotification', () => {
       tarkovStore.currentGameMode = 'pvp';
       notification.undoLastAction();
       expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+      expect(tarkovStore.setTaskAcceptanceUnknown).not.toHaveBeenCalled();
       stop();
     }
   );
@@ -141,8 +602,9 @@ describe('useTaskNotification', () => {
     await history.undoLastAction();
     await retainedUndo();
     expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskAcceptanceUnknown).not.toHaveBeenCalled();
   });
-  it.each(['complete', 'uncomplete', 'fail', 'reset_failed', 'available'] as const)(
+  it.each(['active', 'complete', 'uncomplete', 'fail', 'reset_failed', 'available'] as const)(
     'keeps manual %s and its undo out of activity history',
     async (action) => {
       const { notification, tarkovStore, stop } = await setup([]);
@@ -157,7 +619,7 @@ describe('useTaskNotification', () => {
       notification.undoLastAction();
       expect(tarkovStore.addManualActivityEntries).not.toHaveBeenCalled();
       if (action === 'complete') {
-        expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('first-in-line');
+        expect(tarkovStore.setTaskAcceptanceUnknown).toHaveBeenCalledWith('first-in-line');
       }
       stop();
     }
@@ -300,10 +762,77 @@ describe('useTaskNotification', () => {
     context.notification.undoLastAction();
     return context;
   };
+  it.each([true, false, undefined])(
+    'restores an alternative with prior acceptance %s after completion',
+    async (active) => {
+      const state = structuredClone(defaultState);
+      progressActions.setTaskActive.call(state, undoTask.id);
+      state.pvp.taskCompletions[alternativeTask.id] = {
+        complete: false,
+        failed: false,
+        timestamp: 10,
+        ...(active === undefined ? {} : { active }),
+      };
+      const { notification, tarkovStore, stop } = await setup([undoTask, alternativeTask], {
+        progressData: state.pvp,
+        isTaskActive: progressGetters.isTaskActive(state),
+        isTaskComplete: progressGetters.isTaskComplete(state),
+      });
+      tarkovStore.setTaskActive.mockImplementation((id: string) =>
+        progressActions.setTaskActive.call(state, id)
+      );
+      tarkovStore.setTaskUncompleted.mockImplementation(
+        (...args: Parameters<typeof progressActions.setTaskUncompleted>) =>
+          progressActions.setTaskUncompleted.call(state, ...args)
+      );
+      tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+        progressActions.setTaskAcceptanceUnknown.call(state, id)
+      );
+      notification.onTaskAction({ taskId: undoTask.id, action: 'complete', taskName: 'Main Task' });
+      progressActions.setTaskComplete.call(state, undoTask.id);
+      progressActions.setTaskFailed.call(state, alternativeTask.id);
+      expect(state.pvp.taskCompletions[alternativeTask.id]?.active).toBe(false);
+      notification.undoLastAction();
+      expect(state.pvp.taskCompletions[undoTask.id]?.active).toBe(true);
+      expect(state.pvp.taskCompletions[alternativeTask.id]?.active).toBe(active);
+      stop();
+    }
+  );
+  it('does not partially undo completion when an alternative clock cannot advance', async () => {
+    const state = structuredClone(defaultState);
+    progressActions.setTaskActive.call(state, undoTask.id);
+    const { notification, tarkovStore, stop } = await setup([undoTask, alternativeTask], {
+      progressData: state.pvp,
+    });
+    notification.onTaskAction({ taskId: undoTask.id, action: 'complete', taskName: 'Main Task' });
+    state.pvp.taskCompletions[alternativeTask.id] = {
+      active: false,
+      complete: true,
+      failed: true,
+      timestamp: MAX_CONFIRMATION_TIMESTAMP,
+    };
+    tarkovStore.setTaskAcceptanceUnknown.mockImplementation((id: string) =>
+      progressActions.setTaskAcceptanceUnknown.call(state, id)
+    );
+    await notification.undoLastAction();
+    expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskObjectiveUncomplete).not.toHaveBeenCalled();
+    stop();
+  });
+  it('leaves a completed alternative untouched when undoing completion', async () => {
+    const { tarkovStore, stop } = await undo(
+      { action: 'complete', taskName: 'Main Task' },
+      { isTaskComplete: (id) => id === alternativeTask.id }
+    );
+    expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalledWith(alternativeTask.id);
+    expect(tarkovStore.setTaskAcceptanceUnknown).not.toHaveBeenCalledWith(alternativeTask.id);
+    expect(tarkovStore.setTaskObjectiveUncomplete).not.toHaveBeenCalledWith('obj-alt');
+    stop();
+  });
   it('undoing complete uncompletes the task, its objectives and its alternatives', async () => {
     const { tarkovStore, stop } = await undo({ action: 'complete', taskName: 'Main Task' });
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('task-main');
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('task-alt');
+    expect(tarkovStore.setTaskAcceptanceUnknown).toHaveBeenCalledWith('task-main');
+    expect(tarkovStore.setTaskAcceptanceUnknown).toHaveBeenCalledWith('task-alt');
     expect(tarkovStore.setTaskObjectiveUncomplete).toHaveBeenCalledWith('obj-main');
     expect(tarkovStore.setTaskObjectiveUncomplete).toHaveBeenCalledWith('obj-alt');
     stop();
@@ -348,7 +877,7 @@ describe('useTaskNotification', () => {
   );
   it('undoing fail uncompletes the task and its objectives only', async () => {
     const { tarkovStore, stop } = await undo({ action: 'fail', taskName: 'Main Task' });
-    expect(tarkovStore.setTaskUncompleted).toHaveBeenCalledWith('task-main');
+    expect(tarkovStore.setTaskAcceptanceUnknown).toHaveBeenCalledWith('task-main');
     expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalledWith('task-alt');
     expect(tarkovStore.setTaskObjectiveUncomplete).toHaveBeenCalledWith('obj-main');
     stop();
@@ -361,6 +890,7 @@ describe('useTaskNotification', () => {
     });
     expect(notification.showUndoButton.value).toBe(false);
     expect(tarkovStore.setTaskUncompleted).not.toHaveBeenCalled();
+    expect(tarkovStore.setTaskAcceptanceUnknown).not.toHaveBeenCalled();
     expect(tarkovStore.setTaskComplete).not.toHaveBeenCalled();
     stop();
   });

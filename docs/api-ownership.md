@@ -48,8 +48,9 @@ the live Worker SHA and the consumer pin. Before an API rollout, maintainers mus
 frontend integration evidence and any needed source-pin update, then verify the actual build SHA
 and active Worker version after deployment. The cutover below verified that mapping explicitly.
 API commit `655b825ddfc863a2bc56f88eea97a5bbb15744ce` built as `4ffaa165-f64f-4eb0-b21f-b2821e30f97a`
-and became active version `2043aeb0-6daa-47f2-af25-26a267ddbceb` at 100%. Consumer integration pins
-that exact source through source-only tag `v0.1.2`; the contracts archive remains `v0.1.0`.
+and became active version `2043aeb0-6daa-47f2-af25-26a267ddbceb` at 100%. The cutover used
+source-only tag `v0.1.2` and contracts archive `v0.1.0`. The acceptance integration now tests
+the immutable `v0.2.0` source and contracts archive.
 The duplicate gateway is removed from this checkout; retain the external parity tests and Supabase
 schema assertions here. API deployment and rollback instructions belong in
 [API operations](https://github.com/tarkovtracker-org/TarkovTracker-API/blob/main/docs/operations.md).

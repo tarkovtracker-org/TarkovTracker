@@ -4,6 +4,7 @@ import type { TaskActionPayload } from '@/composables/useTaskActions';
 export type DashboardRecommendationClickVariant = 'primary' | 'secondary';
 export type DashboardFocusProgressInteraction =
   | 'objective_progress'
+  | 'task_active'
   | 'task_available'
   | 'task_complete'
   | 'task_fail'
@@ -153,6 +154,9 @@ export function useDashboardFocusAnalytics(): {
   };
   const trackFocusedTaskAction = (payload: TaskActionPayload) => {
     switch (payload.action) {
+      case 'active':
+        trackFocusedTaskProgress(payload.taskId, 'task_active');
+        return;
       case 'available':
         trackFocusedTaskProgress(payload.taskId, 'task_available');
         return;

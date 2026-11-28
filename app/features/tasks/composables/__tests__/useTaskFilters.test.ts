@@ -96,11 +96,13 @@ describe('useTaskFilters', () => {
   it('counts search matches per status through the status filter pipeline', () => {
     const statusById: Record<string, TaskSecondaryView> = {
       mole: 'locked',
+      rescue: 'active',
       other: 'available',
       shortage: 'completed',
     };
     const tasks = ref([
       createTask('mole', 'Saving the Mole'),
+      createTask('rescue', 'Saving a Friend'),
       createTask('other', 'Debut'),
       createTask('shortage', 'Shortage', 'Saving kit'),
     ]);
@@ -125,7 +127,8 @@ describe('useTaskFilters', () => {
       visibleTasks: ref([]),
     });
     expect(searchStatusCounts.value).toEqual({
-      all: 2,
+      all: 3,
+      active: 1,
       available: 0,
       completed: 1,
       failed: 0,
@@ -134,6 +137,7 @@ describe('useTaskFilters', () => {
     reputationFilterActive.value = true;
     expect(searchStatusCounts.value).toEqual({
       all: 1,
+      active: 0,
       available: 0,
       completed: 0,
       failed: 0,

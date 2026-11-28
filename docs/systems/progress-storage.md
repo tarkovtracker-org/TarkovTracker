@@ -122,6 +122,13 @@ retained device recovery copies are not rewritten or discarded by import.
   Account metadata or persistent-mode changes advance it for browser sync. Seasonal-only and
   identical writes leave it alone. Compatibility clocks and account-row Realtime remain until
   the accepted normalized-client protocol is retired.
+- Task completions preserve explicit `active` through local persistence, sync, realtime and sharing.
+  Complete, failed and neutral writes clear acceptance. Missing legacy values remain unknown.
+  Same-epoch full saves retain omitted unfinished tasks with known acceptance or a positive
+  status timestamp. An older save cannot lower the timestamp of an unfinished task, including
+  after Undo restores unknown acceptance. Equal-clock legacy entries retain known acceptance.
+  Newer status writes and reset epochs keep their precedence. The forward merge also preserves
+  saved-level guards, activity epochs and availability confirmations.
 - API history allows `active`, `completed`, `failed` and `uncompleted`. Keep the first 20
   valid task updates in input order and report the original `taskCount` if truncated. The
   database preserves a higher stored count for the same ID/timestamp. Keep app, API and SQL

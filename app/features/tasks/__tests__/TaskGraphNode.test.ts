@@ -39,6 +39,12 @@ const mountNode = (data: TaskNodeData) =>
     },
   });
 describe('TaskGraphNode light-theme labels', () => {
+  it('uses the active color for active tasks', () => {
+    const wrapper = mountNode(buildData({ status: 'active' }));
+    expect(wrapper.get('[role="button"]').classes()).toContain('border-primary-500/60');
+    expect(wrapper.get('[role="button"]').classes()).toContain('bg-primary-500/10');
+    wrapper.unmount();
+  });
   it('keeps the flow_start indicator label readable in light mode', () => {
     const wrapper = mountNode(buildData({ isRoot: true }));
     const startLabel = wrapper.find('span[title="page.tasks.graph.flow_start"]');

@@ -47,8 +47,8 @@ vi.mock('@/stores/useTarkov', () => ({
     setTraderLevel: state.setTraderLevel,
     setTraderReputation: state.setTraderReputation,
     isHideoutModuleComplete: () => false,
-    setTaskUncompleted: (id: string) => {
-      state.taskCompletions[id] = { complete: false, timestamp: 200 };
+    setTaskActive: (id: string) => {
+      state.taskCompletions[id] = { complete: false, active: true, timestamp: 200 };
     },
     confirmTaskAvailability: state.confirmTaskAvailability,
     isStoryObjectiveComplete: () => false,
@@ -131,6 +131,7 @@ describe('SetupManualReview active quests', () => {
       },
     ] as Task[];
     await saveActiveQuests('story-quest');
+    expect(state.taskCompletions['story-quest']).toMatchObject({ complete: false, active: true });
     expect(state.confirmTaskAvailability).not.toHaveBeenCalled();
     expect(state.setStoryObjectiveComplete).toHaveBeenCalledWith('tour', 'talk');
   });

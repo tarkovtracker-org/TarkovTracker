@@ -28,6 +28,7 @@
               :is-hidden="isHidden"
               :location-tooltip="locationTooltip"
               :is-failed="isFailed"
+              :is-active="isActive"
               :is-invalid="isInvalid"
               :show-required-labels="preferencesStore.getShowRequiredLabels"
               :exclusive-edition-badge="exclusiveEditionBadge"
@@ -53,6 +54,7 @@
                   :is-failed="isFailed"
                   :show-fail="canMarkFailed"
                   @complete="markTaskComplete"
+                  @active="markTaskActive"
                   @uncomplete="markTaskUncomplete"
                   @available="markTaskAvailable"
                   @failed="markTaskFailed"
@@ -376,6 +378,7 @@
   import TaskRequirementChips from '@/features/tasks/TaskRequirementChips.vue';
   import TaskRequirementSummary from '@/features/tasks/TaskRequirementSummary.vue';
   import TaskTimeGateNote from '@/features/tasks/TaskTimeGateNote.vue';
+  import { resolveTaskActionButtonState, type ActionButtonState } from '@/features/tasks/types';
   import { useMetadataStore } from '@/stores/useMetadata';
   import { usePreferencesStore } from '@/stores/usePreferences';
   import { useProgressStore } from '@/stores/useProgress';
@@ -389,7 +392,6 @@
   import { hasCompletionStatus } from '@/utils/taskStatus';
   import { buildTaskTypeFilterOptions, filterTasksByTypeSettings } from '@/utils/taskTypeFilters';
   import type { TaskRequirementRow } from '@/features/tasks/composables/useTaskRequirements';
-  import type { ActionButtonState } from '@/features/tasks/types';
   import type { GameEdition, Task } from '@/types/tarkov';
   type ContextMenuRef = { open: (event: MouseEvent) => void };
   type FailureSource = {
@@ -433,7 +435,7 @@
   const { copyTaskLink, setSelectedItem, openItemOnTarkovDev, openItemOnWiki } = useTaskCardLinks({
     task: () => props.task,
   });
-  const { isComplete, isFailed, isLocked, isInvalid } = useTaskState(() => props.task.id);
+  const { isComplete, isFailed, isActive, isLocked, isInvalid } = useTaskState(() => props.task.id);
   const objectivesExpanded = ref(true);
   const requestedPool = shallowRef<{ id: string }>();
   const showRequirementPool = (id: string) => {
@@ -502,6 +504,7 @@
   // Use extracted task actions composable
   const {
     markTaskComplete,
+    markTaskActive,
     markTaskUncomplete,
     markTaskAvailable,
     markTaskFailed,
@@ -575,12 +578,19 @@
       return 'border-error-600/50 bg-error-950 light:border-error-700 light:bg-error-100';
     if (isInvalid.value) return 'border-surface-700/40 bg-surface-900 opacity-60';
     if (isLocked.value) return 'border-surface-700/40 bg-surface-900';
+    if (isActive.value) return 'border-primary-500/45 bg-primary-950/20';
     return 'border-surface-700/40 bg-surface-900';
   });
   const accentClasses = computed(() => {
     if (props.accentVariant === 'global') {
       const border = 'border-l-4 border-l-info-400';
-      if (isComplete.value || isFailed.value || isInvalid.value || isLocked.value) {
+      if (
+        isComplete.value ||
+        isFailed.value ||
+        isInvalid.value ||
+        isLocked.value ||
+        isActive.value
+      ) {
         return border;
       }
       return `${border} bg-info-500/5`;
@@ -730,12 +740,15 @@
    * Returns which action button(s) should be shown.
    */
   const actionButtonState = computed((): ActionButtonState => {
-    if (!isOurFaction.value) return 'none';
-    if (isFailed.value) return 'complete';
-    if (isLocked.value) return canMarkTaskAvailable() ? 'locked' : 'none';
-    if (isComplete.value) return 'complete';
-    if (showHotWheelsFail.value) return 'hotwheels';
-    return 'available';
+    return resolveTaskActionButtonState({
+      isOurFaction: isOurFaction.value,
+      isFailed: isFailed.value,
+      isLocked: isLocked.value,
+      canMarkAvailable: canMarkTaskAvailable,
+      isComplete: isComplete.value,
+      isActive: isActive.value,
+      showHotWheelsFail: showHotWheelsFail.value,
+    });
   });
   const onMapView = computed(() => preferencesStore.getTaskPrimaryView === 'maps');
   const { rewardsHidden, taskExpanded, toggleTaskVisibility } = useTaskCardExpansion({

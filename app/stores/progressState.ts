@@ -26,8 +26,14 @@ import {
   sanitizeManualActivityHistory,
   sanitizeOwnedProgressData,
 } from '@/utils/progressSanitizers';
+import {
+  hasImportedAcceptance,
+  importedAcceptanceSignature,
+  rebaseManualAcceptance,
+} from '@/utils/shiftingBalanceAcceptance';
 import { nextClock, taskStatusTimestamp } from '@/utils/taskAvailabilityConfirmation';
 import {
+  isTaskActive as isTaskCompletionActive,
   isTaskComplete as isTaskCompletionComplete,
   isTaskFailed as isTaskCompletionFailed,
   type RawTaskCompletion,
@@ -205,6 +211,8 @@ export const getters = {
     isTaskCompletionComplete(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
   isTaskFailed: (state: UserState) => (taskId: string) =>
     isTaskCompletionFailed(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
+  isTaskActive: (state: UserState) => (taskId: string) =>
+    isTaskCompletionActive(getCurrentData(state)?.taskCompletions?.[taskId] as RawTaskCompletion),
   isTaskObjectiveComplete: (state: UserState) => (objectiveId: string) =>
     getCurrentData(state)?.taskObjectives?.[objectiveId]?.complete ?? false,
   isHideoutPartComplete: (state: UserState) => (objectiveId: string) =>
@@ -236,10 +244,11 @@ export const getters = {
     getCurrentData(state)?.storyChapters?.[chapterId]?.objectives?.[objectiveId]?.complete ?? false,
 } as const satisfies _GettersTree<UserState>;
 // Helper functions for common operations
-const createCompletion = (complete: boolean, failed = false, manual?: boolean) => {
+const createCompletion = (complete: boolean, failed = false, active = false, manual?: boolean) => {
   const completion: TaskCompletion = {
     complete,
     failed,
+    active,
     timestamp: Date.now(),
   };
   if (typeof manual === 'boolean') {
@@ -283,22 +292,47 @@ const setAvailabilityConfirmation = (state: UserState, taskId: string, requireme
   // `statusTs - 1` so the confirmation may share the status millisecond (it still counts).
   confirmations[taskId] = { requirements, timestamp: nextClock(statusTs - 1, previousTs) };
 };
-/**
- * A status change must retire the task's current confirmation even when that confirmation carries a
- * clock from a device that runs ahead, so the status timestamp is advanced past it.
- */
+/** Preserve valid EFT evidence when only the explicit acceptance flag changes. */
+const getImportedAcceptance = (data: UserProgressData, taskId: string) => {
+  const signature = importedAcceptanceSignature(taskId);
+  if (!signature) return;
+  if (
+    hasImportedAcceptance(taskId, {
+      completions: data.taskCompletions,
+      confirmations: data.taskAvailability,
+    })
+  )
+    return signature;
+};
+const carryManualAcceptance = (state: UserState, taskId: string, previous: RawTaskCompletion) => {
+  if (taskId !== TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT) return;
+  const data = getCurrentData(state);
+  const dependent = TASK_ID_REGISTRY.PRESERVE_A_VALUABLE_PIECE;
+  const requirements = rebaseManualAcceptance(
+    data.taskAvailability?.[dependent],
+    data.taskCompletions[dependent],
+    taskId,
+    previous,
+    data.taskCompletions[taskId]
+  );
+  if (requirements) setAvailabilityConfirmation(state, dependent, requirements);
+};
+/** Status changes must follow the earlier task/Undo clock and retire live confirmations. */
 const setTaskStatus = (state: UserState, taskId: string, completion: TaskCompletion) => {
-  const confirmationTs = getCurrentData(state).taskAvailability?.[taskId]?.timestamp;
-  let timestamp =
-    confirmationTs === undefined
-      ? completion.timestamp
-      : Math.max(completion.timestamp ?? 0, nextClock(confirmationTs));
-  // A reset on the same millisecond or a slower device must still change Jaeger's revision.
-  if (taskId === TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT) {
-    const previous = taskStatusTimestamp(getCurrentData(state).taskCompletions?.[taskId]);
-    timestamp = Math.max(timestamp ?? 0, previous, nextClock(previous));
-  }
-  updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp });
+  const data = getCurrentData(state);
+  const previousTimestamp = taskStatusTimestamp(data.taskCompletions[taskId]);
+  const confirmationTimestamp = data.taskAvailability?.[taskId]?.timestamp ?? 0;
+  const timestamp = Math.max(
+    completion.timestamp ?? 0,
+    nextClock(previousTimestamp, confirmationTimestamp)
+  );
+  // A corrupt Jaeger clock must continue to invalidate in-game confirmations.
+  const statusTimestamp =
+    taskId === TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT
+      ? Math.max(previousTimestamp, timestamp)
+      : timestamp;
+  updateObjective(state, 'taskCompletions', taskId, { ...completion, timestamp: statusTimestamp });
+  return statusTimestamp;
 };
 // Simplified actions
 export const actions = {
@@ -383,13 +417,43 @@ export const actions = {
     setAvailabilityConfirmation(this, taskId, requirements);
   },
   setTaskComplete(this: UserState, taskId: string) {
-    setTaskStatus(this, taskId, createCompletion(true, false, false));
+    setTaskStatus(this, taskId, createCompletion(true, false, false, false));
+  },
+  setTaskActive(this: UserState, taskId: string) {
+    const data = getCurrentData(this);
+    const previous = data.taskCompletions[taskId];
+    const importedAcceptance = getImportedAcceptance(data, taskId);
+    const timestamp = setTaskStatus(this, taskId, createCompletion(false, false, true, false));
+    if (importedAcceptance) setAvailabilityConfirmation(this, taskId, importedAcceptance);
+    carryManualAcceptance(this, taskId, previous);
+    return timestamp;
   },
   setTaskFailed(this: UserState, taskId: string, failOptions?: { manual?: boolean }) {
-    setTaskStatus(this, taskId, createCompletion(true, true, failOptions?.manual));
+    setTaskStatus(this, taskId, createCompletion(true, true, false, failOptions?.manual));
   },
-  setTaskUncompleted(this: UserState, taskId: string) {
-    setTaskStatus(this, taskId, createCompletion(false, false, false));
+  setTaskAcceptanceUnknown(this: UserState, taskId: string) {
+    const data = getCurrentData(this);
+    const importedAcceptance = getImportedAcceptance(data, taskId);
+    const previous = data.taskCompletions[taskId];
+    const previousTimestamp = previous?.timestamp ?? 0;
+    const timestamp = nextClock(previousTimestamp, data.taskAvailability?.[taskId]?.timestamp ?? 0);
+    // A newer unknown write must beat the server's equal-time acceptance carry.
+    if (timestamp <= previousTimestamp) throw new Error('Task acceptance clock cannot advance');
+    const restored = { ...previous, ...createCompletion(false, false, false, false), timestamp };
+    delete restored.active;
+    // Replace atomically so sync observers never see an intermediate active: false.
+    data.taskCompletions[taskId] = restored;
+    if (importedAcceptance) setAvailabilityConfirmation(this, taskId, importedAcceptance);
+    carryManualAcceptance(this, taskId, previous);
+  },
+  setTaskUncompleted(
+    this: UserState,
+    taskId: string,
+    { restoreAcceptance = false }: { restoreAcceptance?: boolean } = {}
+  ) {
+    const previous = restoreAcceptance ? getCurrentData(this).taskCompletions[taskId] : undefined;
+    setTaskStatus(this, taskId, createCompletion(false, false, false, false));
+    if (restoreAcceptance) carryManualAcceptance(this, taskId, previous);
   },
   setTaskObjectiveComplete(this: UserState, objectiveId: string) {
     updateObjective(this, 'taskObjectives', objectiveId, {

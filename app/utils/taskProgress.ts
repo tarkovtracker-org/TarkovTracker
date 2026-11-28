@@ -194,8 +194,9 @@ export function recordImpliedStoryObjectives(
 const isManuallyFailed = (completion: RawTaskCompletion): boolean =>
   isTaskFailed(completion) && typeof completion === 'object' && completion?.manual === true;
 /**
- * Whether a task's recorded state proves it passed its start gates: completed, manually failed, or
- * confirmed available (Mark available or an imported start). Automatic branch failures prove nothing.
+ * Whether a task's recorded state proves it passed its start gates: completed, accepted, manually
+ * failed, or confirmed available (Mark available or an imported start). Automatic branch failures
+ * prove nothing.
  */
 export const provesStartGates = (
   task: Task,
@@ -204,6 +205,7 @@ export const provesStartGates = (
   completions: UserProgressData['taskCompletions'] | undefined
 ): boolean =>
   isTaskComplete(completion) ||
+  isTaskActive(completion) ||
   isManuallyFailed(completion) ||
   isAvailabilityConfirmed(confirmation, completion, otherRequirementsSignature(task, completions));
 const storyObjectiveKey = ({ chapterId, objectiveId }: StoryObjectiveRef) =>

@@ -21,6 +21,7 @@ const createTarkovStore = (options: {
 }) => {
   const objectiveCounts = new Map<string, number>(Object.entries(options.objectiveCounts ?? {}));
   return {
+    setTaskActive: vi.fn(),
     confirmTaskAvailability: vi.fn(),
     isStoryObjectiveComplete: vi.fn((chapterId: string, objectiveId: string) =>
       (options.completeStoryObjectives ?? []).includes(`${chapterId}/${objectiveId}`)
@@ -141,6 +142,29 @@ const setup = async (
   };
 };
 describe('useTaskActions', () => {
+  it('registers acceptance undo before changing the task state', async () => {
+    const task: Task = { id: 'accept-order', name: 'Accept order' };
+    const { actions, onAction, tarkovStore } = await setup(task, [task], {});
+    tarkovStore.setTaskActive.mockReturnValueOnce(123);
+    onAction.mockImplementation((event) => {
+      expect(tarkovStore.setTaskActive).not.toHaveBeenCalled();
+      expect(event.statusWrite?.timestamp).toBeUndefined();
+    });
+    actions.markTaskActive();
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith(task.id);
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({ statusWrite: { timestamp: 123 } })
+    );
+  });
+  it('accepts an available task as explicitly active', async () => {
+    const task: Task = { id: 'task-active', name: 'Task Active' };
+    const { actions, onAction, tarkovStore } = await setup(task, [task], {});
+    actions.markTaskActive();
+    expect(tarkovStore.setTaskActive).toHaveBeenCalledWith('task-active');
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'active', taskId: 'task-active' })
+    );
+  });
   it('confirms the Lightkeeper quest without creating Jaeger progress', async () => {
     const jaeger = TASK_ID_REGISTRY.CUT_DOWN_TO_THE_ROOT;
     const task: Task = {
@@ -283,6 +307,18 @@ describe('useTaskActions', () => {
         objective: { id: 'talk-to-therapist' },
       },
     ],
+  });
+  it('records the story objectives an accepted task implies for undo', async () => {
+    const task = tourGated('first-in-line');
+    const { actions, onAction, tarkovStore } = await setup(task, [task], {});
+    actions.markTaskActive();
+    expect(tarkovStore.setStoryObjectiveComplete).toHaveBeenCalledWith('tour', 'talk-to-therapist');
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'active',
+        recordedStoryObjectives: [{ chapterId: 'tour', objectiveId: 'talk-to-therapist' }],
+      })
+    );
   });
   it.each(['markTaskComplete', 'markTaskFailed'] as const)(
     '%s records the story objective the task was gated on',

@@ -51,36 +51,27 @@ export const sanitizeDisplayName = (value: unknown): string | null =>
   sanitizeClampedText(value, 64);
 export const sanitizeFaction = (value: unknown): 'BEAR' | 'USEC' =>
   value === 'BEAR' ? 'BEAR' : 'USEC';
-export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['taskCompletions'] => {
-  if (!isRecord(value)) {
-    return {};
+const TASK_COMPLETION_FLAGS = ['complete', 'failed', 'active', 'manual'] as const;
+const sanitizeTaskCompletionRecord = (completion: Record<string, unknown>) => {
+  const normalized: UserProgressData['taskCompletions'][string] = {};
+  for (const flag of TASK_COMPLETION_FLAGS) {
+    if (typeof completion[flag] === 'boolean') normalized[flag] = completion[flag];
   }
+  const timestamp = toFiniteNumber(completion.timestamp);
+  if (timestamp !== null) normalized.timestamp = Math.max(0, Math.trunc(timestamp));
+  return normalized;
+};
+const sanitizeTaskCompletion = (completion: unknown) => {
+  if (typeof completion === 'boolean') return { complete: completion, failed: false };
+  if (!isRecord(completion)) return {};
+  return sanitizeTaskCompletionRecord(completion);
+};
+export const sanitizeTaskCompletionMap = (value: unknown): UserProgressData['taskCompletions'] => {
+  if (!isRecord(value)) return {};
   const sanitized: UserProgressData['taskCompletions'] = {};
   for (const [taskId, completion] of Object.entries(value)) {
-    if (typeof completion === 'boolean') {
-      sanitized[taskId] = { complete: completion, failed: false };
-      continue;
-    }
-    if (!isRecord(completion)) {
-      continue;
-    }
-    const normalized: UserProgressData['taskCompletions'][string] = {};
-    if (typeof completion.complete === 'boolean') {
-      normalized.complete = completion.complete;
-    }
-    if (typeof completion.failed === 'boolean') {
-      normalized.failed = completion.failed;
-    }
-    if (typeof completion.manual === 'boolean') {
-      normalized.manual = completion.manual;
-    }
-    const timestamp = toFiniteNumber(completion.timestamp);
-    if (timestamp !== null) {
-      normalized.timestamp = Math.max(0, Math.trunc(timestamp));
-    }
-    if (Object.keys(normalized).length > 0) {
-      sanitized[taskId] = normalized;
-    }
+    const normalized = sanitizeTaskCompletion(completion);
+    if (Object.keys(normalized).length > 0) sanitized[taskId] = normalized;
   }
   return sanitized;
 };

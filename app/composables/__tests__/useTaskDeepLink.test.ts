@@ -1,6 +1,7 @@
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computed, isRef, reactive, ref } from 'vue';
+import { TASK_STATE } from '@/utils/constants';
 import type { Task } from '@/types/tarkov';
 type QueryRecord = Record<string, string | string[] | undefined>;
 const routeState = reactive({
@@ -40,6 +41,7 @@ const preferenceState = reactive({
   showNonSpecialTasks: true,
   taskPrimaryView: 'all',
   taskSecondaryView: 'all',
+  taskUserView: 'self',
 });
 const setHideNonKappaTasks = vi.fn((value: boolean) => {
   preferenceState.hideNonKappaTasks = value;
@@ -61,6 +63,7 @@ const setTaskSecondaryView = vi.fn((value: string) => {
 });
 const tasksCompletions = ref<Record<string, Record<string, boolean>>>({});
 const tasksFailed = ref<Record<string, Record<string, boolean>>>({});
+const tasksState = ref<Record<string, string>>({});
 const unlockedTasks = ref<Record<string, Record<string, boolean>>>({});
 const trackFocusedTaskVisible = vi.fn();
 describe('useTaskDeepLink', () => {
@@ -78,8 +81,10 @@ describe('useTaskDeepLink', () => {
     preferenceState.showNonSpecialTasks = true;
     preferenceState.taskPrimaryView = 'all';
     preferenceState.taskSecondaryView = 'all';
+    preferenceState.taskUserView = 'self';
     tasksCompletions.value = {};
     tasksFailed.value = {};
+    tasksState.value = {};
     unlockedTasks.value = {};
     vi.doMock('pinia', async () => {
       const actual = await vi.importActual<typeof import('pinia')>('pinia');
@@ -124,6 +129,9 @@ describe('useTaskDeepLink', () => {
         get getTaskSecondaryView() {
           return preferenceState.taskSecondaryView;
         },
+        get getTaskUserView() {
+          return preferenceState.taskUserView;
+        },
         setHideNonKappaTasks,
         setOnlyTasksWithRequiredKeys,
         setShowLightkeeperTasks,
@@ -136,7 +144,15 @@ describe('useTaskDeepLink', () => {
       useProgressStore: () => ({
         tasksCompletions,
         tasksFailed,
+        tasksState,
         unlockedTasks,
+        getTaskStatus: (userId: string, taskId: string) => {
+          if (tasksFailed.value[taskId]?.[userId]) return 'failed';
+          if (tasksCompletions.value[taskId]?.[userId]) return 'completed';
+          if (userId === 'teammate' && taskId === 'teammate-active') return 'active';
+          if (userId === 'self' && tasksState.value[taskId] === TASK_STATE.ACTIVE) return 'active';
+          return 'incomplete';
+        },
       }),
     }));
     vi.doMock('@/composables/useDashboardFocusAnalytics', () => ({
@@ -279,6 +295,88 @@ describe('useTaskDeepLink', () => {
     expect(taskElement.scrollIntoView).toHaveBeenCalled();
     expect(trackFocusedTaskVisible).toHaveBeenCalledWith('task-visible');
     expect(replace).toHaveBeenCalledWith({ query: { status: 'all' } });
+  });
+  it('selects the active secondary view for an explicitly active task', async () => {
+    metadataTasks.value = [{ id: 'task-active', name: 'Active Task', requiredKeys: [] }];
+    tasksState.value = { 'task-active': TASK_STATE.ACTIVE };
+    preferenceState.taskSecondaryView = 'completed';
+    applyRouteQuery({ task: 'task-active' });
+    const taskElement = document.createElement('div');
+    taskElement.id = 'task-task-active';
+    taskElement.scrollIntoView = vi.fn();
+    document.body.appendChild(taskElement);
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(setTaskSecondaryView).toHaveBeenCalledWith('active');
+    expect(taskDeepLink.pinnedTaskId.value).toBe('task-active');
+  });
+  it('selects the teammate status for a deep link while following a teammate', async () => {
+    metadataTasks.value = [{ id: 'teammate-active', name: 'Active for teammate' }];
+    unlockedTasks.value = { 'teammate-active': { self: true } };
+    preferenceState.taskUserView = 'teammate';
+    preferenceState.taskSecondaryView = 'locked';
+    applyRouteQuery({ task: 'teammate-active' });
+    const taskElement = document.createElement('div');
+    taskElement.id = 'task-teammate-active';
+    document.body.appendChild(taskElement);
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(setTaskSecondaryView).toHaveBeenCalledWith('active');
+    expect(taskDeepLink.pinnedTaskId.value).toBe('teammate-active');
+    taskDeepLink.cleanup();
+  });
+  it('focuses a task active for a teammate when the team aggregate was filtered to locked', async () => {
+    metadataTasks.value = [{ id: 'teammate-active', name: 'Active for teammate' }];
+    preferenceState.taskUserView = 'all';
+    preferenceState.taskSecondaryView = 'locked';
+    applyRouteQuery({ task: 'teammate-active' });
+    const taskElement = document.createElement('div');
+    taskElement.id = 'task-teammate-active';
+    document.body.appendChild(taskElement);
+    const { matchesAllUsersView } = await import('@/utils/allUsersTaskStatus');
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const teammates = [
+      { teamId: 'self', isUnlocked: false, isActive: false, isCompleted: false, isFailed: false },
+      { teamId: 'teammate', isUnlocked: true, isActive: true, isCompleted: false, isFailed: false },
+    ];
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: computed(() => {
+        const status = preferenceState.taskSecondaryView as 'all' | 'active' | 'locked';
+        return status === 'all' || matchesAllUsersView(status, teammates, false)
+          ? metadataTasks.value
+          : [];
+      }),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(taskDeepLink.pinnedTaskId.value).toBe('teammate-active');
+    taskDeepLink.cleanup();
+  });
+  it('keeps a legacy unlocked task in the available view when it has no active state', async () => {
+    metadataTasks.value = [{ id: 'task-legacy-available', name: 'Legacy Task', requiredKeys: [] }];
+    unlockedTasks.value = { 'task-legacy-available': { self: true } };
+    preferenceState.taskSecondaryView = 'locked';
+    applyRouteQuery({ task: 'task-legacy-available' });
+    const taskElement = document.createElement('div');
+    taskElement.id = 'task-task-legacy-available';
+    taskElement.scrollIntoView = vi.fn();
+    document.body.appendChild(taskElement);
+    const { useTaskDeepLink } = await import('@/composables/useTaskDeepLink');
+    const taskDeepLink = useTaskDeepLink({
+      filteredTasks: ref(metadataTasks.value),
+      leafletMapRef: ref(null),
+    });
+    await taskDeepLink.handleTaskQueryParam();
+    expect(setTaskSecondaryView).toHaveBeenCalledWith('available');
+    expect(taskDeepLink.pinnedTaskId.value).toBe('task-legacy-available');
   });
   it.each(['locked', 'completed', 'failed'] as const)(
     'keeps a %s task focused after query cleanup synchronizes the status filter',

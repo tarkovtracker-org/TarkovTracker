@@ -1,15 +1,23 @@
 import { useActionHistoryStore } from '@/stores/useActionHistoryStore';
 import { useMetadataStore } from '@/stores/useMetadata';
 import { useTarkovStore } from '@/stores/useTarkov';
+import {
+  hasUnconfirmableStatusClock,
+  isAvailabilityConfirmed,
+  taskStatusTimestamp,
+} from '@/utils/taskAvailabilityConfirmation';
+import { otherRequirementsSignature } from '@/utils/taskOtherRequirements';
 import { provesStartGates, releaseRecordedStoryObjectives } from '@/utils/taskProgress';
+import { isTaskActive } from '@/utils/taskStatus';
 import type { TaskActionPayload } from '@/composables/useTaskActions';
+import type { TaskAvailabilityConfirmation } from '@/types/progress';
 import type { Task, TaskObjective } from '@/types/tarkov';
 interface TaskNotificationReturn {
   taskStatusUpdated: Ref<boolean>;
   taskStatus: Ref<string>;
   showUndoButton: Ref<boolean>;
   onTaskAction: (event: TaskActionPayload) => void;
-  undoLastAction: () => void;
+  undoLastAction: () => Promise<void>;
   closeNotification: () => void;
   cleanup: () => void;
 }
@@ -52,6 +60,7 @@ export function useTaskNotification(): TaskNotificationReturn {
     { flush: 'sync' }
   );
   const entryTitleKeys: Record<TaskActionPayload['action'], string> = {
+    active: 'activity_log.entry.active',
     complete: 'activity_log.entry.completed',
     uncomplete: 'activity_log.entry.uncompleted',
     fail: 'activity_log.entry.failed',
@@ -81,29 +90,15 @@ export function useTaskNotification(): TaskNotificationReturn {
       }
     });
   };
-  type AlternativeTaskAction = 'setTaskComplete' | 'setTaskUncompleted' | 'setTaskFailed';
-  type ObjectiveAction = 'setTaskObjectiveComplete' | 'setTaskObjectiveUncomplete';
-  const updateAlternativeObjectives = (
-    objectives: TaskObjective[],
-    taskAction: AlternativeTaskAction,
-    objectiveAction?: ObjectiveAction
-  ) => {
-    if (taskAction === 'setTaskFailed') clearTaskObjectives(objectives);
-    else if (objectiveAction) handleTaskObjectives(objectives, objectiveAction);
-  };
-  const handleAlternatives = (
-    alternatives: string[] | undefined,
-    taskAction: AlternativeTaskAction,
-    objectiveAction?: ObjectiveAction
-  ) => {
+  const alternativeObjectives = (taskId: string) =>
+    tasks.value.find((task) => task.id === taskId)?.objectives ?? [];
+  const failAlternatives = (alternatives: string[] | undefined) => {
     if (!Array.isArray(alternatives)) return;
-    alternatives.forEach((a: string) => {
-      // Failing alternatives must never overwrite one the player already completed.
-      if (taskAction === 'setTaskFailed' && tarkovStore.isTaskComplete(a)) return;
-      tarkovStore[taskAction](a);
-      const objectives = tasks.value.find((task) => task.id === a)?.objectives;
-      if (objectives) updateAlternativeObjectives(objectives, taskAction, objectiveAction);
-    });
+    for (const taskId of alternatives) {
+      if (tarkovStore.isTaskComplete(taskId)) continue;
+      tarkovStore.setTaskFailed(taskId);
+      clearTaskObjectives(alternativeObjectives(taskId));
+    }
   };
   const needsLevel = (currentLevel: unknown, minLevel: number) =>
     typeof currentLevel !== 'number' || !Number.isFinite(currentLevel) || currentLevel < minLevel;
@@ -115,7 +110,73 @@ export function useTaskNotification(): TaskNotificationReturn {
   type UndoContext = {
     event: TaskActionPayload;
     task: Task | undefined;
+    previousAcceptance: boolean | undefined;
+    previousConfirmation: TaskAvailabilityConfirmation | undefined;
+    alternativeAcceptances: ReadonlyMap<string, boolean | undefined>;
     releaseStoryObjectives: () => void;
+  };
+  const restoreTaskAcceptance = (taskId: string, active: boolean | undefined) => {
+    if (active === undefined) tarkovStore.setTaskAcceptanceUnknown(taskId);
+    else if (active) tarkovStore.setTaskActive(taskId);
+    else tarkovStore.setTaskUncompleted(taskId, { restoreAcceptance: true });
+  };
+  const restoreSelectedAcceptance = ({ event, previousAcceptance }: UndoContext) =>
+    restoreTaskAcceptance(event.taskId, previousAcceptance);
+  const previousAcceptance = (taskId: string): boolean | undefined => {
+    const active = tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId]?.active;
+    return typeof active === 'boolean' ? active : undefined;
+  };
+  const captureAvailability = (task: Task | undefined) => {
+    if (!task) return;
+    const progress = tarkovStore.getCurrentProgressData();
+    const confirmation = progress?.taskAvailability?.[task.id];
+    const completions = progress?.taskCompletions;
+    if (
+      confirmation &&
+      isAvailabilityConfirmed(
+        confirmation,
+        completions?.[task.id],
+        otherRequirementsSignature(task, completions)
+      )
+    ) {
+      return { ...confirmation };
+    }
+  };
+  const currentStatusTimestamp = (taskId: string) =>
+    taskStatusTimestamp(tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId]);
+  const confirmationStillMatches = (task: Task, previous: TaskAvailabilityConfirmation) => {
+    const progress = tarkovStore.getCurrentProgressData();
+    const current = progress?.taskAvailability?.[task.id];
+    return (
+      current?.timestamp === previous.timestamp &&
+      current.requirements === previous.requirements &&
+      otherRequirementsSignature(task, progress?.taskCompletions) === previous.requirements
+    );
+  };
+  const restoreAvailability = ({ task, previousConfirmation }: UndoContext) => {
+    if (task && previousConfirmation && confirmationStillMatches(task, previousConfirmation)) {
+      tarkovStore.confirmTaskAvailability(task.id, previousConfirmation.requirements);
+    }
+  };
+  const captureAlternativeAcceptances = (alternatives: string[] | undefined) =>
+    new Map(
+      (Array.isArray(alternatives) ? alternatives : [])
+        .filter((id) => !tarkovStore.isTaskComplete(id))
+        .map((id) => [id, previousAcceptance(id)] as const)
+    );
+  const checkAcceptanceRestores = (context: UndoContext) => {
+    const completions = tarkovStore.getCurrentProgressData()?.taskCompletions;
+    const restores = [
+      [context.event.taskId, context.previousAcceptance] as const,
+      ...context.alternativeAcceptances,
+    ];
+    if (
+      restores.some(
+        ([id, active]) => active === undefined && hasUnconfirmableStatusClock(completions?.[id])
+      )
+    ) {
+      throw new Error('Task acceptance clock cannot advance');
+    }
   };
   const showUndoStatus = ({ event }: UndoContext, statusKey: string) => {
     updateTaskStatus(statusKey, event.taskName);
@@ -126,15 +187,21 @@ export function useTaskNotification(): TaskNotificationReturn {
   // 'available' mutates an unbounded set of prerequisite tasks and is not safely reversible.
   const undoHandlers: Partial<Record<TaskActionPayload['action'], (context: UndoContext) => void>> =
     {
+      active: (context) => {
+        restoreSelectedAcceptance(context);
+        restoreAvailability(context);
+        context.releaseStoryObjectives();
+        showUndoStatus(context, 'page.tasks.questcard.undo_active');
+      },
       complete: (context) => {
-        tarkovStore.setTaskUncompleted(context.event.taskId);
+        checkAcceptanceRestores(context);
+        restoreSelectedAcceptance(context);
         context.releaseStoryObjectives();
         uncompleteObjectives(context.task);
-        handleAlternatives(
-          context.task?.alternatives,
-          'setTaskUncompleted',
-          'setTaskObjectiveUncomplete'
-        );
+        for (const [taskId, active] of context.alternativeAcceptances) {
+          restoreTaskAcceptance(taskId, active);
+          handleTaskObjectives(alternativeObjectives(taskId), 'setTaskObjectiveUncomplete');
+        }
         showUndoStatus(context, 'page.tasks.questcard.undo_complete');
       },
       uncomplete: (context) => {
@@ -142,7 +209,7 @@ export function useTaskNotification(): TaskNotificationReturn {
         if (context.task?.objectives) {
           handleTaskObjectives(context.task.objectives, 'setTaskObjectiveComplete');
         }
-        handleAlternatives(context.task?.alternatives, 'setTaskFailed');
+        failAlternatives(context.task?.alternatives);
         raiseToMinLevel(context.task?.minPlayerLevel);
         showUndoStatus(context, 'page.tasks.questcard.undo_uncomplete');
       },
@@ -156,7 +223,7 @@ export function useTaskNotification(): TaskNotificationReturn {
         showUndoStatus(context, 'page.tasks.questcard.undo_reset_failed');
       },
       fail: (context) => {
-        tarkovStore.setTaskUncompleted(context.event.taskId);
+        restoreSelectedAcceptance(context);
         context.releaseStoryObjectives();
         uncompleteObjectives(context.task);
         showUndoStatus(context, 'page.tasks.questcard.undo_failed');
@@ -175,9 +242,16 @@ export function useTaskNotification(): TaskNotificationReturn {
   const registerUndo = (event: TaskActionPayload, description: string) => {
     const handler = undoHandlers[event.action];
     if (!handler) return;
+    const task = tasks.value.find(({ id }) => id === event.taskId);
     const context: UndoContext = {
       event,
-      task: tasks.value.find((task) => task.id === event.taskId),
+      task,
+      previousAcceptance: previousAcceptance(event.taskId),
+      previousConfirmation:
+        event.action === 'active' && event.statusWrite ? captureAvailability(task) : undefined,
+      alternativeAcceptances: captureAlternativeAcceptances(
+        event.action === 'complete' ? task?.alternatives : undefined
+      ),
       releaseStoryObjectives: () =>
         releaseRecordedStoryObjectives({
           store: tarkovStore,
@@ -186,11 +260,43 @@ export function useTaskNotification(): TaskNotificationReturn {
           provesStartGates: taskProvesStartGates,
         }),
     };
+    const { taskId, statusWrite } = event;
+    const previousStatuses = new Map(
+      [taskId, ...(task?.alternatives ?? [])].map((id) => [id, currentStatusTimestamp(id)])
+    );
+    const writtenStatuses = () =>
+      statusWrite
+        ? [[taskId, statusWrite.timestamp] as const, ...(statusWrite.alternatives ?? [])]
+        : [];
     actionHistoryStore.pushAction({
       id: `task-${event.taskId}-${Date.now()}`,
       description,
+      taskStatusWrite: statusWrite && { taskId, write: statusWrite },
+      canUndo: () => {
+        const statusMatches = writtenStatuses().every(
+          ([id, timestamp]) => currentStatusTimestamp(id) === timestamp
+        );
+        const isAcceptance = statusWrite && event.action === 'active';
+        const current = tarkovStore.getCurrentProgressData()?.taskCompletions?.[taskId];
+        const allowed = statusMatches && (!isAcceptance || isTaskActive(current));
+        if (!allowed) showUndoButton.value = false;
+        return allowed;
+      },
       undo: () => {
         handler(context);
+        // A local Undo writes a fresh clock for the state created by an older local action.
+        for (const [id] of writtenStatuses()) {
+          const prior = actionHistoryStore.undoStack.findLast(({ taskStatusWrite }) => {
+            if (!taskStatusWrite) return false;
+            const { taskId: priorTaskId, write } = taskStatusWrite;
+            const timestamp = id === priorTaskId ? write.timestamp : write.alternatives?.get(id);
+            return timestamp === previousStatuses.get(id);
+          })?.taskStatusWrite;
+          if (!prior) continue;
+          const timestamp = currentStatusTimestamp(id);
+          if (prior.taskId === id) prior.write.timestamp = timestamp;
+          else prior.write.alternatives?.set(id, timestamp);
+        }
         showUndoButton.value = false;
       },
     });
@@ -209,7 +315,7 @@ export function useTaskNotification(): TaskNotificationReturn {
     showActionStatus(event);
   };
   const undoLastAction = () => {
-    void actionHistoryStore.undoLastAction();
+    return actionHistoryStore.undoLastAction();
   };
   const cleanup = () => {
     if (notificationTimeout.value !== null) {
